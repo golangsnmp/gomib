@@ -1,6 +1,6 @@
 # gomib
 
-Pure Go MIB parser. Parses SMIv1 and SMIv2 MIB files into a queryable model.
+Pure Go SNMP MIB parser. Parses SMIv1 and SMIv2 MIB files into a queryable model.
 
 ## Why gomib?
 
@@ -22,15 +22,6 @@ Pure Go MIB parser. Parses SMIv1 and SMIv2 MIB files into a queryable model.
 - Module metadata (organization, contact, revisions)
 - Structured diagnostics for parse warnings
 - Optional `log/slog` integration for debug and trace output
-
-## Limitations
-
-This is a MIB parser, not an SNMP implementation. It does not:
-
-- Encode or decode SNMP protocol messages
-- Connect to network devices
-- Handle BER/DER encoding of values
-- Generate code from MIB definitions
 
 For SNMP protocol support, pair gomib with a library like [gosnmp](https://github.com/gosnmp/gosnmp).
 
