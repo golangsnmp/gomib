@@ -106,14 +106,20 @@ notif := mib.Notification("coldStart")
 // By qualified name (MODULE::name)
 obj := mib.ObjectByQualified("IF-MIB::ifIndex")
 
-// By OID
+// By OID string (parses the string)
 node := mib.Node("1.3.6.1.2.1.2.2.1.1")
+
+// By OID slice (no string parsing, use for hot paths)
 node := mib.NodeByOID(gomib.Oid{1, 3, 6, 1, 2, 1, 2, 2, 1, 1})
 
 // Flexible lookup (tries qualified, OID, then name)
 node := mib.FindNode("IF-MIB::ifIndex")
 node := mib.FindNode("1.3.6.1.2.1.2.2.1.1")
 node := mib.FindNode("ifIndex")
+
+// Longest prefix match (for resolving SNMP instance OIDs)
+node := mib.LongestPrefix("1.3.6.1.2.1.2.2.1.1.5")        // returns ifIndex
+node := mib.LongestPrefixByOID(gomib.Oid{1, 3, 6, 1, 2, 1, 2, 2, 1, 1, 5})
 ```
 
 ## Model
