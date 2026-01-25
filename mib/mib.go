@@ -62,6 +62,38 @@ func (m *Mib) NodeByOID(oid Oid) *Node {
 	return node
 }
 
+// LongestPrefix finds the deepest node matching a prefix of the given OID string.
+// This is useful for resolving SNMP instance OIDs (e.g., "1.3.6.1.2.1.2.2.1.1.5")
+// to their defining object (e.g., ifIndex at "1.3.6.1.2.1.2.2.1.1").
+// Returns nil if no prefix matches (not even the first arc).
+func (m *Mib) LongestPrefix(oidStr string) *Node {
+	oid, err := ParseOID(oidStr)
+	if err != nil || len(oid) == 0 {
+		return nil
+	}
+	return m.LongestPrefixByOID(oid)
+}
+
+// LongestPrefixByOID finds the deepest node matching a prefix of the given OID.
+// This is useful for resolving SNMP instance OIDs to their defining object.
+// Returns nil if no prefix matches (not even the first arc).
+func (m *Mib) LongestPrefixByOID(oid Oid) *Node {
+	if len(oid) == 0 {
+		return nil
+	}
+	var deepest *Node
+	node := m.root
+	for _, arc := range oid {
+		child := node.Child(arc)
+		if child == nil {
+			break
+		}
+		node = child
+		deepest = node
+	}
+	return deepest
+}
+
 // Object returns the first object with the given name, or nil if not found.
 func (m *Mib) Object(name string) *Object {
 	nodes := m.nameToNodes[name]

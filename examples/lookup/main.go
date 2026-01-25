@@ -69,6 +69,30 @@ func main() {
 	for _, o := range objs {
 		fmt.Printf("  %s::%s OID=%s\n", o.Module.Name, o.Name, o.OID())
 	}
+
+	// Longest prefix matching - useful for resolving SNMP instance OIDs
+	// When you receive an OID like 1.3.6.1.2.1.2.2.1.1.5 (ifIndex.5),
+	// you often need to find the defining object (ifIndex at .1.3.6.1.2.1.2.2.1.1)
+	fmt.Println("\n=== Longest prefix matching ===")
+	instanceOIDs := []string{
+		"1.3.6.1.2.1.2.2.1.1.5",       // ifIndex instance (index=5)
+		"1.3.6.1.2.1.2.2.1.10.3",      // ifInOctets instance (index=3)
+		"1.3.6.1.2.1.1.1.0",           // sysDescr.0 (scalar instance)
+		"1.3.6.1.2.1.1.3.0",           // sysUpTime.0 (scalar instance)
+		"1.3.6.1.2.1.999.999.999.999", // non-existent subtree
+	}
+	for _, oid := range instanceOIDs {
+		n := mib.LongestPrefix(oid)
+		if n != nil {
+			kind := n.Kind.String()
+			if n.Object != nil {
+				kind = n.Object.Kind().String()
+			}
+			fmt.Printf("  %s\n    -> %s (%s, %s)\n", oid, n.Name, n.OID(), kind)
+		} else {
+			fmt.Printf("  %s\n    -> no matching prefix\n", oid)
+		}
+	}
 }
 
 func findCorpus() string {
