@@ -4,27 +4,35 @@ Pure Go MIB parser. Parses SMIv1 and SMIv2 MIB files into a queryable model.
 
 ## Why gomib?
 
-**No CGO, no libsmi.** Most Go MIB libraries wrap libsmi via CGO, which complicates builds, cross-compilation, and deployment. gomib is written entirely in Go with zero C dependencies.
-
-**Zero runtime dependencies.** The library uses only the Go standard library. No parser generators, no external packages. The lexer and parser are hand-written for precise control over error recovery and diagnostics.
-
-**Handles real-world MIBs.** Many MIB files in the wild have syntax errors, non-standard constructs, or vendor quirks. gomib uses permissive parsing with error recovery, so it can load files that strict parsers reject. If net-snmp can read it, gomib should too.
+**Permissive parsing of MIBs.** Many MIB files in the wild have syntax errors, non-standard constructs, or vendor quirks. gomib uses permissive parsing with error recovery, so it can load files that strict parsers reject. If net-snmp can read it, gomib should too.
 
 **Everything resolves upfront.** When you call `Load()`, gomib parses all files, resolves all imports, computes all OIDs, and infers node kinds (table, row, column, scalar). The returned model is fully resolved with no lazy evaluation or deferred errors.
 
-**Isolated instances.** Each `Load()` call returns an independent `Mib` value. No global state, no initialization functions, no cleanup required. You can load different MIB sets concurrently without interference.
-
 **Efficient queries.** OIDs are stored in a trie structure, so lookups are O(depth) regardless of how many MIBs you load. Name lookups are indexed. Walking subtrees is a simple tree traversal.
 
-**Parallel loading.** MIB files are parsed concurrently. Loading hundreds of MIBs is fast.
+## Features
 
-**Simple API.** Load MIBs in one call, query immediately. No Init/Exit lifecycle, no path string manipulation, no manual OID-vs-name detection.
+- SMIv1 (RFC 1155) and SMIv2 (RFC 2578) support
+- Textual conventions with DISPLAY-HINT
+- TRAP-TYPE and NOTIFICATION-TYPE
+- Tables with INDEX, AUGMENTS, and compound indices
+- BITS, enumerated integers, constrained strings
+- Effective SIZE and value ranges computed through type chains
+- Named values (enum members) resolved from base types
+- Module metadata (organization, contact, revisions)
+- Structured diagnostics for parse warnings
+- Optional `log/slog` integration for debug and trace output
 
-```go
-source, _ := gomib.DirTree("/usr/share/snmp/mibs")
-mib, _ := gomib.Load(source)
-node := mib.FindNode("IF-MIB::ifIndex")  // or "1.3.6.1.2.1.2.2.1.1" or "ifIndex"
-```
+## Limitations
+
+This is a MIB parser, not an SNMP implementation. It does not:
+
+- Encode or decode SNMP protocol messages
+- Connect to network devices
+- Handle BER/DER encoding of values
+- Generate code from MIB definitions
+
+For SNMP protocol support, pair gomib with a library like [gosnmp](https://github.com/gosnmp/gosnmp).
 
 ## Install
 
@@ -115,9 +123,6 @@ node := mib.NodeByOID(gomib.Oid{1, 3, 6, 1, 2, 1, 2, 2, 1, 1})
 node := mib.FindNode("IF-MIB::ifIndex")
 node := mib.FindNode("1.3.6.1.2.1.2.2.1.1")
 node := mib.FindNode("ifIndex")
-
-// Longest prefix match (useful for resolving SNMP instance OIDs)
-node := mib.LongestPrefix("1.3.6.1.2.1.2.2.1.1.5")  // returns ifIndex node
 ```
 
 ## Model
@@ -160,31 +165,3 @@ gomib dump IF-MIB
 ## Examples
 
 See [examples/](examples/) for runnable code.
-
-## Features
-
-- SMIv1 (RFC 1155) and SMIv2 (RFC 2578) support
-- Textual conventions with DISPLAY-HINT
-- TRAP-TYPE and NOTIFICATION-TYPE
-- Tables with INDEX, AUGMENTS, and compound indices
-- BITS, enumerated integers, constrained strings
-- Effective SIZE and value ranges computed through type chains
-- Named values (enum members) resolved from base types
-- Module metadata (organization, contact, revisions)
-- Structured diagnostics for parse warnings
-- Optional `log/slog` integration for debug and trace output
-
-## Limitations
-
-This is a MIB parser, not an SNMP implementation. It does not:
-
-- Encode or decode SNMP protocol messages
-- Connect to network devices
-- Handle BER/DER encoding of values
-- Generate code from MIB definitions
-
-For SNMP protocol support, pair gomib with a library like [gosnmp](https://github.com/gosnmp/gosnmp).
-
-## License
-
-MIT
