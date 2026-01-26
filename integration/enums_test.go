@@ -124,12 +124,12 @@ func TestBitsDefinitions(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
 
 			// NamedValues contains the effective BITS positions (pre-computed from inline or type chain)
-			testutil.NotEmpty(t, obj.EffectiveEnums(), "should have BITS definitions")
+			testutil.NotEmpty(t, obj.EffectiveBits(), "should have BITS definitions")
 
 			// Verify expected positions are present
 			for expectedLabel, expectedPos := range tc.Positions {
 				found := false
-				for _, nv := range obj.EffectiveEnums() {
+				for _, nv := range obj.EffectiveBits() {
 					if nv.Label == expectedLabel {
 						testutil.Equal(t, expectedPos, nv.Value, "bit position mismatch for %s", expectedLabel)
 						found = true

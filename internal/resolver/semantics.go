@@ -163,7 +163,12 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 		sizes, ranges := extractConstraints(obj.Syntax)
 		resolved.SetEffectiveSizes(sizes)
 		resolved.SetEffectiveRanges(ranges)
-		resolved.SetEffectiveEnums(extractNamedValues(obj.Syntax))
+		// Route to bits or enums based on syntax type
+		if _, isBits := obj.Syntax.(*module.TypeSyntaxBits); isBits {
+			resolved.SetEffectiveBits(extractNamedValues(obj.Syntax))
+		} else {
+			resolved.SetEffectiveEnums(extractNamedValues(obj.Syntax))
+		}
 
 		// INDEX and AUGMENTS are resolved in a second pass after all objects exist
 		// This ensures index objects exist when we try to link them

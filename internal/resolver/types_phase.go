@@ -74,7 +74,13 @@ func createUserTypes(ctx *ResolverContext) {
 			typ.SetDescription(td.Description)
 
 			// Extract constraints and named values
-			typ.SetEnums(extractNamedValues(td.Syntax))
+			// Route to bits or enums based on base type
+			namedValues := extractNamedValues(td.Syntax)
+			if base == mib.BaseBits {
+				typ.SetBits(namedValues)
+			} else {
+				typ.SetEnums(namedValues)
+			}
 			sizes, ranges := extractConstraints(td.Syntax)
 			typ.SetSizes(sizes)
 			typ.SetRanges(ranges)
