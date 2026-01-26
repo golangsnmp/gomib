@@ -180,7 +180,7 @@ func getDefaultSearchPaths() []string {
 }
 
 // loadMib loads and resolves MIB modules.
-func loadMib(modules []string) (*gomib.Mib, error) {
+func loadMib(modules []string) (gomib.Mib, error) {
 	sources := getSources()
 	if len(sources) == 0 {
 		return nil, gomib.ErrNoSources

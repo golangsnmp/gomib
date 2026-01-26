@@ -96,9 +96,9 @@ func TestObjectType(t *testing.T) {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
 
-			testutil.NotNil(t, obj.Type, "object should have a resolved type")
-			testutil.Equal(t, tc.TypeName, obj.Type.Name, "type name mismatch")
-			testutil.Equal(t, tc.BaseType, obj.Type.Base, "base type mismatch")
+			testutil.NotNil(t, obj.Type(), "object should have a resolved type")
+			testutil.Equal(t, tc.TypeName, obj.Type().Name(), "type name mismatch")
+			testutil.Equal(t, tc.BaseType, obj.Type().Base(), "base type mismatch")
 		})
 	}
 }
@@ -151,21 +151,21 @@ func TestTextualConventions(t *testing.T) {
 			testutil.NotNil(t, mod, "module %s should exist", tc.Module)
 
 			// Search for the type in the module's types
-			var found *gomib.Type
+			var found gomib.Type
 			for _, typ := range mod.Types() {
-				if typ.Name == tc.Name {
+				if typ.Name() == tc.Name {
 					found = typ
 					break
 				}
 			}
 			testutil.NotNil(t, found, "type %s should exist in module %s", tc.Name, tc.Module)
 
-			testutil.Equal(t, tc.BaseType, found.Base, "base type mismatch")
+			testutil.Equal(t, tc.BaseType, found.Base(), "base type mismatch")
 			if tc.Hint != "" {
-				testutil.Equal(t, tc.Hint, found.Hint, "display hint mismatch")
+				testutil.Equal(t, tc.Hint, found.DisplayHint(), "display hint mismatch")
 			}
 			if tc.Description != "" {
-				testutil.Contains(t, found.Description, tc.Description, "description mismatch")
+				testutil.Contains(t, found.Description(), tc.Description, "description mismatch")
 			}
 		})
 	}

@@ -10,10 +10,10 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/parser"
 	"github.com/golangsnmp/gomib/internal/resolver"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 // componentLogger returns a logger with the component attribute, or nil if logger is nil.
@@ -25,7 +25,7 @@ func componentLogger(logger *slog.Logger, component string) *slog.Logger {
 }
 
 // loadAllModules loads all MIB files from sources in parallel.
-func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*Mib, error) {
+func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (Mib, error) {
 	if len(sources) == 0 {
 		return nil, ErrNoSources
 	}
@@ -43,7 +43,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*Mib
 	}
 
 	if len(allFiles) == 0 {
-		return mib.NewMib(), nil
+		return mibimpl.EmptyMib(), nil
 	}
 
 	if logEnabled(logger, slog.LevelInfo) {
@@ -148,7 +148,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*Mib
 }
 
 // loadModulesByName loads specific modules by name along with their dependencies.
-func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg loadConfig) (*Mib, error) {
+func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg loadConfig) (Mib, error) {
 	logger := cfg.logger
 
 	heuristic := defaultHeuristic()

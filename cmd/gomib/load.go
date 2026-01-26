@@ -146,7 +146,7 @@ func printDiagnostic(d gomib.Diagnostic) {
 	}
 }
 
-func printDetailedStats(m *gomib.Mib) {
+func printDetailedStats(m gomib.Mib) {
 	fmt.Println("Statistics:")
 	fmt.Printf("  Modules:        %d\n", m.ModuleCount())
 	fmt.Printf("  Types:          %d\n", m.TypeCount())
@@ -157,10 +157,9 @@ func printDetailedStats(m *gomib.Mib) {
 
 	// Count nodes by kind
 	kindCounts := make(map[gomib.Kind]int)
-	m.Walk(func(node *gomib.Node) bool {
-		kindCounts[node.Kind]++
-		return true
-	})
+	for node := range m.Nodes() {
+		kindCounts[node.Kind()]++
+	}
 
 	fmt.Println()
 	fmt.Println("Nodes by kind:")

@@ -1,16 +1,17 @@
 package resolver
 
 import (
-	"github.com/golangsnmp/gomib/mib"
 	"log/slog"
 
+	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 // ResolverContext holds indices and working state during resolution.
 type ResolverContext struct {
-	Builder *mib.Builder
+	Builder *mibimpl.Builder
 
 	Modules []*module.Module
 
@@ -18,16 +19,16 @@ type ResolverContext struct {
 	ModuleIndex map[string][]*module.Module
 
 	// ModuleToResolved maps parsed module to resolved module
-	ModuleToResolved map[*module.Module]*mib.Module
+	ModuleToResolved map[*module.Module]*mibimpl.Module
 
 	// ModuleSymbolToNode maps module -> symbol -> Node for OID lookups
-	ModuleSymbolToNode map[*module.Module]map[string]*mib.Node
+	ModuleSymbolToNode map[*module.Module]map[string]*mibimpl.Node
 
 	// ModuleImports maps module -> symbol -> source module for import chain traversal
 	ModuleImports map[*module.Module]map[string]*module.Module
 
 	// ModuleSymbolToType maps module -> symbol -> Type for type lookups
-	ModuleSymbolToType map[*module.Module]map[string]*mib.Type
+	ModuleSymbolToType map[*module.Module]map[string]*mibimpl.Type
 
 	// ModuleDefNames caches definition names per module for import resolution
 	ModuleDefNames map[*module.Module]map[string]struct{}
@@ -117,25 +118,25 @@ func scanCapacityHints(mods []*module.Module) capacityHints {
 func newResolverContext(mods []*module.Module, logger *slog.Logger) *ResolverContext {
 	h := scanCapacityHints(mods)
 	return &ResolverContext{
-		Builder:            mib.NewBuilder(),
+		Builder:            mibimpl.NewBuilder(),
 		Modules:            mods,
 		ModuleIndex:        make(map[string][]*module.Module, h.modules),
-		ModuleToResolved:   make(map[*module.Module]*mib.Module, h.modules),
-		ModuleSymbolToNode: make(map[*module.Module]map[string]*mib.Node, h.modules),
+		ModuleToResolved:   make(map[*module.Module]*mibimpl.Module, h.modules),
+		ModuleSymbolToNode: make(map[*module.Module]map[string]*mibimpl.Node, h.modules),
 		ModuleImports:      make(map[*module.Module]map[string]*module.Module, h.modules),
-		ModuleSymbolToType: make(map[*module.Module]map[string]*mib.Type, h.modules),
+		ModuleSymbolToType: make(map[*module.Module]map[string]*mibimpl.Type, h.modules),
 		ModuleDefNames:     make(map[*module.Module]map[string]struct{}, h.modules),
 		Logger:             types.Logger{L: logger},
 	}
 }
 
 // LookupNodeForModule resolves a node by name in a module scope.
-func (c *ResolverContext) LookupNodeForModule(mod *module.Module, name string) (*mib.Node, bool) {
+func (c *ResolverContext) LookupNodeForModule(mod *module.Module, name string) (*mibimpl.Node, bool) {
 	return c.lookupNodeInModuleScope(mod, name)
 }
 
 // LookupNodeInModule resolves a node by module name and symbol.
-func (c *ResolverContext) LookupNodeInModule(moduleName, name string) (*mib.Node, bool) {
+func (c *ResolverContext) LookupNodeInModule(moduleName, name string) (*mibimpl.Node, bool) {
 	candidates := c.ModuleIndex[moduleName]
 	for _, mod := range candidates {
 		if node, ok := c.LookupNodeForModule(mod, name); ok {
@@ -146,7 +147,7 @@ func (c *ResolverContext) LookupNodeInModule(moduleName, name string) (*mib.Node
 }
 
 // LookupType looks up a type by name globally.
-func (c *ResolverContext) LookupType(name string) (*mib.Type, bool) {
+func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
 	// First try SNMPv2-SMI for primitives
 	if c.Snmpv2SMIModule != nil {
 		if t, ok := c.LookupTypeForModule(c.Snmpv2SMIModule, name); ok {
@@ -163,7 +164,7 @@ func (c *ResolverContext) LookupType(name string) (*mib.Type, bool) {
 }
 
 // LookupTypeForModule looks up a type by name in a module scope.
-func (c *ResolverContext) LookupTypeForModule(mod *module.Module, name string) (*mib.Type, bool) {
+func (c *ResolverContext) LookupTypeForModule(mod *module.Module, name string) (*mibimpl.Type, bool) {
 	// Try the module scope traversal first
 	if t, ok := c.lookupTypeInModuleScope(mod, name); ok {
 		return t, true
@@ -231,17 +232,17 @@ func lookupInModuleScope[T any](
 }
 
 // lookupNodeInModuleScope traverses module imports to find a node.
-func (c *ResolverContext) lookupNodeInModuleScope(mod *module.Module, name string) (*mib.Node, bool) {
+func (c *ResolverContext) lookupNodeInModuleScope(mod *module.Module, name string) (*mibimpl.Node, bool) {
 	return lookupInModuleScope(mod, name,
-		func(m *module.Module) map[string]*mib.Node { return c.ModuleSymbolToNode[m] },
+		func(m *module.Module) map[string]*mibimpl.Node { return c.ModuleSymbolToNode[m] },
 		func(m *module.Module) map[string]*module.Module { return c.ModuleImports[m] },
 	)
 }
 
 // lookupTypeInModuleScope traverses module imports to find a type.
-func (c *ResolverContext) lookupTypeInModuleScope(mod *module.Module, name string) (*mib.Type, bool) {
+func (c *ResolverContext) lookupTypeInModuleScope(mod *module.Module, name string) (*mibimpl.Type, bool) {
 	return lookupInModuleScope(mod, name,
-		func(m *module.Module) map[string]*mib.Type { return c.ModuleSymbolToType[m] },
+		func(m *module.Module) map[string]*mibimpl.Type { return c.ModuleSymbolToType[m] },
 		func(m *module.Module) map[string]*module.Module { return c.ModuleImports[m] },
 	)
 }
@@ -257,20 +258,20 @@ func (c *ResolverContext) RegisterImport(importingModule *module.Module, symbol 
 }
 
 // RegisterModuleNodeSymbol registers a module-scoped symbol -> node mapping.
-func (c *ResolverContext) RegisterModuleNodeSymbol(mod *module.Module, symbol string, node *mib.Node) {
+func (c *ResolverContext) RegisterModuleNodeSymbol(mod *module.Module, symbol string, node *mibimpl.Node) {
 	symbols := c.ModuleSymbolToNode[mod]
 	if symbols == nil {
-		symbols = make(map[string]*mib.Node)
+		symbols = make(map[string]*mibimpl.Node)
 		c.ModuleSymbolToNode[mod] = symbols
 	}
 	symbols[symbol] = node
 }
 
 // RegisterModuleTypeSymbol registers a module-scoped symbol -> type mapping.
-func (c *ResolverContext) RegisterModuleTypeSymbol(mod *module.Module, name string, t *mib.Type) {
+func (c *ResolverContext) RegisterModuleTypeSymbol(mod *module.Module, name string, t *mibimpl.Type) {
 	symbols := c.ModuleSymbolToType[mod]
 	if symbols == nil {
-		symbols = make(map[string]*mib.Type)
+		symbols = make(map[string]*mibimpl.Type)
 		c.ModuleSymbolToType[mod] = symbols
 	}
 	symbols[name] = t

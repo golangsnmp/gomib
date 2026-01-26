@@ -107,7 +107,7 @@ func TestObjectAccess(t *testing.T) {
 	for _, tc := range accessTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
-			testutil.Equal(t, tc.Access, obj.Access, "access mismatch")
+			testutil.Equal(t, tc.Access, obj.Access(), "access mismatch")
 		})
 	}
 }
@@ -152,7 +152,7 @@ func TestObjectStatus(t *testing.T) {
 	for _, tc := range statusTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
-			testutil.Equal(t, tc.Status, obj.Status, "status mismatch")
+			testutil.Equal(t, tc.Status, obj.Status(), "status mismatch")
 		})
 	}
 }

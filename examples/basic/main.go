@@ -42,7 +42,7 @@ func main() {
 	// List loaded modules
 	fmt.Println("\nModules:")
 	for _, mod := range mib.Modules()[:min(10, len(mib.Modules()))] {
-		fmt.Printf("  %s (%s)\n", mod.Name, mod.Language)
+		fmt.Printf("  %s (%s)\n", mod.Name(), mod.Language())
 	}
 	if len(mib.Modules()) > 10 {
 		fmt.Printf("  ... and %d more\n", len(mib.Modules())-10)

@@ -4,26 +4,11 @@ Pure Go SNMP MIB parser. Parses SMIv1 and SMIv2 MIB files into a queryable model
 
 ## Why gomib?
 
-**Permissive parsing of MIBs.** Many MIB files in the wild have syntax errors, non-standard constructs, or vendor quirks. gomib uses permissive parsing with error recovery, so it can load files that strict parsers reject. If net-snmp can read it, gomib should too.
+**Permissive parsing.** Many MIB files have syntax errors or vendor quirks. gomib uses error recovery to load files that strict parsers reject.
 
-**Everything resolves upfront.** When you call `Load()`, gomib parses all files, resolves all imports, computes all OIDs, and infers node kinds (table, row, column, scalar). The returned model is fully resolved with no lazy evaluation or deferred errors.
+**Fully resolved.** `Load()` parses all files, resolves imports, computes OIDs, and infers node kinds. The returned model has no lazy evaluation or deferred errors.
 
-**Efficient queries.** OIDs are stored in a trie structure, so lookups are O(depth) regardless of how many MIBs you load. Name lookups are indexed. Walking subtrees is a simple tree traversal.
-
-## Features
-
-- SMIv1 (RFC 1155) and SMIv2 (RFC 2578) support
-- Textual conventions with DISPLAY-HINT
-- TRAP-TYPE and NOTIFICATION-TYPE
-- Tables with INDEX, AUGMENTS, and compound indices
-- BITS, enumerated integers, constrained strings
-- Effective SIZE and value ranges computed through type chains
-- Named values (enum members) resolved from base types
-- Module metadata (organization, contact, revisions)
-- Structured diagnostics for parse warnings
-- Optional `log/slog` integration for debug and trace output
-
-For SNMP protocol support, pair gomib with a library like [gosnmp](https://github.com/gosnmp/gosnmp).
+**Efficient queries.** OID lookups are O(depth) via trie. Name lookups are indexed.
 
 ## Install
 
@@ -33,116 +18,100 @@ go get github.com/golangsnmp/gomib
 
 Requires Go 1.24+.
 
-## Usage
+## Quick Start
 
 ```go
-package main
+// Load MIBs from a directory tree
+source, _ := gomib.DirTree("/usr/share/snmp/mibs")
+mib, _ := gomib.Load(ctx, source)
 
-import (
-    "context"
-    "fmt"
-    "log"
+// Find* methods accept name, qualified name, or OID string
+obj := mib.FindObject("IF-MIB::ifIndex")
+obj := mib.FindObject("1.3.6.1.2.1.2.2.1.1")
 
-    "github.com/golangsnmp/gomib"
-)
-
-func main() {
-    // Load all MIBs from a directory tree
-    source, _ := gomib.DirTree("/usr/share/snmp/mibs")
-    mib, err := gomib.Load(context.Background(), source)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Look up an object
-    obj := mib.Object("sysDescr")
-    fmt.Println(obj.OID()) // 1.3.6.1.2.1.1.1
-
-    // Look up by qualified name
-    ifIndex := mib.ObjectByQualified("IF-MIB::ifIndex")
-    fmt.Println(ifIndex.Kind()) // column
-
-    // Look up by OID
-    node := mib.Node("1.3.6.1.2.1.2.2.1.1")
-    fmt.Println(node.Name) // ifIndex
-
-    // Walk the tree
-    mib.Walk(func(n *gomib.Node) bool {
-        if n.Kind == gomib.KindTable {
-            fmt.Println(n.Name, n.OID())
-        }
-        return true
-    })
-}
+// Resolve SNMP instance OIDs to their defining object
+node := mib.LongestPrefixByOID(gomib.Oid{1,3,6,1,2,1,2,2,1,1,5}) // ifIndex
 ```
 
-## Loading MIBs
+### Loading Options
 
 ```go
-// Load all MIBs from a directory tree
-source, err := gomib.DirTree("/path/to/mibs")
-mib, err := gomib.Load(ctx, source)
-
-// Load specific modules (with dependencies)
-mib, err := gomib.LoadModules(ctx, []string{"IF-MIB", "IP-MIB"}, source)
+// Load specific modules (resolves dependencies automatically)
+mib, _ := gomib.LoadModules(ctx, []string{"IF-MIB", "IP-MIB"}, source)
 
 // Multiple search paths
-src1, _ := gomib.DirTree("/usr/share/snmp/mibs")
-src2, _ := gomib.Dir("/opt/vendor/mibs")
-mib, err := gomib.Load(ctx, gomib.Multi(src1, src2))
+mib, _ := gomib.Load(ctx, gomib.Multi(src1, src2))
 
 // With debug logging
-logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-mib, err := gomib.Load(ctx, source, gomib.WithLogger(logger))
+mib, _ := gomib.Load(ctx, source, gomib.WithLogger(slog.Default()))
 ```
 
-## Queries
+## Working with Objects
 
 ```go
-// By name
-obj := mib.Object("ifIndex")
-typ := mib.Type("DisplayString")
-notif := mib.Notification("coldStart")
+obj := mib.FindObject("ifOperStatus")
 
-// By qualified name (MODULE::name)
-obj := mib.ObjectByQualified("IF-MIB::ifIndex")
+// Basic properties
+obj.OID()    // 1.3.6.1.2.1.2.2.1.8
+obj.Kind()   // KindColumn
+obj.Access() // AccessReadOnly
+obj.Status() // StatusCurrent
 
-// By OID string (parses the string)
-node := mib.Node("1.3.6.1.2.1.2.2.1.1")
+// Type info (walks type chain for effective values)
+obj.Type().Base()          // BaseInteger32
+obj.EffectiveEnums()       // [{up 1} {down 2} {testing 3} ...]
+obj.EffectiveDisplayHint() // from textual convention
+obj.EffectiveSizes()       // SIZE constraints
+obj.EffectiveRanges()      // value range constraints
 
-// By OID slice (no string parsing, use for hot paths)
-node := mib.NodeByOID(gomib.Oid{1, 3, 6, 1, 2, 1, 2, 2, 1, 1})
+// Look up enum by label
+if nv, ok := obj.Enum("up"); ok {
+    fmt.Println(nv.Value) // 1
+}
 
-// Flexible lookup (tries qualified, OID, then name)
-node := mib.FindNode("IF-MIB::ifIndex")
-node := mib.FindNode("1.3.6.1.2.1.2.2.1.1")
-node := mib.FindNode("ifIndex")
-
-// Longest prefix match (for resolving SNMP instance OIDs)
-node := mib.LongestPrefix("1.3.6.1.2.1.2.2.1.1.5")        // returns ifIndex
-node := mib.LongestPrefixByOID(gomib.Oid{1, 3, 6, 1, 2, 1, 2, 2, 1, 1, 5})
+// Quick type checks
+obj.Type().IsEnumeration() // true (has enum values)
+obj.Type().IsCounter()     // false
 ```
 
-## Model
-
-The resolved model contains:
-
-- **Node** - Point in the OID tree with Kind (scalar, table, row, column, etc.)
-- **Object** - OBJECT-TYPE definition with type, access, status, constraints
-- **Type** - Type definition or textual convention
-- **Notification** - NOTIFICATION-TYPE or TRAP-TYPE
-- **Module** - MIB module metadata
+## Working with Tables
 
 ```go
-obj := mib.Object("ifIndex")
-obj.OID()           // 1.3.6.1.2.1.2.2.1.1
-obj.Kind()          // KindColumn
-obj.Type.Base       // BaseInteger32
-obj.Access          // AccessReadOnly
-obj.Status          // StatusCurrent
-obj.NamedValues     // enum values if any
-obj.Size            // SIZE constraint if any
-obj.ValueRange      // value range if any
+// Get all tables
+for _, tbl := range mib.Tables() {
+    fmt.Println(tbl.Name(), tbl.OID())
+}
+
+// Navigate from table to columns
+tbl := mib.FindObject("ifTable")
+tbl.Entry().Name()           // ifEntry (the row object)
+tbl.Entry().EffectiveIndexes() // [{ifIndex, false}]
+for _, col := range tbl.Columns() {
+    fmt.Println(col.Name(), col.Type().Base())
+}
+
+// Navigate from column up to table
+col := mib.FindObject("ifInOctets")
+col.IsColumn()       // true
+col.Row().Name()     // ifEntry
+col.Table().Name()   // ifTable
+```
+
+## Tree Traversal
+
+```go
+// Iterate all nodes
+for node := range mib.Nodes() {
+    if node.Kind() == gomib.KindScalar {
+        fmt.Println(node.Name())
+    }
+}
+
+// Traverse subtree
+ifMIB := mib.FindNode("IF-MIB::ifMIB")
+for node := range ifMIB.Descendants() {
+    fmt.Println(node.OID(), node.Name())
+}
 ```
 
 ## CLI
@@ -150,16 +119,13 @@ obj.ValueRange      // value range if any
 ```bash
 go install github.com/golangsnmp/gomib/cmd/gomib@latest
 
-# Load and summarize
-gomib load -p /usr/share/snmp/mibs IF-MIB
-
-# Query an object
-gomib get -m IF-MIB ifIndex
-
-# Dump as JSON
-gomib dump IF-MIB
+gomib load -p /usr/share/snmp/mibs IF-MIB    # summarize
+gomib get -m IF-MIB ifIndex                   # query object
+gomib dump IF-MIB                             # dump as JSON
 ```
 
-## Examples
+## More Examples
 
-See [examples/](examples/) for runnable code.
+See [examples/](examples/) for runnable code covering modules, types, notifications, and more.
+
+For SNMP protocol support, pair gomib with [gosnmp](https://github.com/gosnmp/gosnmp).

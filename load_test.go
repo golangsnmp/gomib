@@ -62,15 +62,15 @@ func TestLoadIntegration(t *testing.T) {
 	t.Logf("Found %d types", len(types))
 
 	// Test lookup
-	obj := mib.Object("sysDescr")
+	obj := mib.FindObject("sysDescr")
 	if obj != nil {
-		t.Logf("sysDescr found: OID=%s, Module=%s", obj.OID(), obj.Module.Name)
+		t.Logf("sysDescr found: OID=%s, Module=%s", obj.OID(), obj.Module().Name())
 	}
 
 	// Test OID lookup
-	node := mib.Node("1.3.6.1.2.1.1.1")
+	node := mib.FindNode("1.3.6.1.2.1.1.1")
 	if node != nil {
-		t.Logf("Node 1.3.6.1.2.1.1.1: Name=%s, Kind=%v", node.Name, node.Kind)
+		t.Logf("Node 1.3.6.1.2.1.1.1: Name=%s, Kind=%v", node.Name(), node.Kind())
 	}
 }
 
@@ -89,10 +89,10 @@ func TestLoadModulesIntegration(t *testing.T) {
 		t.Log("IF-MIB not found (might be missing from source)")
 		return
 	}
-	t.Logf("Loaded IF-MIB: %s", mod.Name)
+	t.Logf("Loaded IF-MIB: %s", mod.Name())
 
 	// Check for ifOperStatus
-	obj := mib.Object("ifOperStatus")
+	obj := mib.FindObject("ifOperStatus")
 	if obj != nil {
 		t.Logf("ifOperStatus found: OID=%s", obj.OID())
 	}
@@ -137,7 +137,7 @@ func TestFindNode(t *testing.T) {
 				testutil.Nil(t, node, "FindNode(%q)", tt.query)
 			} else {
 				testutil.NotNil(t, node, "FindNode(%q)", tt.query)
-				testutil.Equal(t, tt.wantName, node.Name, "FindNode(%q) name", tt.query)
+				testutil.Equal(t, tt.wantName, node.Name(), "FindNode(%q) name", tt.query)
 			}
 		})
 	}
@@ -162,15 +162,8 @@ func TestNodesIterator(t *testing.T) {
 		nodeCount++
 	}
 
-	// Compare with Walk count
-	walkCount := 0
-	mib.Walk(func(*gomib.Node) bool {
-		walkCount++
-		return true
-	})
-
-	testutil.Equal(t, walkCount, nodeCount, "Nodes() vs Walk() count")
 	t.Logf("Iterator visited %d nodes", nodeCount)
+	testutil.Greater(t, nodeCount, 0, "Nodes() should return nodes")
 
 	// Test early termination
 	earlyCount := 0
@@ -185,7 +178,7 @@ func TestNodesIterator(t *testing.T) {
 	// Test Node.Descendants()
 	sysNode := mib.FindNode("system")
 	if sysNode != nil {
-		var descendants []*gomib.Node
+		var descendants []gomib.Node
 		for n := range sysNode.Descendants() {
 			descendants = append(descendants, n)
 		}

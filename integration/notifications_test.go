@@ -42,19 +42,20 @@ func TestNotifications(t *testing.T) {
 	for _, tc := range notificationTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			node := getNode(t, m, tc.Module, tc.Name)
-			testutil.Equal(t, gomib.KindNotification, node.Kind, "should be a notification")
+			testutil.Equal(t, gomib.KindNotification, node.Kind(), "should be a notification")
 
 			got := node.OID().String()
 			testutil.Equal(t, tc.Oid, got, "OID mismatch")
 
 			if len(tc.Objects) > 0 {
-				notif := node.Notif
+				notif := node.Notification()
 				testutil.NotNil(t, notif, "should have a notification object")
-				testutil.Len(t, notif.Objects, len(tc.Objects), "OBJECTS count mismatch")
+				objs := notif.Objects()
+				testutil.Equal(t, len(tc.Objects), len(objs), "OBJECTS count mismatch")
 
 				for i, expectedName := range tc.Objects {
-					testutil.NotNil(t, notif.Objects[i], "OBJECTS[%d] should be resolved", i)
-					testutil.Equal(t, expectedName, notif.Objects[i].Name, "OBJECTS[%d] name mismatch", i)
+					testutil.NotNil(t, objs[i], "OBJECTS[%d] should be resolved", i)
+					testutil.Equal(t, expectedName, objs[i].Name(), "OBJECTS[%d] name mismatch", i)
 				}
 			}
 		})
@@ -85,7 +86,7 @@ func TestTraps(t *testing.T) {
 	for _, tc := range trapTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			node := getNode(t, m, tc.Module, tc.Name)
-			testutil.Equal(t, gomib.KindNotification, node.Kind, "trap should be notification kind")
+			testutil.Equal(t, gomib.KindNotification, node.Kind(), "trap should be notification kind")
 			// Additional trap-specific assertions can be added
 		})
 	}

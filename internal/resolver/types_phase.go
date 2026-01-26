@@ -1,11 +1,12 @@
 package resolver
 
 import (
-	"github.com/golangsnmp/gomib/mib"
 	"log/slog"
 
+	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 // resolveTypes resolves all types across all modules.
@@ -24,11 +25,10 @@ func seedPrimitiveTypes(ctx *ResolverContext) {
 
 	seeded := 0
 	seedType := func(name string, base mib.BaseType) {
-		typ := &mib.Type{
-			Name:   name,
-			Module: resolved,
-			Base:   base,
-		}
+		typ := mibimpl.NewType(name)
+		typ.SetModule(resolved)
+		typ.SetBase(base)
+
 		ctx.Builder.AddType(typ)
 		ctx.RegisterModuleTypeSymbol(mod, name, typ)
 		if resolved != nil {
@@ -65,19 +65,19 @@ func createUserTypes(ctx *ResolverContext) {
 				base = mib.BaseInteger32
 			}
 
-			typ := &mib.Type{
-				Name:        td.Name,
-				Module:      resolved,
-				Base:        base,
-				IsTC:        td.IsTextualConvention,
-				Status:      convertStatus(td.Status),
-				Hint:        td.DisplayHint,
-				Description: td.Description,
-			}
+			typ := mibimpl.NewType(td.Name)
+			typ.SetModule(resolved)
+			typ.SetBase(base)
+			typ.SetIsTC(td.IsTextualConvention)
+			typ.SetStatus(convertStatus(td.Status))
+			typ.SetDisplayHint(td.DisplayHint)
+			typ.SetDescription(td.Description)
 
 			// Extract constraints and named values
-			typ.NamedValues = extractNamedValues(td.Syntax)
-			typ.Size, typ.ValueRange = extractConstraints(td.Syntax)
+			typ.SetEnums(extractNamedValues(td.Syntax))
+			sizes, ranges := extractConstraints(td.Syntax)
+			typ.SetSizes(sizes)
+			typ.SetRanges(ranges)
 
 			ctx.Builder.AddType(typ)
 			ctx.RegisterModuleTypeSymbol(mod, td.Name, typ)
@@ -99,7 +99,7 @@ func createUserTypes(ctx *ResolverContext) {
 type typeResolutionEntry struct {
 	mod *module.Module
 	td  *module.TypeDef
-	typ *mib.Type
+	typ *mibimpl.Type
 }
 
 func resolveTypeBases(ctx *ResolverContext) {
@@ -193,8 +193,8 @@ func tryResolveTypeParent(ctx *ResolverContext, entry typeResolutionEntry) bool 
 	}
 
 	// Check if parent is ready (has its own parent resolved if needed)
-	if parent.Parent != nil || !hasTypeRefSyntax(findTypeDef(ctx, entry.mod, baseName)) {
-		entry.typ.Parent = parent
+	if parent.InternalParent() != nil || !hasTypeRefSyntax(findTypeDef(ctx, entry.mod, baseName)) {
+		entry.typ.SetParent(parent)
 		return true
 	}
 
@@ -251,8 +251,8 @@ func linkPrimitiveSyntaxParents(ctx *ResolverContext) {
 			if !ok {
 				continue
 			}
-			if typ.Parent == nil {
-				typ.Parent = parent
+			if typ.InternalParent() == nil {
+				typ.SetParent(parent)
 			}
 		}
 	}
@@ -284,7 +284,7 @@ func linkRFC1213TypesToTCs(ctx *ResolverContext) {
 			continue
 		}
 		if sourceType != targetType {
-			sourceType.Parent = targetType
+			sourceType.SetParent(targetType)
 		}
 	}
 }
@@ -292,9 +292,9 @@ func linkRFC1213TypesToTCs(ctx *ResolverContext) {
 func inheritBaseTypes(ctx *ResolverContext) {
 	for _, t := range ctx.Builder.Types() {
 		// Skip types that already have an application base type (explicitly set)
-		if t.Parent != nil && !isApplicationBaseType(t.Base) {
+		if t.InternalParent() != nil && !isApplicationBaseType(t.Base()) {
 			if base, ok := resolveBaseFromChain(t); ok {
-				t.Base = base
+				t.SetBase(base)
 			}
 		}
 	}
@@ -313,18 +313,18 @@ func isApplicationBaseType(b mib.BaseType) bool {
 	}
 }
 
-func resolveBaseFromChain(t *mib.Type) (mib.BaseType, bool) {
-	visited := make(map[*mib.Type]struct{})
+func resolveBaseFromChain(t *mibimpl.Type) (mib.BaseType, bool) {
+	visited := make(map[*mibimpl.Type]struct{})
 	current := t
 	for current != nil {
 		if _, seen := visited[current]; seen {
 			return 0, false
 		}
 		visited[current] = struct{}{}
-		if current.Parent == nil {
-			return current.Base, true
+		if current.InternalParent() == nil {
+			return current.Base(), true
 		}
-		current = current.Parent
+		current = current.InternalParent()
 	}
 	return 0, false
 }

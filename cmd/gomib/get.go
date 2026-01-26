@@ -124,16 +124,16 @@ func cmdGet(args []string) int {
 }
 
 // printNode prints a single node's details.
-func printNode(node *gomib.Node) {
+func printNode(node gomib.Node) {
 	// Header: name  MODULE::name  oid
-	label := node.Name
+	label := node.Name()
 	if label == "" {
 		label = fmt.Sprintf("(%d)", node.Arc())
 	}
 
 	moduleName := ""
-	if node.Module != nil {
-		moduleName = node.Module.Name
+	if node.Module() != nil {
+		moduleName = node.Module().Name()
 	}
 
 	oid := node.OID().String()
@@ -144,42 +144,45 @@ func printNode(node *gomib.Node) {
 		fmt.Printf("%s  %s\n", label, oid)
 	}
 
-	fmt.Printf("  kind:   %s\n", node.Kind.String())
+	fmt.Printf("  kind:   %s\n", node.Kind().String())
 
 	// Print object details if available
-	if node.Object != nil {
-		printObjectDetails(node.Object)
+	if node.Object() != nil {
+		printObjectDetails(node.Object())
 	}
 
 	// Print notification details if available
-	if node.Notif != nil {
-		printNotificationDetails(node.Notif)
+	if node.Notification() != nil {
+		printNotificationDetails(node.Notification())
 	}
 }
 
 // printObjectDetails prints object-specific information.
-func printObjectDetails(obj *gomib.Object) {
+func printObjectDetails(obj gomib.Object) {
 	// Type
-	if obj.Type != nil {
-		typeName := obj.Type.Name
+	if obj.Type() != nil {
+		typ := obj.Type()
+		typeName := typ.Name()
 		if typeName == "" {
-			typeName = obj.Type.Base.String()
+			typeName = typ.Base().String()
 		}
 		typeDesc := typeName
-		if obj.Type.Parent != nil {
-			typeDesc = fmt.Sprintf("%s (%s)", typeName, obj.Type.Base.String())
+		if typ.Parent() != nil {
+			typeDesc = fmt.Sprintf("%s (%s)", typeName, typ.Base().String())
 		}
 		// Add constraints
-		if len(obj.ValueRange) > 0 {
-			vr := obj.ValueRange[0]
+		ranges := obj.EffectiveRanges()
+		if len(ranges) > 0 {
+			vr := ranges[0]
 			if vr.Min == vr.Max {
 				typeDesc += fmt.Sprintf(" (%d)", vr.Min)
 			} else {
 				typeDesc += fmt.Sprintf(" (%d..%d)", vr.Min, vr.Max)
 			}
 		}
-		if len(obj.Size) > 0 {
-			sr := obj.Size[0]
+		sizes := obj.EffectiveSizes()
+		if len(sizes) > 0 {
+			sr := sizes[0]
 			if sr.Min == sr.Max {
 				typeDesc += fmt.Sprintf(" (SIZE(%d))", sr.Min)
 			} else {
@@ -187,24 +190,26 @@ func printObjectDetails(obj *gomib.Object) {
 			}
 		}
 		fmt.Printf("  type:   %s\n", typeDesc)
-	} else if len(obj.NamedValues) > 0 {
-		if obj.Type != nil && obj.Type.Base == gomib.BaseBits {
+	} else {
+		enums := obj.EffectiveEnums()
+		bits := obj.EffectiveBits()
+		if len(bits) > 0 {
 			fmt.Printf("  type:   BITS\n")
-		} else {
+		} else if len(enums) > 0 {
 			fmt.Printf("  type:   INTEGER (enum)\n")
 		}
 	}
 
-	fmt.Printf("  access: %s\n", obj.Access.String())
-	fmt.Printf("  status: %s\n", obj.Status.String())
+	fmt.Printf("  access: %s\n", obj.Access().String())
+	fmt.Printf("  status: %s\n", obj.Status().String())
 
 	// Index
-	if len(obj.Index) > 0 {
-		indexStrs := make([]string, 0, len(obj.Index))
-		for _, idx := range obj.Index {
+	if len(obj.Index()) > 0 {
+		indexStrs := make([]string, 0, len(obj.Index()))
+		for _, idx := range obj.Index() {
 			name := "(unknown)"
 			if idx.Object != nil {
-				name = idx.Object.Name
+				name = idx.Object.Name()
 			}
 			if idx.Implied {
 				name = "IMPLIED " + name
@@ -215,50 +220,52 @@ func printObjectDetails(obj *gomib.Object) {
 	}
 
 	// Augments
-	if obj.Augments != nil {
-		fmt.Printf("  augments: %s\n", obj.Augments.Name)
+	if obj.Augments() != nil {
+		fmt.Printf("  augments: %s\n", obj.Augments().Name())
 	}
 
 	// Units
-	if obj.Units != "" {
-		fmt.Printf("  units:  %s\n", obj.Units)
+	if obj.Units() != "" {
+		fmt.Printf("  units:  %s\n", obj.Units())
 	}
 
 	// Description (truncated)
-	if obj.Description != "" {
-		fmt.Printf("  descr:  %s\n", normalizeDescription(obj.Description, 200))
+	if obj.Description() != "" {
+		fmt.Printf("  descr:  %s\n", normalizeDescription(obj.Description(), 200))
 	}
 
 	// Enum values
-	if len(obj.NamedValues) > 0 && (obj.Type == nil || obj.Type.Base != gomib.BaseBits) {
+	enums := obj.EffectiveEnums()
+	bits := obj.EffectiveBits()
+	if len(enums) > 0 && len(bits) == 0 {
 		fmt.Println("  values:")
-		for _, v := range obj.NamedValues {
+		for _, v := range enums {
 			fmt.Printf("    %s(%d)\n", v.Label, v.Value)
 		}
 	}
 
 	// BITS
-	if len(obj.NamedValues) > 0 && obj.Type != nil && obj.Type.Base == gomib.BaseBits {
+	if len(bits) > 0 {
 		fmt.Println("  bits:")
-		for _, b := range obj.NamedValues {
+		for _, b := range bits {
 			fmt.Printf("    %s(%d)\n", b.Label, b.Value)
 		}
 	}
 }
 
 // printNotificationDetails prints notification-specific information.
-func printNotificationDetails(notif *gomib.Notification) {
-	fmt.Printf("  status: %s\n", notif.Status.String())
+func printNotificationDetails(notif gomib.Notification) {
+	fmt.Printf("  status: %s\n", notif.Status().String())
 
-	if len(notif.Objects) > 0 {
+	if len(notif.Objects()) > 0 {
 		fmt.Println("  objects:")
-		for _, obj := range notif.Objects {
-			fmt.Printf("    %s\n", obj.Name)
+		for _, obj := range notif.Objects() {
+			fmt.Printf("    %s\n", obj.Name())
 		}
 	}
 
-	if notif.Description != "" {
-		fmt.Printf("  descr:  %s\n", normalizeDescription(notif.Description, 200))
+	if notif.Description() != "" {
+		fmt.Printf("  descr:  %s\n", normalizeDescription(notif.Description(), 200))
 	}
 }
 
@@ -272,43 +279,43 @@ func normalizeDescription(s string, maxLen int) string {
 }
 
 // printNodeTree prints a subtree.
-func printNodeTree(node *gomib.Node, maxDepth int) {
+func printNodeTree(node gomib.Node, maxDepth int) {
 	printNodeTreeRecursive(node, 0, maxDepth)
 }
 
-func printNodeTreeRecursive(node *gomib.Node, depth int, maxDepth int) {
+func printNodeTreeRecursive(node gomib.Node, depth int, maxDepth int) {
 	if maxDepth > 0 && depth > maxDepth {
 		return
 	}
 
 	indent := strings.Repeat("  ", depth)
 
-	label := node.Name
+	label := node.Name()
 	if label == "" {
 		label = fmt.Sprintf("(%d)", node.Arc())
 	}
 
 	oid := node.OID().String()
-	kind := node.Kind.String()
+	kind := node.Kind().String()
 
 	// Module name
 	moduleName := ""
-	if node.Module != nil {
-		moduleName = node.Module.Name
+	if node.Module() != nil {
+		moduleName = node.Module().Name()
 	}
 
 	// For objects, show type and access
 	extra := ""
-	if node.Object != nil {
-		obj := node.Object
+	if node.Object() != nil {
+		obj := node.Object()
 		typeName := ""
-		if obj.Type != nil {
-			typeName = obj.Type.Name
+		if obj.Type() != nil {
+			typeName = obj.Type().Name()
 			if typeName == "" {
-				typeName = obj.Type.Base.String()
+				typeName = obj.Type().Base().String()
 			}
 		}
-		extra = fmt.Sprintf("  %s  %s", typeName, obj.Access.String())
+		extra = fmt.Sprintf("  %s  %s", typeName, obj.Access().String())
 	}
 
 	if moduleName != "" {

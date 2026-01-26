@@ -43,7 +43,7 @@ func WithLogger(logger *slog.Logger) LoadOption {
 //	mib, err := gomib.Load(ctx,
 //	    gomib.Multi(gomib.DirTree("/usr/share/snmp/mibs"), gomib.Dir("./custom")),
 //	)
-func Load(ctx context.Context, source Source, opts ...LoadOption) (*Mib, error) {
+func Load(ctx context.Context, source Source, opts ...LoadOption) (Mib, error) {
 	cfg := loadConfig{
 		extensions: DefaultExtensions(),
 	}
@@ -67,7 +67,7 @@ func Load(ctx context.Context, source Source, opts ...LoadOption) (*Mib, error) 
 //	    []string{"IF-MIB", "IP-MIB"},
 //	    gomib.DirTree("/usr/share/snmp/mibs"),
 //	)
-func LoadModules(ctx context.Context, names []string, source Source, opts ...LoadOption) (*Mib, error) {
+func LoadModules(ctx context.Context, names []string, source Source, opts ...LoadOption) (Mib, error) {
 	cfg := loadConfig{
 		extensions: DefaultExtensions(),
 	}
@@ -85,7 +85,7 @@ func LoadModules(ctx context.Context, names []string, source Source, opts ...Loa
 // loadFromSources is the internal implementation.
 // If names is nil, loads all modules from sources.
 // If names is non-nil, loads only those modules (plus dependencies).
-func loadFromSources(ctx context.Context, sources []Source, names []string, cfg loadConfig) (*Mib, error) {
+func loadFromSources(ctx context.Context, sources []Source, names []string, cfg loadConfig) (Mib, error) {
 	if len(sources) == 0 {
 		return nil, ErrNoSources
 	}

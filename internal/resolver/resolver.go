@@ -20,11 +20,11 @@
 package resolver
 
 import (
-	"github.com/golangsnmp/gomib/mib"
 	"log/slog"
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 // resolver resolves modules into a Mib.
@@ -34,13 +34,13 @@ type resolver struct {
 
 // Resolve resolves parsed modules into a Mib.
 // If logger is nil, logging is disabled (zero overhead).
-func Resolve(mods []*module.Module, logger *slog.Logger) *mib.Mib {
+func Resolve(mods []*module.Module, logger *slog.Logger) mib.Mib {
 	r := &resolver{Logger: types.Logger{L: logger}}
 	return r.resolve(mods)
 }
 
 // resolve resolves modules into a Mib.
-func (r *resolver) resolve(mods []*module.Module) *mib.Mib {
+func (r *resolver) resolve(mods []*module.Module) mib.Mib {
 	ctx := newResolverContext(mods, r.L)
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "register"))

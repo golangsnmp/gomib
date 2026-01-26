@@ -56,14 +56,14 @@ func TestSizeConstraints(t *testing.T) {
 	for _, tc := range sizeTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
-			testutil.NotNil(t, obj.Type, "object should have a resolved type")
+			testutil.NotNil(t, obj.Type(), "object should have a resolved type")
 
 			// Size is pre-computed on the object (effective value from inline or type chain)
-			testutil.NotEmpty(t, obj.Size, "should have a SIZE constraint")
+			testutil.NotEmpty(t, obj.EffectiveSizes(), "should have a SIZE constraint")
 
 			// Use first range (most common case)
-			minSize := obj.Size[0].Min
-			maxSize := obj.Size[0].Max
+			minSize := obj.EffectiveSizes()[0].Min
+			maxSize := obj.EffectiveSizes()[0].Max
 
 			testutil.Equal(t, tc.MinSize, minSize, "min size mismatch")
 			testutil.Equal(t, tc.MaxSize, maxSize, "max size mismatch")
@@ -135,14 +135,14 @@ func TestRangeConstraints(t *testing.T) {
 	for _, tc := range rangeTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
-			testutil.NotNil(t, obj.Type, "object should have a resolved type")
+			testutil.NotNil(t, obj.Type(), "object should have a resolved type")
 
 			// ValueRange is pre-computed on the object (effective value from inline or type chain)
-			testutil.NotEmpty(t, obj.ValueRange, "should have a value range constraint")
+			testutil.NotEmpty(t, obj.EffectiveRanges(), "should have a value range constraint")
 
 			// Use first range (most common case)
-			minVal := obj.ValueRange[0].Min
-			maxVal := obj.ValueRange[0].Max
+			minVal := obj.EffectiveRanges()[0].Min
+			maxVal := obj.EffectiveRanges()[0].Max
 
 			testutil.Equal(t, tc.MinValue, minVal, "min value mismatch")
 			testutil.Equal(t, tc.MaxValue, maxVal, "max value mismatch")
@@ -214,10 +214,10 @@ func TestDisplayHints(t *testing.T) {
 	for _, tc := range hintTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
-			testutil.NotNil(t, obj.Type, "object should have a resolved type")
+			testutil.NotNil(t, obj.Type(), "object should have a resolved type")
 
 			// Hint is pre-computed on the object (effective value from inline or type chain)
-			testutil.Equal(t, tc.Hint, obj.Hint, "display hint mismatch")
+			testutil.Equal(t, tc.Hint, obj.EffectiveDisplayHint(), "display hint mismatch")
 		})
 	}
 }

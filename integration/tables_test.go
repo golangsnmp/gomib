@@ -67,37 +67,37 @@ func TestTableStructure(t *testing.T) {
 		t.Run(tc.Module+"::"+tc.TableName, func(t *testing.T) {
 			// Verify table node
 			tableNode := getNode(t, m, tc.Module, tc.TableName)
-			testutil.Equal(t, gomib.KindTable, tableNode.Kind, "should be a table")
+			testutil.Equal(t, gomib.KindTable, tableNode.Kind(), "should be a table")
 
 			// Verify row node
 			rowNode := getNode(t, m, tc.Module, tc.RowName)
-			testutil.Equal(t, gomib.KindRow, rowNode.Kind, "should be a row")
+			testutil.Equal(t, gomib.KindRow, rowNode.Kind(), "should be a row")
 
 			// Verify row is child of table
-			testutil.True(t, tableNode == rowNode.Parent, "row should be child of table")
+			testutil.True(t, tableNode.OID().String() == rowNode.Parent().OID().String(), "row should be child of table")
 
 			// Verify index
 			obj := getObject(t, m, tc.Module, tc.RowName)
-			testutil.NotEmpty(t, obj.Index, "row should have an INDEX clause")
-			testutil.Len(t, obj.Index, len(tc.IndexNames), "index count mismatch")
+			testutil.NotEmpty(t, obj.Index(), "row should have an INDEX clause")
+			testutil.Len(t, obj.Index(), len(tc.IndexNames), "index count mismatch")
 
 			for i, expectedName := range tc.IndexNames {
-				testutil.NotNil(t, obj.Index[i].Object, "index %d should be resolved", i)
-				testutil.Equal(t, expectedName, obj.Index[i].Object.Name, "index %d name mismatch", i)
+				testutil.NotNil(t, obj.Index()[i].Object, "index %d should be resolved", i)
+				testutil.Equal(t, expectedName, obj.Index()[i].Object.Name(), "index %d name mismatch", i)
 			}
 
 			// Verify IMPLIED
 			if tc.HasImplied {
-				lastIdx := len(obj.Index) - 1
+				lastIdx := len(obj.Index()) - 1
 				hasImplied := false
-				for _, idx := range obj.Index {
+				for _, idx := range obj.Index() {
 					if idx.Implied {
 						hasImplied = true
 						break
 					}
 				}
 				testutil.True(t, hasImplied, "should have IMPLIED index")
-				testutil.True(t, obj.Index[lastIdx].Implied, "last index should be IMPLIED")
+				testutil.True(t, obj.Index()[lastIdx].Implied, "last index should be IMPLIED")
 			}
 		})
 	}
@@ -132,10 +132,10 @@ func TestAugments(t *testing.T) {
 	for _, tc := range augmentsTests {
 		t.Run(tc.Module+"::"+tc.RowName, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.RowName)
-			testutil.NotNil(t, obj.Augments, "should have AUGMENTS")
+			testutil.NotNil(t, obj.Augments(), "should have AUGMENTS")
 
-			augObj := obj.Augments
-			testutil.Equal(t, tc.AugmentsRow, augObj.Name, "augmented row name mismatch")
+			augObj := obj.Augments()
+			testutil.Equal(t, tc.AugmentsRow, augObj.Name(), "augmented row name mismatch")
 		})
 	}
 }
@@ -207,14 +207,14 @@ func TestColumns(t *testing.T) {
 	for _, tc := range columnTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			node := getNode(t, m, tc.Module, tc.Name)
-			testutil.Equal(t, gomib.KindColumn, node.Kind, "should be a column")
+			testutil.Equal(t, gomib.KindColumn, node.Kind(), "should be a column")
 
 			// Verify ancestry: column -> row -> table
-			testutil.NotNil(t, node.Parent, "column should have parent (row)")
-			testutil.Equal(t, gomib.KindRow, node.Parent.Kind, "parent should be row")
-			testutil.NotNil(t, node.Parent.Parent, "row should have parent (table)")
-			testutil.Equal(t, gomib.KindTable, node.Parent.Parent.Kind, "grandparent should be table")
-			testutil.Equal(t, tc.TableName, node.Parent.Parent.Name, "table name mismatch")
+			testutil.NotNil(t, node.Parent(), "column should have parent (row)")
+			testutil.Equal(t, gomib.KindRow, node.Parent().Kind(), "parent should be row")
+			testutil.NotNil(t, node.Parent().Parent(), "row should have parent (table)")
+			testutil.Equal(t, gomib.KindTable, node.Parent().Parent().Kind(), "grandparent should be table")
+			testutil.Equal(t, tc.TableName, node.Parent().Parent().Name(), "table name mismatch")
 		})
 	}
 }

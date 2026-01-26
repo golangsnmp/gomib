@@ -75,12 +75,12 @@ func TestEnumValues(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
 
 			// NamedValues contains the effective enum values (pre-computed from inline or type chain)
-			testutil.NotEmpty(t, obj.NamedValues, "should have enum values")
+			testutil.NotEmpty(t, obj.EffectiveEnums(), "should have enum values")
 
 			// Verify expected values are present
 			for expectedLabel, expectedValue := range tc.Values {
 				found := false
-				for _, nv := range obj.NamedValues {
+				for _, nv := range obj.EffectiveEnums() {
 					if nv.Label == expectedLabel {
 						testutil.Equal(t, expectedValue, nv.Value, "enum value mismatch for %s", expectedLabel)
 						found = true
@@ -124,12 +124,12 @@ func TestBitsDefinitions(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
 
 			// NamedValues contains the effective BITS positions (pre-computed from inline or type chain)
-			testutil.NotEmpty(t, obj.NamedValues, "should have BITS definitions")
+			testutil.NotEmpty(t, obj.EffectiveEnums(), "should have BITS definitions")
 
 			// Verify expected positions are present
 			for expectedLabel, expectedPos := range tc.Positions {
 				found := false
-				for _, nv := range obj.NamedValues {
+				for _, nv := range obj.EffectiveEnums() {
 					if nv.Label == expectedLabel {
 						testutil.Equal(t, expectedPos, nv.Value, "bit position mismatch for %s", expectedLabel)
 						found = true

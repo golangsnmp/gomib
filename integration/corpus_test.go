@@ -36,7 +36,7 @@ import (
 // corpusModel holds the shared resolved model for all tests.
 // Loaded once via loadCorpus().
 var (
-	corpusModel *gomib.Mib
+	corpusModel gomib.Mib
 	corpusOnce  sync.Once
 	corpusErr   error
 )
@@ -48,7 +48,7 @@ func corpusPath() string {
 
 // loadCorpus loads the entire test corpus once and caches the result.
 // All tests share the same resolved model for efficiency.
-func loadCorpus(t *testing.T) *gomib.Mib {
+func loadCorpus(t *testing.T) gomib.Mib {
 	t.Helper()
 
 	corpusOnce.Do(func() {
@@ -77,22 +77,22 @@ func loadCorpus(t *testing.T) *gomib.Mib {
 }
 
 // getNode is a helper that retrieves a node by qualified name and fails if not found.
-func getNode(t *testing.T, m *gomib.Mib, module, name string) *gomib.Node {
+func getNode(t *testing.T, m gomib.Mib, module, name string) gomib.Node {
 	t.Helper()
 	qname := module + "::" + name
-	obj := m.ObjectByQualified(qname)
-	if obj != nil && obj.Node != nil {
-		return obj.Node
+	obj := m.FindObject(qname)
+	if obj != nil && obj.Node() != nil {
+		return obj.Node()
 	}
 	// Try notification
-	notif := m.Notification(name)
-	if notif != nil && notif.Node != nil && notif.Module != nil && notif.Module.Name == module {
-		return notif.Node
+	notif := m.FindNotification(name)
+	if notif != nil && notif.Node() != nil && notif.Module() != nil && notif.Module().Name() == module {
+		return notif.Node()
 	}
 	// Try by name and filter by module
 	nodes := getNodesByName(m, name)
 	for _, node := range nodes {
-		if node.Module != nil && node.Module.Name == module {
+		if node.Module() != nil && node.Module().Name() == module {
 			return node
 		}
 	}
@@ -101,22 +101,21 @@ func getNode(t *testing.T, m *gomib.Mib, module, name string) *gomib.Node {
 }
 
 // getNodesByName returns all nodes with the given name.
-func getNodesByName(m *gomib.Mib, name string) []*gomib.Node {
-	var nodes []*gomib.Node
-	m.Walk(func(n *gomib.Node) bool {
-		if n.Name == name {
+func getNodesByName(m gomib.Mib, name string) []gomib.Node {
+	var nodes []gomib.Node
+	for n := range m.Nodes() {
+		if n.Name() == name {
 			nodes = append(nodes, n)
 		}
-		return true
-	})
+	}
 	return nodes
 }
 
 // getObject is a helper that retrieves an object by qualified name and fails if not found.
-func getObject(t *testing.T, m *gomib.Mib, module, name string) *gomib.Object {
+func getObject(t *testing.T, m gomib.Mib, module, name string) gomib.Object {
 	t.Helper()
 	qname := module + "::" + name
-	obj := m.ObjectByQualified(qname)
+	obj := m.FindObject(qname)
 	testutil.NotNil(t, obj, "object %s::%s should exist", module, name)
 	return obj
 }

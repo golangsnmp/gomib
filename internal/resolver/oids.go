@@ -1,11 +1,12 @@
 package resolver
 
 import (
-	"github.com/golangsnmp/gomib/mib"
 	"log/slog"
 
+	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 var smiGlobalOidRoots = map[string]struct{}{
@@ -226,7 +227,7 @@ func resolveOidDefinition(ctx *ResolverContext, def oidDefinition) bool {
 	}
 	defName := def.defName()
 
-	var currentNode *mib.Node
+	var currentNode *mibimpl.Node
 	for idx, component := range components {
 		isLast := idx == len(components)-1
 		node, ok := resolveOidComponent(ctx, def, currentNode, component, isLast, oid.Span, defName)
@@ -243,7 +244,7 @@ func resolveOidDefinition(ctx *ResolverContext, def oidDefinition) bool {
 	return true
 }
 
-func resolveOidComponent(ctx *ResolverContext, def oidDefinition, currentNode *mib.Node, component module.OidComponent, isLast bool, span types.Span, defName string) (*mib.Node, bool) {
+func resolveOidComponent(ctx *ResolverContext, def oidDefinition, currentNode *mibimpl.Node, component module.OidComponent, isLast bool, span types.Span, defName string) (*mibimpl.Node, bool) {
 	switch c := component.(type) {
 	case *module.OidComponentName:
 		return resolveNameComponent(ctx, def, c.NameValue, span, defName)
@@ -261,7 +262,7 @@ func resolveOidComponent(ctx *ResolverContext, def oidDefinition, currentNode *m
 	}
 }
 
-func resolveNameComponent(ctx *ResolverContext, def oidDefinition, name string, span types.Span, defName string) (*mib.Node, bool) {
+func resolveNameComponent(ctx *ResolverContext, def oidDefinition, name string, span types.Span, defName string) (*mibimpl.Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
 		return node, true
 	}
@@ -275,7 +276,7 @@ func resolveNameComponent(ctx *ResolverContext, def oidDefinition, name string, 
 	return nil, false
 }
 
-func resolveNamedNumberComponent(ctx *ResolverContext, def oidDefinition, currentNode *mib.Node, name string, number uint32, isLast bool) (*mib.Node, bool) {
+func resolveNamedNumberComponent(ctx *ResolverContext, def oidDefinition, currentNode *mibimpl.Node, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
 		ctx.RegisterModuleNodeSymbol(def.mod, name, node)
 		return node, true
@@ -286,17 +287,17 @@ func resolveNamedNumberComponent(ctx *ResolverContext, def oidDefinition, curren
 	}
 	ctx.RegisterModuleNodeSymbol(def.mod, name, child)
 	if !isLast {
-		child.Name = name
-		child.Module = ctx.ModuleToResolved[def.mod]
+		child.SetName(name)
+		child.SetModule(ctx.ModuleToResolved[def.mod])
 		ctx.Builder.RegisterNode(name, child)
-		if child.Kind == mib.KindInternal {
-			child.Kind = mib.KindNode
+		if child.Kind() == mib.KindInternal {
+			child.SetKind(mib.KindNode)
 		}
 	}
 	return child, true
 }
 
-func resolveQualifiedNameComponent(ctx *ResolverContext, def oidDefinition, moduleName, name string, span types.Span, defName string) (*mib.Node, bool) {
+func resolveQualifiedNameComponent(ctx *ResolverContext, def oidDefinition, moduleName, name string, span types.Span, defName string) (*mibimpl.Node, bool) {
 	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
 		return node, true
 	}
@@ -304,7 +305,7 @@ func resolveQualifiedNameComponent(ctx *ResolverContext, def oidDefinition, modu
 	return nil, false
 }
 
-func resolveQualifiedNamedNumberComponent(ctx *ResolverContext, def oidDefinition, currentNode *mib.Node, moduleName, name string, number uint32, isLast bool) (*mib.Node, bool) {
+func resolveQualifiedNamedNumberComponent(ctx *ResolverContext, def oidDefinition, currentNode *mibimpl.Node, moduleName, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
 	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
 		ctx.RegisterModuleNodeSymbol(def.mod, name, node)
 		return node, true
@@ -315,33 +316,33 @@ func resolveQualifiedNamedNumberComponent(ctx *ResolverContext, def oidDefinitio
 	}
 	ctx.RegisterModuleNodeSymbol(def.mod, name, child)
 	if !isLast {
-		child.Name = name
-		child.Module = ctx.ModuleToResolved[def.mod]
+		child.SetName(name)
+		child.SetModule(ctx.ModuleToResolved[def.mod])
 		ctx.Builder.RegisterNode(name, child)
-		if child.Kind == mib.KindInternal {
-			child.Kind = mib.KindNode
+		if child.Kind() == mib.KindInternal {
+			child.SetKind(mib.KindNode)
 		}
 	}
 	return child, true
 }
 
-func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mib.Node, label string) {
+func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mibimpl.Node, label string) {
 	switch def.kind {
 	case defObjectType:
-		node.Kind = mib.KindScalar
+		node.SetKind(mib.KindScalar)
 	case defModuleIdentity, defObjectIdentity, defValueAssignment:
-		node.Kind = mib.KindNode
+		node.SetKind(mib.KindNode)
 	case defNotification:
-		node.Kind = mib.KindNotification
+		node.SetKind(mib.KindNotification)
 	case defObjectGroup, defNotificationGroup:
-		node.Kind = mib.KindGroup
+		node.SetKind(mib.KindGroup)
 	case defModuleCompliance:
-		node.Kind = mib.KindCompliance
+		node.SetKind(mib.KindCompliance)
 	case defAgentCapabilities:
-		node.Kind = mib.KindCapabilities
+		node.SetKind(mib.KindCapabilities)
 	}
-	node.Name = label
-	node.Module = ctx.ModuleToResolved[def.mod]
+	node.SetName(label)
+	node.SetModule(ctx.ModuleToResolved[def.mod])
 	ctx.RegisterModuleNodeSymbol(def.mod, label, node)
 	ctx.Builder.RegisterNode(label, node)
 
@@ -349,11 +350,11 @@ func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mib.No
 		ctx.Trace("resolved OID definition",
 			slog.String("name", label),
 			slog.Uint64("arc", uint64(node.Arc())),
-			slog.String("kind", node.Kind.String()))
+			slog.String("kind", node.Kind().String()))
 	}
 }
 
-func resolveNumericComponent(ctx *ResolverContext, parent *mib.Node, arc uint32) *mib.Node {
+func resolveNumericComponent(ctx *ResolverContext, parent *mibimpl.Node, arc uint32) *mibimpl.Node {
 	if parent != nil {
 		return parent.GetOrCreateChild(arc)
 	}
@@ -385,9 +386,9 @@ func resolveTrapTypeDefinitions(ctx *ResolverContext, defs []trapTypeRef) {
 		zeroNode := enterpriseNode.GetOrCreateChild(0)
 		trapNode := zeroNode.GetOrCreateChild(trapNumber)
 
-		trapNode.Name = defName
-		trapNode.Kind = mib.KindNotification
-		trapNode.Module = ctx.ModuleToResolved[def.mod]
+		trapNode.SetName(defName)
+		trapNode.SetKind(mib.KindNotification)
+		trapNode.SetModule(ctx.ModuleToResolved[def.mod])
 		ctx.RegisterModuleNodeSymbol(def.mod, defName, trapNode)
 		ctx.Builder.RegisterNode(defName, trapNode)
 
@@ -400,7 +401,7 @@ func resolveTrapTypeDefinitions(ctx *ResolverContext, defs []trapTypeRef) {
 	}
 }
 
-func lookupOrCreateWellKnownRoot(ctx *ResolverContext, name string) (*mib.Node, bool) {
+func lookupOrCreateWellKnownRoot(ctx *ResolverContext, name string) (*mibimpl.Node, bool) {
 	arc := wellKnownRootArc(name)
 	if arc < 0 {
 		return nil, false
@@ -408,7 +409,7 @@ func lookupOrCreateWellKnownRoot(ctx *ResolverContext, name string) (*mib.Node, 
 	return ctx.Builder.GetOrCreateRoot(uint32(arc)), true
 }
 
-func lookupSmiGlobalOidRoot(ctx *ResolverContext, name string) (*mib.Node, bool) {
+func lookupSmiGlobalOidRoot(ctx *ResolverContext, name string) (*mibimpl.Node, bool) {
 	if _, ok := smiGlobalOidRoots[name]; !ok {
 		return nil, false
 	}

@@ -24,20 +24,21 @@ func main() {
 
 	// Look up a textual convention
 	fmt.Println("=== Textual Convention: DisplayString ===")
-	displayString := mib.Type("DisplayString")
+	displayString := mib.FindType("DisplayString")
 	if displayString != nil {
 		printType(displayString)
 	}
 
 	// Type with enumerations
 	fmt.Println("\n=== Enumerated type from object ===")
-	ifAdminStatus := mib.ObjectByQualified("IF-MIB::ifAdminStatus")
-	if ifAdminStatus != nil && ifAdminStatus.Type != nil {
+	ifAdminStatus := mib.FindObject("IF-MIB::ifAdminStatus")
+	if ifAdminStatus != nil && ifAdminStatus.Type() != nil {
 		fmt.Printf("ifAdminStatus type: %s (base: %s)\n",
-			ifAdminStatus.Type.Name, ifAdminStatus.Type.Base)
-		if len(ifAdminStatus.NamedValues) > 0 {
+			ifAdminStatus.Type().Name(), ifAdminStatus.Type().Base())
+		enums := ifAdminStatus.EffectiveEnums()
+		if len(enums) > 0 {
 			fmt.Println("  Named values:")
-			for _, nv := range ifAdminStatus.NamedValues {
+			for _, nv := range enums {
 				fmt.Printf("    %s(%d)\n", nv.Label, nv.Value)
 			}
 		}
@@ -47,22 +48,23 @@ func main() {
 	fmt.Println("\n=== Textual Conventions (first 10) ===")
 	count := 0
 	for _, t := range mib.Types() {
-		if t.IsTC && count < 10 {
-			fmt.Printf("  %s (%s) from %s\n", t.Name, t.Base, t.Module.Name)
+		if t.IsTextualConvention() && count < 10 {
+			fmt.Printf("  %s (%s) from %s\n", t.Name(), t.Base(), t.Module().Name())
 			count++
 		}
 	}
 
 	// Object with size constraint
 	fmt.Println("\n=== Object with SIZE constraint ===")
-	sysDescr := mib.Object("sysDescr")
+	sysDescr := mib.FindObject("sysDescr")
 	if sysDescr != nil {
 		fmt.Printf("sysDescr:\n")
-		fmt.Printf("  Type: %s\n", sysDescr.Type.Name)
-		fmt.Printf("  Base: %s\n", sysDescr.Type.Base)
-		if len(sysDescr.Size) > 0 {
+		fmt.Printf("  Type: %s\n", sysDescr.Type().Name())
+		fmt.Printf("  Base: %s\n", sysDescr.Type().Base())
+		sizes := sysDescr.EffectiveSizes()
+		if len(sizes) > 0 {
 			fmt.Printf("  Size: ")
-			for i, r := range sysDescr.Size {
+			for i, r := range sizes {
 				if i > 0 {
 					fmt.Print(" | ")
 				}
@@ -74,8 +76,8 @@ func main() {
 			}
 			fmt.Println()
 		}
-		if sysDescr.Hint != "" {
-			fmt.Printf("  Hint: %s\n", sysDescr.Hint)
+		if hint := sysDescr.EffectiveDisplayHint(); hint != "" {
+			fmt.Printf("  Hint: %s\n", hint)
 		}
 	}
 
@@ -83,29 +85,28 @@ func main() {
 	fmt.Println("\n=== Counter64 objects (first 5) ===")
 	count = 0
 	for _, obj := range mib.Objects() {
-		if obj.Type != nil && obj.Type.Base == gomib.BaseCounter64 && count < 5 {
-			fmt.Printf("  %s::%s\n", obj.Module.Name, obj.Name)
+		if obj.Type() != nil && obj.Type().Base() == gomib.BaseCounter64 && count < 5 {
+			fmt.Printf("  %s::%s\n", obj.Module().Name(), obj.Name())
 			count++
 		}
 	}
 }
 
-func printType(t *gomib.Type) {
-	fmt.Printf("Name: %s\n", t.Name)
-	fmt.Printf("Module: %s\n", t.Module.Name)
-	fmt.Printf("Base: %s\n", t.Base)
-	fmt.Printf("IsTC: %v\n", t.IsTC)
-	if t.Parent != nil {
-		fmt.Printf("Parent: %s\n", t.Parent.Name)
+func printType(t gomib.Type) {
+	fmt.Printf("Name: %s\n", t.Name())
+	fmt.Printf("Module: %s\n", t.Module().Name())
+	fmt.Printf("Base: %s\n", t.Base())
+	fmt.Printf("IsTC: %v\n", t.IsTextualConvention())
+	if t.Parent() != nil {
+		fmt.Printf("Parent: %s\n", t.Parent().Name())
 	}
-	if len(t.Size) > 0 {
-		fmt.Printf("Size: %v\n", t.Size)
+	if len(t.Sizes()) > 0 {
+		fmt.Printf("Size: %v\n", t.Sizes())
 	}
-	if t.Hint != "" {
-		fmt.Printf("Hint: %s\n", t.Hint)
+	if hint := t.DisplayHint(); hint != "" {
+		fmt.Printf("Hint: %s\n", hint)
 	}
-	if t.Description != "" {
-		desc := t.Description
+	if desc := t.Description(); desc != "" {
 		if len(desc) > 80 {
 			desc = desc[:77] + "..."
 		}

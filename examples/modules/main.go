@@ -33,7 +33,7 @@ func main() {
 	fmt.Printf("Loaded %d modules (including dependencies)\n", mib.ModuleCount())
 	fmt.Println("\nLoaded modules:")
 	for _, mod := range mib.Modules() {
-		fmt.Printf("  %s (%s)\n", mod.Name, mod.Language)
+		fmt.Printf("  %s (%s)\n", mod.Name(), mod.Language())
 	}
 
 	// Explore a specific module
@@ -46,8 +46,8 @@ func main() {
 	// Module identity OID
 	fmt.Println("\n=== Module identity OIDs ===")
 	for _, mod := range mib.Modules() {
-		if mod.OID != nil {
-			fmt.Printf("  %s: %s\n", mod.Name, mod.OID)
+		if mod.OID() != nil {
+			fmt.Printf("  %s: %s\n", mod.Name(), mod.OID())
 		}
 	}
 
@@ -56,7 +56,7 @@ func main() {
 	for _, mod := range mib.Modules() {
 		objs := mod.Objects()
 		if len(objs) > 0 {
-			fmt.Printf("  %s: %d objects\n", mod.Name, len(objs))
+			fmt.Printf("  %s: %d objects\n", mod.Name(), len(objs))
 		}
 	}
 
@@ -65,19 +65,18 @@ func main() {
 	for _, mod := range mib.Modules() {
 		types := mod.Types()
 		if len(types) > 0 {
-			fmt.Printf("  %s: %d types\n", mod.Name, len(types))
+			fmt.Printf("  %s: %d types\n", mod.Name(), len(types))
 		}
 	}
 }
 
-func printModuleDetails(mod *gomib.Module) {
-	fmt.Printf("Name: %s\n", mod.Name)
-	fmt.Printf("Language: %s\n", mod.Language)
-	if mod.OID != nil {
-		fmt.Printf("OID: %s\n", mod.OID)
+func printModuleDetails(mod gomib.Module) {
+	fmt.Printf("Name: %s\n", mod.Name())
+	fmt.Printf("Language: %s\n", mod.Language())
+	if mod.OID() != nil {
+		fmt.Printf("OID: %s\n", mod.OID())
 	}
-	if mod.Organization != "" {
-		org := mod.Organization
+	if org := mod.Organization(); org != "" {
 		if len(org) > 60 {
 			org = org[:57] + "..."
 		}
@@ -87,11 +86,12 @@ func printModuleDetails(mod *gomib.Module) {
 	fmt.Printf("Types: %d\n", len(mod.Types()))
 	fmt.Printf("Notifications: %d\n", len(mod.Notifications()))
 
-	if len(mod.Revisions) > 0 {
-		fmt.Printf("Revisions: %d\n", len(mod.Revisions))
-		for i, rev := range mod.Revisions {
+	revisions := mod.Revisions()
+	if len(revisions) > 0 {
+		fmt.Printf("Revisions: %d\n", len(revisions))
+		for i, rev := range revisions {
 			if i >= 3 {
-				fmt.Printf("  ... and %d more\n", len(mod.Revisions)-3)
+				fmt.Printf("  ... and %d more\n", len(revisions)-3)
 				break
 			}
 			fmt.Printf("  %s\n", rev.Date)

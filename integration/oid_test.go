@@ -156,7 +156,7 @@ func TestOidResolution(t *testing.T) {
 
 			got := node.OID().String()
 			testutil.Equal(t, tc.Oid, got, "OID mismatch")
-			testutil.Equal(t, tc.Kind, node.Kind, "kind mismatch")
+			testutil.Equal(t, tc.Kind, node.Kind(), "kind mismatch")
 		})
 	}
 }

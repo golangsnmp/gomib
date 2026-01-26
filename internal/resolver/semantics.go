@@ -1,12 +1,13 @@
 package resolver
 
 import (
-	"github.com/golangsnmp/gomib/mib"
 	"log/slog"
 	"slices"
 
+	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 func analyzeSemantics(ctx *ResolverContext) {
@@ -20,7 +21,7 @@ func analyzeSemantics(ctx *ResolverContext) {
 
 func inferNodeKinds(ctx *ResolverContext, objRefs []objectTypeRef) {
 	tables, rows, scalars := 0, 0, 0
-	var rowNodes []*mib.Node
+	var rowNodes []*mibimpl.Node
 
 	for _, ref := range objRefs {
 		obj := ref.obj
@@ -30,14 +31,14 @@ func inferNodeKinds(ctx *ResolverContext, objRefs []objectTypeRef) {
 		}
 
 		if _, isSequenceOf := obj.Syntax.(*module.TypeSyntaxSequenceOf); isSequenceOf {
-			node.Kind = mib.KindTable
+			node.SetKind(mib.KindTable)
 			tables++
 		} else if len(obj.Index) > 0 || obj.Augments != "" {
-			node.Kind = mib.KindRow
+			node.SetKind(mib.KindRow)
 			rows++
 			rowNodes = append(rowNodes, node)
 		} else {
-			node.Kind = mib.KindScalar
+			node.SetKind(mib.KindScalar)
 			scalars++
 		}
 	}
@@ -46,9 +47,12 @@ func inferNodeKinds(ctx *ResolverContext, objRefs []objectTypeRef) {
 	columns := 0
 	for _, row := range rowNodes {
 		for _, child := range row.Children() {
-			if child.Kind == mib.KindScalar {
-				child.Kind = mib.KindColumn
-				columns++
+			// Type assert to get concrete node
+			if childNode, ok := child.(*mibimpl.Node); ok {
+				if childNode.Kind() == mib.KindScalar {
+					childNode.SetKind(mib.KindColumn)
+					columns++
+				}
 			}
 		}
 	}
@@ -141,39 +145,39 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 			continue
 		}
 
-		resolved := &mib.Object{
-			Name:        obj.Name,
-			Node:        node,
-			Module:      ctx.ModuleToResolved[ref.mod],
-			Access:      convertAccess(obj.Access),
-			Status:      convertStatus(obj.Status),
-			Description: obj.Description,
-			Units:       obj.Units,
-			Reference:   obj.Reference,
-		}
+		resolved := mibimpl.NewObject(obj.Name)
+		resolved.SetNode(node)
+		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
+		resolved.SetAccess(convertAccess(obj.Access))
+		resolved.SetStatus(convertStatus(obj.Status))
+		resolved.SetDescription(obj.Description)
+		resolved.SetUnits(obj.Units)
+		resolved.SetReference(obj.Reference)
 
 		// Resolve type and extract inline constraints
 		if t, ok := resolveTypeSyntax(ctx, obj.Syntax, ref.mod, obj.Name, obj.Span); ok {
-			resolved.Type = t
+			resolved.SetType(t)
 		}
 
 		// Extract inline constraints and named values
-		resolved.Size, resolved.ValueRange = extractConstraints(obj.Syntax)
-		resolved.NamedValues = extractNamedValues(obj.Syntax)
+		sizes, ranges := extractConstraints(obj.Syntax)
+		resolved.SetEffectiveSizes(sizes)
+		resolved.SetEffectiveRanges(ranges)
+		resolved.SetEffectiveEnums(extractNamedValues(obj.Syntax))
 
 		// INDEX and AUGMENTS are resolved in a second pass after all objects exist
 		// This ensures index objects exist when we try to link them
 
 		// Convert DEFVAL
 		if obj.DefVal != nil {
-			resolved.DefVal = convertDefVal(ctx, obj.DefVal, ref.mod)
+			resolved.SetDefaultValue(convertDefVal(ctx, obj.DefVal, ref.mod))
 		}
 
 		// Pre-compute effective values from type chain
 		computeEffectiveValues(resolved)
 
 		ctx.Builder.AddObject(resolved)
-		node.Object = resolved
+		node.SetObject(resolved)
 		created++
 
 		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
@@ -185,29 +189,33 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 	for _, ref := range objRefs {
 		obj := ref.obj
 		node, ok := ctx.LookupNodeForModule(ref.mod, obj.Name)
-		if !ok || node.Object == nil {
+		if !ok || node.InternalObject() == nil {
 			continue
 		}
 
+		resolvedObj := node.InternalObject()
+
 		// Resolve INDEX
 		if len(obj.Index) > 0 {
+			var indexEntries []mib.IndexEntry
 			for _, item := range obj.Index {
 				if indexNode, ok := ctx.LookupNodeForModule(ref.mod, item.Object); ok {
-					if indexNode.Object != nil {
-						node.Object.Index = append(node.Object.Index, mib.IndexEntry{
-							Object:  indexNode.Object,
+					if indexNode.InternalObject() != nil {
+						indexEntries = append(indexEntries, mib.IndexEntry{
+							Object:  indexNode.InternalObject(),
 							Implied: item.Implied,
 						})
 					}
 				}
 			}
+			resolvedObj.SetIndex(indexEntries)
 		}
 
 		// Resolve AUGMENTS
 		if obj.Augments != "" {
 			if augNode, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); ok {
-				if augNode.Object != nil {
-					node.Object.Augments = augNode.Object
+				if augNode.InternalObject() != nil {
+					resolvedObj.SetAugments(augNode.InternalObject())
 				}
 			}
 		}
@@ -218,27 +226,30 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 	}
 }
 
-func computeEffectiveValues(obj *mib.Object) {
-	if obj.Type == nil {
+func computeEffectiveValues(obj *mibimpl.Object) {
+	t := obj.InternalType()
+	if t == nil {
 		return
 	}
 
 	// Walk the type chain to find effective values
-	t := obj.Type
 	for t != nil {
-		if obj.Hint == "" && t.Hint != "" {
-			obj.Hint = t.Hint
+		if obj.EffectiveDisplayHint() == "" && t.DisplayHint() != "" {
+			obj.SetEffectiveHint(t.DisplayHint())
 		}
-		if len(obj.Size) == 0 && len(t.Size) > 0 {
-			obj.Size = t.Size
+		if len(obj.EffectiveSizes()) == 0 && len(t.Sizes()) > 0 {
+			obj.SetEffectiveSizes(t.Sizes())
 		}
-		if len(obj.ValueRange) == 0 && len(t.ValueRange) > 0 {
-			obj.ValueRange = t.ValueRange
+		if len(obj.EffectiveRanges()) == 0 && len(t.Ranges()) > 0 {
+			obj.SetEffectiveRanges(t.Ranges())
 		}
-		if len(obj.NamedValues) == 0 && len(t.NamedValues) > 0 {
-			obj.NamedValues = t.NamedValues
+		if len(obj.EffectiveEnums()) == 0 && len(t.Enums()) > 0 {
+			obj.SetEffectiveEnums(t.Enums())
 		}
-		t = t.Parent
+		if len(obj.EffectiveBits()) == 0 && len(t.Bits()) > 0 {
+			obj.SetEffectiveBits(t.Bits())
+		}
+		t = t.InternalParent()
 	}
 }
 
@@ -252,19 +263,17 @@ func createResolvedNotifications(ctx *ResolverContext) {
 			continue
 		}
 
-		resolved := &mib.Notification{
-			Name:        notif.Name,
-			Node:        node,
-			Module:      ctx.ModuleToResolved[ref.mod],
-			Status:      convertStatus(notif.Status),
-			Description: notif.Description,
-			Reference:   notif.Reference,
-		}
+		resolved := mibimpl.NewNotification(notif.Name)
+		resolved.SetNode(node)
+		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
+		resolved.SetStatus(convertStatus(notif.Status))
+		resolved.SetDescription(notif.Description)
+		resolved.SetReference(notif.Reference)
 
 		for _, objName := range notif.Objects {
 			if objNode, ok := ctx.LookupNodeForModule(ref.mod, objName); ok {
-				if objNode.Object != nil {
-					resolved.Objects = append(resolved.Objects, objNode.Object)
+				if objNode.InternalObject() != nil {
+					resolved.AddObject(objNode.InternalObject())
 				}
 			} else {
 				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
@@ -272,7 +281,7 @@ func createResolvedNotifications(ctx *ResolverContext) {
 		}
 
 		ctx.Builder.AddNotification(resolved)
-		node.Notif = resolved
+		node.SetNotification(resolved)
 		created++
 
 		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
@@ -285,7 +294,7 @@ func createResolvedNotifications(ctx *ResolverContext) {
 	}
 }
 
-func resolveTypeSyntax(ctx *ResolverContext, syntax module.TypeSyntax, mod *module.Module, objectName string, span types.Span) (*mib.Type, bool) {
+func resolveTypeSyntax(ctx *ResolverContext, syntax module.TypeSyntax, mod *module.Module, objectName string, span types.Span) (*mibimpl.Type, bool) {
 	switch s := syntax.(type) {
 	case *module.TypeSyntaxTypeRef:
 		if t, ok := ctx.LookupTypeForModule(mod, s.Name); ok {

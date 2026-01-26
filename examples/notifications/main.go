@@ -31,11 +31,11 @@ func main() {
 	snmpMod := mib.Module("SNMPv2-MIB")
 	if snmpMod != nil {
 		for _, notif := range snmpMod.Notifications() {
-			fmt.Printf("%s (%s)\n", notif.Name, notif.OID())
-			if len(notif.Objects) > 0 {
+			fmt.Printf("%s (%s)\n", notif.Name(), notif.OID())
+			if len(notif.Objects()) > 0 {
 				fmt.Printf("  Objects:\n")
-				for _, obj := range notif.Objects {
-					fmt.Printf("    - %s\n", obj.Name)
+				for _, obj := range notif.Objects() {
+					fmt.Printf("    - %s\n", obj.Name())
 				}
 			}
 		}
@@ -43,14 +43,13 @@ func main() {
 
 	// Find notification by name
 	fmt.Println("\n=== Lookup notification by name ===")
-	coldStart := mib.Notification("coldStart")
+	coldStart := mib.FindNotification("coldStart")
 	if coldStart != nil {
 		fmt.Printf("coldStart:\n")
 		fmt.Printf("  OID: %s\n", coldStart.OID())
-		fmt.Printf("  Module: %s\n", coldStart.Module.Name)
-		fmt.Printf("  Status: %s\n", coldStart.Status)
-		if coldStart.Description != "" {
-			desc := coldStart.Description
+		fmt.Printf("  Module: %s\n", coldStart.Module().Name())
+		fmt.Printf("  Status: %s\n", coldStart.Status())
+		if desc := coldStart.Description(); desc != "" {
 			if len(desc) > 100 {
 				desc = desc[:97] + "..."
 			}
@@ -62,8 +61,8 @@ func main() {
 	fmt.Println("\n=== Notifications per module (top 5) ===")
 	modCounts := make(map[string]int)
 	for _, notif := range mib.Notifications() {
-		if notif.Module != nil {
-			modCounts[notif.Module.Name]++
+		if notif.Module() != nil {
+			modCounts[notif.Module().Name()]++
 		}
 	}
 
@@ -91,11 +90,11 @@ func main() {
 	}
 	var withObjects []notifInfo
 	for _, notif := range mib.Notifications() {
-		if len(notif.Objects) > 2 {
+		if len(notif.Objects()) > 2 {
 			withObjects = append(withObjects, notifInfo{
-				name:    notif.Name,
-				module:  notif.Module.Name,
-				objects: len(notif.Objects),
+				name:    notif.Name(),
+				module:  notif.Module().Name(),
+				objects: len(notif.Objects()),
 			})
 		}
 	}

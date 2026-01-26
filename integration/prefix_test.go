@@ -98,12 +98,15 @@ func TestLongestPrefix(t *testing.T) {
 
 	for _, tc := range longestPrefixTests {
 		t.Run(tc.Description, func(t *testing.T) {
-			node := m.LongestPrefix(tc.Query)
+			oid, err := gomib.ParseOID(tc.Query)
+			testutil.NoError(t, err, "parse OID")
+
+			node := m.LongestPrefixByOID(oid)
 			testutil.NotNil(t, node, "should find a matching prefix for %s", tc.Query)
 
 			testutil.Equal(t, tc.ExpectedOid, node.OID().String(), "OID mismatch")
-			testutil.Equal(t, tc.ExpectedName, node.Name, "name mismatch")
-			testutil.Equal(t, tc.ExpectedKind, node.Kind, "kind mismatch")
+			testutil.Equal(t, tc.ExpectedName, node.Name(), "name mismatch")
+			testutil.Equal(t, tc.ExpectedKind, node.Kind(), "kind mismatch")
 		})
 	}
 }
@@ -112,21 +115,24 @@ func TestLongestPrefix_NoMatch(t *testing.T) {
 	m := loadCorpus(t)
 
 	// OID that doesn't exist at all (wrong top-level arc)
-	node := m.LongestPrefix("9.9.9.9.9")
+	oid, _ := gomib.ParseOID("9.9.9.9.9")
+	node := m.LongestPrefixByOID(oid)
 	testutil.Nil(t, node, "should return nil for completely unknown OID tree")
 }
 
 func TestLongestPrefix_EmptyOid(t *testing.T) {
 	m := loadCorpus(t)
 
-	node := m.LongestPrefix("")
+	node := m.LongestPrefixByOID(nil)
 	testutil.Nil(t, node, "should return nil for empty OID")
 }
 
 func TestLongestPrefix_InvalidOid(t *testing.T) {
 	m := loadCorpus(t)
 
-	node := m.LongestPrefix("not.an.oid")
+	// Invalid OID string will parse to nil
+	oid, _ := gomib.ParseOID("not.an.oid")
+	node := m.LongestPrefixByOID(oid)
 	testutil.Nil(t, node, "should return nil for invalid OID")
 }
 
@@ -138,7 +144,7 @@ func TestLongestPrefixByOID(t *testing.T) {
 	node := m.LongestPrefixByOID(oid)
 
 	testutil.NotNil(t, node, "should find node")
-	testutil.Equal(t, "syntheticSimpleIndex", node.Name, "name mismatch")
+	testutil.Equal(t, "syntheticSimpleIndex", node.Name(), "name mismatch")
 	testutil.Equal(t, "1.3.6.1.2.1.999.2.1.1.1", node.OID().String(), "OID mismatch")
 }
 
