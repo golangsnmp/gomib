@@ -2,10 +2,13 @@
 package main
 
 import (
+	"cmp"
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/golangsnmp/gomib"
 )
@@ -16,7 +19,7 @@ func main() {
 		log.Fatalf("failed to open MIB directory: %v", err)
 	}
 
-	mib, err := gomib.Load(source)
+	mib, err := gomib.Load(context.Background(), source)
 	if err != nil {
 		log.Fatalf("failed to load MIBs: %v", err)
 	}
@@ -72,14 +75,9 @@ func main() {
 	for name, count := range modCounts {
 		sorted = append(sorted, modCount{name, count})
 	}
-	// Simple bubble sort for top 5
-	for i := 0; i < len(sorted)-1; i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[j].count > sorted[i].count {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	slices.SortFunc(sorted, func(a, b modCount) int {
+		return cmp.Compare(b.count, a.count) // descending
+	})
 	for i := 0; i < min(5, len(sorted)); i++ {
 		fmt.Printf("  %s: %d notifications\n", sorted[i].name, sorted[i].count)
 	}
@@ -101,14 +99,9 @@ func main() {
 			})
 		}
 	}
-	// Sort by object count
-	for i := 0; i < len(withObjects)-1; i++ {
-		for j := i + 1; j < len(withObjects); j++ {
-			if withObjects[j].objects > withObjects[i].objects {
-				withObjects[i], withObjects[j] = withObjects[j], withObjects[i]
-			}
-		}
-	}
+	slices.SortFunc(withObjects, func(a, b notifInfo) int {
+		return cmp.Compare(b.objects, a.objects) // descending
+	})
 	for i := 0; i < min(5, len(withObjects)); i++ {
 		n := withObjects[i]
 		fmt.Printf("  %s::%s (%d objects)\n", n.module, n.name, n.objects)

@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -182,7 +183,7 @@ func getDefaultSearchPaths() []string {
 func loadMib(modules []string) (*gomib.Mib, error) {
 	sources := getSources()
 	if len(sources) == 0 {
-		return nil, fmt.Errorf("no MIB sources available")
+		return nil, gomib.ErrNoSources
 	}
 
 	var source gomib.Source
@@ -198,9 +199,9 @@ func loadMib(modules []string) (*gomib.Mib, error) {
 	}
 
 	if len(modules) > 0 {
-		return gomib.LoadModules(modules, source, opts...)
+		return gomib.LoadModules(context.Background(), modules, source, opts...)
 	}
-	return gomib.Load(source, opts...)
+	return gomib.Load(context.Background(), source, opts...)
 }
 
 // printError prints an error message to stderr.

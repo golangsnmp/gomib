@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
@@ -30,7 +31,7 @@ func main() {
 	fmt.Println()
 
 	// Load with logging - this will show module loading, resolution phases, etc.
-	mib, err := gomib.LoadModules(
+	mib, err := gomib.LoadModules(context.Background(),
 		[]string{"IF-MIB"},
 		source,
 		gomib.WithLogger(logger),
@@ -48,7 +49,7 @@ func main() {
 	}))
 
 	// Load a single small module to see trace output
-	_, _ = gomib.LoadModules(
+	_, _ = gomib.LoadModules(context.Background(),
 		[]string{"SNMPv2-SMI"},
 		source,
 		gomib.WithLogger(traceLogger),

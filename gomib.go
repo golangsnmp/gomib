@@ -34,16 +34,16 @@ func WithLogger(logger *slog.Logger) LoadOption {
 //
 // Example:
 //
-//	mib, err := gomib.Load(
+//	mib, err := gomib.Load(ctx,
 //	    gomib.DirTree("/usr/share/snmp/mibs"),
 //	    gomib.WithLogger(slog.Default()),
 //	)
 //
 //	// Multiple sources:
-//	mib, err := gomib.Load(
+//	mib, err := gomib.Load(ctx,
 //	    gomib.Multi(gomib.DirTree("/usr/share/snmp/mibs"), gomib.Dir("./custom")),
 //	)
-func Load(source Source, opts ...LoadOption) (*Mib, error) {
+func Load(ctx context.Context, source Source, opts ...LoadOption) (*Mib, error) {
 	cfg := loadConfig{
 		extensions: DefaultExtensions,
 	}
@@ -55,7 +55,7 @@ func Load(source Source, opts ...LoadOption) (*Mib, error) {
 	if source != nil {
 		sources = append(sources, source)
 	}
-	return loadFromSources(sources, nil, cfg)
+	return loadFromSources(ctx, sources, nil, cfg)
 }
 
 // LoadModules loads specific MIB modules by name, along with their dependencies.
@@ -63,11 +63,11 @@ func Load(source Source, opts ...LoadOption) (*Mib, error) {
 //
 // Example:
 //
-//	mib, err := gomib.LoadModules(
+//	mib, err := gomib.LoadModules(ctx,
 //	    []string{"IF-MIB", "IP-MIB"},
 //	    gomib.DirTree("/usr/share/snmp/mibs"),
 //	)
-func LoadModules(names []string, source Source, opts ...LoadOption) (*Mib, error) {
+func LoadModules(ctx context.Context, names []string, source Source, opts ...LoadOption) (*Mib, error) {
 	cfg := loadConfig{
 		extensions: DefaultExtensions,
 	}
@@ -79,13 +79,13 @@ func LoadModules(names []string, source Source, opts ...LoadOption) (*Mib, error
 	if source != nil {
 		sources = append(sources, source)
 	}
-	return loadFromSources(sources, names, cfg)
+	return loadFromSources(ctx, sources, names, cfg)
 }
 
 // loadFromSources is the internal implementation.
 // If names is nil, loads all modules from sources.
 // If names is non-nil, loads only those modules (plus dependencies).
-func loadFromSources(sources []Source, names []string, cfg loadConfig) (*Mib, error) {
+func loadFromSources(ctx context.Context, sources []Source, names []string, cfg loadConfig) (*Mib, error) {
 	if len(sources) == 0 {
 		return nil, ErrNoSources
 	}
@@ -96,9 +96,9 @@ func loadFromSources(sources []Source, names []string, cfg loadConfig) (*Mib, er
 	}
 
 	if names != nil {
-		return loadModulesByName(sources, names, loadCfg)
+		return loadModulesByName(ctx, sources, names, loadCfg)
 	}
-	return loadAllModules(sources, loadCfg)
+	return loadAllModules(ctx, sources, loadCfg)
 }
 
 // logEnabled returns true if logging is enabled at the given level.

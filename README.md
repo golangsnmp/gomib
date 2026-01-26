@@ -39,6 +39,7 @@ Requires Go 1.24+.
 package main
 
 import (
+    "context"
     "fmt"
     "log"
 
@@ -48,7 +49,7 @@ import (
 func main() {
     // Load all MIBs from a directory tree
     source, _ := gomib.DirTree("/usr/share/snmp/mibs")
-    mib, err := gomib.Load(source)
+    mib, err := gomib.Load(context.Background(), source)
     if err != nil {
         log.Fatal(err)
     }
@@ -80,19 +81,19 @@ func main() {
 ```go
 // Load all MIBs from a directory tree
 source, err := gomib.DirTree("/path/to/mibs")
-mib, err := gomib.Load(source)
+mib, err := gomib.Load(ctx, source)
 
 // Load specific modules (with dependencies)
-mib, err := gomib.LoadModules([]string{"IF-MIB", "IP-MIB"}, source)
+mib, err := gomib.LoadModules(ctx, []string{"IF-MIB", "IP-MIB"}, source)
 
 // Multiple search paths
 src1, _ := gomib.DirTree("/usr/share/snmp/mibs")
 src2, _ := gomib.Dir("/opt/vendor/mibs")
-mib, err := gomib.Load(gomib.Multi(src1, src2))
+mib, err := gomib.Load(ctx, gomib.Multi(src1, src2))
 
 // With debug logging
 logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-mib, err := gomib.Load(source, gomib.WithLogger(logger))
+mib, err := gomib.Load(ctx, source, gomib.WithLogger(logger))
 ```
 
 ## Queries

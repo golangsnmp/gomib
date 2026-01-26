@@ -31,7 +31,7 @@ type LoadConfig struct {
 }
 
 // loadAllModules loads all MIB files from sources in parallel.
-func loadAllModules(sources []Source, cfg LoadConfig) (*Mib, error) {
+func loadAllModules(ctx context.Context, sources []Source, cfg LoadConfig) (*Mib, error) {
 	if len(sources) == 0 {
 		return nil, ErrNoSources
 	}
@@ -53,7 +53,7 @@ func loadAllModules(sources []Source, cfg LoadConfig) (*Mib, error) {
 	}
 
 	if logEnabled(logger, slog.LevelInfo) {
-		logger.LogAttrs(context.Background(), slog.LevelInfo, "parallel loading",
+		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading",
 			slog.Int("files", len(allFiles)))
 	}
 
@@ -75,8 +75,19 @@ func loadAllModules(sources []Source, cfg LoadConfig) (*Mib, error) {
 		wg.Add(1)
 		go func(path string) {
 			defer wg.Done()
-			sem <- struct{}{}
+
+			// Check for cancellation before acquiring semaphore
+			select {
+			case <-ctx.Done():
+				return
+			case sem <- struct{}{}:
+			}
 			defer func() { <-sem }()
+
+			// Check for cancellation after acquiring semaphore
+			if ctx.Err() != nil {
+				return
+			}
 
 			content, err := os.ReadFile(path)
 			if err != nil {
@@ -113,6 +124,11 @@ func loadAllModules(sources []Source, cfg LoadConfig) (*Mib, error) {
 		}
 	}
 
+	// Check for cancellation
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	// Add base modules
 	for _, name := range module.BaseModuleNames() {
 		if _, ok := modules[name]; !ok {
@@ -129,7 +145,7 @@ func loadAllModules(sources []Source, cfg LoadConfig) (*Mib, error) {
 	}
 
 	if logEnabled(logger, slog.LevelInfo) {
-		logger.LogAttrs(context.Background(), slog.LevelInfo, "parallel loading complete",
+		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading complete",
 			slog.Int("modules", len(mods)))
 	}
 
@@ -138,7 +154,7 @@ func loadAllModules(sources []Source, cfg LoadConfig) (*Mib, error) {
 }
 
 // loadModulesByName loads specific modules by name along with their dependencies.
-func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, error) {
+func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg LoadConfig) (*Mib, error) {
 	logger := cfg.Logger
 
 	heuristic := defaultHeuristic()
@@ -151,6 +167,11 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 
 	var loadOne func(name string) error
 	loadOne = func(name string) error {
+		// Check for cancellation
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		// Already loaded?
 		if _, ok := modules[name]; ok {
 			return nil
@@ -173,7 +194,7 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 		content, err := findModuleContent(sources, name)
 		if err != nil {
 			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(context.Background(), slog.LevelDebug, "module not found",
+				logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
 					slog.String("module", name))
 			}
 			return nil // skip missing modules
@@ -181,7 +202,7 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 
 		if !heuristic.looksLikeMIBContent(content) {
 			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(context.Background(), slog.LevelDebug, "content rejected by heuristic",
+				logger.LogAttrs(ctx, slog.LevelDebug, "content rejected by heuristic",
 					slog.String("module", name))
 			}
 			return nil
@@ -192,7 +213,7 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 		ast := p.ParseModule()
 		if ast == nil {
 			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(context.Background(), slog.LevelDebug, "parse failed",
+				logger.LogAttrs(ctx, slog.LevelDebug, "parse failed",
 					slog.String("module", name))
 			}
 			return nil
@@ -202,7 +223,7 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 		mod := module.Lower(ast, componentLogger(logger, "module"))
 		if mod == nil {
 			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(context.Background(), slog.LevelDebug, "lowering failed",
+				logger.LogAttrs(ctx, slog.LevelDebug, "lowering failed",
 					slog.String("module", name))
 			}
 			return nil
@@ -215,7 +236,9 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 
 		// Load dependencies
 		for _, imp := range mod.Imports {
-			_ = loadOne(imp.Module)
+			if err := loadOne(imp.Module); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -223,7 +246,9 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 
 	// Load requested modules
 	for _, name := range names {
-		_ = loadOne(name)
+		if err := loadOne(name); err != nil {
+			return nil, err
+		}
 	}
 
 	// Add base modules
@@ -252,10 +277,10 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 // findModuleContent searches sources for a module and returns its content.
 func findModuleContent(sources []Source, name string) ([]byte, error) {
 	for _, src := range sources {
-		r, _, err := src.Find(name)
+		result, err := src.Find(name)
 		if err == nil {
-			content, err := io.ReadAll(r)
-			_ = r.Close()
+			content, err := io.ReadAll(result.Reader)
+			_ = result.Reader.Close()
 			if err == nil {
 				return content, nil
 			}

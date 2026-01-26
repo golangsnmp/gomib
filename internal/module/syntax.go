@@ -65,13 +65,13 @@ func NewOidAssignment(components []OidComponent, span types.Span) OidAssignment 
 }
 
 // OidComponent is a component of an OID assignment.
+// Use type switches to distinguish concrete types:
+//   - *OidComponentName: just a name reference
+//   - *OidComponentNumber: just a number
+//   - *OidComponentNamedNumber: name with number like org(3)
+//   - *OidComponentQualifiedName: qualified reference like SNMPv2-SMI.enterprises
+//   - *OidComponentQualifiedNamedNumber: qualified with number
 type OidComponent interface {
-	// Number returns the numeric value if this component has one.
-	Number() (uint32, bool)
-	// Name returns the name if this component has one.
-	Name() (string, bool)
-	// Module returns the module name if this is a qualified reference.
-	Module() (string, bool)
 	// oidComponent marker
 	oidComponent()
 }
@@ -81,20 +81,14 @@ type OidComponentName struct {
 	NameValue string
 }
 
-func (c *OidComponentName) Number() (uint32, bool) { return 0, false }
-func (c *OidComponentName) Name() (string, bool)   { return c.NameValue, true }
-func (c *OidComponentName) Module() (string, bool) { return "", false }
-func (*OidComponentName) oidComponent()            {}
+func (*OidComponentName) oidComponent() {}
 
 // OidComponentNumber is just a number: `1`, `31`
 type OidComponentNumber struct {
 	Value uint32
 }
 
-func (c *OidComponentNumber) Number() (uint32, bool) { return c.Value, true }
-func (c *OidComponentNumber) Name() (string, bool)   { return "", false }
-func (c *OidComponentNumber) Module() (string, bool) { return "", false }
-func (*OidComponentNumber) oidComponent()            {}
+func (*OidComponentNumber) oidComponent() {}
 
 // OidComponentNamedNumber is a name with number: `org(3)` - common in well-known roots
 type OidComponentNamedNumber struct {
@@ -102,10 +96,7 @@ type OidComponentNamedNumber struct {
 	NumberValue uint32
 }
 
-func (c *OidComponentNamedNumber) Number() (uint32, bool) { return c.NumberValue, true }
-func (c *OidComponentNamedNumber) Name() (string, bool)   { return c.NameValue, true }
-func (c *OidComponentNamedNumber) Module() (string, bool) { return "", false }
-func (*OidComponentNamedNumber) oidComponent()            {}
+func (*OidComponentNamedNumber) oidComponent() {}
 
 // OidComponentQualifiedName is a qualified name: `SNMPv2-SMI.enterprises`
 type OidComponentQualifiedName struct {
@@ -113,10 +104,7 @@ type OidComponentQualifiedName struct {
 	NameValue   string
 }
 
-func (c *OidComponentQualifiedName) Number() (uint32, bool) { return 0, false }
-func (c *OidComponentQualifiedName) Name() (string, bool)   { return c.NameValue, true }
-func (c *OidComponentQualifiedName) Module() (string, bool) { return c.ModuleValue, true }
-func (*OidComponentQualifiedName) oidComponent()            {}
+func (*OidComponentQualifiedName) oidComponent() {}
 
 // OidComponentQualifiedNamedNumber is a qualified name with number: `SNMPv2-SMI.enterprises(1)`
 type OidComponentQualifiedNamedNumber struct {
@@ -125,17 +113,14 @@ type OidComponentQualifiedNamedNumber struct {
 	NumberValue uint32
 }
 
-func (c *OidComponentQualifiedNamedNumber) Number() (uint32, bool) { return c.NumberValue, true }
-func (c *OidComponentQualifiedNamedNumber) Name() (string, bool)   { return c.NameValue, true }
-func (c *OidComponentQualifiedNamedNumber) Module() (string, bool) { return c.ModuleValue, true }
-func (*OidComponentQualifiedNamedNumber) oidComponent()            {}
+func (*OidComponentQualifiedNamedNumber) oidComponent() {}
 
 // TypeSyntax is a type representation with symbol references (not resolved).
+// Use type switches to distinguish concrete types:
+//   - *TypeSyntaxSequenceOf for SEQUENCE OF (table type)
+//   - *TypeSyntaxSequence for SEQUENCE (row type)
+//   - *TypeSyntaxTypeRef, *TypeSyntaxIntegerEnum, etc. for other forms
 type TypeSyntax interface {
-	// IsSequenceOf returns true if this is a SEQUENCE OF (table type).
-	IsSequenceOf() bool
-	// IsSequence returns true if this is a SEQUENCE (row type).
-	IsSequence() bool
 	// typeSyntax marker
 	typeSyntax()
 }
@@ -145,27 +130,21 @@ type TypeSyntaxTypeRef struct {
 	Name string
 }
 
-func (*TypeSyntaxTypeRef) IsSequenceOf() bool { return false }
-func (*TypeSyntaxTypeRef) IsSequence() bool   { return false }
-func (*TypeSyntaxTypeRef) typeSyntax()        {}
+func (*TypeSyntaxTypeRef) typeSyntax() {}
 
 // TypeSyntaxIntegerEnum is INTEGER with enum values: `INTEGER { up(1), down(2) }`
 type TypeSyntaxIntegerEnum struct {
 	NamedNumbers []NamedNumber
 }
 
-func (*TypeSyntaxIntegerEnum) IsSequenceOf() bool { return false }
-func (*TypeSyntaxIntegerEnum) IsSequence() bool   { return false }
-func (*TypeSyntaxIntegerEnum) typeSyntax()        {}
+func (*TypeSyntaxIntegerEnum) typeSyntax() {}
 
 // TypeSyntaxBits is BITS with named bits: `BITS { flag1(0), flag2(1) }`
 type TypeSyntaxBits struct {
 	NamedBits []NamedBit
 }
 
-func (*TypeSyntaxBits) IsSequenceOf() bool { return false }
-func (*TypeSyntaxBits) IsSequence() bool   { return false }
-func (*TypeSyntaxBits) typeSyntax()        {}
+func (*TypeSyntaxBits) typeSyntax() {}
 
 // TypeSyntaxConstrained is a constrained type: `OCTET STRING (SIZE (0..255))`
 type TypeSyntaxConstrained struct {
@@ -175,41 +154,31 @@ type TypeSyntaxConstrained struct {
 	Constraint Constraint
 }
 
-func (*TypeSyntaxConstrained) IsSequenceOf() bool { return false }
-func (*TypeSyntaxConstrained) IsSequence() bool   { return false }
-func (*TypeSyntaxConstrained) typeSyntax()        {}
+func (*TypeSyntaxConstrained) typeSyntax() {}
 
 // TypeSyntaxSequenceOf is SEQUENCE OF: `SEQUENCE OF IfEntry`
 type TypeSyntaxSequenceOf struct {
 	EntryType string
 }
 
-func (*TypeSyntaxSequenceOf) IsSequenceOf() bool { return true }
-func (*TypeSyntaxSequenceOf) IsSequence() bool   { return false }
-func (*TypeSyntaxSequenceOf) typeSyntax()        {}
+func (*TypeSyntaxSequenceOf) typeSyntax() {}
 
 // TypeSyntaxSequence is SEQUENCE with fields (for row types).
 type TypeSyntaxSequence struct {
 	Fields []SequenceField
 }
 
-func (*TypeSyntaxSequence) IsSequenceOf() bool { return false }
-func (*TypeSyntaxSequence) IsSequence() bool   { return true }
-func (*TypeSyntaxSequence) typeSyntax()        {}
+func (*TypeSyntaxSequence) typeSyntax() {}
 
 // TypeSyntaxOctetString is OCTET STRING (explicit).
 type TypeSyntaxOctetString struct{}
 
-func (*TypeSyntaxOctetString) IsSequenceOf() bool { return false }
-func (*TypeSyntaxOctetString) IsSequence() bool   { return false }
-func (*TypeSyntaxOctetString) typeSyntax()        {}
+func (*TypeSyntaxOctetString) typeSyntax() {}
 
 // TypeSyntaxObjectIdentifier is OBJECT IDENTIFIER (explicit).
 type TypeSyntaxObjectIdentifier struct{}
 
-func (*TypeSyntaxObjectIdentifier) IsSequenceOf() bool { return false }
-func (*TypeSyntaxObjectIdentifier) IsSequence() bool   { return false }
-func (*TypeSyntaxObjectIdentifier) typeSyntax()        {}
+func (*TypeSyntaxObjectIdentifier) typeSyntax() {}
 
 // Constraint is a type constraint.
 type Constraint interface {

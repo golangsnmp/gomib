@@ -212,7 +212,7 @@ func TestLowerTypeSyntax(t *testing.T) {
 			},
 			checkFn: func(ts TypeSyntax) bool {
 				so, ok := ts.(*TypeSyntaxSequenceOf)
-				return ok && so.EntryType == "IfEntry" && ts.IsSequenceOf()
+				return ok && so.EntryType == "IfEntry"
 			},
 		},
 	}

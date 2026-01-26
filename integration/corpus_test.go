@@ -23,6 +23,7 @@
 package integration
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -62,7 +63,7 @@ func loadCorpus(t *testing.T) *gomib.Mib {
 			corpusErr = err
 			return
 		}
-		corpusModel, corpusErr = gomib.Load(src)
+		corpusModel, corpusErr = gomib.Load(context.Background(), src)
 	})
 
 	if corpusErr != nil {

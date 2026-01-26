@@ -1,6 +1,7 @@
 package gomib_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,7 +47,7 @@ func TestLoadIntegration(t *testing.T) {
 	src, err := gomib.DirTree(mibPath)
 	testutil.NoError(t, err, "create source")
 
-	mib, err := gomib.Load(src)
+	mib, err := gomib.Load(context.Background(), src)
 	testutil.NoError(t, err, "load")
 
 	// Basic sanity checks
@@ -79,7 +80,7 @@ func TestLoadModulesIntegration(t *testing.T) {
 	src, err := gomib.DirTree(mibPath)
 	testutil.NoError(t, err, "create source")
 
-	mib, err := gomib.LoadModules([]string{"IF-MIB"}, src)
+	mib, err := gomib.LoadModules(context.Background(), []string{"IF-MIB"}, src)
 	testutil.NoError(t, err, "load IF-MIB")
 
 	// Check we got IF-MIB
@@ -99,7 +100,7 @@ func TestLoadModulesIntegration(t *testing.T) {
 
 func TestLoadNoSource(t *testing.T) {
 	// Loading with nil source should return ErrNoSources
-	_, err := gomib.Load(nil)
+	_, err := gomib.Load(context.Background(), nil)
 	testutil.Equal(t, gomib.ErrNoSources, err, "Load(nil)")
 }
 
@@ -109,7 +110,7 @@ func TestFindNode(t *testing.T) {
 	src, err := gomib.DirTree(mibPath)
 	testutil.NoError(t, err, "create source")
 
-	mib, err := gomib.LoadModules([]string{"SNMPv2-MIB"}, src)
+	mib, err := gomib.LoadModules(context.Background(), []string{"SNMPv2-MIB"}, src)
 	testutil.NoError(t, err, "load SNMPv2-MIB")
 
 	// Check that SNMPv2-MIB loaded
@@ -148,7 +149,7 @@ func TestNodesIterator(t *testing.T) {
 	src, err := gomib.DirTree(mibPath)
 	testutil.NoError(t, err, "create source")
 
-	mib, err := gomib.LoadModules([]string{"SNMPv2-MIB"}, src)
+	mib, err := gomib.LoadModules(context.Background(), []string{"SNMPv2-MIB"}, src)
 	testutil.NoError(t, err, "load SNMPv2-MIB")
 
 	if mib.Module("SNMPv2-MIB") == nil {

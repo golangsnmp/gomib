@@ -29,7 +29,7 @@ func inferNodeKinds(ctx *ResolverContext, objRefs []objectTypeRef) {
 			continue
 		}
 
-		if obj.Syntax.IsSequenceOf() {
+		if _, isSequenceOf := obj.Syntax.(*module.TypeSyntaxSequenceOf); isSequenceOf {
 			node.Kind = mib.KindTable
 			tables++
 		} else if len(obj.Index) > 0 || obj.Augments != "" {
@@ -345,7 +345,18 @@ func convertDefVal(ctx *ResolverContext, defval module.DefVal, mod *module.Modul
 		return nil
 	case *module.DefValOidValue:
 		if len(v.Components) > 0 {
-			if name, ok := v.Components[0].Name(); ok {
+			var name string
+			switch c := v.Components[0].(type) {
+			case *module.OidComponentName:
+				name = c.NameValue
+			case *module.OidComponentNamedNumber:
+				name = c.NameValue
+			case *module.OidComponentQualifiedName:
+				name = c.NameValue
+			case *module.OidComponentQualifiedNamedNumber:
+				name = c.NameValue
+			}
+			if name != "" {
 				if node, ok := ctx.LookupNodeForModule(mod, name); ok {
 					return mib.DefValOID(node.OID())
 				}

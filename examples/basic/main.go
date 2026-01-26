@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -21,7 +22,7 @@ func main() {
 	}
 
 	// Load all MIBs from the source
-	mib, err := gomib.Load(source)
+	mib, err := gomib.Load(context.Background(), source)
 	if err != nil {
 		log.Fatalf("failed to load MIBs: %v", err)
 	}

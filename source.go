@@ -16,11 +16,19 @@ import (
 // Empty string matches files with no extension (e.g., "IF-MIB").
 var DefaultExtensions = []string{"", ".mib", ".smi", ".txt", ".my"}
 
+// FindResult contains the result of a Source.Find operation.
+type FindResult struct {
+	// Reader provides access to the file content.
+	Reader io.ReadCloser
+	// Path is the source path for diagnostics.
+	Path string
+}
+
 // Source finds MIB files by module name.
 type Source interface {
 	// Find locates a module by name.
-	// Returns the file content, source path for diagnostics, or fs.ErrNotExist if not found.
-	Find(name string) (io.ReadCloser, string, error)
+	// Returns fs.ErrNotExist if not found.
+	Find(name string) (FindResult, error)
 
 	// ListFiles returns all MIB file paths known to this source.
 	// Used for parallel loading.
@@ -88,18 +96,18 @@ func MustDir(path string, opts ...SourceOption) Source {
 	return src
 }
 
-func (s *dirSource) Find(name string) (io.ReadCloser, string, error) {
+func (s *dirSource) Find(name string) (FindResult, error) {
 	for _, ext := range s.config.extensions {
 		fullPath := filepath.Join(s.path, name+ext)
 		f, err := os.Open(fullPath)
 		if err == nil {
-			return f, fullPath, nil
+			return FindResult{Reader: f, Path: fullPath}, nil
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
-			return nil, fullPath, err
+			return FindResult{Path: fullPath}, err
 		}
 	}
-	return nil, "", fs.ErrNotExist
+	return FindResult{}, fs.ErrNotExist
 }
 
 func (s *dirSource) ListFiles() ([]string, error) {
@@ -186,16 +194,16 @@ func MustDirTree(root string, opts ...SourceOption) Source {
 	return src
 }
 
-func (s *treeSource) Find(name string) (io.ReadCloser, string, error) {
+func (s *treeSource) Find(name string) (FindResult, error) {
 	path, ok := s.index[name]
 	if !ok {
-		return nil, "", fs.ErrNotExist
+		return FindResult{}, fs.ErrNotExist
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, path, err
+		return FindResult{Path: path}, err
 	}
-	return f, path, nil
+	return FindResult{Reader: f, Path: path}, nil
 }
 
 func (s *treeSource) ListFiles() ([]string, error) {
@@ -229,23 +237,24 @@ func FS(name string, fsys fs.FS, opts ...SourceOption) Source {
 	}
 }
 
-func (s *fsSource) Find(name string) (io.ReadCloser, string, error) {
+func (s *fsSource) Find(name string) (FindResult, error) {
 	s.once.Do(func() {
 		s.index, s.err = s.buildIndex()
 	})
 	if s.err != nil {
-		return nil, "", s.err
+		return FindResult{}, s.err
 	}
 
 	path, ok := s.index[name]
 	if !ok {
-		return nil, "", fs.ErrNotExist
+		return FindResult{}, fs.ErrNotExist
 	}
+	fullPath := s.name + ":" + path
 	f, err := s.fsys.Open(path)
 	if err != nil {
-		return nil, s.name + ":" + path, err
+		return FindResult{Path: fullPath}, err
 	}
-	return f, s.name + ":" + path, nil
+	return FindResult{Reader: f, Path: fullPath}, nil
 }
 
 func (s *fsSource) ListFiles() ([]string, error) {
@@ -302,17 +311,17 @@ func Multi(sources ...Source) Source {
 	return &multiSource{sources: sources}
 }
 
-func (s *multiSource) Find(name string) (io.ReadCloser, string, error) {
+func (s *multiSource) Find(name string) (FindResult, error) {
 	for _, src := range s.sources {
-		r, path, err := src.Find(name)
+		result, err := src.Find(name)
 		if err == nil {
-			return r, path, nil
+			return result, nil
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
-			return nil, path, err
+			return result, err
 		}
 	}
-	return nil, "", fs.ErrNotExist
+	return FindResult{}, fs.ErrNotExist
 }
 
 func (s *multiSource) ListFiles() ([]string, error) {

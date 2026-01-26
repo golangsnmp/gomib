@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -21,7 +22,7 @@ func main() {
 
 	// Load only specific modules (with their dependencies)
 	fmt.Println("=== Loading IF-MIB and SNMPv2-MIB ===")
-	mib, err := gomib.LoadModules(
+	mib, err := gomib.LoadModules(context.Background(),
 		[]string{"IF-MIB", "SNMPv2-MIB"},
 		source,
 	)

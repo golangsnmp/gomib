@@ -61,12 +61,15 @@ func resolveOids(ctx *ResolverContext) {
 				defName := def.defName()
 				span := oid.Span
 				first := oid.Components[0]
-				if name, ok := first.Name(); ok {
-					ctx.RecordUnresolvedOid(def.mod, defName, name, span)
-				} else if moduleName, ok := first.Module(); ok {
-					if name, ok := first.Name(); ok {
-						ctx.RecordUnresolvedOid(def.mod, defName, moduleName+"."+name, span)
-					}
+				switch c := first.(type) {
+				case *module.OidComponentName:
+					ctx.RecordUnresolvedOid(def.mod, defName, c.NameValue, span)
+				case *module.OidComponentNamedNumber:
+					ctx.RecordUnresolvedOid(def.mod, defName, c.NameValue, span)
+				case *module.OidComponentQualifiedName:
+					ctx.RecordUnresolvedOid(def.mod, defName, c.ModuleValue+"."+c.NameValue, span)
+				case *module.OidComponentQualifiedNamedNumber:
+					ctx.RecordUnresolvedOid(def.mod, defName, c.ModuleValue+"."+c.NameValue, span)
 				}
 			}
 			break
@@ -176,30 +179,40 @@ func isFirstComponentResolvable(ctx *ResolverContext, def oidDefinition) bool {
 		return false
 	}
 	first := oid.Components[0]
-	if name, ok := first.Name(); ok {
-		if _, ok := ctx.LookupNodeForModule(def.mod, name); ok {
+	switch c := first.(type) {
+	case *module.OidComponentName:
+		if _, ok := ctx.LookupNodeForModule(def.mod, c.NameValue); ok {
 			return true
 		}
-		if wellKnownRootArc(name) >= 0 {
+		if wellKnownRootArc(c.NameValue) >= 0 {
 			return true
 		}
-		if _, ok := lookupSmiGlobalOidRoot(ctx, name); ok {
+		if _, ok := lookupSmiGlobalOidRoot(ctx, c.NameValue); ok {
 			return true
 		}
 		return false
-	}
-	if _, ok := first.Number(); ok {
+	case *module.OidComponentNumber:
 		return true
-	}
-	if moduleName, ok := first.Module(); ok {
-		name, ok := first.Name()
-		if !ok {
-			return false
+	case *module.OidComponentNamedNumber:
+		if _, ok := ctx.LookupNodeForModule(def.mod, c.NameValue); ok {
+			return true
 		}
-		_, ok = ctx.LookupNodeInModule(moduleName, name)
+		if wellKnownRootArc(c.NameValue) >= 0 {
+			return true
+		}
+		if _, ok := lookupSmiGlobalOidRoot(ctx, c.NameValue); ok {
+			return true
+		}
+		return true // Has a number, can resolve via that
+	case *module.OidComponentQualifiedName:
+		_, ok := ctx.LookupNodeInModule(c.ModuleValue, c.NameValue)
 		return ok
+	case *module.OidComponentQualifiedNamedNumber:
+		_, ok := ctx.LookupNodeInModule(c.ModuleValue, c.NameValue)
+		return ok
+	default:
+		return false
 	}
-	return false
 }
 
 func resolveOidDefinition(ctx *ResolverContext, def oidDefinition) bool {
