@@ -57,7 +57,12 @@ func loadCorpus(t *testing.T) *gomib.Mib {
 			return
 		}
 
-		corpusModel, corpusErr = gomib.Load(gomib.DirTree(path))
+		src, err := gomib.DirTree(path)
+		if err != nil {
+			corpusErr = err
+			return
+		}
+		corpusModel, corpusErr = gomib.Load(src)
 	})
 
 	if corpusErr != nil {

@@ -30,7 +30,7 @@ func registerModules(ctx *ResolverContext) {
 			Name:     mod.Name,
 			Language: convertLanguage(mod.Language),
 		}
-		ctx.Mib.AddModule(resolved)
+		ctx.Builder.AddModule(resolved)
 		ctx.ModuleToResolved[mod] = resolved
 
 		if mod.Name == "SNMPv2-SMI" {

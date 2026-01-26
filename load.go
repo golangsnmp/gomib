@@ -2,6 +2,7 @@ package gomib
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/parser"
 	"github.com/golangsnmp/gomib/internal/resolver"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 // componentLogger returns a logger with the component attribute, or nil if logger is nil.
@@ -31,7 +33,7 @@ type LoadConfig struct {
 // loadAllModules loads all MIB files from sources in parallel.
 func loadAllModules(sources []Source, cfg LoadConfig) (*Mib, error) {
 	if len(sources) == 0 {
-		return NewMib(), nil
+		return nil, ErrNoSources
 	}
 
 	logger := cfg.Logger
@@ -47,11 +49,11 @@ func loadAllModules(sources []Source, cfg LoadConfig) (*Mib, error) {
 	}
 
 	if len(allFiles) == 0 {
-		return NewMib(), nil
+		return mib.NewMib(), nil
 	}
 
 	if logEnabled(logger, slog.LevelInfo) {
-		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading",
+		logger.LogAttrs(context.Background(), slog.LevelInfo, "parallel loading",
 			slog.Int("files", len(allFiles)))
 	}
 
@@ -127,7 +129,7 @@ func loadAllModules(sources []Source, cfg LoadConfig) (*Mib, error) {
 	}
 
 	if logEnabled(logger, slog.LevelInfo) {
-		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading complete",
+		logger.LogAttrs(context.Background(), slog.LevelInfo, "parallel loading complete",
 			slog.Int("modules", len(mods)))
 	}
 
@@ -171,7 +173,7 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 		content, err := findModuleContent(sources, name)
 		if err != nil {
 			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
+				logger.LogAttrs(context.Background(), slog.LevelDebug, "module not found",
 					slog.String("module", name))
 			}
 			return nil // skip missing modules
@@ -179,7 +181,7 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 
 		if !heuristic.looksLikeMIBContent(content) {
 			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "content rejected by heuristic",
+				logger.LogAttrs(context.Background(), slog.LevelDebug, "content rejected by heuristic",
 					slog.String("module", name))
 			}
 			return nil
@@ -190,7 +192,7 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 		ast := p.ParseModule()
 		if ast == nil {
 			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "parse failed",
+				logger.LogAttrs(context.Background(), slog.LevelDebug, "parse failed",
 					slog.String("module", name))
 			}
 			return nil
@@ -200,7 +202,7 @@ func loadModulesByName(sources []Source, names []string, cfg LoadConfig) (*Mib, 
 		mod := module.Lower(ast, componentLogger(logger, "module"))
 		if mod == nil {
 			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "lowering failed",
+				logger.LogAttrs(context.Background(), slog.LevelDebug, "lowering failed",
 					slog.String("module", name))
 			}
 			return nil

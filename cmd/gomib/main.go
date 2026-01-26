@@ -181,18 +181,26 @@ func getDefaultSearchPaths() []string {
 // loadMib loads and resolves MIB modules.
 func loadMib(modules []string) (*gomib.Mib, error) {
 	sources := getSources()
-	var args []any
-	for _, src := range sources {
-		args = append(args, src)
+	if len(sources) == 0 {
+		return nil, fmt.Errorf("no MIB sources available")
 	}
+
+	var source gomib.Source
+	if len(sources) == 1 {
+		source = sources[0]
+	} else {
+		source = gomib.Multi(sources...)
+	}
+
+	var opts []gomib.LoadOption
 	if logger := setupLogger(); logger != nil {
-		args = append(args, gomib.WithLogger(logger))
+		opts = append(opts, gomib.WithLogger(logger))
 	}
 
 	if len(modules) > 0 {
-		return gomib.LoadModules(modules, args...)
+		return gomib.LoadModules(modules, source, opts...)
 	}
-	return gomib.Load(args...)
+	return gomib.Load(source, opts...)
 }
 
 // printError prints an error message to stderr.

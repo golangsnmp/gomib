@@ -139,6 +139,3 @@ const (
 
 // ParseOID parses an OID from a dotted string (e.g., "1.3.6.1.2.1").
 var ParseOID = mib.ParseOID
-
-// NewMib creates a new empty Mib with a pseudo-root.
-var NewMib = mib.NewMib

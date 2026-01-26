@@ -225,6 +225,34 @@ func (m *Mib) FindNode(query string) *Node {
 	return nil
 }
 
+// FindObject looks up an object by OID, name, or qualified name.
+// It tries multiple query formats in order:
+//   - Qualified name: "MODULE::name" (e.g., "IF-MIB::ifIndex")
+//   - Numeric OID: "1.3.6.1.2.1.2.2.1.1"
+//   - Partial OID: ".1.2.1.2" (leading dot stripped)
+//   - Simple name: "ifIndex"
+//
+// Returns nil if no matching object is found.
+func (m *Mib) FindObject(query string) *Object {
+	// Try qualified name first (MODULE::name)
+	if idx := strings.Index(query, "::"); idx >= 0 {
+		return m.ObjectByQualified(query)
+	}
+
+	// Try numeric OID (starts with digit)
+	if len(query) > 0 && query[0] >= '0' && query[0] <= '9' {
+		return m.ObjectByOID(query)
+	}
+
+	// Try partial OID (starts with .)
+	if len(query) > 0 && query[0] == '.' {
+		return m.ObjectByOID(query[1:])
+	}
+
+	// Try name lookup
+	return m.Object(query)
+}
+
 // Module returns the module with the given name, or nil if not found.
 func (m *Mib) Module(name string) *Module {
 	return m.moduleByName[name]
@@ -275,8 +303,6 @@ func (m *Mib) Unresolved() []UnresolvedRef {
 	return m.unresolved
 }
 
-// --- Internal helpers ---
-
 // parseQualifiedName splits "MODULE::name" into (module, name, ok).
 func parseQualifiedName(qname string) (module, name string, ok bool) {
 	idx := strings.Index(qname, "::")
@@ -284,63 +310,6 @@ func parseQualifiedName(qname string) (module, name string, ok bool) {
 		return "", "", false
 	}
 	return qname[:idx], qname[idx+2:], true
-}
-
-// RegisterNode adds a node to the name index.
-func (m *Mib) RegisterNode(name string, node *Node) {
-	if name != "" {
-		m.nameToNodes[name] = append(m.nameToNodes[name], node)
-	}
-}
-
-// GetOrCreateNode returns the node at the given OID, creating nodes along the path as needed.
-func (m *Mib) GetOrCreateNode(oid Oid) *Node {
-	node := m.root
-	for _, arc := range oid {
-		node = node.GetOrCreateChild(arc)
-	}
-	return node
-}
-
-// GetOrCreateRoot returns the root node with the given arc (0, 1, or 2), creating if needed.
-func (m *Mib) GetOrCreateRoot(arc uint32) *Node {
-	return m.root.GetOrCreateChild(arc)
-}
-
-// AddModule adds a module to the Mib.
-func (m *Mib) AddModule(mod *Module) {
-	m.modules = append(m.modules, mod)
-	if mod.Name != "" {
-		m.moduleByName[mod.Name] = mod
-	}
-}
-
-// AddType adds a type to the Mib.
-func (m *Mib) AddType(t *Type) {
-	m.types = append(m.types, t)
-	if t.Name != "" && m.typeByName[t.Name] == nil {
-		m.typeByName[t.Name] = t
-	}
-}
-
-// AddObject adds an object to the Mib.
-func (m *Mib) AddObject(obj *Object) {
-	m.objects = append(m.objects, obj)
-}
-
-// AddNotification adds a notification to the Mib.
-func (m *Mib) AddNotification(n *Notification) {
-	m.notifications = append(m.notifications, n)
-}
-
-// AddUnresolved adds an unresolved reference.
-func (m *Mib) AddUnresolved(ref UnresolvedRef) {
-	m.unresolved = append(m.unresolved, ref)
-}
-
-// AddDiagnostic adds a diagnostic message.
-func (m *Mib) AddDiagnostic(d Diagnostic) {
-	m.diagnostics = append(m.diagnostics, d)
 }
 
 // ModuleCount returns the number of modules.

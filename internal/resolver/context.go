@@ -10,7 +10,7 @@ import (
 
 // ResolverContext holds indices and working state during resolution.
 type ResolverContext struct {
-	Mib *mib.Mib
+	Builder *mib.Builder
 
 	Modules []*module.Module
 
@@ -117,7 +117,7 @@ func scanCapacityHints(mods []*module.Module) capacityHints {
 func newResolverContext(mods []*module.Module, logger *slog.Logger) *ResolverContext {
 	h := scanCapacityHints(mods)
 	return &ResolverContext{
-		Mib:                mib.NewMib(),
+		Builder:            mib.NewBuilder(),
 		Modules:            mods,
 		ModuleIndex:        make(map[string][]*module.Module, h.modules),
 		ModuleToResolved:   make(map[*module.Module]*mib.Module, h.modules),
@@ -341,7 +341,7 @@ func (c *ResolverContext) FinalizeUnresolved() {
 		if u.importingModule != nil {
 			modName = u.importingModule.Name
 		}
-		c.Mib.AddUnresolved(mib.UnresolvedRef{
+		c.Builder.AddUnresolved(mib.UnresolvedRef{
 			Kind:   "import",
 			Symbol: u.symbol,
 			Module: modName,
@@ -352,7 +352,7 @@ func (c *ResolverContext) FinalizeUnresolved() {
 		if u.module != nil {
 			modName = u.module.Name
 		}
-		c.Mib.AddUnresolved(mib.UnresolvedRef{
+		c.Builder.AddUnresolved(mib.UnresolvedRef{
 			Kind:   "type",
 			Symbol: u.referenced,
 			Module: modName,
@@ -363,7 +363,7 @@ func (c *ResolverContext) FinalizeUnresolved() {
 		if u.module != nil {
 			modName = u.module.Name
 		}
-		c.Mib.AddUnresolved(mib.UnresolvedRef{
+		c.Builder.AddUnresolved(mib.UnresolvedRef{
 			Kind:   "oid",
 			Symbol: u.component,
 			Module: modName,

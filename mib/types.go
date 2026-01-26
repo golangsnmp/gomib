@@ -3,6 +3,8 @@ package mib
 import (
 	"cmp"
 	"slices"
+	"strconv"
+	"strings"
 )
 
 // Node is a point in the OID tree.
@@ -189,7 +191,9 @@ type NamedValue struct {
 }
 
 // DefVal is the interface for default values.
+// All DefVal types implement String() for display.
 type DefVal interface {
+	String() string
 	defVal()
 }
 
@@ -198,40 +202,69 @@ type DefValInt int64
 
 func (DefValInt) defVal() {}
 
+// String returns the integer as a decimal string.
+func (d DefValInt) String() string { return strconv.FormatInt(int64(d), 10) }
+
 // DefValUnsigned is an unsigned integer default value.
 type DefValUnsigned uint64
 
 func (DefValUnsigned) defVal() {}
+
+// String returns the integer as a decimal string.
+func (d DefValUnsigned) String() string { return strconv.FormatUint(uint64(d), 10) }
 
 // DefValString is a quoted string default value.
 type DefValString string
 
 func (DefValString) defVal() {}
 
+// String returns the string value with quotes.
+func (d DefValString) String() string { return `"` + string(d) + `"` }
+
 // DefValHexString is a hex string default value (e.g., '1F2E'H).
 type DefValHexString string
 
 func (DefValHexString) defVal() {}
+
+// String returns the hex string in MIB format (e.g., '1F2E'H).
+func (d DefValHexString) String() string { return "'" + string(d) + "'H" }
 
 // DefValBinaryString is a binary string default value (e.g., '1010'B).
 type DefValBinaryString string
 
 func (DefValBinaryString) defVal() {}
 
+// String returns the binary string in MIB format (e.g., '1010'B).
+func (d DefValBinaryString) String() string { return "'" + string(d) + "'B" }
+
 // DefValEnum is an enumeration label default value.
 type DefValEnum string
 
 func (DefValEnum) defVal() {}
+
+// String returns the enum label.
+func (d DefValEnum) String() string { return string(d) }
 
 // DefValBits is a BITS default value (list of bit labels).
 type DefValBits []string
 
 func (DefValBits) defVal() {}
 
+// String returns the bit labels in braces (e.g., { bit1, bit2 }).
+func (d DefValBits) String() string {
+	if len(d) == 0 {
+		return "{ }"
+	}
+	return "{ " + strings.Join(d, ", ") + " }"
+}
+
 // DefValOID is an OID default value.
 type DefValOID Oid
 
 func (DefValOID) defVal() {}
+
+// String returns the OID as a dotted string.
+func (d DefValOID) String() string { return Oid(d).String() }
 
 // Type is a type definition (textual convention or type reference).
 type Type struct {

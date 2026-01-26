@@ -106,14 +106,11 @@ func TestLoadModulesIntegration(t *testing.T) {
 	}
 }
 
-func TestLoadEmpty(t *testing.T) {
-	// Loading with no sources should return empty Mib
-	mib, err := gomib.Load()
-	if err != nil {
-		t.Fatalf("Failed to load empty: %v", err)
-	}
-	if len(mib.Modules()) != 0 {
-		t.Errorf("Expected 0 modules, got %d", len(mib.Modules()))
+func TestLoadNoSource(t *testing.T) {
+	// Loading with nil source should return ErrNoSources
+	_, err := gomib.Load(nil)
+	if err != gomib.ErrNoSources {
+		t.Errorf("Load(nil) = %v, want ErrNoSources", err)
 	}
 }
 

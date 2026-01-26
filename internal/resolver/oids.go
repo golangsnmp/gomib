@@ -275,7 +275,7 @@ func resolveNamedNumberComponent(ctx *ResolverContext, def oidDefinition, curren
 	if !isLast {
 		child.Name = name
 		child.Module = ctx.ModuleToResolved[def.mod]
-		ctx.Mib.RegisterNode(name, child)
+		ctx.Builder.RegisterNode(name, child)
 		if child.Kind == mib.KindInternal {
 			child.Kind = mib.KindNode
 		}
@@ -304,7 +304,7 @@ func resolveQualifiedNamedNumberComponent(ctx *ResolverContext, def oidDefinitio
 	if !isLast {
 		child.Name = name
 		child.Module = ctx.ModuleToResolved[def.mod]
-		ctx.Mib.RegisterNode(name, child)
+		ctx.Builder.RegisterNode(name, child)
 		if child.Kind == mib.KindInternal {
 			child.Kind = mib.KindNode
 		}
@@ -330,7 +330,7 @@ func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mib.No
 	node.Name = label
 	node.Module = ctx.ModuleToResolved[def.mod]
 	ctx.RegisterModuleNodeSymbol(def.mod, label, node)
-	ctx.Mib.RegisterNode(label, node)
+	ctx.Builder.RegisterNode(label, node)
 
 	if ctx.TraceEnabled() {
 		ctx.Trace("resolved OID definition",
@@ -345,7 +345,7 @@ func resolveNumericComponent(ctx *ResolverContext, parent *mib.Node, arc uint32)
 		return parent.GetOrCreateChild(arc)
 	}
 	// No parent - this is a root
-	return ctx.Mib.GetOrCreateRoot(arc)
+	return ctx.Builder.GetOrCreateRoot(arc)
 }
 
 func resolveTrapTypeDefinitions(ctx *ResolverContext, defs []trapTypeRef) {
@@ -376,7 +376,7 @@ func resolveTrapTypeDefinitions(ctx *ResolverContext, defs []trapTypeRef) {
 		trapNode.Kind = mib.KindNotification
 		trapNode.Module = ctx.ModuleToResolved[def.mod]
 		ctx.RegisterModuleNodeSymbol(def.mod, defName, trapNode)
-		ctx.Mib.RegisterNode(defName, trapNode)
+		ctx.Builder.RegisterNode(defName, trapNode)
 
 		if ctx.TraceEnabled() {
 			ctx.Trace("resolved TRAP-TYPE",
@@ -392,7 +392,7 @@ func lookupOrCreateWellKnownRoot(ctx *ResolverContext, name string) (*mib.Node, 
 	if arc < 0 {
 		return nil, false
 	}
-	return ctx.Mib.GetOrCreateRoot(uint32(arc)), true
+	return ctx.Builder.GetOrCreateRoot(uint32(arc)), true
 }
 
 func lookupSmiGlobalOidRoot(ctx *ResolverContext, name string) (*mib.Node, bool) {

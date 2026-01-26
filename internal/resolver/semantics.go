@@ -172,7 +172,7 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 		// Pre-compute effective values from type chain
 		computeEffectiveValues(resolved)
 
-		ctx.Mib.AddObject(resolved)
+		ctx.Builder.AddObject(resolved)
 		node.Object = resolved
 		created++
 
@@ -271,7 +271,7 @@ func createResolvedNotifications(ctx *ResolverContext) {
 			}
 		}
 
-		ctx.Mib.AddNotification(resolved)
+		ctx.Builder.AddNotification(resolved)
 		node.Notif = resolved
 		created++
 

@@ -2,8 +2,12 @@ package gomib
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 )
+
+// ErrNoSources is returned when Load is called with no sources.
+var ErrNoSources = errors.New("no MIB sources provided")
 
 // LevelTrace is a custom log level more verbose than Debug.
 // Use for per-item iteration logging (tokens, OID nodes, imports).
@@ -11,9 +15,7 @@ import (
 const LevelTrace = slog.Level(-8)
 
 // LoadOption configures Load and LoadModules.
-type LoadOption interface {
-	apply(*loadConfig)
-}
+type LoadOption func(*loadConfig)
 
 type loadConfig struct {
 	logger      *slog.Logger
@@ -21,18 +23,14 @@ type loadConfig struct {
 	noHeuristic bool
 }
 
-type loggerOption struct{ logger *slog.Logger }
-
-func (o loggerOption) apply(c *loadConfig) { c.logger = o.logger }
-
 // WithLogger sets the logger for debug/trace output.
 // If not set, no logging occurs (zero overhead).
 func WithLogger(logger *slog.Logger) LoadOption {
-	return loggerOption{logger: logger}
+	return func(c *loadConfig) { c.logger = logger }
 }
 
-// Load loads all MIB modules from the given sources and resolves them.
-// Sources are searched in order; the first match for each module name wins.
+// Load loads all MIB modules from the given source and resolves them.
+// Use Multi() to combine multiple sources.
 //
 // Example:
 //
@@ -40,30 +38,28 @@ func WithLogger(logger *slog.Logger) LoadOption {
 //	    gomib.DirTree("/usr/share/snmp/mibs"),
 //	    gomib.WithLogger(slog.Default()),
 //	)
-func Load(args ...any) (*Mib, error) {
-	var sources []Source
-	var opts []LoadOption
-
-	for _, arg := range args {
-		switch v := arg.(type) {
-		case Source:
-			sources = append(sources, v)
-		case LoadOption:
-			opts = append(opts, v)
-		}
-	}
-
+//
+//	// Multiple sources:
+//	mib, err := gomib.Load(
+//	    gomib.Multi(gomib.DirTree("/usr/share/snmp/mibs"), gomib.Dir("./custom")),
+//	)
+func Load(source Source, opts ...LoadOption) (*Mib, error) {
 	cfg := loadConfig{
 		extensions: DefaultExtensions,
 	}
 	for _, opt := range opts {
-		opt.apply(&cfg)
+		opt(&cfg)
 	}
 
+	var sources []Source
+	if source != nil {
+		sources = append(sources, source)
+	}
 	return loadFromSources(sources, nil, cfg)
 }
 
 // LoadModules loads specific MIB modules by name, along with their dependencies.
+// Use Multi() to combine multiple sources.
 //
 // Example:
 //
@@ -71,26 +67,18 @@ func Load(args ...any) (*Mib, error) {
 //	    []string{"IF-MIB", "IP-MIB"},
 //	    gomib.DirTree("/usr/share/snmp/mibs"),
 //	)
-func LoadModules(names []string, args ...any) (*Mib, error) {
-	var sources []Source
-	var opts []LoadOption
-
-	for _, arg := range args {
-		switch v := arg.(type) {
-		case Source:
-			sources = append(sources, v)
-		case LoadOption:
-			opts = append(opts, v)
-		}
-	}
-
+func LoadModules(names []string, source Source, opts ...LoadOption) (*Mib, error) {
 	cfg := loadConfig{
 		extensions: DefaultExtensions,
 	}
 	for _, opt := range opts {
-		opt.apply(&cfg)
+		opt(&cfg)
 	}
 
+	var sources []Source
+	if source != nil {
+		sources = append(sources, source)
+	}
 	return loadFromSources(sources, names, cfg)
 }
 
@@ -99,7 +87,7 @@ func LoadModules(names []string, args ...any) (*Mib, error) {
 // If names is non-nil, loads only those modules (plus dependencies).
 func loadFromSources(sources []Source, names []string, cfg loadConfig) (*Mib, error) {
 	if len(sources) == 0 {
-		return NewMib(), nil
+		return nil, ErrNoSources
 	}
 
 	loadCfg := LoadConfig{
@@ -113,12 +101,7 @@ func loadFromSources(sources []Source, names []string, cfg loadConfig) (*Mib, er
 	return loadAllModules(sources, loadCfg)
 }
 
-// --- Logging helpers ---
-
-// ctx is a package-level context for logging.
-var ctx = context.Background()
-
 // logEnabled returns true if logging is enabled at the given level.
 func logEnabled(logger *slog.Logger, level slog.Level) bool {
-	return logger != nil && logger.Enabled(ctx, level)
+	return logger != nil && logger.Enabled(context.Background(), level)
 }

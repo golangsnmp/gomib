@@ -29,7 +29,7 @@ func seedPrimitiveTypes(ctx *ResolverContext) {
 			Module: resolved,
 			Base:   base,
 		}
-		ctx.Mib.AddType(typ)
+		ctx.Builder.AddType(typ)
 		ctx.RegisterModuleTypeSymbol(mod, name, typ)
 		if resolved != nil {
 			resolved.AddType(typ)
@@ -79,7 +79,7 @@ func createUserTypes(ctx *ResolverContext) {
 			typ.NamedValues = extractNamedValues(td.Syntax)
 			typ.Size, typ.ValueRange = extractConstraints(td.Syntax)
 
-			ctx.Mib.AddType(typ)
+			ctx.Builder.AddType(typ)
 			ctx.RegisterModuleTypeSymbol(mod, td.Name, typ)
 
 			if ctx.TraceEnabled() {
@@ -290,7 +290,7 @@ func linkRFC1213TypesToTCs(ctx *ResolverContext) {
 }
 
 func inheritBaseTypes(ctx *ResolverContext) {
-	for _, t := range ctx.Mib.Types() {
+	for _, t := range ctx.Builder.Types() {
 		// Skip types that already have an application base type (explicitly set)
 		if t.Parent != nil && !isApplicationBaseType(t.Base) {
 			if base, ok := resolveBaseFromChain(t); ok {

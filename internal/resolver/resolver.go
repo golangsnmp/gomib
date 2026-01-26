@@ -46,7 +46,7 @@ func (r *resolver) resolve(mods []*module.Module) *mib.Mib {
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "register"))
 	registerModules(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "register"),
-		slog.Int("modules", ctx.Mib.ModuleCount()))
+		slog.Int("modules", ctx.Builder.ModuleCount()))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "imports"))
 	resolveImports(ctx)
@@ -54,18 +54,18 @@ func (r *resolver) resolve(mods []*module.Module) *mib.Mib {
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "types"))
 	resolveTypes(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "types"),
-		slog.Int("types", ctx.Mib.TypeCount()))
+		slog.Int("types", ctx.Builder.TypeCount()))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "oids"))
 	resolveOids(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "oids"),
-		slog.Int("nodes", ctx.Mib.NodeCount()))
+		slog.Int("nodes", ctx.Builder.NodeCount()))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "semantics"))
 	analyzeSemantics(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "semantics"),
-		slog.Int("objects", ctx.Mib.ObjectCount()),
-		slog.Int("notifications", ctx.Mib.NotificationCount()))
+		slog.Int("objects", ctx.Builder.ObjectCount()),
+		slog.Int("notifications", ctx.Builder.NotificationCount()))
 
 	ctx.DropModules()
 
@@ -91,9 +91,9 @@ func (r *resolver) resolve(mods []*module.Module) *mib.Mib {
 	}
 
 	r.Log(slog.LevelInfo, "resolution complete",
-		slog.Int("modules", ctx.Mib.ModuleCount()),
-		slog.Int("types", ctx.Mib.TypeCount()),
-		slog.Int("nodes", ctx.Mib.NodeCount()))
+		slog.Int("modules", ctx.Builder.ModuleCount()),
+		slog.Int("types", ctx.Builder.TypeCount()),
+		slog.Int("nodes", ctx.Builder.NodeCount()))
 
-	return ctx.Mib
+	return ctx.Builder.Mib()
 }
