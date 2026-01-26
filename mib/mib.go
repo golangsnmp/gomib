@@ -1,6 +1,7 @@
 package mib
 
 import (
+	"iter"
 	"strings"
 )
 
@@ -264,6 +265,22 @@ func (m *Mib) Walk(fn func(*Node) bool) {
 	for _, child := range m.root.Children() {
 		if !child.walk(fn) {
 			return
+		}
+	}
+}
+
+// Nodes returns an iterator over all nodes in pre-order.
+// This is the iterator equivalent of Walk for use with range-over-func:
+//
+//	for node := range mib.Nodes() {
+//	    fmt.Println(node.Name, node.OID())
+//	}
+func (m *Mib) Nodes() iter.Seq[*Node] {
+	return func(yield func(*Node) bool) {
+		for _, child := range m.root.Children() {
+			if !child.yieldAll(yield) {
+				return
+			}
 		}
 	}
 }

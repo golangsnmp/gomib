@@ -4,8 +4,10 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -197,11 +199,7 @@ func (s *treeSource) Find(name string) (io.ReadCloser, string, error) {
 }
 
 func (s *treeSource) ListFiles() ([]string, error) {
-	files := make([]string, 0, len(s.index))
-	for _, path := range s.index {
-		files = append(files, path)
-	}
-	return files, nil
+	return slices.Collect(maps.Values(s.index)), nil
 }
 
 // --- FS Source (for embed.FS, testing, http filesystems) ---

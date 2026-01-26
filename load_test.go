@@ -161,3 +161,64 @@ func TestFindNode(t *testing.T) {
 		})
 	}
 }
+
+func TestNodesIterator(t *testing.T) {
+	mibPath := findMibDir(t)
+
+	src, err := gomib.DirTree(mibPath)
+	if err != nil {
+		t.Fatalf("Failed to create source: %v", err)
+	}
+
+	mib, err := gomib.LoadModules([]string{"SNMPv2-MIB"}, src)
+	if err != nil {
+		t.Fatalf("Failed to load: %v", err)
+	}
+
+	if mib.Module("SNMPv2-MIB") == nil {
+		t.Skip("SNMPv2-MIB not found")
+	}
+
+	// Test Mib.Nodes() iterator
+	nodeCount := 0
+	for range mib.Nodes() {
+		nodeCount++
+	}
+
+	// Compare with Walk count
+	walkCount := 0
+	mib.Walk(func(*gomib.Node) bool {
+		walkCount++
+		return true
+	})
+
+	if nodeCount != walkCount {
+		t.Errorf("Nodes() yielded %d nodes, Walk counted %d", nodeCount, walkCount)
+	}
+	t.Logf("Iterator visited %d nodes", nodeCount)
+
+	// Test early termination
+	earlyCount := 0
+	for range mib.Nodes() {
+		earlyCount++
+		if earlyCount >= 5 {
+			break
+		}
+	}
+	if earlyCount != 5 {
+		t.Errorf("Early termination: got %d, want 5", earlyCount)
+	}
+
+	// Test Node.Descendants()
+	sysNode := mib.FindNode("system")
+	if sysNode != nil {
+		descCount := 0
+		for range sysNode.Descendants() {
+			descCount++
+		}
+		if descCount == 0 {
+			t.Error("system node Descendants() returned no nodes")
+		}
+		t.Logf("system node has %d descendants", descCount)
+	}
+}

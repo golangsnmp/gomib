@@ -1,8 +1,9 @@
 package resolver
 
 import (
+	"cmp"
 	"log/slog"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib/internal/module"
@@ -180,11 +181,12 @@ func findCandidateWithAllSymbols(ctx *ResolverContext, candidates []*module.Modu
 		})
 	}
 
-	sort.Slice(scoredCandidates, func(i, j int) bool {
-		if scoredCandidates[i].symbolCount != scoredCandidates[j].symbolCount {
-			return scoredCandidates[i].symbolCount > scoredCandidates[j].symbolCount
+	slices.SortFunc(scoredCandidates, func(a, b scored) int {
+		// Sort by symbol count descending, then by lastUpdated descending
+		if c := cmp.Compare(b.symbolCount, a.symbolCount); c != 0 {
+			return c
 		}
-		return scoredCandidates[i].lastUpdated > scoredCandidates[j].lastUpdated
+		return cmp.Compare(b.lastUpdated, a.lastUpdated)
 	})
 
 	for _, cand := range scoredCandidates {

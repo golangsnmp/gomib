@@ -2,6 +2,7 @@ package mib
 
 import (
 	"cmp"
+	"iter"
 	"slices"
 	"strconv"
 	"strings"
@@ -87,6 +88,30 @@ func (n *Node) walk(fn func(*Node) bool) bool {
 		}
 	}
 	return true
+}
+
+// yieldAll yields this node and all descendants to the iterator.
+func (n *Node) yieldAll(yield func(*Node) bool) bool {
+	if !yield(n) {
+		return false
+	}
+	for _, child := range n.Children() {
+		if !child.yieldAll(yield) {
+			return false
+		}
+	}
+	return true
+}
+
+// Descendants returns an iterator over this node and all its descendants in pre-order.
+//
+//	for node := range root.Descendants() {
+//	    fmt.Println(node.Name, node.OID())
+//	}
+func (n *Node) Descendants() iter.Seq[*Node] {
+	return func(yield func(*Node) bool) {
+		n.yieldAll(yield)
+	}
 }
 
 // IsRoot returns true if this is the pseudo-root node.
