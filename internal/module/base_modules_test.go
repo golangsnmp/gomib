@@ -2,26 +2,21 @@ package module
 
 import (
 	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 func TestBaseModuleCount(t *testing.T) {
 	modules := AllBaseModules()
-	if len(modules) != 7 {
-		t.Errorf("got %d base modules, want 7", len(modules))
-	}
+	testutil.Len(t, modules, 7, "base modules count")
 }
 
 func TestBaseModuleRoundtrip(t *testing.T) {
 	for _, m := range AllBaseModules() {
 		name := m.Name()
 		parsed, ok := BaseModuleFromName(name)
-		if !ok {
-			t.Errorf("BaseModuleFromName(%q) returned false", name)
-			continue
-		}
-		if parsed != m {
-			t.Errorf("roundtrip failed for %s: got %v, want %v", name, parsed, m)
-		}
+		testutil.True(t, ok, "BaseModuleFromName(%q) returned false", name)
+		testutil.Equal(t, m, parsed, "roundtrip failed for %s", name)
 	}
 }
 
@@ -44,17 +39,13 @@ func TestIsBaseModule(t *testing.T) {
 
 	for _, tt := range tests {
 		got := IsBaseModule(tt.name)
-		if got != tt.expected {
-			t.Errorf("IsBaseModule(%q) = %v, want %v", tt.name, got, tt.expected)
-		}
+		testutil.Equal(t, tt.expected, got, "IsBaseModule(%q)", tt.name)
 	}
 }
 
 func TestCreateBaseModules(t *testing.T) {
 	modules := CreateBaseModules()
-	if len(modules) != 7 {
-		t.Fatalf("got %d modules, want 7", len(modules))
-	}
+	testutil.Len(t, modules, 7, "modules count")
 
 	expectedNames := []string{
 		"SNMPv2-SMI",
@@ -67,9 +58,7 @@ func TestCreateBaseModules(t *testing.T) {
 	}
 
 	for i, name := range expectedNames {
-		if modules[i].Name != name {
-			t.Errorf("modules[%d].Name = %q, want %q", i, modules[i].Name, name)
-		}
+		testutil.Equal(t, name, modules[i].Name, "modules[%d].Name", i)
 	}
 }
 
@@ -88,9 +77,7 @@ func TestSNMPv2SMIHasOidDefinitions(t *testing.T) {
 	}
 
 	for _, name := range expectedOids {
-		if !defNames[name] {
-			t.Errorf("SNMPv2-SMI missing OID definition: %s", name)
-		}
+		testutil.True(t, defNames[name], "SNMPv2-SMI missing OID definition: %s", name)
 	}
 }
 
@@ -109,9 +96,7 @@ func TestSNMPv2SMIHasBaseTypes(t *testing.T) {
 	}
 
 	for _, name := range expectedTypes {
-		if !defNames[name] {
-			t.Errorf("SNMPv2-SMI missing base type: %s", name)
-		}
+		testutil.True(t, defNames[name], "SNMPv2-SMI missing base type: %s", name)
 	}
 }
 
@@ -129,9 +114,7 @@ func TestSNMPv2TCHasTCs(t *testing.T) {
 	}
 
 	for _, name := range expectedTCs {
-		if !defNames[name] {
-			t.Errorf("SNMPv2-TC missing textual convention: %s", name)
-		}
+		testutil.True(t, defNames[name], "SNMPv2-TC missing textual convention: %s", name)
 	}
 }
 
@@ -159,22 +142,12 @@ func TestRootOidArcs(t *testing.T) {
 				continue
 			}
 			found = true
-			if len(va.Oid.Components) != 1 {
-				t.Errorf("%s has %d components, want 1", exp.name, len(va.Oid.Components))
-				continue
-			}
+			testutil.Len(t, va.Oid.Components, 1, "%s components", exp.name)
 			num, ok := va.Oid.Components[0].(*OidComponentNumber)
-			if !ok {
-				t.Errorf("%s component is not a number", exp.name)
-				continue
-			}
-			if num.Value != exp.arcNum {
-				t.Errorf("%s arc = %d, want %d", exp.name, num.Value, exp.arcNum)
-			}
+			testutil.True(t, ok, "%s component is not a number", exp.name)
+			testutil.Equal(t, exp.arcNum, num.Value, "%s arc", exp.name)
 		}
-		if !found {
-			t.Errorf("root OID %s not found", exp.name)
-		}
+		testutil.True(t, found, "root OID %s not found", exp.name)
 	}
 }
 
@@ -192,17 +165,13 @@ func TestRFC1155SMIHasTypes(t *testing.T) {
 	}
 
 	for _, name := range expectedTypes {
-		if !defNames[name] {
-			t.Errorf("RFC1155-SMI missing type: %s", name)
-		}
+		testutil.True(t, defNames[name], "RFC1155-SMI missing type: %s", name)
 	}
 
 	// Check OID roots
 	expectedOids := []string{"internet", "enterprises"}
 	for _, name := range expectedOids {
-		if !defNames[name] {
-			t.Errorf("RFC1155-SMI missing OID: %s", name)
-		}
+		testutil.True(t, defNames[name], "RFC1155-SMI missing OID: %s", name)
 	}
 }
 
@@ -213,10 +182,7 @@ func TestEmptyModules(t *testing.T) {
 	emptyModules := []int{2, 5, 6} // indices
 
 	for _, idx := range emptyModules {
-		if len(modules[idx].Definitions) != 0 {
-			t.Errorf("%s has %d definitions, want 0",
-				modules[idx].Name, len(modules[idx].Definitions))
-		}
+		testutil.Len(t, modules[idx].Definitions, 0, "%s definitions", modules[idx].Name)
 	}
 }
 
@@ -231,31 +197,18 @@ func TestOidChain(t *testing.T) {
 			continue
 		}
 
-		if len(va.Oid.Components) != 2 {
-			t.Errorf("enterprises has %d components, want 2", len(va.Oid.Components))
-			return
-		}
+		testutil.Len(t, va.Oid.Components, 2, "enterprises components")
 
 		nameComp, ok := va.Oid.Components[0].(*OidComponentName)
-		if !ok {
-			t.Errorf("enterprises[0] is not a name component")
-			return
-		}
-		if nameComp.NameValue != "private" {
-			t.Errorf("enterprises[0] = %q, want %q", nameComp.NameValue, "private")
-		}
+		testutil.True(t, ok, "enterprises[0] is not a name component")
+		testutil.Equal(t, "private", nameComp.NameValue, "enterprises[0]")
 
 		numComp, ok := va.Oid.Components[1].(*OidComponentNumber)
-		if !ok {
-			t.Errorf("enterprises[1] is not a number component")
-			return
-		}
-		if numComp.Value != 1 {
-			t.Errorf("enterprises[1] = %d, want 1", numComp.Value)
-		}
+		testutil.True(t, ok, "enterprises[1] is not a number component")
+		testutil.Equal(t, uint32(1), numComp.Value, "enterprises[1]")
 		return
 	}
-	t.Error("enterprises not found")
+	testutil.Fail(t, "enterprises not found")
 }
 
 func TestBaseModuleSMIVersions(t *testing.T) {
@@ -274,11 +227,7 @@ func TestBaseModuleSMIVersions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if tt.module.IsSMIv1() != tt.isSMIv1 {
-			t.Errorf("%s.IsSMIv1() = %v, want %v", tt.module.Name(), tt.module.IsSMIv1(), tt.isSMIv1)
-		}
-		if tt.module.IsSMIv2() != tt.isSMIv2 {
-			t.Errorf("%s.IsSMIv2() = %v, want %v", tt.module.Name(), tt.module.IsSMIv2(), tt.isSMIv2)
-		}
+		testutil.Equal(t, tt.isSMIv1, tt.module.IsSMIv1(), "%s.IsSMIv1()", tt.module.Name())
+		testutil.Equal(t, tt.isSMIv2, tt.module.IsSMIv2(), "%s.IsSMIv2()", tt.module.Name())
 	}
 }

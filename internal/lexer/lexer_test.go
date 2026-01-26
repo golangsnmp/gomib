@@ -3,6 +3,7 @@ package lexer
 import (
 	"testing"
 
+	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -32,16 +33,12 @@ func tokenTexts(source string) []string {
 
 func TestEmptyInput(t *testing.T) {
 	kinds := tokenKinds("")
-	if len(kinds) != 1 || kinds[0] != TokEOF {
-		t.Errorf("expected [TokEOF], got %v", kinds)
-	}
+	testutil.SliceEqual(t, []TokenKind{TokEOF}, kinds, "empty input")
 }
 
 func TestWhitespaceOnly(t *testing.T) {
 	kinds := tokenKinds("   \t\n\r\n  ")
-	if len(kinds) != 1 || kinds[0] != TokEOF {
-		t.Errorf("expected [TokEOF], got %v", kinds)
-	}
+	testutil.SliceEqual(t, []TokenKind{TokEOF}, kinds, "whitespace only")
 }
 
 func TestPunctuation(t *testing.T) {
@@ -51,7 +48,7 @@ func TestPunctuation(t *testing.T) {
 		TokLParen, TokRParen, TokSemicolon, TokComma,
 		TokDot, TokPipe, TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestOperators(t *testing.T) {
@@ -59,44 +56,44 @@ func TestOperators(t *testing.T) {
 	expected := []TokenKind{
 		TokDotDot, TokColonColonEqual, TokColon, TokMinus, TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestNumbers(t *testing.T) {
 	texts := tokenTexts("0 1 42 12345")
 	expectedTexts := []string{"0", "1", "42", "12345"}
-	assertTexts(t, expectedTexts, texts)
+	testutil.SliceEqual(t, expectedTexts, texts, "token texts")
 
 	kinds := tokenKinds("0 1 42 12345")
 	expected := []TokenKind{
 		TokNumber, TokNumber, TokNumber, TokNumber, TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestNegativeNumbers(t *testing.T) {
 	texts := tokenTexts("-1 -42 -0")
 	expectedTexts := []string{"-1", "-42", "-0"}
-	assertTexts(t, expectedTexts, texts)
+	testutil.SliceEqual(t, expectedTexts, texts, "token texts")
 
 	kinds := tokenKinds("-1 -42")
 	expected := []TokenKind{
 		TokNegativeNumber, TokNegativeNumber, TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestIdentifiers(t *testing.T) {
 	texts := tokenTexts("ifIndex myObject IF-MIB MyModule")
 	expectedTexts := []string{"ifIndex", "myObject", "IF-MIB", "MyModule"}
-	assertTexts(t, expectedTexts, texts)
+	testutil.SliceEqual(t, expectedTexts, texts, "token texts")
 
 	kinds := tokenKinds("ifIndex myObject IF-MIB MyModule")
 	expected := []TokenKind{
 		TokLowercaseIdent, TokLowercaseIdent,
 		TokUppercaseIdent, TokUppercaseIdent, TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestKeywords(t *testing.T) {
@@ -105,7 +102,7 @@ func TestKeywords(t *testing.T) {
 		TokKwDefinitions, TokKwBegin, TokKwEnd,
 		TokKwImports, TokKwFrom, TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestTypeKeywords(t *testing.T) {
@@ -114,7 +111,7 @@ func TestTypeKeywords(t *testing.T) {
 		TokKwInteger, TokKwInteger32, TokKwCounter32,
 		TokKwCounter64, TokKwGauge32, TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestMacroKeywords(t *testing.T) {
@@ -122,44 +119,44 @@ func TestMacroKeywords(t *testing.T) {
 	expected := []TokenKind{
 		TokKwObjectType, TokKwObjectIdentity, TokKwModuleIdentity, TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestQuotedString(t *testing.T) {
 	texts := tokenTexts(`"hello" "world" "with spaces"`)
 	expectedTexts := []string{`"hello"`, `"world"`, `"with spaces"`}
-	assertTexts(t, expectedTexts, texts)
+	testutil.SliceEqual(t, expectedTexts, texts, "token texts")
 
 	kinds := tokenKinds(`"hello"`)
 	expected := []TokenKind{TokQuotedString, TokEOF}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestMultilineString(t *testing.T) {
 	source := "\"line1\nline2\nline3\""
 	kinds := tokenKinds(source)
 	expected := []TokenKind{TokQuotedString, TokEOF}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestHexString(t *testing.T) {
 	texts := tokenTexts("'0A1B'H 'ff00'h")
 	expectedTexts := []string{"'0A1B'H", "'ff00'h"}
-	assertTexts(t, expectedTexts, texts)
+	testutil.SliceEqual(t, expectedTexts, texts, "token texts")
 
 	kinds := tokenKinds("'0A1B'H")
 	expected := []TokenKind{TokHexString, TokEOF}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestBinString(t *testing.T) {
 	texts := tokenTexts("'01010101'B '11110000'b")
 	expectedTexts := []string{"'01010101'B", "'11110000'b"}
-	assertTexts(t, expectedTexts, texts)
+	testutil.SliceEqual(t, expectedTexts, texts, "token texts")
 
 	kinds := tokenKinds("'01010101'B")
 	expected := []TokenKind{TokBinString, TokEOF}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestCommentsDashDash(t *testing.T) {
@@ -170,7 +167,7 @@ func TestCommentsDashDash(t *testing.T) {
 		TokUppercaseIdent, // TYPE is not a keyword
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestCommentsInline(t *testing.T) {
@@ -181,7 +178,7 @@ func TestCommentsInline(t *testing.T) {
 		TokUppercaseIdent, // TYPE
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestModuleHeader(t *testing.T) {
@@ -194,7 +191,7 @@ func TestModuleHeader(t *testing.T) {
 		TokKwBegin,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestObjectTypeDeclaration(t *testing.T) {
@@ -225,7 +222,7 @@ func TestObjectTypeDeclaration(t *testing.T) {
 		TokRBrace,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestImportsClause(t *testing.T) {
@@ -250,7 +247,7 @@ func TestImportsClause(t *testing.T) {
 		TokSemicolon,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestMacroSkip(t *testing.T) {
@@ -273,7 +270,7 @@ func TestMacroSkip(t *testing.T) {
 		TokKwObjectType,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestMacroSkipHyphenatedEnd(t *testing.T) {
@@ -295,7 +292,7 @@ func TestMacroSkipHyphenatedEnd(t *testing.T) {
 		TokKwObjectType,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestMacroEndWithDoubleHyphen(t *testing.T) {
@@ -317,7 +314,7 @@ func TestMacroEndWithDoubleHyphen(t *testing.T) {
 		TokKwObjectType,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestExportsSkip(t *testing.T) {
@@ -330,7 +327,7 @@ func TestExportsSkip(t *testing.T) {
 		TokKwObjectType,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestChoiceTokenized(t *testing.T) {
@@ -348,7 +345,7 @@ func TestChoiceTokenized(t *testing.T) {
 		TokKwCounter,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestOidValue(t *testing.T) {
@@ -372,7 +369,7 @@ func TestOidValue(t *testing.T) {
 		TokRBrace,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestRangeConstraint(t *testing.T) {
@@ -387,7 +384,7 @@ func TestRangeConstraint(t *testing.T) {
 		TokRParen,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestSizeConstraint(t *testing.T) {
@@ -406,7 +403,7 @@ func TestSizeConstraint(t *testing.T) {
 		TokRParen,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestEnumValues(t *testing.T) {
@@ -432,44 +429,30 @@ func TestEnumValues(t *testing.T) {
 		TokRBrace,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestIdentifierWithUnderscore(t *testing.T) {
 	// Per leniency philosophy, underscores should be accepted
 	texts := tokenTexts("my_identifier SOME_TYPE")
 	expectedTexts := []string{"my_identifier", "SOME_TYPE"}
-	assertTexts(t, expectedTexts, texts)
+	testutil.SliceEqual(t, expectedTexts, texts, "token texts")
 }
 
 func TestTrailingHyphenAccepted(t *testing.T) {
 	lexer := New([]byte("bad-"), nil)
 	tokens, diagnostics := lexer.Tokenize()
 
-	// Should produce a valid token
-	if tokens[0].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
-
-	// Should NOT produce diagnostics (lenient parsing)
-	if len(diagnostics) != 0 {
-		t.Errorf("expected no diagnostics, got %d", len(diagnostics))
-	}
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "should produce valid token")
+	testutil.Len(t, diagnostics, 0, "should NOT produce diagnostics")
 }
 
 func TestLeadingZerosAccepted(t *testing.T) {
 	lexer := New([]byte("007"), nil)
 	tokens, diagnostics := lexer.Tokenize()
 
-	// Should produce a valid number token
-	if tokens[0].Kind != TokNumber {
-		t.Errorf("expected TokNumber, got %v", tokens[0].Kind)
-	}
-
-	// Should NOT produce diagnostics (lenient parsing)
-	if len(diagnostics) != 0 {
-		t.Errorf("expected no diagnostics, got %d", len(diagnostics))
-	}
+	testutil.Equal(t, TokNumber, tokens[0].Kind, "should produce number token")
+	testutil.Len(t, diagnostics, 0, "should NOT produce diagnostics")
 }
 
 func TestSpanTracking(t *testing.T) {
@@ -477,19 +460,13 @@ func TestSpanTracking(t *testing.T) {
 	lexer := New(source, nil)
 	tokens, _ := lexer.Tokenize()
 
-	if tokens[0].Kind != TokKwBegin {
-		t.Errorf("expected TokKwBegin, got %v", tokens[0].Kind)
-	}
-	if tokens[0].Span.Start != 0 || tokens[0].Span.End != 5 {
-		t.Errorf("expected span [0,5), got [%d,%d)", tokens[0].Span.Start, tokens[0].Span.End)
-	}
+	testutil.Equal(t, TokKwBegin, tokens[0].Kind, "first token kind")
+	testutil.Equal(t, 0, tokens[0].Span.Start, "first token span start")
+	testutil.Equal(t, 5, tokens[0].Span.End, "first token span end")
 
-	if tokens[1].Kind != TokKwEnd {
-		t.Errorf("expected TokKwEnd, got %v", tokens[1].Kind)
-	}
-	if tokens[1].Span.Start != 6 || tokens[1].Span.End != 9 {
-		t.Errorf("expected span [6,9), got [%d,%d)", tokens[1].Span.Start, tokens[1].Span.End)
-	}
+	testutil.Equal(t, TokKwEnd, tokens[1].Kind, "second token kind")
+	testutil.Equal(t, 6, tokens[1].Span.Start, "second token span start")
+	testutil.Equal(t, 9, tokens[1].Span.End, "second token span end")
 }
 
 func TestStatusKeywords(t *testing.T) {
@@ -502,7 +479,7 @@ func TestStatusKeywords(t *testing.T) {
 		TokKwOptional,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestAccessKeywords(t *testing.T) {
@@ -514,7 +491,7 @@ func TestAccessKeywords(t *testing.T) {
 		TokKwNotAccessible,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
 func TestNonUtf8InString(t *testing.T) {
@@ -525,21 +502,13 @@ func TestNonUtf8InString(t *testing.T) {
 	tokens, diagnostics := lexer.Tokenize()
 
 	// Should successfully tokenize despite non-UTF-8
-	if tokens[0].Kind != TokKwDescription {
-		t.Errorf("expected TokKwDescription, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokQuotedString {
-		t.Errorf("expected TokQuotedString, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[2].Kind)
-	}
+	testutil.Equal(t, TokKwDescription, tokens[0].Kind, "first token")
+	testutil.Equal(t, TokQuotedString, tokens[1].Kind, "second token")
+	testutil.Equal(t, TokEOF, tokens[2].Kind, "third token")
 
 	// No errors - non-UTF-8 in strings is accepted silently
 	errors := filterErrors(diagnostics)
-	if len(errors) != 0 {
-		t.Errorf("expected no errors, got %v", errors)
-	}
+	testutil.Len(t, errors, 0, "errors")
 }
 
 func TestNonUtf8InComment(t *testing.T) {
@@ -548,15 +517,9 @@ func TestNonUtf8InComment(t *testing.T) {
 	lexer := New(source, nil)
 	tokens, _ := lexer.Tokenize()
 
-	if tokens[0].Kind != TokKwBegin {
-		t.Errorf("expected TokKwBegin, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokKwEnd {
-		t.Errorf("expected TokKwEnd, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[2].Kind)
-	}
+	testutil.Equal(t, TokKwBegin, tokens[0].Kind, "first token")
+	testutil.Equal(t, TokKwEnd, tokens[1].Kind, "second token")
+	testutil.Equal(t, TokEOF, tokens[2].Kind, "third token")
 }
 
 // ========================================================================
@@ -570,32 +533,18 @@ func TestDoubleHyphenBreaksIdentifier(t *testing.T) {
 	tokens, _ := lexer.Tokenize()
 
 	// Should be: identifier, minus, identifier, EOF
-	if len(tokens) != 4 {
-		t.Fatalf("expected 4 tokens, got %d", len(tokens))
-	}
-	if tokens[0].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
+	testutil.Len(t, tokens, 4, "token count")
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token kind")
 	text := source[tokens[0].Span.Start:tokens[0].Span.End]
-	if text != "rfu-1plus1-tx-mhsb-" {
-		t.Errorf("expected 'rfu-1plus1-tx-mhsb-', got '%s'", text)
-	}
+	testutil.Equal(t, "rfu-1plus1-tx-mhsb-", text, "first token text")
 
-	if tokens[1].Kind != TokMinus {
-		t.Errorf("expected TokMinus, got %v", tokens[1].Kind)
-	}
+	testutil.Equal(t, TokMinus, tokens[1].Kind, "second token kind")
 
-	if tokens[2].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[2].Kind)
-	}
+	testutil.Equal(t, TokLowercaseIdent, tokens[2].Kind, "third token kind")
 	text2 := source[tokens[2].Span.Start:tokens[2].Span.End]
-	if text2 != "rx-sd" {
-		t.Errorf("expected 'rx-sd', got '%s'", text2)
-	}
+	testutil.Equal(t, "rx-sd", text2, "third token text")
 
-	if tokens[3].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[3].Kind)
-	}
+	testutil.Equal(t, TokEOF, tokens[3].Kind, "fourth token kind")
 }
 
 func TestDoubleHyphenSimple(t *testing.T) {
@@ -604,28 +553,16 @@ func TestDoubleHyphenSimple(t *testing.T) {
 	lexer := New([]byte(source), nil)
 	tokens, _ := lexer.Tokenize()
 
-	if len(tokens) != 4 {
-		t.Fatalf("expected 4 tokens, got %d", len(tokens))
-	}
-	if tokens[0].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
+	testutil.Len(t, tokens, 4, "token count")
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token kind")
 	text := source[tokens[0].Span.Start:tokens[0].Span.End]
-	if text != "foo-" {
-		t.Errorf("expected 'foo-', got '%s'", text)
-	}
+	testutil.Equal(t, "foo-", text, "first token text")
 
-	if tokens[1].Kind != TokMinus {
-		t.Errorf("expected TokMinus, got %v", tokens[1].Kind)
-	}
+	testutil.Equal(t, TokMinus, tokens[1].Kind, "second token kind")
 
-	if tokens[2].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[2].Kind)
-	}
+	testutil.Equal(t, TokLowercaseIdent, tokens[2].Kind, "third token kind")
 	text2 := source[tokens[2].Span.Start:tokens[2].Span.End]
-	if text2 != "bar" {
-		t.Errorf("expected 'bar', got '%s'", text2)
-	}
+	testutil.Equal(t, "bar", text2, "third token text")
 }
 
 func TestDoubleHyphenAtStartIsComment(t *testing.T) {
@@ -635,13 +572,9 @@ func TestDoubleHyphenAtStartIsComment(t *testing.T) {
 	tokens, _ := lexer.Tokenize()
 
 	// The -- starts a comment that runs to end of line
-	if tokens[0].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token kind")
 	text := source[tokens[0].Span.Start:tokens[0].Span.End]
-	if text != "bar" {
-		t.Errorf("expected 'bar', got '%s'", text)
-	}
+	testutil.Equal(t, "bar", text, "first token text")
 }
 
 func TestSingleHyphenInIdentifierOk(t *testing.T) {
@@ -653,11 +586,11 @@ func TestSingleHyphenInIdentifierOk(t *testing.T) {
 		TokLowercaseIdent,
 		TokEOF,
 	}
-	assertTokenKinds(t, expected, kinds)
+	testutil.SliceEqual(t, expected, kinds, "token kinds")
 
 	texts := tokenTexts(source)
 	expectedTexts := []string{"if-index", "my-object"}
-	assertTexts(t, expectedTexts, texts)
+	testutil.SliceEqual(t, expectedTexts, texts, "token texts")
 }
 
 // ========================================================================
@@ -669,23 +602,13 @@ func TestForbiddenKeywordFalse(t *testing.T) {
 	lexer := New([]byte(source), nil)
 	tokens, diagnostics := lexer.Tokenize()
 
-	if tokens[0].Kind != TokKwDefval {
-		t.Errorf("expected TokKwDefval, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokLBrace {
-		t.Errorf("expected TokLBrace, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokForbiddenKeyword {
-		t.Errorf("expected TokForbiddenKeyword, got %v", tokens[2].Kind)
-	}
-	if tokens[3].Kind != TokRBrace {
-		t.Errorf("expected TokRBrace, got %v", tokens[3].Kind)
-	}
+	testutil.Equal(t, TokKwDefval, tokens[0].Kind, "first token")
+	testutil.Equal(t, TokLBrace, tokens[1].Kind, "second token")
+	testutil.Equal(t, TokForbiddenKeyword, tokens[2].Kind, "third token")
+	testutil.Equal(t, TokRBrace, tokens[3].Kind, "fourth token")
 
 	// Should NOT produce diagnostics (lenient parsing)
-	if len(diagnostics) != 0 {
-		t.Errorf("expected no diagnostics, got %d", len(diagnostics))
-	}
+	testutil.Len(t, diagnostics, 0, "diagnostics")
 }
 
 func TestForbiddenKeywordTrue(t *testing.T) {
@@ -693,14 +616,10 @@ func TestForbiddenKeywordTrue(t *testing.T) {
 	lexer := New([]byte(source), nil)
 	tokens, diagnostics := lexer.Tokenize()
 
-	if tokens[2].Kind != TokForbiddenKeyword {
-		t.Errorf("expected TokForbiddenKeyword, got %v", tokens[2].Kind)
-	}
+	testutil.Equal(t, TokForbiddenKeyword, tokens[2].Kind, "third token")
 
 	// Should NOT produce diagnostics (lenient parsing)
-	if len(diagnostics) != 0 {
-		t.Errorf("expected no diagnostics, got %d", len(diagnostics))
-	}
+	testutil.Len(t, diagnostics, 0, "diagnostics")
 }
 
 func TestForbiddenKeywordsList(t *testing.T) {
@@ -712,13 +631,9 @@ func TestForbiddenKeywordsList(t *testing.T) {
 		lexer := New([]byte(kw), nil)
 		tokens, diagnostics := lexer.Tokenize()
 
-		if tokens[0].Kind != TokForbiddenKeyword {
-			t.Errorf("%s should be a forbidden keyword, got %v", kw, tokens[0].Kind)
-		}
+		testutil.Equal(t, TokForbiddenKeyword, tokens[0].Kind, kw+" should be forbidden keyword")
 		// Should NOT produce diagnostics (lenient parsing)
-		if len(diagnostics) != 0 {
-			t.Errorf("%s should not generate diagnostics, got %d", kw, len(diagnostics))
-		}
+		testutil.Len(t, diagnostics, 0, kw+" diagnostics")
 	}
 }
 
@@ -728,16 +643,10 @@ func TestMaxMinForbidden(t *testing.T) {
 	lexer := New([]byte(source), nil)
 	tokens, diagnostics := lexer.Tokenize()
 
-	if tokens[0].Kind != TokForbiddenKeyword {
-		t.Errorf("expected TokForbiddenKeyword for MAX, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokForbiddenKeyword {
-		t.Errorf("expected TokForbiddenKeyword for MIN, got %v", tokens[1].Kind)
-	}
+	testutil.Equal(t, TokForbiddenKeyword, tokens[0].Kind, "MAX should be forbidden")
+	testutil.Equal(t, TokForbiddenKeyword, tokens[1].Kind, "MIN should be forbidden")
 	// Should NOT produce diagnostics (lenient parsing)
-	if len(diagnostics) != 0 {
-		t.Errorf("expected no diagnostics, got %d", len(diagnostics))
-	}
+	testutil.Len(t, diagnostics, 0, "diagnostics")
 }
 
 func TestValidKeywordsNotForbidden(t *testing.T) {
@@ -748,9 +657,7 @@ func TestValidKeywordsNotForbidden(t *testing.T) {
 		lexer := New([]byte(kw), nil)
 		tokens, _ := lexer.Tokenize()
 
-		if tokens[0].Kind == TokError {
-			t.Errorf("%s should NOT be a forbidden keyword", kw)
-		}
+		testutil.True(t, tokens[0].Kind != TokError, kw+" should NOT be a forbidden keyword")
 	}
 }
 
@@ -760,9 +667,7 @@ func TestForbiddenKeywordCaseSensitive(t *testing.T) {
 	lexer := New([]byte(source), nil)
 	tokens, _ := lexer.Tokenize()
 
-	if tokens[0].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent for 'false', got %v", tokens[0].Kind)
-	}
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "'false' should be lowercase identifier")
 }
 
 // ========================================================================
@@ -777,23 +682,13 @@ func TestErrorRecoverySkipsToEOL(t *testing.T) {
 	tokens, diagnostics := lexer.Tokenize()
 
 	// Should be: foo, (error skips rest of line), bar, EOF
-	if len(tokens) != 3 {
-		t.Fatalf("expected 3 tokens, got %d", len(tokens))
-	}
-	if tokens[0].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[2].Kind)
-	}
+	testutil.Len(t, tokens, 3, "token count")
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token")
+	testutil.Equal(t, TokLowercaseIdent, tokens[1].Kind, "second token")
+	testutil.Equal(t, TokEOF, tokens[2].Kind, "third token")
 
 	// Should have one error diagnostic
-	if len(diagnostics) != 1 {
-		t.Errorf("expected 1 diagnostic, got %d", len(diagnostics))
-	}
+	testutil.Len(t, diagnostics, 1, "diagnostics")
 }
 
 func TestErrorRecoveryMultipleBadCharsSameLine(t *testing.T) {
@@ -803,18 +698,10 @@ func TestErrorRecoveryMultipleBadCharsSameLine(t *testing.T) {
 	tokens, diagnostics := lexer.Tokenize()
 
 	// Should skip from first bad char to EOL
-	if len(tokens) != 3 {
-		t.Fatalf("expected 3 tokens, got %d", len(tokens))
-	}
-	if tokens[0].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[1].Kind)
-	}
-	if len(diagnostics) != 1 {
-		t.Errorf("expected 1 diagnostic, got %d", len(diagnostics))
-	}
+	testutil.Len(t, tokens, 3, "token count")
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token")
+	testutil.Equal(t, TokLowercaseIdent, tokens[1].Kind, "second token")
+	testutil.Len(t, diagnostics, 1, "diagnostics")
 }
 
 func TestErrorRecoveryPreservesSameLineBeforeError(t *testing.T) {
@@ -823,18 +710,10 @@ func TestErrorRecoveryPreservesSameLineBeforeError(t *testing.T) {
 	lexer := New(source, nil)
 	tokens, _ := lexer.Tokenize()
 
-	if tokens[0].Kind != TokKwBegin {
-		t.Errorf("expected TokKwBegin, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokLowercaseIdent { // foo
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokKwEnd {
-		t.Errorf("expected TokKwEnd, got %v", tokens[2].Kind)
-	}
-	if tokens[3].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[3].Kind)
-	}
+	testutil.Equal(t, TokKwBegin, tokens[0].Kind, "first token")
+	testutil.Equal(t, TokLowercaseIdent, tokens[1].Kind, "second token (foo)")
+	testutil.Equal(t, TokKwEnd, tokens[2].Kind, "third token")
+	testutil.Equal(t, TokEOF, tokens[3].Kind, "fourth token")
 }
 
 func TestErrorAtEofNoInfiniteLoop(t *testing.T) {
@@ -843,18 +722,10 @@ func TestErrorAtEofNoInfiniteLoop(t *testing.T) {
 	lexer := New(source, nil)
 	tokens, diagnostics := lexer.Tokenize()
 
-	if len(tokens) != 2 {
-		t.Fatalf("expected 2 tokens, got %d", len(tokens))
-	}
-	if tokens[0].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[1].Kind)
-	}
-	if len(diagnostics) != 1 {
-		t.Errorf("expected 1 diagnostic, got %d", len(diagnostics))
-	}
+	testutil.Len(t, tokens, 2, "token count")
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token")
+	testutil.Equal(t, TokEOF, tokens[1].Kind, "second token")
+	testutil.Len(t, diagnostics, 1, "diagnostics")
 }
 
 // ========================================================================
@@ -867,18 +738,10 @@ func TestOddDashesThreeAtEOL(t *testing.T) {
 	lexer := New([]byte(source), nil)
 	tokens, _ := lexer.Tokenize()
 
-	if len(tokens) != 3 {
-		t.Fatalf("expected 3 tokens, got %d: %v", len(tokens), tokens)
-	}
-	if tokens[0].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[2].Kind)
-	}
+	testutil.Len(t, tokens, 3, "token count")
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token")
+	testutil.Equal(t, TokLowercaseIdent, tokens[1].Kind, "second token")
+	testutil.Equal(t, TokEOF, tokens[2].Kind, "third token")
 }
 
 func TestOddDashes81Dashes(t *testing.T) {
@@ -892,18 +755,10 @@ func TestOddDashes81Dashes(t *testing.T) {
 	tokens, _ := lexer.Tokenize()
 
 	// Should only have: foo + bar + EOF (no MINUS tokens)
-	if len(tokens) != 3 {
-		t.Fatalf("expected 3 tokens, got %d", len(tokens))
-	}
-	if tokens[0].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokLowercaseIdent {
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[2].Kind)
-	}
+	testutil.Len(t, tokens, 3, "token count")
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token")
+	testutil.Equal(t, TokLowercaseIdent, tokens[1].Kind, "second token")
+	testutil.Equal(t, TokEOF, tokens[2].Kind, "third token")
 }
 
 func TestOddDashesFiveDashesAtEOL(t *testing.T) {
@@ -912,18 +767,10 @@ func TestOddDashesFiveDashesAtEOL(t *testing.T) {
 	lexer := New([]byte(source), nil)
 	tokens, _ := lexer.Tokenize()
 
-	if len(tokens) != 3 {
-		t.Fatalf("expected 3 tokens, got %d", len(tokens))
-	}
-	if tokens[0].Kind != TokLowercaseIdent { // foo
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokLowercaseIdent { // bar
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[2].Kind)
-	}
+	testutil.Len(t, tokens, 3, "token count")
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token (foo)")
+	testutil.Equal(t, TokLowercaseIdent, tokens[1].Kind, "second token (bar)")
+	testutil.Equal(t, TokEOF, tokens[2].Kind, "third token")
 }
 
 func TestOddDashesFiveNotAtEOL(t *testing.T) {
@@ -933,18 +780,10 @@ func TestOddDashesFiveNotAtEOL(t *testing.T) {
 	tokens, _ := lexer.Tokenize()
 
 	// foo, then 5 dashes: -- enters comment, -- exits, - becomes MINUS
-	if tokens[0].Kind != TokLowercaseIdent { // foo
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokMinus { // the 5th dash
-		t.Errorf("expected TokMinus, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokLowercaseIdent { // bar
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[2].Kind)
-	}
-	if tokens[3].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[3].Kind)
-	}
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token (foo)")
+	testutil.Equal(t, TokMinus, tokens[1].Kind, "second token (5th dash)")
+	testutil.Equal(t, TokLowercaseIdent, tokens[2].Kind, "third token (bar)")
+	testutil.Equal(t, TokEOF, tokens[3].Kind, "fourth token")
 }
 
 func TestOddDashesSevenDashes(t *testing.T) {
@@ -954,18 +793,10 @@ func TestOddDashesSevenDashes(t *testing.T) {
 	tokens, _ := lexer.Tokenize()
 
 	// No MINUS emitted because the single dash is inside a comment
-	if len(tokens) != 3 {
-		t.Fatalf("expected 3 tokens, got %d", len(tokens))
-	}
-	if tokens[0].Kind != TokLowercaseIdent { // foo
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokLowercaseIdent { // bar
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[2].Kind)
-	}
+	testutil.Len(t, tokens, 3, "token count")
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token (foo)")
+	testutil.Equal(t, TokLowercaseIdent, tokens[1].Kind, "second token (bar)")
+	testutil.Equal(t, TokEOF, tokens[2].Kind, "third token")
 }
 
 func TestOddDashesNineAtEOL(t *testing.T) {
@@ -974,18 +805,10 @@ func TestOddDashesNineAtEOL(t *testing.T) {
 	lexer := New([]byte(source), nil)
 	tokens, _ := lexer.Tokenize()
 
-	if len(tokens) != 3 {
-		t.Fatalf("expected 3 tokens, got %d", len(tokens))
-	}
-	if tokens[0].Kind != TokLowercaseIdent { // foo
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[0].Kind)
-	}
-	if tokens[1].Kind != TokLowercaseIdent { // bar
-		t.Errorf("expected TokLowercaseIdent, got %v", tokens[1].Kind)
-	}
-	if tokens[2].Kind != TokEOF {
-		t.Errorf("expected TokEOF, got %v", tokens[2].Kind)
-	}
+	testutil.Len(t, tokens, 3, "token count")
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token (foo)")
+	testutil.Equal(t, TokLowercaseIdent, tokens[1].Kind, "second token (bar)")
+	testutil.Equal(t, TokEOF, tokens[2].Kind, "third token")
 }
 
 // ========================================================================
@@ -995,10 +818,8 @@ func TestOddDashesNineAtEOL(t *testing.T) {
 func TestKeywordsSorted(t *testing.T) {
 	// Verify the keyword table is sorted
 	for i := 1; i < len(keywords); i++ {
-		if keywords[i-1].text >= keywords[i].text {
-			t.Errorf("Keywords not sorted: %s should come before %s",
-				keywords[i-1].text, keywords[i].text)
-		}
+		testutil.True(t, keywords[i-1].text < keywords[i].text,
+			"keywords not sorted: %s should come before %s", keywords[i-1].text, keywords[i].text)
 	}
 }
 
@@ -1023,45 +844,39 @@ func TestKeywordLookup(t *testing.T) {
 
 	for _, tc := range tests {
 		kind, found := LookupKeyword(tc.text)
-		if found != tc.found {
-			t.Errorf("LookupKeyword(%q): expected found=%v, got %v", tc.text, tc.found, found)
-		}
-		if found && kind != tc.expected {
-			t.Errorf("LookupKeyword(%q): expected %v, got %v", tc.text, tc.expected, kind)
+		testutil.Equal(t, tc.found, found, "LookupKeyword(%q) found", tc.text)
+		if found {
+			testutil.Equal(t, tc.expected, kind, "LookupKeyword(%q) kind", tc.text)
 		}
 	}
 }
 
 func TestKeywordCaseSensitive(t *testing.T) {
 	// Keywords are case-sensitive
-	if kind, ok := LookupKeyword("OBJECT-TYPE"); !ok || kind != TokKwObjectType {
-		t.Error("OBJECT-TYPE should be a keyword")
-	}
-	if _, ok := LookupKeyword("object-type"); ok {
-		t.Error("object-type should NOT be a keyword")
-	}
-	if _, ok := LookupKeyword("Object-Type"); ok {
-		t.Error("Object-Type should NOT be a keyword")
-	}
+	kind, ok := LookupKeyword("OBJECT-TYPE")
+	testutil.True(t, ok && kind == TokKwObjectType, "OBJECT-TYPE should be a keyword")
 
-	if kind, ok := LookupKeyword("Integer32"); !ok || kind != TokKwInteger32 {
-		t.Error("Integer32 should be a keyword")
-	}
-	if _, ok := LookupKeyword("INTEGER32"); ok {
-		t.Error("INTEGER32 should NOT be a keyword")
-	}
-	if _, ok := LookupKeyword("integer32"); ok {
-		t.Error("integer32 should NOT be a keyword")
-	}
+	_, ok = LookupKeyword("object-type")
+	testutil.True(t, !ok, "object-type should NOT be a keyword")
+
+	_, ok = LookupKeyword("Object-Type")
+	testutil.True(t, !ok, "Object-Type should NOT be a keyword")
+
+	kind, ok = LookupKeyword("Integer32")
+	testutil.True(t, ok && kind == TokKwInteger32, "Integer32 should be a keyword")
+
+	_, ok = LookupKeyword("INTEGER32")
+	testutil.True(t, !ok, "INTEGER32 should NOT be a keyword")
+
+	_, ok = LookupKeyword("integer32")
+	testutil.True(t, !ok, "integer32 should NOT be a keyword")
 }
 
 func TestForbiddenKeywordsSorted(t *testing.T) {
 	// Verify the forbidden keyword table is sorted
 	for i := 1; i < len(forbiddenKeywords); i++ {
-		if forbiddenKeywords[i-1] >= forbiddenKeywords[i] {
-			t.Errorf("Forbidden keywords not sorted: %s should come before %s",
-				forbiddenKeywords[i-1], forbiddenKeywords[i])
-		}
+		testutil.True(t, forbiddenKeywords[i-1] < forbiddenKeywords[i],
+			"forbidden keywords not sorted: %s should come before %s", forbiddenKeywords[i-1], forbiddenKeywords[i])
 	}
 }
 
@@ -1069,62 +884,24 @@ func TestForbiddenKeywordLookup(t *testing.T) {
 	// Test some forbidden keywords
 	forbidden := []string{"FALSE", "TRUE", "NULL", "ABSENT", "MAX", "MIN", "PRIVATE", "SET"}
 	for _, kw := range forbidden {
-		if !IsForbiddenKeyword(kw) {
-			t.Errorf("%s should be a forbidden keyword", kw)
-		}
+		testutil.True(t, IsForbiddenKeyword(kw), "%s should be a forbidden keyword", kw)
 	}
 
 	// Test non-forbidden keywords
 	notForbidden := []string{"BEGIN", "END", "OBJECT-TYPE", "INTEGER", "ifIndex"}
 	for _, kw := range notForbidden {
-		if IsForbiddenKeyword(kw) {
-			t.Errorf("%s should NOT be a forbidden keyword", kw)
-		}
+		testutil.True(t, !IsForbiddenKeyword(kw), "%s should NOT be a forbidden keyword", kw)
 	}
 
 	// Test case sensitivity
-	if !IsForbiddenKeyword("FALSE") {
-		t.Error("FALSE should be a forbidden keyword")
-	}
-	if IsForbiddenKeyword("false") {
-		t.Error("false should NOT be a forbidden keyword (case-sensitive)")
-	}
-	if IsForbiddenKeyword("False") {
-		t.Error("False should NOT be a forbidden keyword (case-sensitive)")
-	}
+	testutil.True(t, IsForbiddenKeyword("FALSE"), "FALSE should be a forbidden keyword")
+	testutil.True(t, !IsForbiddenKeyword("false"), "false should NOT be a forbidden keyword (case-sensitive)")
+	testutil.True(t, !IsForbiddenKeyword("False"), "False should NOT be a forbidden keyword (case-sensitive)")
 }
 
 // ========================================================================
 // Helper functions
 // ========================================================================
-
-func assertTokenKinds(t *testing.T, expected, actual []TokenKind) {
-	t.Helper()
-	if len(expected) != len(actual) {
-		t.Errorf("expected %d tokens, got %d\nexpected: %v\nactual: %v",
-			len(expected), len(actual), expected, actual)
-		return
-	}
-	for i := range expected {
-		if expected[i] != actual[i] {
-			t.Errorf("token %d: expected %v, got %v", i, expected[i], actual[i])
-		}
-	}
-}
-
-func assertTexts(t *testing.T, expected, actual []string) {
-	t.Helper()
-	if len(expected) != len(actual) {
-		t.Errorf("expected %d texts, got %d\nexpected: %v\nactual: %v",
-			len(expected), len(actual), expected, actual)
-		return
-	}
-	for i := range expected {
-		if expected[i] != actual[i] {
-			t.Errorf("text %d: expected %q, got %q", i, expected[i], actual[i])
-		}
-	}
-}
 
 func filterErrors(diags []types.Diagnostic) []types.Diagnostic {
 	var errors []types.Diagnostic

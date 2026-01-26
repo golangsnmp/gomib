@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/ast"
+	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -26,9 +27,7 @@ func TestLowerAccess(t *testing.T) {
 
 	for _, tt := range tests {
 		got := lowerAccess(tt.input)
-		if got != tt.expected {
-			t.Errorf("lowerAccess(%v) = %v, want %v", tt.input, got, tt.expected)
-		}
+		testutil.Equal(t, tt.expected, got, "lowerAccess(%v)", tt.input)
 	}
 }
 
@@ -47,9 +46,7 @@ func TestLowerStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		got := lowerStatus(tt.input)
-		if got != tt.expected {
-			t.Errorf("lowerStatus(%v) = %v, want %v", tt.input, got, tt.expected)
-		}
+		testutil.Equal(t, tt.expected, got, "lowerStatus(%v)", tt.input)
 	}
 }
 
@@ -64,18 +61,10 @@ func TestLowerEmptyModule(t *testing.T) {
 
 	mod := Lower(astMod, nil)
 
-	if mod.Name != "TEST-MIB" {
-		t.Errorf("got name %q, want %q", mod.Name, "TEST-MIB")
-	}
-	if mod.Language != SmiLanguageSMIv1 {
-		t.Errorf("got language %v, want %v", mod.Language, SmiLanguageSMIv1)
-	}
-	if len(mod.Imports) != 0 {
-		t.Errorf("got %d imports, want 0", len(mod.Imports))
-	}
-	if len(mod.Definitions) != 0 {
-		t.Errorf("got %d definitions, want 0", len(mod.Definitions))
-	}
+	testutil.Equal(t, "TEST-MIB", mod.Name, "module name")
+	testutil.Equal(t, SmiLanguageSMIv1, mod.Language, "module language")
+	testutil.Len(t, mod.Imports, 0, "imports")
+	testutil.Len(t, mod.Definitions, 0, "definitions")
 }
 
 func TestLowerSMIv2Detection(t *testing.T) {
@@ -98,18 +87,10 @@ func TestLowerSMIv2Detection(t *testing.T) {
 
 	mod := Lower(astMod, nil)
 
-	if mod.Language != SmiLanguageSMIv2 {
-		t.Errorf("got language %v, want %v", mod.Language, SmiLanguageSMIv2)
-	}
-	if len(mod.Imports) != 2 {
-		t.Errorf("got %d imports, want 2", len(mod.Imports))
-	}
-	if mod.Imports[0].Module != "SNMPv2-SMI" {
-		t.Errorf("got module %q, want %q", mod.Imports[0].Module, "SNMPv2-SMI")
-	}
-	if mod.Imports[0].Symbol != "MODULE-IDENTITY" {
-		t.Errorf("got symbol %q, want %q", mod.Imports[0].Symbol, "MODULE-IDENTITY")
-	}
+	testutil.Equal(t, SmiLanguageSMIv2, mod.Language, "module language")
+	testutil.Len(t, mod.Imports, 2, "imports")
+	testutil.Equal(t, "SNMPv2-SMI", mod.Imports[0].Module, "import module")
+	testutil.Equal(t, "MODULE-IDENTITY", mod.Imports[0].Symbol, "import symbol")
 }
 
 func TestLowerValueAssignment(t *testing.T) {
@@ -134,21 +115,13 @@ func TestLowerValueAssignment(t *testing.T) {
 
 	mod := Lower(astMod, nil)
 
-	if len(mod.Definitions) != 1 {
-		t.Fatalf("got %d definitions, want 1", len(mod.Definitions))
-	}
+	testutil.Len(t, mod.Definitions, 1, "definitions")
 
 	va, ok := mod.Definitions[0].(*ValueAssignment)
-	if !ok {
-		t.Fatalf("expected ValueAssignment, got %T", mod.Definitions[0])
-	}
+	testutil.True(t, ok, "expected ValueAssignment, got %T", mod.Definitions[0])
 
-	if va.Name != "testOid" {
-		t.Errorf("got name %q, want %q", va.Name, "testOid")
-	}
-	if len(va.Oid.Components) != 2 {
-		t.Errorf("got %d OID components, want 2", len(va.Oid.Components))
-	}
+	testutil.Equal(t, "testOid", va.Name, "value assignment name")
+	testutil.Len(t, va.Oid.Components, 2, "OID components")
 }
 
 func TestLowerMacroDefinitionFiltered(t *testing.T) {
@@ -180,17 +153,11 @@ func TestLowerMacroDefinitionFiltered(t *testing.T) {
 	mod := Lower(astMod, nil)
 
 	// MACRO definitions should be filtered out
-	if len(mod.Definitions) != 1 {
-		t.Fatalf("got %d definitions, want 1 (MACRO should be filtered)", len(mod.Definitions))
-	}
+	testutil.Len(t, mod.Definitions, 1, "definitions (MACRO should be filtered)")
 
 	va, ok := mod.Definitions[0].(*ValueAssignment)
-	if !ok {
-		t.Fatalf("expected ValueAssignment, got %T", mod.Definitions[0])
-	}
-	if va.Name != "internet" {
-		t.Errorf("got name %q, want %q", va.Name, "internet")
-	}
+	testutil.True(t, ok, "expected ValueAssignment, got %T", mod.Definitions[0])
+	testutil.Equal(t, "internet", va.Name, "value assignment name")
 }
 
 func TestLowerTypeSyntax(t *testing.T) {
@@ -253,9 +220,7 @@ func TestLowerTypeSyntax(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := lowerTypeSyntax(tt.input)
-			if !tt.checkFn(result) {
-				t.Errorf("lowerTypeSyntax failed for %s", tt.name)
-			}
+			testutil.True(t, tt.checkFn(result), "lowerTypeSyntax failed for %s", tt.name)
 		})
 	}
 }

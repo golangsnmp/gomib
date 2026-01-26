@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 // findMibDir tries to locate a directory with MIB files for testing
@@ -43,20 +44,14 @@ func TestLoadIntegration(t *testing.T) {
 	mibPath := findMibDir(t)
 
 	src, err := gomib.DirTree(mibPath)
-	if err != nil {
-		t.Fatalf("Failed to create source: %v", err)
-	}
+	testutil.NoError(t, err, "create source")
 
 	mib, err := gomib.Load(src)
-	if err != nil {
-		t.Fatalf("Failed to load: %v", err)
-	}
+	testutil.NoError(t, err, "load")
 
 	// Basic sanity checks
 	modules := mib.Modules()
-	if len(modules) == 0 {
-		t.Error("Expected at least some modules")
-	}
+	testutil.NotEmpty(t, modules, "expected at least some modules")
 	t.Logf("Loaded %d modules", len(modules))
 
 	objects := mib.Objects()
@@ -82,14 +77,10 @@ func TestLoadModulesIntegration(t *testing.T) {
 	mibPath := findMibDir(t)
 
 	src, err := gomib.DirTree(mibPath)
-	if err != nil {
-		t.Fatalf("Failed to create source: %v", err)
-	}
+	testutil.NoError(t, err, "create source")
 
 	mib, err := gomib.LoadModules([]string{"IF-MIB"}, src)
-	if err != nil {
-		t.Fatalf("Failed to load: %v", err)
-	}
+	testutil.NoError(t, err, "load IF-MIB")
 
 	// Check we got IF-MIB
 	mod := mib.Module("IF-MIB")
@@ -109,23 +100,17 @@ func TestLoadModulesIntegration(t *testing.T) {
 func TestLoadNoSource(t *testing.T) {
 	// Loading with nil source should return ErrNoSources
 	_, err := gomib.Load(nil)
-	if err != gomib.ErrNoSources {
-		t.Errorf("Load(nil) = %v, want ErrNoSources", err)
-	}
+	testutil.Equal(t, gomib.ErrNoSources, err, "Load(nil)")
 }
 
 func TestFindNode(t *testing.T) {
 	mibPath := findMibDir(t)
 
 	src, err := gomib.DirTree(mibPath)
-	if err != nil {
-		t.Fatalf("Failed to create source: %v", err)
-	}
+	testutil.NoError(t, err, "create source")
 
 	mib, err := gomib.LoadModules([]string{"SNMPv2-MIB"}, src)
-	if err != nil {
-		t.Fatalf("Failed to load: %v", err)
-	}
+	testutil.NoError(t, err, "load SNMPv2-MIB")
 
 	// Check that SNMPv2-MIB loaded
 	if mib.Module("SNMPv2-MIB") == nil {
@@ -148,15 +133,10 @@ func TestFindNode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			node := mib.FindNode(tt.query)
 			if tt.wantName == "" {
-				if node != nil {
-					t.Errorf("FindNode(%q) = %q, want nil", tt.query, node.Name)
-				}
+				testutil.Nil(t, node, "FindNode(%q)", tt.query)
 			} else {
-				if node == nil {
-					t.Errorf("FindNode(%q) = nil, want %q", tt.query, tt.wantName)
-				} else if node.Name != tt.wantName {
-					t.Errorf("FindNode(%q) = %q, want %q", tt.query, node.Name, tt.wantName)
-				}
+				testutil.NotNil(t, node, "FindNode(%q)", tt.query)
+				testutil.Equal(t, tt.wantName, node.Name, "FindNode(%q) name", tt.query)
 			}
 		})
 	}
@@ -166,14 +146,10 @@ func TestNodesIterator(t *testing.T) {
 	mibPath := findMibDir(t)
 
 	src, err := gomib.DirTree(mibPath)
-	if err != nil {
-		t.Fatalf("Failed to create source: %v", err)
-	}
+	testutil.NoError(t, err, "create source")
 
 	mib, err := gomib.LoadModules([]string{"SNMPv2-MIB"}, src)
-	if err != nil {
-		t.Fatalf("Failed to load: %v", err)
-	}
+	testutil.NoError(t, err, "load SNMPv2-MIB")
 
 	if mib.Module("SNMPv2-MIB") == nil {
 		t.Skip("SNMPv2-MIB not found")
@@ -192,9 +168,7 @@ func TestNodesIterator(t *testing.T) {
 		return true
 	})
 
-	if nodeCount != walkCount {
-		t.Errorf("Nodes() yielded %d nodes, Walk counted %d", nodeCount, walkCount)
-	}
+	testutil.Equal(t, walkCount, nodeCount, "Nodes() vs Walk() count")
 	t.Logf("Iterator visited %d nodes", nodeCount)
 
 	// Test early termination
@@ -205,20 +179,16 @@ func TestNodesIterator(t *testing.T) {
 			break
 		}
 	}
-	if earlyCount != 5 {
-		t.Errorf("Early termination: got %d, want 5", earlyCount)
-	}
+	testutil.Equal(t, 5, earlyCount, "early termination count")
 
 	// Test Node.Descendants()
 	sysNode := mib.FindNode("system")
 	if sysNode != nil {
-		descCount := 0
-		for range sysNode.Descendants() {
-			descCount++
+		var descendants []*gomib.Node
+		for n := range sysNode.Descendants() {
+			descendants = append(descendants, n)
 		}
-		if descCount == 0 {
-			t.Error("system node Descendants() returned no nodes")
-		}
-		t.Logf("system node has %d descendants", descCount)
+		testutil.NotEmpty(t, descendants, "system node Descendants()")
+		t.Logf("system node has %d descendants", len(descendants))
 	}
 }

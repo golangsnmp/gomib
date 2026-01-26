@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/ast"
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 func TestParseEmptyModule(t *testing.T) {
@@ -11,15 +12,9 @@ func TestParseEmptyModule(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if module.Name.Name != "TEST-MIB" {
-		t.Errorf("expected module name TEST-MIB, got %s", module.Name.Name)
-	}
-	if module.DefinitionsKind != ast.DefinitionsKindDefinitions {
-		t.Errorf("expected DefinitionsKindDefinitions")
-	}
-	if len(module.Body) != 0 {
-		t.Errorf("expected empty body, got %d definitions", len(module.Body))
-	}
+	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name")
+	testutil.Equal(t, ast.DefinitionsKindDefinitions, module.DefinitionsKind, "definitions kind")
+	testutil.Len(t, module.Body, 0, "body should be empty")
 }
 
 func TestParseModuleWithImports(t *testing.T) {
@@ -31,21 +26,11 @@ func TestParseModuleWithImports(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if module.Name.Name != "TEST-MIB" {
-		t.Errorf("expected module name TEST-MIB, got %s", module.Name.Name)
-	}
-	if len(module.Imports) != 2 {
-		t.Fatalf("expected 2 imports, got %d", len(module.Imports))
-	}
-	if module.Imports[0].FromModule.Name != "SNMPv2-SMI" {
-		t.Errorf("expected first import from SNMPv2-SMI, got %s", module.Imports[0].FromModule.Name)
-	}
-	if len(module.Imports[0].Symbols) != 2 {
-		t.Errorf("expected 2 symbols in first import, got %d", len(module.Imports[0].Symbols))
-	}
-	if module.Imports[1].FromModule.Name != "SNMPv2-TC" {
-		t.Errorf("expected second import from SNMPv2-TC, got %s", module.Imports[1].FromModule.Name)
-	}
+	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name")
+	testutil.Len(t, module.Imports, 2, "imports count")
+	testutil.Equal(t, "SNMPv2-SMI", module.Imports[0].FromModule.Name, "first import module")
+	testutil.Len(t, module.Imports[0].Symbols, 2, "first import symbols count")
+	testutil.Equal(t, "SNMPv2-TC", module.Imports[1].FromModule.Name, "second import module")
 }
 
 func TestParseValueAssignment(t *testing.T) {
@@ -55,19 +40,11 @@ func TestParseValueAssignment(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if len(module.Body) != 1 {
-		t.Fatalf("expected 1 definition, got %d", len(module.Body))
-	}
+	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ValueAssignmentDef)
-	if !ok {
-		t.Fatalf("expected ValueAssignmentDef, got %T", module.Body[0])
-	}
-	if def.Name.Name != "testObject" {
-		t.Errorf("expected name testObject, got %s", def.Name.Name)
-	}
-	if len(def.OidAssignment.Components) != 2 {
-		t.Errorf("expected 2 OID components, got %d", len(def.OidAssignment.Components))
-	}
+	testutil.True(t, ok, "expected ValueAssignmentDef, got %T", module.Body[0])
+	testutil.Equal(t, "testObject", def.Name.Name, "definition name")
+	testutil.Len(t, def.OidAssignment.Components, 2, "OID components count")
 }
 
 func TestParseSimpleObjectType(t *testing.T) {
@@ -82,29 +59,15 @@ func TestParseSimpleObjectType(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if len(module.Body) != 1 {
-		t.Fatalf("expected 1 definition, got %d", len(module.Body))
-	}
+	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
-	if !ok {
-		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
-	}
-	if def.Name.Name != "testIndex" {
-		t.Errorf("expected name testIndex, got %s", def.Name.Name)
-	}
-	if def.Access.Value != ast.AccessValueReadOnly {
-		t.Errorf("expected read-only access, got %v", def.Access.Value)
-	}
-	if def.Status == nil {
-		t.Error("expected status to be set")
-	} else if def.Status.Value != ast.StatusValueCurrent {
-		t.Errorf("expected current status, got %v", def.Status.Value)
-	}
-	if def.Description == nil {
-		t.Error("expected description to be set")
-	} else if def.Description.Value != "Test description" {
-		t.Errorf("expected description 'Test description', got '%s'", def.Description.Value)
-	}
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
+	testutil.Equal(t, "testIndex", def.Name.Name, "definition name")
+	testutil.Equal(t, ast.AccessValueReadOnly, def.Access.Value, "access value")
+	testutil.NotNil(t, def.Status, "status should be set")
+	testutil.Equal(t, ast.StatusValueCurrent, def.Status.Value, "status value")
+	testutil.NotNil(t, def.Description, "description should be set")
+	testutil.Equal(t, "Test description", def.Description.Value, "description value")
 }
 
 func TestParseIntegerEnum(t *testing.T) {
@@ -119,23 +82,14 @@ func TestParseIntegerEnum(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if len(module.Body) != 1 {
-		t.Fatalf("expected 1 definition, got %d", len(module.Body))
-	}
+	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
-	if !ok {
-		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
-	}
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
 	enumSyntax, ok := def.Syntax.Syntax.(*ast.TypeSyntaxIntegerEnum)
-	if !ok {
-		t.Fatalf("expected IntegerEnum syntax, got %T", def.Syntax.Syntax)
-	}
-	if len(enumSyntax.NamedNumbers) != 3 {
-		t.Errorf("expected 3 named numbers, got %d", len(enumSyntax.NamedNumbers))
-	}
-	if enumSyntax.NamedNumbers[0].Name.Name != "up" || enumSyntax.NamedNumbers[0].Value != 1 {
-		t.Errorf("expected up(1), got %s(%d)", enumSyntax.NamedNumbers[0].Name.Name, enumSyntax.NamedNumbers[0].Value)
-	}
+	testutil.True(t, ok, "expected IntegerEnum syntax, got %T", def.Syntax.Syntax)
+	testutil.Len(t, enumSyntax.NamedNumbers, 3, "named numbers count")
+	testutil.Equal(t, "up", enumSyntax.NamedNumbers[0].Name.Name, "first named number name")
+	testutil.Equal(t, int64(1), enumSyntax.NamedNumbers[0].Value, "first named number value")
 }
 
 func TestParseModuleIdentity(t *testing.T) {
@@ -150,22 +104,12 @@ func TestParseModuleIdentity(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if len(module.Body) != 1 {
-		t.Fatalf("expected 1 definition, got %d", len(module.Body))
-	}
+	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ModuleIdentityDef)
-	if !ok {
-		t.Fatalf("expected ModuleIdentityDef, got %T", module.Body[0])
-	}
-	if def.Name.Name != "testMIB" {
-		t.Errorf("expected name testMIB, got %s", def.Name.Name)
-	}
-	if def.LastUpdated.Value != "200001010000Z" {
-		t.Errorf("expected last-updated '200001010000Z', got '%s'", def.LastUpdated.Value)
-	}
-	if def.Organization.Value != "Test Org" {
-		t.Errorf("expected organization 'Test Org', got '%s'", def.Organization.Value)
-	}
+	testutil.True(t, ok, "expected ModuleIdentityDef, got %T", module.Body[0])
+	testutil.Equal(t, "testMIB", def.Name.Name, "definition name")
+	testutil.Equal(t, "200001010000Z", def.LastUpdated.Value, "last-updated value")
+	testutil.Equal(t, "Test Org", def.Organization.Value, "organization value")
 }
 
 func TestParseTextualConvention(t *testing.T) {
@@ -179,30 +123,17 @@ func TestParseTextualConvention(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if len(module.Body) != 1 {
-		t.Fatalf("expected 1 definition, got %d", len(module.Body))
-	}
+	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.TextualConventionDef)
-	if !ok {
-		t.Fatalf("expected TextualConventionDef, got %T", module.Body[0])
-	}
-	if def.Name.Name != "TestString" {
-		t.Errorf("expected name TestString, got %s", def.Name.Name)
-	}
-	if def.DisplayHint == nil || def.DisplayHint.Value != "255a" {
-		t.Errorf("expected display-hint '255a'")
-	}
+	testutil.True(t, ok, "expected TextualConventionDef, got %T", module.Body[0])
+	testutil.Equal(t, "TestString", def.Name.Name, "definition name")
+	testutil.NotNil(t, def.DisplayHint, "display-hint should be set")
+	testutil.Equal(t, "255a", def.DisplayHint.Value, "display-hint value")
 	constrained, ok := def.Syntax.Syntax.(*ast.TypeSyntaxConstrained)
-	if !ok {
-		t.Fatalf("expected constrained syntax, got %T", def.Syntax.Syntax)
-	}
+	testutil.True(t, ok, "expected constrained syntax, got %T", def.Syntax.Syntax)
 	sizeConstraint, ok := constrained.Constraint.(*ast.ConstraintSize)
-	if !ok {
-		t.Fatalf("expected SIZE constraint, got %T", constrained.Constraint)
-	}
-	if len(sizeConstraint.Ranges) != 1 {
-		t.Errorf("expected 1 range, got %d", len(sizeConstraint.Ranges))
-	}
+	testutil.True(t, ok, "expected SIZE constraint, got %T", constrained.Constraint)
+	testutil.Len(t, sizeConstraint.Ranges, 1, "size constraint ranges count")
 }
 
 func TestParseObjectGroup(t *testing.T) {
@@ -216,19 +147,11 @@ func TestParseObjectGroup(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if len(module.Body) != 1 {
-		t.Fatalf("expected 1 definition, got %d", len(module.Body))
-	}
+	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectGroupDef)
-	if !ok {
-		t.Fatalf("expected ObjectGroupDef, got %T", module.Body[0])
-	}
-	if def.Name.Name != "testGroup" {
-		t.Errorf("expected name testGroup, got %s", def.Name.Name)
-	}
-	if len(def.Objects) != 2 {
-		t.Errorf("expected 2 objects, got %d", len(def.Objects))
-	}
+	testutil.True(t, ok, "expected ObjectGroupDef, got %T", module.Body[0])
+	testutil.Equal(t, "testGroup", def.Name.Name, "definition name")
+	testutil.Len(t, def.Objects, 2, "objects count")
 }
 
 func TestParseTypeAssignment(t *testing.T) {
@@ -241,23 +164,13 @@ func TestParseTypeAssignment(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if len(module.Body) != 1 {
-		t.Fatalf("expected 1 definition, got %d", len(module.Body))
-	}
+	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.TypeAssignmentDef)
-	if !ok {
-		t.Fatalf("expected TypeAssignmentDef, got %T", module.Body[0])
-	}
-	if def.Name.Name != "TestEntry" {
-		t.Errorf("expected name TestEntry, got %s", def.Name.Name)
-	}
+	testutil.True(t, ok, "expected TypeAssignmentDef, got %T", module.Body[0])
+	testutil.Equal(t, "TestEntry", def.Name.Name, "definition name")
 	seq, ok := def.Syntax.(*ast.TypeSyntaxSequence)
-	if !ok {
-		t.Fatalf("expected SEQUENCE syntax, got %T", def.Syntax)
-	}
-	if len(seq.Fields) != 2 {
-		t.Errorf("expected 2 fields, got %d", len(seq.Fields))
-	}
+	testutil.True(t, ok, "expected SEQUENCE syntax, got %T", def.Syntax)
+	testutil.Len(t, seq.Fields, 2, "sequence fields count")
 }
 
 func TestParseDefVal(t *testing.T) {
@@ -273,23 +186,13 @@ func TestParseDefVal(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if len(module.Body) != 1 {
-		t.Fatalf("expected 1 definition, got %d", len(module.Body))
-	}
+	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
-	if !ok {
-		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
-	}
-	if def.DefVal == nil {
-		t.Fatal("expected DEFVAL to be set")
-	}
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
+	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 	intVal, ok := def.DefVal.Value.(*ast.DefValContentInteger)
-	if !ok {
-		t.Fatalf("expected integer DEFVAL, got %T", def.DefVal.Value)
-	}
-	if intVal.Value != 42 {
-		t.Errorf("expected DEFVAL 42, got %d", intVal.Value)
-	}
+	testutil.True(t, ok, "expected integer DEFVAL, got %T", def.DefVal.Value)
+	testutil.Equal(t, int64(42), intVal.Value, "DEFVAL value")
 }
 
 func TestParseIndex(t *testing.T) {
@@ -305,29 +208,15 @@ func TestParseIndex(t *testing.T) {
 	p := New(source, nil)
 	module := p.ParseModule()
 
-	if len(module.Body) != 1 {
-		t.Fatalf("expected 1 definition, got %d", len(module.Body))
-	}
+	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
-	if !ok {
-		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
-	}
-	if def.Index == nil {
-		t.Fatal("expected INDEX to be set")
-	}
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
+	testutil.True(t, def.Index != nil, "INDEX should be set")
 	indexClause, ok := def.Index.(*ast.IndexClauseIndex)
-	if !ok {
-		t.Fatalf("expected IndexClauseIndex, got %T", def.Index)
-	}
-	if len(indexClause.Items) != 2 {
-		t.Fatalf("expected 2 indexes, got %d", len(indexClause.Items))
-	}
-	if indexClause.Items[0].Implied {
-		t.Error("first index should not be IMPLIED")
-	}
-	if !indexClause.Items[1].Implied {
-		t.Error("second index should be IMPLIED")
-	}
+	testutil.True(t, ok, "expected IndexClauseIndex, got %T", def.Index)
+	testutil.Len(t, indexClause.Items, 2, "index items count")
+	testutil.False(t, indexClause.Items[0].Implied, "first index should not be IMPLIED")
+	testutil.True(t, indexClause.Items[1].Implied, "second index should be IMPLIED")
 }
 
 func TestParseErrorRecovery(t *testing.T) {
@@ -350,12 +239,8 @@ func TestParseErrorRecovery(t *testing.T) {
 	module := p.ParseModule()
 
 	// Should have some diagnostics from the error
-	if len(module.Diagnostics) == 0 {
-		t.Error("expected diagnostics from parse error")
-	}
+	testutil.Greater(t, len(module.Diagnostics), 0, "expected diagnostics from parse error")
 
 	// Should have recovered and parsed the second definition
-	if len(module.Body) < 1 {
-		t.Error("expected at least one definition after recovery")
-	}
+	testutil.Greater(t, len(module.Body), 0, "expected at least one definition after recovery")
 }
