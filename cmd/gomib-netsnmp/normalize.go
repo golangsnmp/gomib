@@ -255,7 +255,7 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 			}
 
 			// Get default value
-			if dv := obj.DefaultValue(); dv != nil {
+			if dv := obj.DefaultValue(); !dv.IsZero() {
 				n.DefaultValue = dv.String()
 			}
 

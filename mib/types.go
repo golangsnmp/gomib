@@ -32,81 +32,133 @@ type NamedValue struct {
 	Value int64
 }
 
-// DefVal is the interface for default values.
-// All DefVal types implement String() for display.
-type DefVal interface {
-	String() string
-	defVal()
+// DefValKind identifies the type of default value.
+type DefValKind int
+
+const (
+	DefValKindInt    DefValKind = iota // int64
+	DefValKindUint                     // uint64
+	DefValKindString                   // string (quoted)
+	DefValKindBytes                    // []byte (from hex/binary string)
+	DefValKindEnum                     // string (enum label)
+	DefValKindBits                     // []string (bit labels)
+	DefValKindOID                      // Oid
+)
+
+// DefVal represents a default value with both interpreted value and raw MIB syntax.
+// Use Value() to get the interpreted value, Raw() for original MIB syntax.
+type DefVal struct {
+	kind  DefValKind
+	value any    // int64, uint64, string, []byte, []string, Oid
+	raw   string // original MIB syntax
 }
 
-// DefValInt is a signed integer default value.
-type DefValInt int64
+// NewDefValInt creates a DefVal for a signed integer.
+func NewDefValInt(v int64, raw string) DefVal {
+	return DefVal{kind: DefValKindInt, value: v, raw: raw}
+}
 
-func (DefValInt) defVal() {}
+// NewDefValUint creates a DefVal for an unsigned integer.
+func NewDefValUint(v uint64, raw string) DefVal {
+	return DefVal{kind: DefValKindUint, value: v, raw: raw}
+}
 
-// String returns the integer as a decimal string.
-func (d DefValInt) String() string { return strconv.FormatInt(int64(d), 10) }
+// NewDefValString creates a DefVal for a quoted string.
+func NewDefValString(v string, raw string) DefVal {
+	return DefVal{kind: DefValKindString, value: v, raw: raw}
+}
 
-// DefValUnsigned is an unsigned integer default value.
-type DefValUnsigned uint64
+// NewDefValBytes creates a DefVal for bytes (from hex/binary string).
+func NewDefValBytes(v []byte, raw string) DefVal {
+	return DefVal{kind: DefValKindBytes, value: v, raw: raw}
+}
 
-func (DefValUnsigned) defVal() {}
+// NewDefValEnum creates a DefVal for an enum label.
+func NewDefValEnum(label string, raw string) DefVal {
+	return DefVal{kind: DefValKindEnum, value: label, raw: raw}
+}
 
-// String returns the integer as a decimal string.
-func (d DefValUnsigned) String() string { return strconv.FormatUint(uint64(d), 10) }
+// NewDefValBits creates a DefVal for BITS (list of bit labels).
+func NewDefValBits(labels []string, raw string) DefVal {
+	return DefVal{kind: DefValKindBits, value: labels, raw: raw}
+}
 
-// DefValString is a quoted string default value.
-type DefValString string
+// NewDefValOID creates a DefVal for an OID.
+func NewDefValOID(oid Oid, raw string) DefVal {
+	return DefVal{kind: DefValKindOID, value: oid, raw: raw}
+}
 
-func (DefValString) defVal() {}
+// Kind returns the type of the default value.
+func (d DefVal) Kind() DefValKind { return d.kind }
 
-// String returns the string value with quotes.
-func (d DefValString) String() string { return `"` + string(d) + `"` }
+// Value returns the interpreted value.
+// Type depends on Kind: int64, uint64, string, []byte, []string, or Oid.
+func (d DefVal) Value() any { return d.value }
 
-// DefValHexString is a hex string default value (e.g., '1F2E'H).
-type DefValHexString string
+// Raw returns the original MIB syntax (e.g., "'00000000'H", "42", "{ bit1, bit2 }").
+func (d DefVal) Raw() string { return d.raw }
 
-func (DefValHexString) defVal() {}
-
-// String returns the hex string in MIB format (e.g., '1F2E'H).
-func (d DefValHexString) String() string { return "'" + string(d) + "'H" }
-
-// DefValBinaryString is a binary string default value (e.g., '1010'B).
-type DefValBinaryString string
-
-func (DefValBinaryString) defVal() {}
-
-// String returns the binary string in MIB format (e.g., '1010'B).
-func (d DefValBinaryString) String() string { return "'" + string(d) + "'B" }
-
-// DefValEnum is an enumeration label default value.
-type DefValEnum string
-
-func (DefValEnum) defVal() {}
-
-// String returns the enum label.
-func (d DefValEnum) String() string { return string(d) }
-
-// DefValBits is a BITS default value (list of bit labels).
-type DefValBits []string
-
-func (DefValBits) defVal() {}
-
-// String returns the bit labels in braces (e.g., { bit1, bit2 }).
-func (d DefValBits) String() string {
-	if len(d) == 0 {
-		return "{ }"
+// String returns a user-friendly representation of the value.
+func (d DefVal) String() string {
+	switch d.kind {
+	case DefValKindInt:
+		return strconv.FormatInt(d.value.(int64), 10)
+	case DefValKindUint:
+		return strconv.FormatUint(d.value.(uint64), 10)
+	case DefValKindString:
+		return `"` + d.value.(string) + `"`
+	case DefValKindBytes:
+		b := d.value.([]byte)
+		if len(b) == 0 {
+			return "0"
+		}
+		// For small byte arrays, interpret as big-endian integer
+		// This matches net-snmp behavior for hex DEFVALs
+		if len(b) <= 8 {
+			var n uint64
+			for _, v := range b {
+				n = n<<8 | uint64(v)
+			}
+			return strconv.FormatUint(n, 10)
+		}
+		// For larger byte arrays, show as hex
+		return "0x" + bytesToHex(b)
+	case DefValKindEnum:
+		return d.value.(string)
+	case DefValKindBits:
+		labels := d.value.([]string)
+		if len(labels) == 0 {
+			return "{ }"
+		}
+		return "{ " + strings.Join(labels, ", ") + " }"
+	case DefValKindOID:
+		return d.value.(Oid).String()
+	default:
+		return d.raw
 	}
-	return "{ " + strings.Join(d, ", ") + " }"
 }
 
-// DefValOID is an OID default value.
-type DefValOID Oid
+// IsZero returns true if this is the zero value (no default set).
+func (d DefVal) IsZero() bool {
+	return d.value == nil
+}
 
-func (DefValOID) defVal() {}
+// DefValAs returns the value as type T if compatible, or zero value and false.
+func DefValAs[T any](d DefVal) (T, bool) {
+	v, ok := d.value.(T)
+	return v, ok
+}
 
-// String returns the OID as a dotted string.
-func (d DefValOID) String() string { return Oid(d).String() }
+// bytesToHex converts bytes to uppercase hex string.
+func bytesToHex(b []byte) string {
+	const hex = "0123456789ABCDEF"
+	result := make([]byte, len(b)*2)
+	for i, v := range b {
+		result[i*2] = hex[v>>4]
+		result[i*2+1] = hex[v&0x0f]
+	}
+	return string(result)
+}
 
 // Revision describes a module revision.
 type Revision struct {

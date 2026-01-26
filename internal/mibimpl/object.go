@@ -13,7 +13,7 @@ type Object struct {
 	desc     string
 	ref      string
 	units    string
-	defVal   mib.DefVal
+	defVal   *mib.DefVal
 	augments *Object
 	index    []mib.IndexEntry
 
@@ -73,7 +73,10 @@ func (o *Object) Units() string {
 }
 
 func (o *Object) DefaultValue() mib.DefVal {
-	return o.defVal
+	if o.defVal == nil {
+		return mib.DefVal{}
+	}
+	return *o.defVal
 }
 
 func (o *Object) EffectiveDisplayHint() string {
@@ -287,7 +290,7 @@ func (o *Object) SetUnits(u string) {
 	o.units = u
 }
 
-func (o *Object) SetDefaultValue(d mib.DefVal) {
+func (o *Object) SetDefaultValue(d *mib.DefVal) {
 	o.defVal = d
 }
 

@@ -3,6 +3,8 @@ package resolver
 import (
 	"log/slog"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
@@ -175,7 +177,7 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 
 		// Convert DEFVAL
 		if obj.DefVal != nil {
-			resolved.SetDefaultValue(convertDefVal(ctx, obj.DefVal, ref.mod))
+			resolved.SetDefaultValue(convertDefVal(ctx, obj.DefVal, ref.mod, obj.Syntax))
 		}
 
 		// Pre-compute effective values from type chain
@@ -355,25 +357,53 @@ func resolveTypeSyntax(ctx *ResolverContext, syntax module.TypeSyntax, mod *modu
 	}
 }
 
-func convertDefVal(ctx *ResolverContext, defval module.DefVal, mod *module.Module) mib.DefVal {
+func convertDefVal(ctx *ResolverContext, defval module.DefVal, mod *module.Module, syntax module.TypeSyntax) *mib.DefVal {
 	switch v := defval.(type) {
 	case *module.DefValInteger:
-		return mib.DefValInt(v.Value)
+		raw := strconv.FormatInt(v.Value, 10)
+		dv := mib.NewDefValInt(v.Value, raw)
+		return &dv
 	case *module.DefValUnsigned:
-		return mib.DefValUnsigned(v.Value)
+		raw := strconv.FormatUint(v.Value, 10)
+		dv := mib.NewDefValUint(v.Value, raw)
+		return &dv
 	case *module.DefValString:
-		return mib.DefValString(v.Value)
+		raw := `"` + v.Value + `"`
+		dv := mib.NewDefValString(v.Value, raw)
+		return &dv
 	case *module.DefValHexString:
-		return mib.DefValHexString(v.Value)
+		raw := "'" + v.Value + "'H"
+		bytes := hexToBytes(v.Value)
+		dv := mib.NewDefValBytes(bytes, raw)
+		return &dv
 	case *module.DefValBinaryString:
-		return mib.DefValBinaryString(v.Value)
+		raw := "'" + v.Value + "'B"
+		bytes := binaryToBytes(v.Value)
+		dv := mib.NewDefValBytes(bytes, raw)
+		return &dv
 	case *module.DefValEnum:
-		return mib.DefValEnum(v.Name)
+		// Check if this is actually an OID reference based on object's type
+		if isOIDType(syntax) {
+			if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
+				oid := mib.Oid(node.OID())
+				dv := mib.NewDefValOID(oid, v.Name)
+				return &dv
+			}
+		}
+		dv := mib.NewDefValEnum(v.Name, v.Name)
+		return &dv
 	case *module.DefValBits:
-		return mib.DefValBits(slices.Clone(v.Labels))
+		raw := "{ " + strings.Join(v.Labels, ", ") + " }"
+		if len(v.Labels) == 0 {
+			raw = "{ }"
+		}
+		dv := mib.NewDefValBits(slices.Clone(v.Labels), raw)
+		return &dv
 	case *module.DefValOidRef:
 		if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
-			return mib.DefValOID(node.OID())
+			oid := mib.Oid(node.OID())
+			dv := mib.NewDefValOID(oid, v.Name)
+			return &dv
 		}
 		return nil
 	case *module.DefValOidValue:
@@ -391,7 +421,9 @@ func convertDefVal(ctx *ResolverContext, defval module.DefVal, mod *module.Modul
 			}
 			if name != "" {
 				if node, ok := ctx.LookupNodeForModule(mod, name); ok {
-					return mib.DefValOID(node.OID())
+					oid := mib.Oid(node.OID())
+					dv := mib.NewDefValOID(oid, name)
+					return &dv
 				}
 			}
 		}
@@ -399,6 +431,59 @@ func convertDefVal(ctx *ResolverContext, defval module.DefVal, mod *module.Modul
 	default:
 		return nil
 	}
+}
+
+// hexToBytes converts a hex string (e.g., "00FF1A") to bytes.
+func hexToBytes(s string) []byte {
+	if len(s) == 0 {
+		return []byte{}
+	}
+	// Handle odd-length hex strings by padding
+	if len(s)%2 != 0 {
+		s = "0" + s
+	}
+	result := make([]byte, len(s)/2)
+	for i := 0; i < len(s); i += 2 {
+		var b byte
+		for j := 0; j < 2; j++ {
+			c := s[i+j]
+			b <<= 4
+			switch {
+			case c >= '0' && c <= '9':
+				b |= c - '0'
+			case c >= 'A' && c <= 'F':
+				b |= c - 'A' + 10
+			case c >= 'a' && c <= 'f':
+				b |= c - 'a' + 10
+			}
+		}
+		result[i/2] = b
+	}
+	return result
+}
+
+// binaryToBytes converts a binary string (e.g., "10101010") to bytes.
+func binaryToBytes(s string) []byte {
+	if len(s) == 0 {
+		return []byte{}
+	}
+	// Pad to multiple of 8
+	padding := (8 - len(s)%8) % 8
+	for i := 0; i < padding; i++ {
+		s = "0" + s
+	}
+	result := make([]byte, len(s)/8)
+	for i := 0; i < len(s); i += 8 {
+		var b byte
+		for j := 0; j < 8; j++ {
+			b <<= 1
+			if s[i+j] == '1' {
+				b |= 1
+			}
+		}
+		result[i/8] = b
+	}
+	return result
 }
 
 func convertAccess(a types.Access) mib.Access {
@@ -425,6 +510,21 @@ func isBareTypeIndex(name string) bool {
 	case "INTEGER", "Integer32", "Unsigned32", "Counter32", "Counter64", "Gauge32",
 		"IpAddress", "Opaque", "TimeTicks", "BITS", "OCTET", "STRING", "Counter", "Gauge", "NetworkAddress":
 		return true
+	default:
+		return false
+	}
+}
+
+// isOIDType checks if the syntax resolves to OBJECT IDENTIFIER.
+func isOIDType(syntax module.TypeSyntax) bool {
+	switch s := syntax.(type) {
+	case *module.TypeSyntaxObjectIdentifier:
+		return true
+	case *module.TypeSyntaxTypeRef:
+		// Check for common OID type names
+		return s.Name == "OBJECT IDENTIFIER" || s.Name == "AutonomousType"
+	case *module.TypeSyntaxConstrained:
+		return isOIDType(s.Base)
 	default:
 		return false
 	}

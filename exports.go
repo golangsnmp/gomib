@@ -62,20 +62,39 @@ type Diagnostic = mib.Diagnostic
 // UnresolvedRef describes a symbol that could not be resolved.
 type UnresolvedRef = mib.UnresolvedRef
 
-// DefVal is the interface for default values.
+// DefVal represents a default value with both interpreted value and raw MIB syntax.
 type DefVal = mib.DefVal
 
-// DefVal concrete types.
-type (
-	DefValInt          = mib.DefValInt
-	DefValUnsigned     = mib.DefValUnsigned
-	DefValString       = mib.DefValString
-	DefValHexString    = mib.DefValHexString
-	DefValBinaryString = mib.DefValBinaryString
-	DefValEnum         = mib.DefValEnum
-	DefValBits         = mib.DefValBits
-	DefValOID          = mib.DefValOID
+// DefValKind identifies the type of default value.
+type DefValKind = mib.DefValKind
+
+// DefVal kind constants.
+const (
+	DefValKindInt    = mib.DefValKindInt
+	DefValKindUint   = mib.DefValKindUint
+	DefValKindString = mib.DefValKindString
+	DefValKindBytes  = mib.DefValKindBytes
+	DefValKindEnum   = mib.DefValKindEnum
+	DefValKindBits   = mib.DefValKindBits
+	DefValKindOID    = mib.DefValKindOID
 )
+
+// DefVal constructors.
+var (
+	NewDefValInt    = mib.NewDefValInt
+	NewDefValUint   = mib.NewDefValUint
+	NewDefValString = mib.NewDefValString
+	NewDefValBytes  = mib.NewDefValBytes
+	NewDefValEnum   = mib.NewDefValEnum
+	NewDefValBits   = mib.NewDefValBits
+	NewDefValOID    = mib.NewDefValOID
+)
+
+// DefValAs returns the value as type T if compatible.
+// Usage: value, ok := gomib.DefValAs[int64](defval)
+func DefValAs[T any](d DefVal) (T, bool) {
+	return mib.DefValAs[T](d)
+}
 
 // Kind constants.
 const (

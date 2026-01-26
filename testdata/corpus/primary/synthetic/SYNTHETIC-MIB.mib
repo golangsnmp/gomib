@@ -203,13 +203,60 @@ syntheticTypeCodeValue OBJECT-TYPE
         "A value using the type imported from SYNTHETIC-TYPES-MIB."
     ::= { syntheticScalars 12 }
 
+-- DEFVAL test objects for integration testing
+
+syntheticDefvalInteger OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Test object for integer DEFVAL."
+    DEFVAL      { 42 }
+    ::= { syntheticScalars 13 }
+
+syntheticDefvalString OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..64))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Test object for string DEFVAL."
+    DEFVAL      { "default" }
+    ::= { syntheticScalars 14 }
+
+syntheticDefvalHex OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (4))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Test object for hex string DEFVAL representing 4 bytes."
+    DEFVAL      { 'DEADBEEF'H }
+    ::= { syntheticScalars 15 }
+
+syntheticDefvalEmptyHex OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..32))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Test object for empty hex string DEFVAL."
+    DEFVAL      { ''H }
+    ::= { syntheticScalars 16 }
+
+syntheticDefvalBits OBJECT-TYPE
+    SYNTAX      BITS { flag0(0), flag1(1), flag2(2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Test object for BITS DEFVAL."
+    DEFVAL      { { flag0, flag2 } }
+    ::= { syntheticScalars 17 }
+
 syntheticFixedId OBJECT-TYPE
     SYNTAX      SyntheticFixedOctetString -- Using fixed-size TC
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
         "A fixed-size identifier."
-    ::= { syntheticScalars 13 }
+    ::= { syntheticScalars 18 }
 
 -- Simple Table Group
 syntheticSimpleTableGroup OBJECT IDENTIFIER ::= { syntheticMIB 2 }

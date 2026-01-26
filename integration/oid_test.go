@@ -53,8 +53,8 @@ var oidTests = []OidTestCase{
 		NetSnmp: "snmptranslate -On SYNTHETIC-MIB::syntheticInstallDate -> .1.3.6.1.2.1.999.1.11"},
 	{Name: "syntheticTypeCodeValue", Module: "SYNTHETIC-MIB", Oid: "1.3.6.1.2.1.999.1.12", Kind: gomib.KindScalar,
 		NetSnmp: "snmptranslate -On SYNTHETIC-MIB::syntheticTypeCodeValue -> .1.3.6.1.2.1.999.1.12"},
-	{Name: "syntheticFixedId", Module: "SYNTHETIC-MIB", Oid: "1.3.6.1.2.1.999.1.13", Kind: gomib.KindScalar,
-		NetSnmp: "snmptranslate -On SYNTHETIC-MIB::syntheticFixedId -> .1.3.6.1.2.1.999.1.13"},
+	{Name: "syntheticFixedId", Module: "SYNTHETIC-MIB", Oid: "1.3.6.1.2.1.999.1.18", Kind: gomib.KindScalar,
+		NetSnmp: "snmptranslate -On SYNTHETIC-MIB::syntheticFixedId -> .1.3.6.1.2.1.999.1.18"},
 
 	// === Simple Table ===
 	{Name: "syntheticSimpleTable", Module: "SYNTHETIC-MIB", Oid: "1.3.6.1.2.1.999.2.1", Kind: gomib.KindTable,

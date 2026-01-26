@@ -550,17 +550,32 @@ func printComparisonResult(w io.Writer, result *ComparisonResult) {
 	printFieldAccuracy(w, "varbinds", result.Summary.Varbinds)
 
 	if len(result.Mismatches) > 0 {
-		fmt.Fprintf(w, "\nMismatches (first 50):\n")
-		limit := 50
-		if len(result.Mismatches) < limit {
-			limit = len(result.Mismatches)
+		// Group mismatches by field type
+		byField := make(map[string][]Mismatch)
+		for _, m := range result.Mismatches {
+			byField[m.Field] = append(byField[m.Field], m)
 		}
-		for _, m := range result.Mismatches[:limit] {
-			fmt.Fprintf(w, "  %s (%s::%s)\n", m.OID, m.Module, m.Name)
-			fmt.Fprintf(w, "    %s: gomib=%q net-snmp=%q\n", m.Field, m.Gomib, m.NetSnmp)
-		}
-		if len(result.Mismatches) > limit {
-			fmt.Fprintf(w, "  ... and %d more\n", len(result.Mismatches)-limit)
+
+		// Print up to 5 examples per field type
+		fmt.Fprintf(w, "\nMismatches by field (up to 5 each):\n")
+		fieldOrder := []string{"type", "access", "status", "enums", "index", "hint", "tc_name", "units", "ranges", "defval", "bits", "varbinds"}
+		for _, field := range fieldOrder {
+			mismatches, ok := byField[field]
+			if !ok || len(mismatches) == 0 {
+				continue
+			}
+			fmt.Fprintf(w, "\n  [%s] (%d total)\n", field, len(mismatches))
+			limit := 5
+			if len(mismatches) < limit {
+				limit = len(mismatches)
+			}
+			for _, m := range mismatches[:limit] {
+				fmt.Fprintf(w, "    %s (%s::%s)\n", m.OID, m.Module, m.Name)
+				fmt.Fprintf(w, "      gomib=%q net-snmp=%q\n", m.Gomib, m.NetSnmp)
+			}
+			if len(mismatches) > limit {
+				fmt.Fprintf(w, "    ... and %d more\n", len(mismatches)-limit)
+			}
 		}
 	}
 
