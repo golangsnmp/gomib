@@ -3,7 +3,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 // SizeTestCase defines a test case for SIZE constraint verification.
@@ -56,17 +56,17 @@ func TestSizeConstraints(t *testing.T) {
 	for _, tc := range sizeTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
-			require.NotNil(t, obj.Type, "object should have a resolved type")
+			testutil.NotNil(t, obj.Type, "object should have a resolved type")
 
 			// Size is pre-computed on the object (effective value from inline or type chain)
-			require.NotEmpty(t, obj.Size, "should have a SIZE constraint")
+			testutil.NotEmpty(t, obj.Size, "should have a SIZE constraint")
 
 			// Use first range (most common case)
 			minSize := obj.Size[0].Min
 			maxSize := obj.Size[0].Max
 
-			require.Equal(t, tc.MinSize, minSize, "min size mismatch")
-			require.Equal(t, tc.MaxSize, maxSize, "max size mismatch")
+			testutil.Equal(t, tc.MinSize, minSize, "min size mismatch")
+			testutil.Equal(t, tc.MaxSize, maxSize, "max size mismatch")
 		})
 	}
 }
@@ -135,17 +135,17 @@ func TestRangeConstraints(t *testing.T) {
 	for _, tc := range rangeTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
-			require.NotNil(t, obj.Type, "object should have a resolved type")
+			testutil.NotNil(t, obj.Type, "object should have a resolved type")
 
 			// ValueRange is pre-computed on the object (effective value from inline or type chain)
-			require.NotEmpty(t, obj.ValueRange, "should have a value range constraint")
+			testutil.NotEmpty(t, obj.ValueRange, "should have a value range constraint")
 
 			// Use first range (most common case)
 			minVal := obj.ValueRange[0].Min
 			maxVal := obj.ValueRange[0].Max
 
-			require.Equal(t, tc.MinValue, minVal, "min value mismatch")
-			require.Equal(t, tc.MaxValue, maxVal, "max value mismatch")
+			testutil.Equal(t, tc.MinValue, minVal, "min value mismatch")
+			testutil.Equal(t, tc.MaxValue, maxVal, "max value mismatch")
 		})
 	}
 }
@@ -214,10 +214,10 @@ func TestDisplayHints(t *testing.T) {
 	for _, tc := range hintTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
-			require.NotNil(t, obj.Type, "object should have a resolved type")
+			testutil.NotNil(t, obj.Type, "object should have a resolved type")
 
 			// Hint is pre-computed on the object (effective value from inline or type chain)
-			require.Equal(t, tc.Hint, obj.Hint, "display hint mismatch")
+			testutil.Equal(t, tc.Hint, obj.Hint, "display hint mismatch")
 		})
 	}
 }

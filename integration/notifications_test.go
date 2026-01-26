@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib"
-	"github.com/stretchr/testify/require"
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 // NotificationTestCase defines a test case for notification verification.
@@ -42,19 +42,19 @@ func TestNotifications(t *testing.T) {
 	for _, tc := range notificationTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			node := getNode(t, m, tc.Module, tc.Name)
-			require.Equal(t, gomib.KindNotification, node.Kind, "should be a notification")
+			testutil.Equal(t, gomib.KindNotification, node.Kind, "should be a notification")
 
 			got := node.OID().String()
-			require.Equal(t, tc.Oid, got, "OID mismatch")
+			testutil.Equal(t, tc.Oid, got, "OID mismatch")
 
 			if len(tc.Objects) > 0 {
 				notif := node.Notif
-				require.NotNil(t, notif, "should have a notification object")
-				require.Len(t, notif.Objects, len(tc.Objects), "OBJECTS count mismatch")
+				testutil.NotNil(t, notif, "should have a notification object")
+				testutil.Len(t, notif.Objects, len(tc.Objects), "OBJECTS count mismatch")
 
 				for i, expectedName := range tc.Objects {
-					require.NotNil(t, notif.Objects[i], "OBJECTS[%d] should be resolved", i)
-					require.Equal(t, expectedName, notif.Objects[i].Name, "OBJECTS[%d] name mismatch", i)
+					testutil.NotNil(t, notif.Objects[i], "OBJECTS[%d] should be resolved", i)
+					testutil.Equal(t, expectedName, notif.Objects[i].Name, "OBJECTS[%d] name mismatch", i)
 				}
 			}
 		})
@@ -85,7 +85,7 @@ func TestTraps(t *testing.T) {
 	for _, tc := range trapTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			node := getNode(t, m, tc.Module, tc.Name)
-			require.Equal(t, gomib.KindNotification, node.Kind, "trap should be notification kind")
+			testutil.Equal(t, gomib.KindNotification, node.Kind, "trap should be notification kind")
 			// Additional trap-specific assertions can be added
 		})
 	}

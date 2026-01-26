@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib"
-	"github.com/stretchr/testify/require"
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 // OidTestCase defines a test case for OID resolution.
@@ -155,8 +155,8 @@ func TestOidResolution(t *testing.T) {
 			node := getNode(t, m, tc.Module, tc.Name)
 
 			got := node.OID().String()
-			require.Equal(t, tc.Oid, got, "OID mismatch")
-			require.Equal(t, tc.Kind, node.Kind, "kind mismatch")
+			testutil.Equal(t, tc.Oid, got, "OID mismatch")
+			testutil.Equal(t, tc.Kind, node.Kind, "kind mismatch")
 		})
 	}
 }

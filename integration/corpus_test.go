@@ -29,7 +29,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib"
-	"github.com/stretchr/testify/require"
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 // corpusModel holds the shared resolved model for all tests.
@@ -95,7 +95,7 @@ func getNode(t *testing.T, m *gomib.Mib, module, name string) *gomib.Node {
 			return node
 		}
 	}
-	require.Fail(t, "node %s::%s should exist", module, name)
+	testutil.Fail(t, "node %s::%s should exist", module, name)
 	return nil
 }
 
@@ -116,7 +116,7 @@ func getObject(t *testing.T, m *gomib.Mib, module, name string) *gomib.Object {
 	t.Helper()
 	qname := module + "::" + name
 	obj := m.ObjectByQualified(qname)
-	require.NotNil(t, obj, "object %s::%s should exist", module, name)
+	testutil.NotNil(t, obj, "object %s::%s should exist", module, name)
 	return obj
 }
 
@@ -125,10 +125,10 @@ func TestCorpusLoads(t *testing.T) {
 	m := loadCorpus(t)
 
 	// Basic sanity checks
-	require.Greater(t, m.ModuleCount(), 0, "should have loaded modules")
-	require.Greater(t, m.NodeCount(), 0, "should have OID nodes")
-	require.Greater(t, m.ObjectCount(), 0, "should have objects")
-	require.Greater(t, m.TypeCount(), 0, "should have types")
+	testutil.Greater(t, m.ModuleCount(), 0, "should have loaded modules")
+	testutil.Greater(t, m.NodeCount(), 0, "should have OID nodes")
+	testutil.Greater(t, m.ObjectCount(), 0, "should have objects")
+	testutil.Greater(t, m.TypeCount(), 0, "should have types")
 
 	t.Logf("Corpus: %d modules, %d nodes, %d objects, %d types",
 		m.ModuleCount(), m.NodeCount(), m.ObjectCount(), m.TypeCount())

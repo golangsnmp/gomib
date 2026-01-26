@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib"
-	"github.com/stretchr/testify/require"
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 // TypeTestCase defines a test case for object type resolution.
@@ -96,9 +96,9 @@ func TestObjectType(t *testing.T) {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
 
-			require.NotNil(t, obj.Type, "object should have a resolved type")
-			require.Equal(t, tc.TypeName, obj.Type.Name, "type name mismatch")
-			require.Equal(t, tc.BaseType, obj.Type.Base, "base type mismatch")
+			testutil.NotNil(t, obj.Type, "object should have a resolved type")
+			testutil.Equal(t, tc.TypeName, obj.Type.Name, "type name mismatch")
+			testutil.Equal(t, tc.BaseType, obj.Type.Base, "base type mismatch")
 		})
 	}
 }
@@ -148,7 +148,7 @@ func TestTextualConventions(t *testing.T) {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			// Find the type by name in the module
 			mod := m.Module(tc.Module)
-			require.NotNil(t, mod, "module %s should exist", tc.Module)
+			testutil.NotNil(t, mod, "module %s should exist", tc.Module)
 
 			// Search for the type in the module's types
 			var found *gomib.Type
@@ -158,14 +158,14 @@ func TestTextualConventions(t *testing.T) {
 					break
 				}
 			}
-			require.NotNil(t, found, "type %s should exist in module %s", tc.Name, tc.Module)
+			testutil.NotNil(t, found, "type %s should exist in module %s", tc.Name, tc.Module)
 
-			require.Equal(t, tc.BaseType, found.Base, "base type mismatch")
+			testutil.Equal(t, tc.BaseType, found.Base, "base type mismatch")
 			if tc.Hint != "" {
-				require.Equal(t, tc.Hint, found.Hint, "display hint mismatch")
+				testutil.Equal(t, tc.Hint, found.Hint, "display hint mismatch")
 			}
 			if tc.Description != "" {
-				require.Contains(t, found.Description, tc.Description, "description mismatch")
+				testutil.Contains(t, found.Description, tc.Description, "description mismatch")
 			}
 		})
 	}

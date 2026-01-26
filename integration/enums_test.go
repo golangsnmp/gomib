@@ -3,7 +3,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 // EnumTestCase defines a test case for enumerated INTEGER verification.
@@ -75,19 +75,19 @@ func TestEnumValues(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
 
 			// NamedValues contains the effective enum values (pre-computed from inline or type chain)
-			require.NotEmpty(t, obj.NamedValues, "should have enum values")
+			testutil.NotEmpty(t, obj.NamedValues, "should have enum values")
 
 			// Verify expected values are present
 			for expectedLabel, expectedValue := range tc.Values {
 				found := false
 				for _, nv := range obj.NamedValues {
 					if nv.Label == expectedLabel {
-						require.Equal(t, expectedValue, nv.Value, "enum value mismatch for %s", expectedLabel)
+						testutil.Equal(t, expectedValue, nv.Value, "enum value mismatch for %s", expectedLabel)
 						found = true
 						break
 					}
 				}
-				require.True(t, found, "enum label %s not found", expectedLabel)
+				testutil.True(t, found, "enum label %s not found", expectedLabel)
 			}
 		})
 	}
@@ -124,19 +124,19 @@ func TestBitsDefinitions(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.Name)
 
 			// NamedValues contains the effective BITS positions (pre-computed from inline or type chain)
-			require.NotEmpty(t, obj.NamedValues, "should have BITS definitions")
+			testutil.NotEmpty(t, obj.NamedValues, "should have BITS definitions")
 
 			// Verify expected positions are present
 			for expectedLabel, expectedPos := range tc.Positions {
 				found := false
 				for _, nv := range obj.NamedValues {
 					if nv.Label == expectedLabel {
-						require.Equal(t, expectedPos, nv.Value, "bit position mismatch for %s", expectedLabel)
+						testutil.Equal(t, expectedPos, nv.Value, "bit position mismatch for %s", expectedLabel)
 						found = true
 						break
 					}
 				}
-				require.True(t, found, "bit label %s not found", expectedLabel)
+				testutil.True(t, found, "bit label %s not found", expectedLabel)
 			}
 		})
 	}

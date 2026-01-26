@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib"
-	"github.com/stretchr/testify/require"
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 // TableTestCase defines a test case for table structure verification.
@@ -67,23 +67,23 @@ func TestTableStructure(t *testing.T) {
 		t.Run(tc.Module+"::"+tc.TableName, func(t *testing.T) {
 			// Verify table node
 			tableNode := getNode(t, m, tc.Module, tc.TableName)
-			require.Equal(t, gomib.KindTable, tableNode.Kind, "should be a table")
+			testutil.Equal(t, gomib.KindTable, tableNode.Kind, "should be a table")
 
 			// Verify row node
 			rowNode := getNode(t, m, tc.Module, tc.RowName)
-			require.Equal(t, gomib.KindRow, rowNode.Kind, "should be a row")
+			testutil.Equal(t, gomib.KindRow, rowNode.Kind, "should be a row")
 
 			// Verify row is child of table
-			require.Equal(t, tableNode, rowNode.Parent, "row should be child of table")
+			testutil.True(t, tableNode == rowNode.Parent, "row should be child of table")
 
 			// Verify index
 			obj := getObject(t, m, tc.Module, tc.RowName)
-			require.NotEmpty(t, obj.Index, "row should have an INDEX clause")
-			require.Len(t, obj.Index, len(tc.IndexNames), "index count mismatch")
+			testutil.NotEmpty(t, obj.Index, "row should have an INDEX clause")
+			testutil.Len(t, obj.Index, len(tc.IndexNames), "index count mismatch")
 
 			for i, expectedName := range tc.IndexNames {
-				require.NotNil(t, obj.Index[i].Object, "index %d should be resolved", i)
-				require.Equal(t, expectedName, obj.Index[i].Object.Name, "index %d name mismatch", i)
+				testutil.NotNil(t, obj.Index[i].Object, "index %d should be resolved", i)
+				testutil.Equal(t, expectedName, obj.Index[i].Object.Name, "index %d name mismatch", i)
 			}
 
 			// Verify IMPLIED
@@ -96,8 +96,8 @@ func TestTableStructure(t *testing.T) {
 						break
 					}
 				}
-				require.True(t, hasImplied, "should have IMPLIED index")
-				require.True(t, obj.Index[lastIdx].Implied, "last index should be IMPLIED")
+				testutil.True(t, hasImplied, "should have IMPLIED index")
+				testutil.True(t, obj.Index[lastIdx].Implied, "last index should be IMPLIED")
 			}
 		})
 	}
@@ -132,10 +132,10 @@ func TestAugments(t *testing.T) {
 	for _, tc := range augmentsTests {
 		t.Run(tc.Module+"::"+tc.RowName, func(t *testing.T) {
 			obj := getObject(t, m, tc.Module, tc.RowName)
-			require.NotNil(t, obj.Augments, "should have AUGMENTS")
+			testutil.NotNil(t, obj.Augments, "should have AUGMENTS")
 
 			augObj := obj.Augments
-			require.Equal(t, tc.AugmentsRow, augObj.Name, "augmented row name mismatch")
+			testutil.Equal(t, tc.AugmentsRow, augObj.Name, "augmented row name mismatch")
 		})
 	}
 }
@@ -207,14 +207,14 @@ func TestColumns(t *testing.T) {
 	for _, tc := range columnTests {
 		t.Run(tc.Module+"::"+tc.Name, func(t *testing.T) {
 			node := getNode(t, m, tc.Module, tc.Name)
-			require.Equal(t, gomib.KindColumn, node.Kind, "should be a column")
+			testutil.Equal(t, gomib.KindColumn, node.Kind, "should be a column")
 
 			// Verify ancestry: column -> row -> table
-			require.NotNil(t, node.Parent, "column should have parent (row)")
-			require.Equal(t, gomib.KindRow, node.Parent.Kind, "parent should be row")
-			require.NotNil(t, node.Parent.Parent, "row should have parent (table)")
-			require.Equal(t, gomib.KindTable, node.Parent.Parent.Kind, "grandparent should be table")
-			require.Equal(t, tc.TableName, node.Parent.Parent.Name, "table name mismatch")
+			testutil.NotNil(t, node.Parent, "column should have parent (row)")
+			testutil.Equal(t, gomib.KindRow, node.Parent.Kind, "parent should be row")
+			testutil.NotNil(t, node.Parent.Parent, "row should have parent (table)")
+			testutil.Equal(t, gomib.KindTable, node.Parent.Parent.Kind, "grandparent should be table")
+			testutil.Equal(t, tc.TableName, node.Parent.Parent.Name, "table name mismatch")
 		})
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib"
-	"github.com/stretchr/testify/require"
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 // LongestPrefixTestCase defines a test case for longest prefix matching.
@@ -99,11 +99,11 @@ func TestLongestPrefix(t *testing.T) {
 	for _, tc := range longestPrefixTests {
 		t.Run(tc.Description, func(t *testing.T) {
 			node := m.LongestPrefix(tc.Query)
-			require.NotNil(t, node, "should find a matching prefix for %s", tc.Query)
+			testutil.NotNil(t, node, "should find a matching prefix for %s", tc.Query)
 
-			require.Equal(t, tc.ExpectedOid, node.OID().String(), "OID mismatch")
-			require.Equal(t, tc.ExpectedName, node.Name, "name mismatch")
-			require.Equal(t, tc.ExpectedKind, node.Kind, "kind mismatch")
+			testutil.Equal(t, tc.ExpectedOid, node.OID().String(), "OID mismatch")
+			testutil.Equal(t, tc.ExpectedName, node.Name, "name mismatch")
+			testutil.Equal(t, tc.ExpectedKind, node.Kind, "kind mismatch")
 		})
 	}
 }
@@ -113,21 +113,21 @@ func TestLongestPrefix_NoMatch(t *testing.T) {
 
 	// OID that doesn't exist at all (wrong top-level arc)
 	node := m.LongestPrefix("9.9.9.9.9")
-	require.Nil(t, node, "should return nil for completely unknown OID tree")
+	testutil.Nil(t, node, "should return nil for completely unknown OID tree")
 }
 
 func TestLongestPrefix_EmptyOid(t *testing.T) {
 	m := loadCorpus(t)
 
 	node := m.LongestPrefix("")
-	require.Nil(t, node, "should return nil for empty OID")
+	testutil.Nil(t, node, "should return nil for empty OID")
 }
 
 func TestLongestPrefix_InvalidOid(t *testing.T) {
 	m := loadCorpus(t)
 
 	node := m.LongestPrefix("not.an.oid")
-	require.Nil(t, node, "should return nil for invalid OID")
+	testutil.Nil(t, node, "should return nil for invalid OID")
 }
 
 func TestLongestPrefixByOID(t *testing.T) {
@@ -137,17 +137,17 @@ func TestLongestPrefixByOID(t *testing.T) {
 	oid := gomib.Oid{1, 3, 6, 1, 2, 1, 999, 2, 1, 1, 1, 5}
 	node := m.LongestPrefixByOID(oid)
 
-	require.NotNil(t, node)
-	require.Equal(t, "syntheticSimpleIndex", node.Name)
-	require.Equal(t, "1.3.6.1.2.1.999.2.1.1.1", node.OID().String())
+	testutil.NotNil(t, node, "should find node")
+	testutil.Equal(t, "syntheticSimpleIndex", node.Name, "name mismatch")
+	testutil.Equal(t, "1.3.6.1.2.1.999.2.1.1.1", node.OID().String(), "OID mismatch")
 }
 
 func TestLongestPrefixByOID_Empty(t *testing.T) {
 	m := loadCorpus(t)
 
 	node := m.LongestPrefixByOID(nil)
-	require.Nil(t, node, "should return nil for nil OID")
+	testutil.Nil(t, node, "should return nil for nil OID")
 
 	node = m.LongestPrefixByOID(gomib.Oid{})
-	require.Nil(t, node, "should return nil for empty OID")
+	testutil.Nil(t, node, "should return nil for empty OID")
 }
