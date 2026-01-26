@@ -232,3 +232,8 @@ func (n *Node) InternalNotification() *Notification {
 func (n *Node) InternalParent() *Node {
 	return n.parent
 }
+
+// InternalModule returns the concrete module for resolver use.
+func (n *Node) InternalModule() *Module {
+	return n.module
+}

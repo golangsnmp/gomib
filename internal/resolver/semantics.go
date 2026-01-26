@@ -177,7 +177,20 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 		computeEffectiveValues(resolved)
 
 		ctx.Builder.AddObject(resolved)
-		node.SetObject(resolved)
+
+		// Only set this Object on the node if this module is preferred over
+		// any existing module. This handles cases where multiple modules define
+		// the same OID (e.g., IF-MIB and RFC1213-MIB both define ifEntry).
+		// We prefer SMIv2 modules over SMIv1.
+		currentObj := node.InternalObject()
+		var currentMod *mibimpl.Module
+		if currentObj != nil {
+			currentMod = currentObj.InternalModule()
+		}
+		newMod := ctx.ModuleToResolved[ref.mod]
+		if shouldPreferModule(newMod, currentMod, ref.mod, ctx) {
+			node.SetObject(resolved)
+		}
 		created++
 
 		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
@@ -188,12 +201,18 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 	// Second pass: resolve INDEX and AUGMENTS references now that all objects exist
 	for _, ref := range objRefs {
 		obj := ref.obj
-		node, ok := ctx.LookupNodeForModule(ref.mod, obj.Name)
-		if !ok || node.InternalObject() == nil {
+
+		// Get the Object from the module's collection, not from the shared node.
+		// Multiple modules can define objects at the same OID (e.g., IF-MIB and
+		// RFC1213-MIB both define ifEntry). Each module has its own Object instance.
+		resolvedMod := ctx.ModuleToResolved[ref.mod]
+		if resolvedMod == nil {
 			continue
 		}
-
-		resolvedObj := node.InternalObject()
+		resolvedObj := resolvedMod.InternalObject(obj.Name)
+		if resolvedObj == nil {
+			continue
+		}
 
 		// Resolve INDEX
 		if len(obj.Index) > 0 {

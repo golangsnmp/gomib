@@ -2,12 +2,14 @@ package gomib
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"io"
 	"io/fs"
 	"log/slog"
 	"os"
 	"runtime"
+	"slices"
 	"sync"
 
 	"github.com/golangsnmp/gomib/internal/mibimpl"
@@ -132,11 +134,15 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (Mib,
 		}
 	}
 
-	// Convert map to slice
+	// Convert map to slice with deterministic ordering
 	var mods []*module.Module
 	for _, mod := range modules {
 		mods = append(mods, mod)
 	}
+	// Sort by name to ensure deterministic processing order
+	slices.SortFunc(mods, func(a, b *module.Module) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
 
 	if logEnabled(logger, slog.LevelInfo) {
 		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading complete",
@@ -254,7 +260,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 		}
 	}
 
-	// Convert map to slice (deduplicate)
+	// Convert map to slice (deduplicate) with deterministic ordering
 	seen := make(map[*module.Module]struct{})
 	var mods []*module.Module
 	for _, mod := range modules {
@@ -263,6 +269,10 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			mods = append(mods, mod)
 		}
 	}
+	// Sort by name to ensure deterministic processing order
+	slices.SortFunc(mods, func(a, b *module.Module) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
 
 	// Resolve
 	return resolver.Resolve(mods, componentLogger(logger, "resolver")), nil

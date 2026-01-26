@@ -21,6 +21,7 @@ Commands:
   load    Load and resolve MIB modules
   get     Query OID or name lookups
   dump    Output modules or subtrees as JSON
+  trace   Trace symbol resolution for debugging
 
 Common options:
   -p, --path PATH   Add MIB search path (repeatable)
@@ -32,6 +33,7 @@ Examples:
   gomib load IF-MIB
   gomib get -m IF-MIB ifIndex
   gomib dump IF-MIB
+  gomib trace -m IF-MIB ifEntry
 `
 
 var (
@@ -103,6 +105,8 @@ func run() int {
 		return cmdGet(cmdArgs)
 	case "dump":
 		return cmdDump(cmdArgs)
+	case "trace":
+		return cmdTrace(cmdArgs)
 	case "help":
 		_, _ = fmt.Fprint(os.Stdout, usage)
 		return 0

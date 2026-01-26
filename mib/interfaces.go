@@ -120,9 +120,9 @@ type Object interface {
 	DefaultValue() DefVal
 
 	// Table structure - navigation
-	Table() Object   // parent table for column/row; nil otherwise
-	Row() Object     // parent row for column; nil otherwise
-	Entry() Object   // row entry for table; nil otherwise
+	Table() Object     // parent table for column/row; nil otherwise
+	Row() Object       // parent row for column; nil otherwise
+	Entry() Object     // row entry for table; nil otherwise
 	Columns() []Object // columns for table or row; nil otherwise
 
 	// Table structure - index

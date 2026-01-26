@@ -333,3 +333,8 @@ func (o *Object) InternalType() *Type {
 func (o *Object) InternalAugments() *Object {
 	return o.augments
 }
+
+// InternalModule returns the concrete module for resolver use.
+func (o *Object) InternalModule() *Module {
+	return o.module
+}

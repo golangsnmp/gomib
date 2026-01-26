@@ -342,7 +342,21 @@ func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mibimp
 		node.SetKind(mib.KindCapabilities)
 	}
 	node.SetName(label)
-	node.SetModule(ctx.ModuleToResolved[def.mod])
+
+	// Set module with preference: SMIv2 > SMIv1 > Unknown
+	// This ensures modern modules (IF-MIB) are preferred over legacy (RFC1213-MIB)
+	newMod := ctx.ModuleToResolved[def.mod]
+	currentMod := node.InternalModule()
+	if currentMod != nil && ctx.TraceEnabled() {
+		ctx.Trace("node already has module",
+			slog.String("node", label),
+			slog.String("current", currentMod.Name()),
+			slog.String("new", def.mod.Name))
+	}
+	if shouldPreferModule(newMod, currentMod, def.mod, ctx) {
+		node.SetModule(newMod)
+	}
+
 	ctx.RegisterModuleNodeSymbol(def.mod, label, node)
 	ctx.Builder.RegisterNode(label, node)
 
@@ -432,5 +446,65 @@ func wellKnownRootArc(name string) int {
 		return 2
 	default:
 		return -1
+	}
+}
+
+// shouldPreferModule determines if newMod should replace currentMod as the node's module.
+// Preference order: SMIv2 > SMIv1 > Unknown, with newer LAST-UPDATED as tiebreaker.
+func shouldPreferModule(newMod, currentMod *mibimpl.Module, srcMod *module.Module, ctx *ResolverContext) bool {
+	// Always set if no current module
+	if currentMod == nil {
+		return true
+	}
+
+	// Find the source module for the current resolved module
+	var currentSrcMod *module.Module
+	for _, mod := range ctx.Modules {
+		if ctx.ModuleToResolved[mod] == currentMod {
+			currentSrcMod = mod
+			break
+		}
+	}
+	if currentSrcMod == nil {
+		return true
+	}
+
+	// Compare languages: SMIv2 > SMIv1 > Unknown
+	newRank := languageRank(srcMod.Language)
+	currentRank := languageRank(currentSrcMod.Language)
+
+	if ctx.TraceEnabled() {
+		ctx.Trace("module preference check",
+			slog.String("new", srcMod.Name),
+			slog.String("newLang", srcMod.Language.String()),
+			slog.Int("newRank", newRank),
+			slog.String("current", currentSrcMod.Name),
+			slog.String("currentLang", currentSrcMod.Language.String()),
+			slog.Int("currentRank", currentRank))
+	}
+
+	if newRank > currentRank {
+		return true
+	}
+	if newRank < currentRank {
+		return false
+	}
+
+	// Same language - use LAST-UPDATED as tiebreaker (newer wins)
+	newUpdated := extractLastUpdated(srcMod)
+	currentUpdated := extractLastUpdated(currentSrcMod)
+	return newUpdated > currentUpdated
+}
+
+// languageRank returns a numeric rank for language preference.
+// Higher is better: SMIv2(2) > SMIv1(1) > Unknown/SPPI(0)
+func languageRank(lang module.SmiLanguage) int {
+	switch lang {
+	case module.SmiLanguageSMIv2:
+		return 2
+	case module.SmiLanguageSMIv1:
+		return 1
+	default:
+		return 0
 	}
 }
