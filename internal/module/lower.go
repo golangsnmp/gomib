@@ -580,7 +580,11 @@ func lowerTypeSyntax(syntax ast.TypeSyntax) TypeSyntax {
 		for i, nn := range s.NamedNumbers {
 			namedNumbers[i] = NewNamedNumber(nn.Name.Name, nn.Value)
 		}
-		return &TypeSyntaxIntegerEnum{NamedNumbers: namedNumbers}
+		var base string
+		if s.Base != nil {
+			base = s.Base.Name
+		}
+		return &TypeSyntaxIntegerEnum{Base: base, NamedNumbers: namedNumbers}
 
 	case *ast.TypeSyntaxBits:
 		namedBits := make([]NamedBit, len(s.NamedBits))

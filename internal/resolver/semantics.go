@@ -297,11 +297,19 @@ func createResolvedNotifications(ctx *ResolverContext) {
 		resolved.SetReference(notif.Reference)
 
 		for _, objName := range notif.Objects {
-			if objNode, ok := ctx.LookupNodeForModule(ref.mod, objName); ok {
-				if objNode.InternalObject() != nil {
-					resolved.AddObject(objNode.InternalObject())
-				}
-			} else {
+			var objNode *mibimpl.Node
+			var ok bool
+
+			// Try module-scoped lookup first
+			objNode, ok = ctx.LookupNodeForModule(ref.mod, objName)
+			if !ok {
+				// Fall back to global lookup for objects not explicitly imported
+				objNode, ok = ctx.LookupNodeGlobal(objName)
+			}
+
+			if ok && objNode.InternalObject() != nil {
+				resolved.AddObject(objNode.InternalObject())
+			} else if !ok {
 				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
 			}
 		}
@@ -331,6 +339,15 @@ func resolveTypeSyntax(ctx *ResolverContext, syntax module.TypeSyntax, mod *modu
 	case *module.TypeSyntaxConstrained:
 		return resolveTypeSyntax(ctx, s.Base, mod, objectName, span)
 	case *module.TypeSyntaxIntegerEnum:
+		// If there's a base type name (e.g., TPSPRateType { kbps(1) }), use it
+		if s.Base != "" {
+			if t, ok := ctx.LookupTypeForModule(mod, s.Base); ok {
+				return t, true
+			}
+			ctx.RecordUnresolvedType(mod, objectName, s.Base, span)
+			return nil, false
+		}
+		// Otherwise fall back to Integer32
 		if t, ok := ctx.LookupType("Integer32"); ok {
 			return t, true
 		}

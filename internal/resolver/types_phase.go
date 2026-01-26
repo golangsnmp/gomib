@@ -199,7 +199,15 @@ func tryResolveTypeParent(ctx *ResolverContext, entry typeResolutionEntry) bool 
 	}
 
 	// Check if parent is ready (has its own parent resolved if needed)
-	if parent.InternalParent() != nil || !hasTypeRefSyntax(findTypeDef(ctx, entry.mod, baseName)) {
+	// Parent is ready if:
+	// 1. It has a resolved parent (type chain complete), OR
+	// 2. It has a known base type (built-in/primitive), OR
+	// 3. Its definition has no type reference syntax (terminal type)
+	parentReady := parent.InternalParent() != nil ||
+		parent.Base() != 0 ||
+		!hasTypeRefSyntax(findTypeDef(ctx, entry.mod, baseName))
+
+	if parentReady {
 		entry.typ.SetParent(parent)
 		return true
 	}
@@ -328,6 +336,11 @@ func resolveBaseFromChain(t *mibimpl.Type) (mib.BaseType, bool) {
 		}
 		visited[current] = struct{}{}
 		if current.InternalParent() == nil {
+			return current.Base(), true
+		}
+		// Stop at application base types - their base is explicitly set
+		// and should not be overridden by walking further up the chain
+		if isApplicationBaseType(current.Base()) {
 			return current.Base(), true
 		}
 		current = current.InternalParent()

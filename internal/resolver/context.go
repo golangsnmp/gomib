@@ -146,6 +146,16 @@ func (c *ResolverContext) LookupNodeInModule(moduleName, name string) (*mibimpl.
 	return nil, false
 }
 
+// LookupNodeGlobal looks up a node by name across all modules.
+func (c *ResolverContext) LookupNodeGlobal(name string) (*mibimpl.Node, bool) {
+	for _, symbols := range c.ModuleSymbolToNode {
+		if node, ok := symbols[name]; ok {
+			return node, true
+		}
+	}
+	return nil, false
+}
+
 // LookupType looks up a type by name globally.
 func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
 	// First try SNMPv2-SMI for primitives

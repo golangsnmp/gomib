@@ -93,20 +93,35 @@ func resolveImportsFromModule(ctx *ResolverContext, importingModule *module.Modu
 		}
 	}
 
-	reason := "symbol_not_exported"
-	if len(candidates) == 0 {
-		reason = "module_not_found"
+	// Try partial resolution - resolve symbols that are found, record unresolved for others.
+	// This handles real-world MIBs that import from the "wrong" module.
+	if len(candidates) > 0 {
+		resolved, unresolved := tryPartialResolution(ctx, candidates, userSymbols)
+		for _, res := range resolved {
+			ctx.RegisterImport(importingModule, res.symbol, res.source)
+		}
+		if ctx.TraceEnabled() && len(resolved) > 0 {
+			ctx.Trace("imports partially resolved",
+				slog.String("from", fromModuleName),
+				slog.Int("resolved", len(resolved)),
+				slog.Int("unresolved", len(unresolved)))
+		}
+		for _, sym := range unresolved {
+			ctx.RecordUnresolvedImport(importingModule, fromModuleName, sym.name, "symbol_not_exported", sym.span)
+		}
+		return
 	}
 
+	// Module not found at all
 	if ctx.TraceEnabled() {
 		ctx.Trace("imports unresolved",
 			slog.String("from", fromModuleName),
 			slog.Int("symbols", len(userSymbols)),
-			slog.String("reason", reason))
+			slog.String("reason", "module_not_found"))
 	}
 
 	for _, sym := range userSymbols {
-		ctx.RecordUnresolvedImport(importingModule, fromModuleName, sym.name, reason, sym.span)
+		ctx.RecordUnresolvedImport(importingModule, fromModuleName, sym.name, "module_not_found", sym.span)
 	}
 }
 
@@ -115,8 +130,38 @@ type forwardedSymbol struct {
 	source *module.Module
 }
 
+// tryPartialResolution tries to resolve as many symbols as possible from the candidates.
+// Returns resolved symbols and unresolved symbols separately.
+func tryPartialResolution(ctx *ResolverContext, candidates []*module.Module, symbols []importSymbol) ([]forwardedSymbol, []importSymbol) {
+	var resolved []forwardedSymbol
+	var unresolved []importSymbol
+
+	for _, sym := range symbols {
+		found := false
+		for _, candidate := range candidates {
+			defNames := ctx.ModuleDefNames[candidate]
+			if defNames != nil {
+				if _, isDirect := defNames[sym.name]; isDirect {
+					resolved = append(resolved, forwardedSymbol{
+						symbol: sym.name,
+						source: candidate,
+					})
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			unresolved = append(unresolved, sym)
+		}
+	}
+
+	return resolved, unresolved
+}
+
 func tryImportForwarding(ctx *ResolverContext, candidates []*module.Module, symbols []importSymbol) []forwardedSymbol {
 	for _, candidate := range candidates {
+		defNames := ctx.ModuleDefNames[candidate]
 		importMap := make(map[string]string)
 		for _, imp := range candidate.Imports {
 			importMap[imp.Symbol] = imp.Module
@@ -125,6 +170,17 @@ func tryImportForwarding(ctx *ResolverContext, candidates []*module.Module, symb
 		forwarded := make([]forwardedSymbol, 0, len(symbols))
 		allFound := true
 		for _, sym := range symbols {
+			// First check if directly defined in candidate
+			if defNames != nil {
+				if _, isDirect := defNames[sym.name]; isDirect {
+					forwarded = append(forwarded, forwardedSymbol{
+						symbol: sym.name,
+						source: candidate,
+					})
+					continue
+				}
+			}
+			// Otherwise check if imported (re-exported)
 			sourceModuleName, ok := importMap[sym.name]
 			if !ok {
 				allFound = false

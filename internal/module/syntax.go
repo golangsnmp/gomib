@@ -133,7 +133,11 @@ type TypeSyntaxTypeRef struct {
 func (*TypeSyntaxTypeRef) typeSyntax() {}
 
 // TypeSyntaxIntegerEnum is INTEGER with enum values: `INTEGER { up(1), down(2) }`
+// or a TC with inline restrictions: `TPSPRateType { kbps(1), percentLocal(2) }`
 type TypeSyntaxIntegerEnum struct {
+	// Base is the base type name (e.g., "TPSPRateType").
+	// Empty string if the base is implicit INTEGER.
+	Base         string
 	NamedNumbers []NamedNumber
 }
 
