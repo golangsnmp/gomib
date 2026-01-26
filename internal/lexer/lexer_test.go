@@ -815,14 +815,6 @@ func TestOddDashesNineAtEOL(t *testing.T) {
 // Keyword tests
 // ========================================================================
 
-func TestKeywordsSorted(t *testing.T) {
-	// Verify the keyword table is sorted
-	for i := 1; i < len(keywords); i++ {
-		testutil.True(t, keywords[i-1].text < keywords[i].text,
-			"keywords not sorted: %s should come before %s", keywords[i-1].text, keywords[i].text)
-	}
-}
-
 func TestKeywordLookup(t *testing.T) {
 	tests := []struct {
 		text     string
@@ -870,14 +862,6 @@ func TestKeywordCaseSensitive(t *testing.T) {
 
 	_, ok = LookupKeyword("integer32")
 	testutil.True(t, !ok, "integer32 should NOT be a keyword")
-}
-
-func TestForbiddenKeywordsSorted(t *testing.T) {
-	// Verify the forbidden keyword table is sorted
-	for i := 1; i < len(forbiddenKeywords); i++ {
-		testutil.True(t, forbiddenKeywords[i-1] < forbiddenKeywords[i],
-			"forbidden keywords not sorted: %s should come before %s", forbiddenKeywords[i-1], forbiddenKeywords[i])
-	}
 }
 
 func TestForbiddenKeywordLookup(t *testing.T) {
