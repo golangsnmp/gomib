@@ -1,6 +1,6 @@
 # Test MIB Corpus
 
-A curated collection of 194 real-world MIBs for integration testing.
+A curated collection of 196 real-world MIBs for integration testing.
 
 ## Structure
 
@@ -16,7 +16,7 @@ corpus/
 │   ├── huawei/        # Huawei (8)
 │   ├── adva/          # ADVA/FSP/Tropic (17)
 │   ├── net-snmp/      # Net-SNMP/UCD (3)
-│   ├── misc/          # Other vendors (27)
+│   ├── misc/          # Other vendors (29)
 │   └── synthetic/     # Purpose-built test MIBs (2)
 └── <future>/          # Edge-case corpora as needed
 ```
@@ -48,3 +48,22 @@ MIBs were selected for maximum diversity:
 ## File Naming
 
 All files use `.mib` extension for consistency.
+
+## Known Issues
+
+These MIBs have intentional defects and are included as test targets for error handling:
+
+### PRVT-SERV-MIB.mib (misc/)
+
+**Issue:** Imports `serviceAccessSwitch` from wrong module.
+
+The MIB imports `serviceAccessSwitch FROM PRVT-QOS-MIB` but that identifier is
+actually defined in PRVT-SWITCH-MIB. PRVT-QOS-MIB only imports it for its own
+use and does not re-export it.
+
+**Expected behavior:** Parsers should report an unresolved import. The module
+will partially resolve but `prvtServicesMIB` and its children will have
+unlinked OIDs.
+
+**Test value:** Exercises import resolution error handling and graceful
+degradation when dependencies are incorrectly specified.
