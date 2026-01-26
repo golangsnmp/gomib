@@ -12,9 +12,11 @@ import (
 	"sync"
 )
 
-// DefaultExtensions are the file extensions recognized as MIB files.
+// DefaultExtensions returns the file extensions recognized as MIB files.
 // Empty string matches files with no extension (e.g., "IF-MIB").
-var DefaultExtensions = []string{"", ".mib", ".smi", ".txt", ".my"}
+func DefaultExtensions() []string {
+	return []string{"", ".mib", ".smi", ".txt", ".my"}
+}
 
 // FindResult contains the result of a Source.Find operation.
 type FindResult struct {
@@ -45,7 +47,7 @@ type sourceConfig struct {
 
 func defaultSourceConfig() sourceConfig {
 	return sourceConfig{
-		extensions: DefaultExtensions,
+		extensions: DefaultExtensions(),
 	}
 }
 

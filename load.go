@@ -24,19 +24,13 @@ func componentLogger(logger *slog.Logger, component string) *slog.Logger {
 	return logger.With(slog.String("component", component))
 }
 
-// LoadConfig holds loading options.
-type LoadConfig struct {
-	Logger      *slog.Logger
-	NoHeuristic bool
-}
-
 // loadAllModules loads all MIB files from sources in parallel.
-func loadAllModules(ctx context.Context, sources []Source, cfg LoadConfig) (*Mib, error) {
+func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*Mib, error) {
 	if len(sources) == 0 {
 		return nil, ErrNoSources
 	}
 
-	logger := cfg.Logger
+	logger := cfg.logger
 
 	// Collect all files from sources
 	var allFiles []string
@@ -67,7 +61,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg LoadConfig) (*Mib
 	sem := make(chan struct{}, runtime.NumCPU())
 
 	heuristic := defaultHeuristic()
-	if cfg.NoHeuristic {
+	if cfg.noHeuristic {
 		heuristic.enabled = false
 	}
 
@@ -154,11 +148,11 @@ func loadAllModules(ctx context.Context, sources []Source, cfg LoadConfig) (*Mib
 }
 
 // loadModulesByName loads specific modules by name along with their dependencies.
-func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg LoadConfig) (*Mib, error) {
-	logger := cfg.Logger
+func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg loadConfig) (*Mib, error) {
+	logger := cfg.logger
 
 	heuristic := defaultHeuristic()
-	if cfg.NoHeuristic {
+	if cfg.noHeuristic {
 		heuristic.enabled = false
 	}
 

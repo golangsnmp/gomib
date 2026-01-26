@@ -207,6 +207,14 @@ type Range struct {
 	Min, Max int64
 }
 
+// String returns the range as "min..max" or just "value" if min equals max.
+func (r Range) String() string {
+	if r.Min == r.Max {
+		return strconv.FormatInt(r.Min, 10)
+	}
+	return strconv.FormatInt(r.Min, 10) + ".." + strconv.FormatInt(r.Max, 10)
+}
+
 // NamedValue represents a labeled integer from an enum or BITS definition.
 // For INTEGER enums, Value is the enum constant.
 // For BITS, Value is the bit position (0-based).
@@ -364,6 +372,16 @@ type Module struct {
 // Objects returns all objects defined in this module.
 func (m *Module) Objects() []*Object {
 	return m.objects
+}
+
+// Object returns the object with the given name, or nil if not found.
+func (m *Module) Object(name string) *Object {
+	for _, obj := range m.objects {
+		if obj.Name == name {
+			return obj
+		}
+	}
+	return nil
 }
 
 // Types returns all types defined in this module.

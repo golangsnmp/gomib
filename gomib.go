@@ -45,7 +45,7 @@ func WithLogger(logger *slog.Logger) LoadOption {
 //	)
 func Load(ctx context.Context, source Source, opts ...LoadOption) (*Mib, error) {
 	cfg := loadConfig{
-		extensions: DefaultExtensions,
+		extensions: DefaultExtensions(),
 	}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -69,7 +69,7 @@ func Load(ctx context.Context, source Source, opts ...LoadOption) (*Mib, error) 
 //	)
 func LoadModules(ctx context.Context, names []string, source Source, opts ...LoadOption) (*Mib, error) {
 	cfg := loadConfig{
-		extensions: DefaultExtensions,
+		extensions: DefaultExtensions(),
 	}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -90,15 +90,10 @@ func loadFromSources(ctx context.Context, sources []Source, names []string, cfg 
 		return nil, ErrNoSources
 	}
 
-	loadCfg := LoadConfig{
-		Logger:      cfg.logger,
-		NoHeuristic: cfg.noHeuristic,
-	}
-
 	if names != nil {
-		return loadModulesByName(ctx, sources, names, loadCfg)
+		return loadModulesByName(ctx, sources, names, cfg)
 	}
-	return loadAllModules(ctx, sources, loadCfg)
+	return loadAllModules(ctx, sources, cfg)
 }
 
 // logEnabled returns true if logging is enabled at the given level.
