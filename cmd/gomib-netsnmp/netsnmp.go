@@ -74,6 +74,14 @@ typedef struct {
     char** indexes;
     int* implied_flags;
     char augments[128];
+    // Additional fields
+    int range_count;
+    int* range_lows;
+    int* range_highs;
+    char default_value[256];
+    int varbind_count;
+    char** varbinds;
+    char reference[512];
 } NodeInfo;
 
 static int node_count = 0;
@@ -160,6 +168,54 @@ void collect_node(struct tree* tp) {
         }
     }
 
+    // Collect ranges
+    struct range_list* rp = tp->ranges;
+    int range_count = 0;
+    while (rp) { range_count++; rp = rp->next; }
+
+    if (range_count > 0) {
+        n->range_count = range_count;
+        n->range_lows = malloc(range_count * sizeof(int));
+        n->range_highs = malloc(range_count * sizeof(int));
+
+        rp = tp->ranges;
+        int i = 0;
+        while (rp) {
+            n->range_lows[i] = rp->low;
+            n->range_highs[i] = rp->high;
+            i++;
+            rp = rp->next;
+        }
+    }
+
+    // Collect default value
+    if (tp->defaultValue) {
+        strncpy(n->default_value, tp->defaultValue, sizeof(n->default_value) - 1);
+    }
+
+    // Collect varbinds (OBJECTS clause for notifications)
+    struct varbind_list* vb = tp->varbinds;
+    int vb_count = 0;
+    while (vb) { vb_count++; vb = vb->next; }
+
+    if (vb_count > 0) {
+        n->varbind_count = vb_count;
+        n->varbinds = malloc(vb_count * sizeof(char*));
+
+        vb = tp->varbinds;
+        int i = 0;
+        while (vb) {
+            n->varbinds[i] = strdup(vb->vblabel ? vb->vblabel : "");
+            i++;
+            vb = vb->next;
+        }
+    }
+
+    // Collect reference
+    if (tp->reference) {
+        strncpy(n->reference, tp->reference, sizeof(n->reference) - 1);
+    }
+
     node_count++;
 }
 
@@ -224,6 +280,14 @@ void cleanup_nodes() {
             free(n->indexes);
         }
         if (n->implied_flags) free(n->implied_flags);
+        if (n->range_lows) free(n->range_lows);
+        if (n->range_highs) free(n->range_highs);
+        if (n->varbinds) {
+            for (int j = 0; j < n->varbind_count; j++) {
+                free(n->varbinds[j]);
+            }
+            free(n->varbinds);
+        }
     }
     free(nodes);
     nodes = NULL;
@@ -328,25 +392,39 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 		}
 
 		node := &NormalizedNode{
-			OID:        oid,
-			Name:       C.GoString(&cNode.name[0]),
-			Module:     C.GoString(&cNode.module[0]),
-			Type:       C.GoString(C.type_to_string(cNode._type)),
-			Access:     C.GoString(C.access_to_string(cNode.access)),
-			Status:     C.GoString(C.status_to_string(cNode.status)),
-			Hint:       C.GoString(&cNode.hint[0]),
-			TCName:     C.GoString(&cNode.tc_name[0]),
-			Units:      C.GoString(&cNode.units[0]),
-			Augments:   C.GoString(&cNode.augments[0]),
-			EnumValues: make(map[int]string),
+			OID:          oid,
+			Name:         C.GoString(&cNode.name[0]),
+			Module:       C.GoString(&cNode.module[0]),
+			Type:         C.GoString(C.type_to_string(cNode._type)),
+			Access:       C.GoString(C.access_to_string(cNode.access)),
+			Status:       C.GoString(C.status_to_string(cNode.status)),
+			Hint:         C.GoString(&cNode.hint[0]),
+			TCName:       C.GoString(&cNode.tc_name[0]),
+			Units:        C.GoString(&cNode.units[0]),
+			Augments:     C.GoString(&cNode.augments[0]),
+			DefaultValue: C.GoString(&cNode.default_value[0]),
+			Reference:    C.GoString(&cNode.reference[0]),
+			NodeType:     C.GoString(C.type_to_string(cNode._type)),
+			EnumValues:   make(map[int]string),
+			BitValues:    make(map[int]string),
 		}
 
+		// Determine kind based on type and structure
+		node.Kind = inferNetSnmpKind(cNode._type, int(cNode.index_count), node.Augments)
+
 		// Get enums
+		// Note: net-snmp uses the same enum list for both INTEGER enums and BITS
+		// We distinguish based on type
+		isBitsType := cNode._type == 12 // TYPE_BITSTRING
 		for j := 0; j < int(cNode.enum_count); j++ {
 			val := int(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.enum_values)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
 			namePtr := *(**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.enum_names)) + uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
 			name := C.GoString(namePtr)
-			node.EnumValues[val] = name
+			if isBitsType {
+				node.BitValues[val] = name
+			} else {
+				node.EnumValues[val] = name
+			}
 		}
 
 		// Get indexes with IMPLIED flags
@@ -359,8 +437,37 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 			})
 		}
 
+		// Get ranges
+		for j := 0; j < int(cNode.range_count); j++ {
+			low := int64(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.range_lows)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
+			high := int64(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.range_highs)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
+			node.Ranges = append(node.Ranges, RangeInfo{Low: low, High: high})
+		}
+
+		// Get varbinds (OBJECTS for notifications)
+		for j := 0; j < int(cNode.varbind_count); j++ {
+			vbPtr := *(**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.varbinds)) + uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
+			node.Varbinds = append(node.Varbinds, C.GoString(vbPtr))
+		}
+
 		nodes[oid] = node
 	}
 
 	return nodes
+}
+
+// inferNetSnmpKind infers the node kind from net-snmp type and structure.
+// net-snmp doesn't directly expose table/row/column/scalar, but we can infer:
+// - row: has INDEX clause or AUGMENTS
+// - table: parent of a row (name ends in "Table" with child ending in "Entry")
+// - column: child of a row entry
+// - scalar: leaf node without index
+func inferNetSnmpKind(nodeType C.int, indexCount int, augments string) string {
+	// Nodes with INDEX or AUGMENTS are rows
+	if indexCount > 0 || augments != "" {
+		return "row"
+	}
+	// We can't reliably infer table/column/scalar from net-snmp without tree context
+	// Leave empty and compare only when gomib has a value
+	return ""
 }

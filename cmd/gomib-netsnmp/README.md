@@ -46,9 +46,17 @@ Compares:
 - OID resolution
 - Type mapping
 - Access levels
+- Status
 - Enum values
+- BITS values
 - Index structures
 - AUGMENTS relationships
+- Display hints
+- Textual convention names
+- Units
+- Range/size constraints
+- Default values (DEFVAL)
+- Notification OBJECTS
 
 ### tables
 
@@ -81,9 +89,32 @@ Generate Go test cases from net-snmp ground truth:
 # Generate access tests
 ./gomib-netsnmp testgen -type access -p /usr/share/snmp/mibs IF-MIB
 
+# Generate BITS tests
+./gomib-netsnmp testgen -type bits -p /usr/share/snmp/mibs IF-MIB
+
+# Generate range/size constraint tests
+./gomib-netsnmp testgen -type ranges -p /usr/share/snmp/mibs IF-MIB
+
+# Generate display hint tests
+./gomib-netsnmp testgen -type hints -p /usr/share/snmp/mibs IF-MIB
+
+# Generate units tests
+./gomib-netsnmp testgen -type units -p /usr/share/snmp/mibs IF-MIB
+
+# Generate default value tests
+./gomib-netsnmp testgen -type defval -p /usr/share/snmp/mibs IF-MIB
+
+# Generate notification tests
+./gomib-netsnmp testgen -type notifications -p /usr/share/snmp/mibs IF-MIB
+
+# Generate textual convention tests
+./gomib-netsnmp testgen -type tc -p /usr/share/snmp/mibs IF-MIB
+
 # Output to file
 ./gomib-netsnmp testgen -type tables -o generated_tests.go -p ./testdata SYNTHETIC-MIB
 ```
+
+Test types: `tables`, `oids`, `enums`, `access`, `augments`, `ranges`, `bits`, `hints`, `units`, `defval`, `notifications`, `tc`
 
 ### validate
 

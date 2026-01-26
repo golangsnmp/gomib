@@ -72,8 +72,22 @@ Options:
 		return generateAccessTests(out, netsnmpNodes, modules, *varName)
 	case "augments":
 		return generateAugmentsTests(out, netsnmpNodes, modules, *varName)
+	case "ranges":
+		return generateRangeTests(out, netsnmpNodes, modules, *varName)
+	case "bits":
+		return generateBitsTests(out, netsnmpNodes, modules, *varName)
+	case "hints":
+		return generateHintTests(out, netsnmpNodes, modules, *varName)
+	case "units":
+		return generateUnitsTests(out, netsnmpNodes, modules, *varName)
+	case "defval":
+		return generateDefvalTests(out, netsnmpNodes, modules, *varName)
+	case "notifications":
+		return generateNotificationTests(out, netsnmpNodes, modules, *varName)
+	case "tc":
+		return generateTCTests(out, netsnmpNodes, modules, *varName)
 	default:
-		printError("unknown test type: %s (expected: tables, oids, enums, access, augments)", *testType)
+		printError("unknown test type: %s (expected: tables, oids, enums, access, augments, ranges, bits, hints, units, defval, notifications, tc)", *testType)
 		return 1
 	}
 }
@@ -305,6 +319,331 @@ func generateAugmentsTests(w io.Writer, nodes map[string]*NormalizedNode, module
 		fmt.Fprintf(w, "\t\tAugmentsRow: %q, AugmentsMod: %q,\n",
 			a.node.Augments, a.node.Module) // Note: augments module might differ
 		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", netsnmpStr)
+	}
+	fmt.Fprintln(w, "}")
+
+	return 0
+}
+
+// generateRangeTests generates test cases for range constraints.
+func generateRangeTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+	if varName == "" {
+		varName = "rangeTests"
+	}
+
+	type rangeInfo struct {
+		oid  string
+		node *NormalizedNode
+	}
+
+	var items []rangeInfo
+	for oid, node := range nodes {
+		if len(node.Ranges) > 0 {
+			items = append(items, rangeInfo{oid, node})
+		}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].oid < items[j].oid
+	})
+
+	fmt.Fprintf(w, "// RangeTestCase defines a test case for range constraints.\n")
+	fmt.Fprintf(w, "type RangeTestCase struct {\n")
+	fmt.Fprintf(w, "\tName    string\n")
+	fmt.Fprintf(w, "\tModule  string\n")
+	fmt.Fprintf(w, "\tOID     string\n")
+	fmt.Fprintf(w, "\tRanges  []Range\n")
+	fmt.Fprintf(w, "\tNetSnmp string\n")
+	fmt.Fprintf(w, "}\n\n")
+
+	fmt.Fprintf(w, "type Range struct {\n")
+	fmt.Fprintf(w, "\tLow, High int64\n")
+	fmt.Fprintf(w, "}\n\n")
+
+	fmt.Fprintf(w, "var %s = []RangeTestCase{\n", varName)
+	for _, item := range items {
+		var rangeParts []string
+		for _, r := range item.node.Ranges {
+			rangeParts = append(rangeParts, fmt.Sprintf("{%d, %d}", r.Low, r.High))
+		}
+
+		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q,\n",
+			item.node.Name, item.node.Module, item.oid)
+		fmt.Fprintf(w, "\t\tRanges: []Range{%s},\n", strings.Join(rangeParts, ", "))
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", rangesString(item.node.Ranges))
+	}
+	fmt.Fprintln(w, "}")
+
+	return 0
+}
+
+// generateBitsTests generates test cases for BITS values.
+func generateBitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+	if varName == "" {
+		varName = "bitsTests"
+	}
+
+	type bitsInfo struct {
+		oid  string
+		node *NormalizedNode
+	}
+
+	var items []bitsInfo
+	for oid, node := range nodes {
+		if len(node.BitValues) > 0 {
+			items = append(items, bitsInfo{oid, node})
+		}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].oid < items[j].oid
+	})
+
+	fmt.Fprintf(w, "// BitsTestCase defines a test case for BITS values.\n")
+	fmt.Fprintf(w, "type BitsTestCase struct {\n")
+	fmt.Fprintf(w, "\tName      string\n")
+	fmt.Fprintf(w, "\tModule    string\n")
+	fmt.Fprintf(w, "\tOID       string\n")
+	fmt.Fprintf(w, "\tBitValues map[int]string\n")
+	fmt.Fprintf(w, "\tNetSnmp   string\n")
+	fmt.Fprintf(w, "}\n\n")
+
+	fmt.Fprintf(w, "var %s = []BitsTestCase{\n", varName)
+	for _, item := range items {
+		var keys []int
+		for k := range item.node.BitValues {
+			keys = append(keys, k)
+		}
+		sort.Ints(keys)
+
+		var bitParts []string
+		for _, k := range keys {
+			bitParts = append(bitParts, fmt.Sprintf("%d: %q", k, item.node.BitValues[k]))
+		}
+
+		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q,\n",
+			item.node.Name, item.node.Module, item.oid)
+		fmt.Fprintf(w, "\t\tBitValues: map[int]string{%s},\n", strings.Join(bitParts, ", "))
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", bitsString(item.node.BitValues))
+	}
+	fmt.Fprintln(w, "}")
+
+	return 0
+}
+
+// generateHintTests generates test cases for display hints.
+func generateHintTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+	if varName == "" {
+		varName = "hintTests"
+	}
+
+	type hintInfo struct {
+		oid  string
+		node *NormalizedNode
+	}
+
+	var items []hintInfo
+	for oid, node := range nodes {
+		if node.Hint != "" {
+			items = append(items, hintInfo{oid, node})
+		}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].oid < items[j].oid
+	})
+
+	fmt.Fprintf(w, "// HintTestCase defines a test case for display hints.\n")
+	fmt.Fprintf(w, "type HintTestCase struct {\n")
+	fmt.Fprintf(w, "\tName    string\n")
+	fmt.Fprintf(w, "\tModule  string\n")
+	fmt.Fprintf(w, "\tOID     string\n")
+	fmt.Fprintf(w, "\tHint    string\n")
+	fmt.Fprintf(w, "\tNetSnmp string\n")
+	fmt.Fprintf(w, "}\n\n")
+
+	fmt.Fprintf(w, "var %s = []HintTestCase{\n", varName)
+	for _, item := range items {
+		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, Hint: %q,\n",
+			item.node.Name, item.node.Module, item.oid, item.node.Hint)
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", item.node.Hint)
+	}
+	fmt.Fprintln(w, "}")
+
+	return 0
+}
+
+// generateUnitsTests generates test cases for UNITS clause.
+func generateUnitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+	if varName == "" {
+		varName = "unitsTests"
+	}
+
+	type unitsInfo struct {
+		oid  string
+		node *NormalizedNode
+	}
+
+	var items []unitsInfo
+	for oid, node := range nodes {
+		if node.Units != "" {
+			items = append(items, unitsInfo{oid, node})
+		}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].oid < items[j].oid
+	})
+
+	fmt.Fprintf(w, "// UnitsTestCase defines a test case for UNITS clause.\n")
+	fmt.Fprintf(w, "type UnitsTestCase struct {\n")
+	fmt.Fprintf(w, "\tName    string\n")
+	fmt.Fprintf(w, "\tModule  string\n")
+	fmt.Fprintf(w, "\tOID     string\n")
+	fmt.Fprintf(w, "\tUnits   string\n")
+	fmt.Fprintf(w, "\tNetSnmp string\n")
+	fmt.Fprintf(w, "}\n\n")
+
+	fmt.Fprintf(w, "var %s = []UnitsTestCase{\n", varName)
+	for _, item := range items {
+		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, Units: %q,\n",
+			item.node.Name, item.node.Module, item.oid, item.node.Units)
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", item.node.Units)
+	}
+	fmt.Fprintln(w, "}")
+
+	return 0
+}
+
+// generateDefvalTests generates test cases for DEFVAL clause.
+func generateDefvalTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+	if varName == "" {
+		varName = "defvalTests"
+	}
+
+	type defvalInfo struct {
+		oid  string
+		node *NormalizedNode
+	}
+
+	var items []defvalInfo
+	for oid, node := range nodes {
+		if node.DefaultValue != "" {
+			items = append(items, defvalInfo{oid, node})
+		}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].oid < items[j].oid
+	})
+
+	fmt.Fprintf(w, "// DefvalTestCase defines a test case for DEFVAL clause.\n")
+	fmt.Fprintf(w, "type DefvalTestCase struct {\n")
+	fmt.Fprintf(w, "\tName     string\n")
+	fmt.Fprintf(w, "\tModule   string\n")
+	fmt.Fprintf(w, "\tOID      string\n")
+	fmt.Fprintf(w, "\tDefval   string\n")
+	fmt.Fprintf(w, "\tNetSnmp  string\n")
+	fmt.Fprintf(w, "}\n\n")
+
+	fmt.Fprintf(w, "var %s = []DefvalTestCase{\n", varName)
+	for _, item := range items {
+		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, Defval: %q,\n",
+			item.node.Name, item.node.Module, item.oid, item.node.DefaultValue)
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", item.node.DefaultValue)
+	}
+	fmt.Fprintln(w, "}")
+
+	return 0
+}
+
+// generateNotificationTests generates test cases for notifications.
+func generateNotificationTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+	if varName == "" {
+		varName = "notificationTests"
+	}
+
+	type notifInfo struct {
+		oid  string
+		node *NormalizedNode
+	}
+
+	var items []notifInfo
+	for oid, node := range nodes {
+		if node.NodeType == "NOTIFICATION-TYPE" || node.NodeType == "TRAP-TYPE" {
+			items = append(items, notifInfo{oid, node})
+		}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].oid < items[j].oid
+	})
+
+	fmt.Fprintf(w, "// NotificationTestCase defines a test case for notifications.\n")
+	fmt.Fprintf(w, "type NotificationTestCase struct {\n")
+	fmt.Fprintf(w, "\tName     string\n")
+	fmt.Fprintf(w, "\tModule   string\n")
+	fmt.Fprintf(w, "\tOID      string\n")
+	fmt.Fprintf(w, "\tType     string // NOTIFICATION-TYPE or TRAP-TYPE\n")
+	fmt.Fprintf(w, "\tObjects  []string\n")
+	fmt.Fprintf(w, "\tStatus   string\n")
+	fmt.Fprintf(w, "\tNetSnmp  string\n")
+	fmt.Fprintf(w, "}\n\n")
+
+	fmt.Fprintf(w, "var %s = []NotificationTestCase{\n", varName)
+	for _, item := range items {
+		var objParts []string
+		for _, obj := range item.node.Varbinds {
+			objParts = append(objParts, fmt.Sprintf("%q", obj))
+		}
+
+		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, Type: %q,\n",
+			item.node.Name, item.node.Module, item.oid, item.node.NodeType)
+		fmt.Fprintf(w, "\t\tObjects: []string{%s}, Status: %q,\n",
+			strings.Join(objParts, ", "), item.node.Status)
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", varbindsString(item.node.Varbinds))
+	}
+	fmt.Fprintln(w, "}")
+
+	return 0
+}
+
+// generateTCTests generates test cases for textual convention names.
+func generateTCTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+	if varName == "" {
+		varName = "tcTests"
+	}
+
+	type tcInfo struct {
+		oid  string
+		node *NormalizedNode
+	}
+
+	var items []tcInfo
+	for oid, node := range nodes {
+		if node.TCName != "" {
+			items = append(items, tcInfo{oid, node})
+		}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].oid < items[j].oid
+	})
+
+	fmt.Fprintf(w, "// TCTestCase defines a test case for textual convention names.\n")
+	fmt.Fprintf(w, "type TCTestCase struct {\n")
+	fmt.Fprintf(w, "\tName    string\n")
+	fmt.Fprintf(w, "\tModule  string\n")
+	fmt.Fprintf(w, "\tOID     string\n")
+	fmt.Fprintf(w, "\tTCName  string\n")
+	fmt.Fprintf(w, "\tNetSnmp string\n")
+	fmt.Fprintf(w, "}\n\n")
+
+	fmt.Fprintf(w, "var %s = []TCTestCase{\n", varName)
+	for _, item := range items {
+		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, TCName: %q,\n",
+			item.node.Name, item.node.Module, item.oid, item.node.TCName)
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", item.node.TCName)
 	}
 	fmt.Fprintln(w, "}")
 

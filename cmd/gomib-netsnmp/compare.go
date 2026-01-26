@@ -35,11 +35,18 @@ type Mismatch struct {
 
 // FieldCounts tracks match/mismatch counts per field.
 type FieldCounts struct {
-	Type   CountPair `json:"type"`
-	Access CountPair `json:"access"`
-	Status CountPair `json:"status"`
-	Enums  CountPair `json:"enums"`
-	Index  CountPair `json:"index"`
+	Type         CountPair `json:"type"`
+	Access       CountPair `json:"access"`
+	Status       CountPair `json:"status"`
+	Enums        CountPair `json:"enums"`
+	Index        CountPair `json:"index"`
+	Hint         CountPair `json:"hint"`
+	TCName       CountPair `json:"tc_name"`
+	Units        CountPair `json:"units"`
+	Ranges       CountPair `json:"ranges"`
+	DefaultValue CountPair `json:"default_value"`
+	Bits         CountPair `json:"bits"`
+	Varbinds     CountPair `json:"varbinds"`
 }
 
 // CountPair holds match and mismatch counts.
@@ -233,6 +240,125 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 				})
 			}
 		}
+
+		// Compare display hint
+		if nsNode.Hint != "" {
+			if hintsEquivalent(gNode.Hint, nsNode.Hint) {
+				result.Summary.Hint.Match++
+			} else if gNode.Hint != "" {
+				result.Summary.Hint.Mismatch++
+				result.Mismatches = append(result.Mismatches, Mismatch{
+					OID:     oid,
+					Name:    nsNode.Name,
+					Module:  nsNode.Module,
+					Field:   "hint",
+					Gomib:   gNode.Hint,
+					NetSnmp: nsNode.Hint,
+				})
+			}
+		}
+
+		// Compare TC name
+		if nsNode.TCName != "" {
+			if gNode.TCName == nsNode.TCName {
+				result.Summary.TCName.Match++
+			} else if gNode.TCName != "" {
+				result.Summary.TCName.Mismatch++
+				result.Mismatches = append(result.Mismatches, Mismatch{
+					OID:     oid,
+					Name:    nsNode.Name,
+					Module:  nsNode.Module,
+					Field:   "tc_name",
+					Gomib:   gNode.TCName,
+					NetSnmp: nsNode.TCName,
+				})
+			}
+		}
+
+		// Compare units
+		if nsNode.Units != "" {
+			if gNode.Units == nsNode.Units {
+				result.Summary.Units.Match++
+			} else if gNode.Units != "" {
+				result.Summary.Units.Mismatch++
+				result.Mismatches = append(result.Mismatches, Mismatch{
+					OID:     oid,
+					Name:    nsNode.Name,
+					Module:  nsNode.Module,
+					Field:   "units",
+					Gomib:   gNode.Units,
+					NetSnmp: nsNode.Units,
+				})
+			}
+		}
+
+		// Compare ranges
+		if len(nsNode.Ranges) > 0 {
+			if rangesEqual(nsNode.Ranges, gNode.Ranges) {
+				result.Summary.Ranges.Match++
+			} else {
+				result.Summary.Ranges.Mismatch++
+				result.Mismatches = append(result.Mismatches, Mismatch{
+					OID:     oid,
+					Name:    nsNode.Name,
+					Module:  nsNode.Module,
+					Field:   "ranges",
+					Gomib:   rangesString(gNode.Ranges),
+					NetSnmp: rangesString(nsNode.Ranges),
+				})
+			}
+		}
+
+		// Compare default value
+		if nsNode.DefaultValue != "" {
+			if defaultValuesEquivalent(gNode.DefaultValue, nsNode.DefaultValue) {
+				result.Summary.DefaultValue.Match++
+			} else if gNode.DefaultValue != "" {
+				result.Summary.DefaultValue.Mismatch++
+				result.Mismatches = append(result.Mismatches, Mismatch{
+					OID:     oid,
+					Name:    nsNode.Name,
+					Module:  nsNode.Module,
+					Field:   "defval",
+					Gomib:   gNode.DefaultValue,
+					NetSnmp: nsNode.DefaultValue,
+				})
+			}
+		}
+
+		// Compare BITS values
+		if len(nsNode.BitValues) > 0 {
+			if enumsEqual(nsNode.BitValues, gNode.BitValues) {
+				result.Summary.Bits.Match++
+			} else {
+				result.Summary.Bits.Mismatch++
+				result.Mismatches = append(result.Mismatches, Mismatch{
+					OID:     oid,
+					Name:    nsNode.Name,
+					Module:  nsNode.Module,
+					Field:   "bits",
+					Gomib:   bitsString(gNode.BitValues),
+					NetSnmp: bitsString(nsNode.BitValues),
+				})
+			}
+		}
+
+		// Compare varbinds (notification OBJECTS)
+		if len(nsNode.Varbinds) > 0 {
+			if varbindsEqual(nsNode.Varbinds, gNode.Varbinds) {
+				result.Summary.Varbinds.Match++
+			} else {
+				result.Summary.Varbinds.Mismatch++
+				result.Mismatches = append(result.Mismatches, Mismatch{
+					OID:     oid,
+					Name:    nsNode.Name,
+					Module:  nsNode.Module,
+					Field:   "varbinds",
+					Gomib:   varbindsString(gNode.Varbinds),
+					NetSnmp: varbindsString(nsNode.Varbinds),
+				})
+			}
+		}
 	}
 
 	// Sort missing lists for deterministic output
@@ -316,6 +442,69 @@ func indexesEqual(a, b []IndexInfo) bool {
 	return true
 }
 
+// hintsEquivalent checks if two display hints are semantically equivalent.
+func hintsEquivalent(a, b string) bool {
+	if a == b {
+		return true
+	}
+	// Normalize common variations (whitespace, case for hex digits)
+	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
+}
+
+// rangesEqual checks if two range lists are equivalent.
+func rangesEqual(a, b []RangeInfo) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	// Sort both for comparison (order may differ)
+	aCopy := make([]RangeInfo, len(a))
+	bCopy := make([]RangeInfo, len(b))
+	copy(aCopy, a)
+	copy(bCopy, b)
+	sort.Slice(aCopy, func(i, j int) bool {
+		if aCopy[i].Low != aCopy[j].Low {
+			return aCopy[i].Low < aCopy[j].Low
+		}
+		return aCopy[i].High < aCopy[j].High
+	})
+	sort.Slice(bCopy, func(i, j int) bool {
+		if bCopy[i].Low != bCopy[j].Low {
+			return bCopy[i].Low < bCopy[j].Low
+		}
+		return bCopy[i].High < bCopy[j].High
+	})
+	for i := range aCopy {
+		if aCopy[i].Low != bCopy[i].Low || aCopy[i].High != bCopy[i].High {
+			return false
+		}
+	}
+	return true
+}
+
+// defaultValuesEquivalent checks if two default values are semantically equivalent.
+func defaultValuesEquivalent(a, b string) bool {
+	if a == b {
+		return true
+	}
+	// Normalize: strip quotes, whitespace
+	aNorm := strings.Trim(strings.TrimSpace(a), "\"'")
+	bNorm := strings.Trim(strings.TrimSpace(b), "\"'")
+	return aNorm == bNorm
+}
+
+// varbindsEqual checks if two varbind lists are equivalent.
+func varbindsEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func formatEnums(enums map[int]string) string {
 	if len(enums) == 0 {
 		return "{}"
@@ -352,6 +541,13 @@ func printComparisonResult(w io.Writer, result *ComparisonResult) {
 	printFieldAccuracy(w, "status", result.Summary.Status)
 	printFieldAccuracy(w, "enums", result.Summary.Enums)
 	printFieldAccuracy(w, "index", result.Summary.Index)
+	printFieldAccuracy(w, "hint", result.Summary.Hint)
+	printFieldAccuracy(w, "tc_name", result.Summary.TCName)
+	printFieldAccuracy(w, "units", result.Summary.Units)
+	printFieldAccuracy(w, "ranges", result.Summary.Ranges)
+	printFieldAccuracy(w, "defval", result.Summary.DefaultValue)
+	printFieldAccuracy(w, "bits", result.Summary.Bits)
+	printFieldAccuracy(w, "varbinds", result.Summary.Varbinds)
 
 	if len(result.Mismatches) > 0 {
 		fmt.Fprintf(w, "\nMismatches (first 50):\n")

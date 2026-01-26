@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
@@ -28,6 +29,21 @@ type NormalizedNode struct {
 	EnumValues map[int]string
 	Indexes    []IndexInfo
 	Augments   string
+
+	// Additional fields
+	Ranges       []RangeInfo    // Size/value constraints
+	DefaultValue string         // DEFVAL clause
+	Kind         string         // table, row, column, scalar, or empty
+	Varbinds     []string       // OBJECTS clause for notifications
+	NodeType     string         // NOTIFICATION-TYPE, TRAP-TYPE, OBJECT-TYPE, etc.
+	BitValues    map[int]string // BITS named values (separate from enums)
+	Reference    string         // REFERENCE clause
+}
+
+// RangeInfo describes a range constraint.
+type RangeInfo struct {
+	Low  int64
+	High int64
 }
 
 // IndexInfo describes an index component.
@@ -50,6 +66,47 @@ func indexString(indexes []IndexInfo) string {
 		}
 	}
 	return "{ " + strings.Join(parts, ", ") + " }"
+}
+
+// rangesString returns a human-readable representation of ranges.
+func rangesString(ranges []RangeInfo) string {
+	if len(ranges) == 0 {
+		return ""
+	}
+	var parts []string
+	for _, r := range ranges {
+		if r.Low == r.High {
+			parts = append(parts, fmt.Sprintf("%d", r.Low))
+		} else {
+			parts = append(parts, fmt.Sprintf("%d..%d", r.Low, r.High))
+		}
+	}
+	return "(" + strings.Join(parts, " | ") + ")"
+}
+
+// bitsString returns a human-readable representation of BITS values.
+func bitsString(bits map[int]string) string {
+	if len(bits) == 0 {
+		return "{}"
+	}
+	var keys []int
+	for k := range bits {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	var parts []string
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s(%d)", bits[k], k))
+	}
+	return "{ " + strings.Join(parts, ", ") + " }"
+}
+
+// varbindsString returns a human-readable representation of varbinds.
+func varbindsString(varbinds []string) string {
+	if len(varbinds) == 0 {
+		return ""
+	}
+	return "{ " + strings.Join(varbinds, ", ") + " }"
 }
 
 // loadNetSnmpNodes loads MIBs with net-snmp and returns normalized nodes.
@@ -157,6 +214,7 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 			OID:        oid,
 			Name:       node.Name(),
 			EnumValues: make(map[int]string),
+			BitValues:  make(map[int]string),
 		}
 
 		if mod := node.Module(); mod != nil {
@@ -169,6 +227,9 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 			n.Status = normalizeGomibStatus(obj.Status())
 			n.Units = obj.Units()
 			n.Hint = obj.EffectiveDisplayHint()
+			n.NodeType = "OBJECT-TYPE"
+			n.Kind = normalizeGomibKind(obj.Kind())
+			n.Reference = obj.Reference()
 
 			if t := obj.Type(); t != nil {
 				n.TCName = t.Name()
@@ -177,6 +238,25 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 			// Get enums
 			for _, ev := range obj.EffectiveEnums() {
 				n.EnumValues[int(ev.Value)] = ev.Label
+			}
+
+			// Get BITS values (separate from enums)
+			for _, bv := range obj.EffectiveBits() {
+				n.BitValues[int(bv.Value)] = bv.Label
+			}
+
+			// Get ranges (value constraints)
+			for _, r := range obj.EffectiveRanges() {
+				n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
+			}
+			// Also include sizes (for OCTET STRING)
+			for _, r := range obj.EffectiveSizes() {
+				n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
+			}
+
+			// Get default value
+			if dv := obj.DefaultValue(); dv != nil {
+				n.DefaultValue = dv.String()
 			}
 
 			// Get indexes
@@ -192,6 +272,16 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 			// Get augments
 			if aug := obj.Augments(); aug != nil {
 				n.Augments = aug.Name()
+			}
+		}
+
+		// Handle notifications
+		if notif := node.Notification(); notif != nil {
+			n.Status = normalizeGomibStatus(notif.Status())
+			n.Reference = notif.Reference()
+			n.NodeType = "NOTIFICATION-TYPE"
+			for _, vb := range notif.Objects() {
+				n.Varbinds = append(n.Varbinds, vb.Name())
 			}
 		}
 
@@ -264,6 +354,22 @@ func normalizeGomibStatus(s gomib.Status) string {
 		return "deprecated"
 	case gomib.StatusObsolete:
 		return "obsolete"
+	default:
+		return ""
+	}
+}
+
+// normalizeGomibKind converts gomib Kind to normalized string.
+func normalizeGomibKind(k gomib.Kind) string {
+	switch k {
+	case gomib.KindTable:
+		return "table"
+	case gomib.KindRow:
+		return "row"
+	case gomib.KindColumn:
+		return "column"
+	case gomib.KindScalar:
+		return "scalar"
 	default:
 		return ""
 	}
