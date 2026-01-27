@@ -32,7 +32,7 @@ type Revision struct {
 
 // IndexEntry describes an index component for a table row.
 type IndexEntry struct {
-	Name    string // object name (may be from another module)
+	Object  Object // always non-nil in resolved model
 	Implied bool   // IMPLIED keyword present
 }
 

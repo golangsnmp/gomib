@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
-	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func tokenKinds(source string) []TokenKind {
@@ -218,14 +217,4 @@ func TestKeywordLookup(t *testing.T) {
 			testutil.Equal(t, tc.expected, kind, "LookupKeyword(%q) kind", tc.text)
 		}
 	}
-}
-
-func filterErrors(diags []types.Diagnostic) []types.Diagnostic {
-	var errors []types.Diagnostic
-	for _, d := range diags {
-		if d.Severity == types.SeverityError {
-			errors = append(errors, d)
-		}
-	}
-	return errors
 }

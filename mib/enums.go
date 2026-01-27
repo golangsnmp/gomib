@@ -130,15 +130,22 @@ func (k Kind) IsConformance() bool {
 }
 
 // Access levels for OBJECT-TYPE definitions.
+// Includes SMIv1, SMIv2, SPPI (RFC 3159), and AGENT-CAPABILITIES values.
 type Access int
 
 const (
-	AccessNotAccessible Access = iota
-	AccessAccessibleForNotify
-	AccessReadOnly
-	AccessReadWrite
-	AccessReadCreate
-	AccessWriteOnly
+	AccessNotAccessible       Access = iota // both: not directly accessible
+	AccessAccessibleForNotify               // SMIv2: only in notifications
+	AccessReadOnly                          // both: GET only
+	AccessReadWrite                         // both: GET and SET
+	AccessReadCreate                        // SMIv2: GET, SET, row creation
+	AccessWriteOnly                         // SMIv1: SET only (obsolete)
+	// SPPI-specific (RFC 3159)
+	AccessInstall       // SPPI: can be installed
+	AccessInstallNotify // SPPI: install + notify
+	AccessReportOnly    // SPPI: reporting only
+	// AGENT-CAPABILITIES specific
+	AccessNotImplemented // variation: not supported
 )
 
 func (a Access) String() string {
@@ -155,18 +162,55 @@ func (a Access) String() string {
 		return "read-create"
 	case AccessWriteOnly:
 		return "write-only"
+	case AccessInstall:
+		return "install"
+	case AccessInstallNotify:
+		return "install-notify"
+	case AccessReportOnly:
+		return "report-only"
+	case AccessNotImplemented:
+		return "not-implemented"
 	default:
 		return fmt.Sprintf("Access(%d)", a)
 	}
 }
 
+// AccessKeyword indicates which keyword was used in the source MIB.
+// Preserved for accurate MIB generation.
+type AccessKeyword int
+
+const (
+	AccessKeywordAccess    AccessKeyword = iota // SMIv1: ACCESS
+	AccessKeywordMaxAccess                      // SMIv2: MAX-ACCESS
+	AccessKeywordMinAccess                      // SMIv2: MIN-ACCESS (compliance)
+	AccessKeywordPibAccess                      // SPPI: PIB-ACCESS
+)
+
+func (k AccessKeyword) String() string {
+	switch k {
+	case AccessKeywordAccess:
+		return "ACCESS"
+	case AccessKeywordMaxAccess:
+		return "MAX-ACCESS"
+	case AccessKeywordMinAccess:
+		return "MIN-ACCESS"
+	case AccessKeywordPibAccess:
+		return "PIB-ACCESS"
+	default:
+		return fmt.Sprintf("AccessKeyword(%d)", k)
+	}
+}
+
 // Status values for MIB definitions.
+// Preserves SMIv1-specific values (mandatory, optional) without normalizing.
 type Status int
 
 const (
-	StatusCurrent Status = iota
-	StatusDeprecated
-	StatusObsolete
+	StatusCurrent    Status = iota // SMIv2: active definition
+	StatusDeprecated               // SMIv2: being phased out
+	StatusObsolete                 // both: no longer used
+	StatusMandatory                // SMIv1: agent MUST implement
+	StatusOptional                 // SMIv1: agent MAY implement
 )
 
 func (s Status) String() string {
@@ -177,9 +221,18 @@ func (s Status) String() string {
 		return "deprecated"
 	case StatusObsolete:
 		return "obsolete"
+	case StatusMandatory:
+		return "mandatory"
+	case StatusOptional:
+		return "optional"
 	default:
 		return fmt.Sprintf("Status(%d)", s)
 	}
+}
+
+// IsSMIv1 reports whether this is an SMIv1-specific status value.
+func (s Status) IsSMIv1() bool {
+	return s == StatusMandatory || s == StatusOptional
 }
 
 // Language identifies the SMI version of a module.
@@ -223,6 +276,7 @@ const (
 	BaseObjectIdentifier
 	BaseBits
 	BaseOpaque
+	BaseSequence // For table row SEQUENCE types
 )
 
 func (b BaseType) String() string {
@@ -251,6 +305,8 @@ func (b BaseType) String() string {
 		return "BITS"
 	case BaseOpaque:
 		return "Opaque"
+	case BaseSequence:
+		return "SEQUENCE"
 	default:
 		return fmt.Sprintf("BaseType(%d)", b)
 	}
