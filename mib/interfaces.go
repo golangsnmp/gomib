@@ -44,7 +44,7 @@ type Mib interface {
 	// Diagnostics
 	Unresolved() []UnresolvedRef
 	Diagnostics() []Diagnostic
-	IsComplete() bool
+	HasErrors() bool // any diagnostic at Error or above
 }
 
 // Node is a point in the OID tree.
@@ -53,7 +53,7 @@ type Node interface {
 	Name() string
 	OID() Oid
 	Kind() Kind
-	Module() Module // defining module (for OBJECT IDENTIFIER, Object, or Notification)
+	Module() Module
 
 	// Associated definitions (nil if none)
 	Object() Object
@@ -62,8 +62,8 @@ type Node interface {
 	// Tree navigation
 	Parent() Node
 	Child(arc uint32) Node
-	Children() []Node            // bounded, typically small
-	Descendants() iter.Seq[Node] // unbounded traversal
+	Children() []Node
+	Descendants() iter.Seq[Node]
 
 	// Prefix matching
 	LongestPrefix(oid Oid) Node
@@ -94,7 +94,7 @@ type Module interface {
 	Rows() []Object
 
 	// Lookups
-	Node(name string) Node // for OBJECT IDENTIFIER assignments
+	Node(name string) Node
 	Object(name string) Object
 	Type(name string) Type
 	Notification(name string) Notification
@@ -120,15 +120,15 @@ type Object interface {
 	DefaultValue() DefVal
 
 	// Table structure - navigation
-	Table() Object     // parent table for column/row; nil otherwise
-	Row() Object       // parent row for column; nil otherwise
-	Entry() Object     // row entry for table; nil otherwise
-	Columns() []Object // columns for table or row; nil otherwise
+	Table() Object
+	Row() Object
+	Entry() Object
+	Columns() []Object
 
 	// Table structure - index
 	Augments() Object
-	Index() []IndexEntry            // direct INDEX clause
-	EffectiveIndexes() []IndexEntry // follows AUGMENTS chain
+	Index() []IndexEntry
+	EffectiveIndexes() []IndexEntry
 
 	// Effective constraints (from inline + type chain)
 	EffectiveDisplayHint() string
@@ -171,13 +171,13 @@ type Type interface {
 	Enum(label string) (NamedValue, bool)
 	Bit(label string) (NamedValue, bool)
 
-	// Classification predicates (use effective values)
+	// Classification predicates
 	IsTextualConvention() bool
-	IsCounter() bool     // EffectiveBase is Counter32 or Counter64
-	IsGauge() bool       // EffectiveBase is Gauge32
-	IsString() bool      // EffectiveBase is OctetString
-	IsEnumeration() bool // EffectiveBase is Integer32 with EffectiveEnums
-	IsBits() bool        // has EffectiveBits
+	IsCounter() bool
+	IsGauge() bool
+	IsString() bool
+	IsEnumeration() bool
+	IsBits() bool
 
 	// Effective (walks type chain)
 	EffectiveBase() BaseType

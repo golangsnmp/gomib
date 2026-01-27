@@ -1,7 +1,67 @@
-// Package gomib provides MIB parsing and querying for SNMP management.
+// Package mib provides MIB parsing and querying for SNMP management.
 package mib
 
 import "fmt"
+
+// Severity levels for diagnostics (libsmi-compatible).
+// Lower values are more severe.
+type Severity int
+
+const (
+	SeverityFatal   Severity = 0 // Cannot continue parsing
+	SeveritySevere  Severity = 1 // Semantics changed to continue, must correct
+	SeverityError   Severity = 2 // Able to continue, should correct
+	SeverityMinor   Severity = 3 // Minor issue, should correct
+	SeverityStyle   Severity = 4 // Style recommendation
+	SeverityWarning Severity = 5 // Might be correct under some circumstances
+	SeverityInfo    Severity = 6 // Informational notice
+)
+
+func (s Severity) String() string {
+	switch s {
+	case SeverityFatal:
+		return "fatal"
+	case SeveritySevere:
+		return "severe"
+	case SeverityError:
+		return "error"
+	case SeverityMinor:
+		return "minor"
+	case SeverityStyle:
+		return "style"
+	case SeverityWarning:
+		return "warning"
+	case SeverityInfo:
+		return "info"
+	default:
+		return fmt.Sprintf("Severity(%d)", s)
+	}
+}
+
+// StrictnessLevel defines preset strictness configurations.
+type StrictnessLevel int
+
+const (
+	StrictnessStrict     StrictnessLevel = 0 // RFC-only, reject non-compliant
+	StrictnessNormal     StrictnessLevel = 3 // Default, warn on issues
+	StrictnessPermissive StrictnessLevel = 5 // Accept most real-world MIBs
+	StrictnessSilent     StrictnessLevel = 6 // Accept everything, minimal output
+)
+
+func (l StrictnessLevel) String() string {
+	switch l {
+	case StrictnessStrict:
+		return "strict"
+	case StrictnessNormal:
+		return "normal"
+	case StrictnessPermissive:
+		return "permissive"
+	case StrictnessSilent:
+		return "silent"
+	default:
+		return fmt.Sprintf("StrictnessLevel(%d)", l)
+	}
+}
 
 // Kind identifies what an OID node represents.
 type Kind int
@@ -126,16 +186,22 @@ func (s Status) String() string {
 type Language int
 
 const (
-	LanguageSMIv1 Language = iota
+	LanguageUnknown Language = iota
+	LanguageSMIv1
 	LanguageSMIv2
+	LanguageSPPI // Policy Information Base (RFC 3159)
 )
 
 func (l Language) String() string {
 	switch l {
+	case LanguageUnknown:
+		return "unknown"
 	case LanguageSMIv1:
 		return "SMIv1"
 	case LanguageSMIv2:
 		return "SMIv2"
+	case LanguageSPPI:
+		return "SPPI"
 	default:
 		return fmt.Sprintf("Language(%d)", l)
 	}
@@ -145,7 +211,8 @@ func (l Language) String() string {
 type BaseType int
 
 const (
-	BaseInteger32 BaseType = iota
+	BaseUnknown BaseType = iota
+	BaseInteger32
 	BaseUnsigned32
 	BaseCounter32
 	BaseCounter64
@@ -160,6 +227,8 @@ const (
 
 func (b BaseType) String() string {
 	switch b {
+	case BaseUnknown:
+		return "unknown"
 	case BaseInteger32:
 		return "Integer32"
 	case BaseUnsigned32:
@@ -184,27 +253,5 @@ func (b BaseType) String() string {
 		return "Opaque"
 	default:
 		return fmt.Sprintf("BaseType(%d)", b)
-	}
-}
-
-// Severity for diagnostics.
-type Severity int
-
-const (
-	SeverityInfo Severity = iota
-	SeverityWarning
-	SeverityError
-)
-
-func (s Severity) String() string {
-	switch s {
-	case SeverityInfo:
-		return "info"
-	case SeverityWarning:
-		return "warning"
-	case SeverityError:
-		return "error"
-	default:
-		return fmt.Sprintf("Severity(%d)", s)
 	}
 }

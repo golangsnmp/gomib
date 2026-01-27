@@ -7,7 +7,6 @@ import (
 )
 
 // Oid is a sequence of arc values representing an SNMP Object Identifier.
-// It is a defined type (not alias) so methods can be attached.
 type Oid []uint32
 
 // ParseOID parses an OID from a dotted string (e.g., "1.3.6.1.2.1").
@@ -62,7 +61,6 @@ func (o Oid) String() string {
 }
 
 // Parent returns the parent OID (all arcs except the last).
-// Returns nil if the OID is empty or has only one arc.
 func (o Oid) Parent() Oid {
 	if len(o) <= 1 {
 		return nil
@@ -97,7 +95,6 @@ func (o Oid) Equal(other Oid) bool {
 }
 
 // Compare returns -1 if o < other, 0 if equal, 1 if o > other.
-// Comparison is lexicographic by arc value.
 func (o Oid) Compare(other Oid) int {
 	return slices.Compare(o, other)
 }

@@ -5,12 +5,6 @@ import (
 	"strings"
 )
 
-// IndexEntry describes an index component for a table row.
-type IndexEntry struct {
-	Object  Object // always non-nil in resolved model
-	Implied bool   // IMPLIED keyword present
-}
-
 // Range for size/value constraints.
 type Range struct {
 	Min, Max int64
@@ -25,11 +19,21 @@ func (r Range) String() string {
 }
 
 // NamedValue represents a labeled integer from an enum or BITS definition.
-// For INTEGER enums, Value is the enum constant.
-// For BITS, Value is the bit position (0-based).
 type NamedValue struct {
 	Label string
 	Value int64
+}
+
+// Revision describes a module revision.
+type Revision struct {
+	Date        string // "YYYY-MM-DD" or original format
+	Description string
+}
+
+// IndexEntry describes an index component for a table row.
+type IndexEntry struct {
+	Name    string // object name (may be from another module)
+	Implied bool   // IMPLIED keyword present
 }
 
 // DefValKind identifies the type of default value.
@@ -46,11 +50,10 @@ const (
 )
 
 // DefVal represents a default value with both interpreted value and raw MIB syntax.
-// Use Value() to get the interpreted value, Raw() for original MIB syntax.
 type DefVal struct {
 	kind  DefValKind
-	value any    // int64, uint64, string, []byte, []string, Oid
-	raw   string // original MIB syntax
+	value any
+	raw   string
 }
 
 // NewDefValInt creates a DefVal for a signed integer.
@@ -92,13 +95,12 @@ func NewDefValOID(oid Oid, raw string) DefVal {
 func (d DefVal) Kind() DefValKind { return d.kind }
 
 // Value returns the interpreted value.
-// Type depends on Kind: int64, uint64, string, []byte, []string, or Oid.
 func (d DefVal) Value() any { return d.value }
 
-// Raw returns the original MIB syntax (e.g., "'00000000'H", "42", "{ bit1, bit2 }").
+// Raw returns the original MIB syntax.
 func (d DefVal) Raw() string { return d.raw }
 
-// String returns a user-friendly representation of the value.
+// String returns a user-friendly representation.
 func (d DefVal) String() string {
 	switch d.kind {
 	case DefValKindInt:
@@ -112,8 +114,6 @@ func (d DefVal) String() string {
 		if len(b) == 0 {
 			return "0"
 		}
-		// For small byte arrays, interpret as big-endian integer
-		// This matches net-snmp behavior for hex DEFVALs
 		if len(b) <= 8 {
 			var n uint64
 			for _, v := range b {
@@ -121,7 +121,6 @@ func (d DefVal) String() string {
 			}
 			return strconv.FormatUint(n, 10)
 		}
-		// For larger byte arrays, show as hex
 		return "0x" + bytesToHex(b)
 	case DefValKindEnum:
 		return d.value.(string)
@@ -143,13 +142,12 @@ func (d DefVal) IsZero() bool {
 	return d.value == nil
 }
 
-// DefValAs returns the value as type T if compatible, or zero value and false.
+// DefValAs returns the value as type T if compatible.
 func DefValAs[T any](d DefVal) (T, bool) {
 	v, ok := d.value.(T)
 	return v, ok
 }
 
-// bytesToHex converts bytes to uppercase hex string.
 func bytesToHex(b []byte) string {
 	const hex = "0123456789ABCDEF"
 	result := make([]byte, len(b)*2)
@@ -160,23 +158,9 @@ func bytesToHex(b []byte) string {
 	return string(result)
 }
 
-// Revision describes a module revision.
-type Revision struct {
-	Date        string // "YYYY-MM-DD" or original format
-	Description string
-}
-
-// Diagnostic represents a parse or resolution issue.
-type Diagnostic struct {
-	Severity Severity
-	Module   string // source module name
-	Message  string
-	Line     int // 0 if not applicable
-}
-
 // UnresolvedRef describes a symbol that could not be resolved.
 type UnresolvedRef struct {
 	Kind   string // "type", "object", "import"
-	Symbol string // the unresolved symbol
-	Module string // where it was referenced
+	Symbol string
+	Module string
 }
