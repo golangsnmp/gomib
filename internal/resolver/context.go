@@ -43,6 +43,10 @@ type ResolverContext struct {
 	unresolvedIndexes      []unresolvedIndex
 	unresolvedNotifObjects []unresolvedNotifObject
 
+	// Diagnostic configuration and collection
+	diagConfig  mib.DiagnosticConfig
+	diagnostics []mib.Diagnostic
+
 	types.Logger
 }
 
@@ -114,8 +118,8 @@ func scanCapacityHints(mods []*module.Module) capacityHints {
 	return h
 }
 
-// newResolverContext creates a new context with an optional logger.
-func newResolverContext(mods []*module.Module, logger *slog.Logger) *ResolverContext {
+// newResolverContext creates a new context with an optional logger and diagnostic config.
+func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *ResolverContext {
 	h := scanCapacityHints(mods)
 	return &ResolverContext{
 		Builder:            mibimpl.NewBuilder(),
@@ -126,6 +130,7 @@ func newResolverContext(mods []*module.Module, logger *slog.Logger) *ResolverCon
 		ModuleImports:      make(map[*module.Module]map[string]*module.Module, h.modules),
 		ModuleSymbolToType: make(map[*module.Module]map[string]*mibimpl.Type, h.modules),
 		ModuleDefNames:     make(map[*module.Module]map[string]struct{}, h.modules),
+		diagConfig:         diagConfig,
 		Logger:             types.Logger{L: logger},
 	}
 }
@@ -287,6 +292,31 @@ func (c *ResolverContext) RegisterModuleTypeSymbol(mod *module.Module, name stri
 	symbols[name] = t
 }
 
+// EmitDiagnostic records a diagnostic if it should be reported under the current config.
+func (c *ResolverContext) EmitDiagnostic(code string, severity mib.Severity, moduleName string, line, col int, message string) {
+	if !c.diagConfig.ShouldReport(code, severity) {
+		return
+	}
+	c.diagnostics = append(c.diagnostics, mib.Diagnostic{
+		Severity: severity,
+		Code:     code,
+		Message:  message,
+		Module:   moduleName,
+		Line:     line,
+		Column:   col,
+	})
+}
+
+// Diagnostics returns all collected diagnostics.
+func (c *ResolverContext) Diagnostics() []mib.Diagnostic {
+	return c.diagnostics
+}
+
+// DiagnosticConfig returns the diagnostic configuration.
+func (c *ResolverContext) DiagnosticConfig() mib.DiagnosticConfig {
+	return c.diagConfig
+}
+
 // RecordUnresolvedImport records an unresolved import.
 func (c *ResolverContext) RecordUnresolvedImport(importingModule *module.Module, fromModule, symbol, reason string, span types.Span) {
 	c.unresolvedImports = append(c.unresolvedImports, unresolvedImport{
@@ -296,6 +326,19 @@ func (c *ResolverContext) RecordUnresolvedImport(importingModule *module.Module,
 		reason:          reason,
 		span:            span,
 	})
+
+	// Also emit a diagnostic
+	modName := ""
+	if importingModule != nil {
+		modName = importingModule.Name
+	}
+	code := "import-not-found"
+	if reason == "module not found" {
+		code = "import-module-not-found"
+	}
+	// Note: Line/Column are 0 since we only have byte offsets in Span
+	c.EmitDiagnostic(code, mib.SeverityError, modName, 0, 0,
+		"unresolved import: "+symbol+" from "+fromModule+" ("+reason+")")
 }
 
 // RecordUnresolvedType records an unresolved type reference.
@@ -306,6 +349,14 @@ func (c *ResolverContext) RecordUnresolvedType(mod *module.Module, referrer, ref
 		referenced: referenced,
 		span:       span,
 	})
+
+	// Also emit a diagnostic
+	modName := ""
+	if mod != nil {
+		modName = mod.Name
+	}
+	c.EmitDiagnostic("type-unknown", mib.SeverityError, modName, 0, 0,
+		"unresolved type: "+referrer+" references unknown type "+referenced)
 }
 
 // RecordUnresolvedOid records an unresolved OID component.
@@ -316,6 +367,14 @@ func (c *ResolverContext) RecordUnresolvedOid(mod *module.Module, defName, compo
 		component:  component,
 		span:       span,
 	})
+
+	// Also emit a diagnostic
+	modName := ""
+	if mod != nil {
+		modName = mod.Name
+	}
+	c.EmitDiagnostic("oid-orphan", mib.SeverityWarning, modName, 0, 0,
+		"unresolved OID: "+defName+" references unknown parent "+component)
 }
 
 // RecordUnresolvedIndex records an unresolved index object.
@@ -326,6 +385,14 @@ func (c *ResolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexOb
 		indexObject: indexObject,
 		span:        span,
 	})
+
+	// Also emit a diagnostic
+	modName := ""
+	if mod != nil {
+		modName = mod.Name
+	}
+	c.EmitDiagnostic("index-unresolved", mib.SeverityError, modName, 0, 0,
+		"unresolved INDEX: "+row+" references unknown object "+indexObject)
 }
 
 // RecordUnresolvedNotificationObject records an unresolved notification object reference.
@@ -336,6 +403,14 @@ func (c *ResolverContext) RecordUnresolvedNotificationObject(mod *module.Module,
 		object:       object,
 		span:         span,
 	})
+
+	// Also emit a diagnostic
+	modName := ""
+	if mod != nil {
+		modName = mod.Name
+	}
+	c.EmitDiagnostic("objects-unresolved", mib.SeverityWarning, modName, 0, 0,
+		"unresolved OBJECTS: "+notification+" references unknown object "+object)
 }
 
 // DropModules drops modules to free memory after resolution.
@@ -345,7 +420,7 @@ func (c *ResolverContext) DropModules() {
 	c.ModuleDefNames = nil
 }
 
-// FinalizeUnresolved copies unresolved references to the Mib.
+// FinalizeUnresolved copies unresolved references and diagnostics to the Mib.
 func (c *ResolverContext) FinalizeUnresolved() {
 	for _, u := range c.unresolvedImports {
 		modName := ""
@@ -379,6 +454,11 @@ func (c *ResolverContext) FinalizeUnresolved() {
 			Symbol: u.component,
 			Module: modName,
 		})
+	}
+
+	// Copy diagnostics to the Mib
+	for _, d := range c.diagnostics {
+		c.Builder.AddDiagnostic(d)
 	}
 }
 

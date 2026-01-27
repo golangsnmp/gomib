@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+
+	"github.com/golangsnmp/gomib/mib"
 )
 
 // ErrNoSources is returned when Load is called with no sources.
@@ -21,12 +23,39 @@ type loadConfig struct {
 	logger      *slog.Logger
 	extensions  []string
 	noHeuristic bool
+	diagConfig  mib.DiagnosticConfig
 }
 
 // WithLogger sets the logger for debug/trace output.
 // If not set, no logging occurs (zero overhead).
 func WithLogger(logger *slog.Logger) LoadOption {
 	return func(c *loadConfig) { c.logger = logger }
+}
+
+// WithDiagnosticConfig sets the diagnostic configuration for strictness control.
+// If not set, defaults to Normal strictness (report Minor and above, fail on Severe).
+func WithDiagnosticConfig(cfg mib.DiagnosticConfig) LoadOption {
+	return func(c *loadConfig) { c.diagConfig = cfg }
+}
+
+// WithStrictness sets the strictness level using a preset configuration.
+// Convenience wrapper for WithDiagnosticConfig with preset configs.
+func WithStrictness(level mib.StrictnessLevel) LoadOption {
+	return func(c *loadConfig) {
+		switch level {
+		case mib.StrictnessStrict:
+			c.diagConfig = mib.StrictConfig()
+		case mib.StrictnessPermissive:
+			c.diagConfig = mib.PermissiveConfig()
+		case mib.StrictnessSilent:
+			c.diagConfig = mib.DiagnosticConfig{
+				Level:  mib.StrictnessSilent,
+				FailAt: mib.SeverityFatal,
+			}
+		default:
+			c.diagConfig = mib.DefaultConfig()
+		}
+	}
 }
 
 // Load loads all MIB modules from the given source and resolves them.
@@ -46,6 +75,7 @@ func WithLogger(logger *slog.Logger) LoadOption {
 func Load(ctx context.Context, source Source, opts ...LoadOption) (Mib, error) {
 	cfg := loadConfig{
 		extensions: DefaultExtensions(),
+		diagConfig: mib.DefaultConfig(),
 	}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -70,6 +100,7 @@ func Load(ctx context.Context, source Source, opts ...LoadOption) (Mib, error) {
 func LoadModules(ctx context.Context, names []string, source Source, opts ...LoadOption) (Mib, error) {
 	cfg := loadConfig{
 		extensions: DefaultExtensions(),
+		diagConfig: mib.DefaultConfig(),
 	}
 	for _, opt := range opts {
 		opt(&cfg)

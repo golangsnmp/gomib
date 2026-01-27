@@ -150,7 +150,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (Mib,
 	}
 
 	// Resolve
-	return resolver.Resolve(mods, componentLogger(logger, "resolver")), nil
+	return resolver.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig), nil
 }
 
 // loadModulesByName loads specific modules by name along with their dependencies.
@@ -275,7 +275,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 	})
 
 	// Resolve
-	return resolver.Resolve(mods, componentLogger(logger, "resolver")), nil
+	return resolver.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig), nil
 }
 
 // findModuleContent searches sources for a module and returns its content.

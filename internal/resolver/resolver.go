@@ -30,18 +30,24 @@ import (
 // resolver resolves modules into a Mib.
 type resolver struct {
 	types.Logger
+	diagConfig mib.DiagnosticConfig
 }
 
 // Resolve resolves parsed modules into a Mib.
 // If logger is nil, logging is disabled (zero overhead).
-func Resolve(mods []*module.Module, logger *slog.Logger) mib.Mib {
-	r := &resolver{Logger: types.Logger{L: logger}}
+// If diagConfig is nil, defaults to Normal strictness.
+func Resolve(mods []*module.Module, logger *slog.Logger, diagConfig *mib.DiagnosticConfig) mib.Mib {
+	cfg := mib.DefaultConfig()
+	if diagConfig != nil {
+		cfg = *diagConfig
+	}
+	r := &resolver{Logger: types.Logger{L: logger}, diagConfig: cfg}
 	return r.resolve(mods)
 }
 
 // resolve resolves modules into a Mib.
 func (r *resolver) resolve(mods []*module.Module) mib.Mib {
-	ctx := newResolverContext(mods, r.L)
+	ctx := newResolverContext(mods, r.L, r.diagConfig)
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "register"))
 	registerModules(ctx)

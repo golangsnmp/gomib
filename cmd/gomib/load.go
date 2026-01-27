@@ -14,15 +14,25 @@ Usage:
   gomib load [options] MODULE...
 
 Options:
-  --strict      Exit non-zero if any unresolved references
+  --strict      Use strict RFC compliance mode
+  --permissive  Use permissive mode for vendor MIBs
+  --level N     Set strictness level (0-6, lower is stricter)
   --stats       Show detailed statistics
   -h, --help    Show help
+
+Strictness Levels:
+  0 (strict)     - RFC compliance checking
+  3 (normal)     - Default, balanced
+  5 (permissive) - Accept most real-world MIBs
+  6 (silent)     - Maximum compatibility
 
 Examples:
   gomib load IF-MIB
   gomib load IF-MIB SNMPv2-MIB
   gomib load -v IF-MIB                 # Debug logging
   gomib load -vv IF-MIB                # Trace logging
+  gomib load --strict IF-MIB           # RFC compliance mode
+  gomib load --permissive IF-MIB       # Vendor MIB mode
   gomib load --stats IF-MIB            # Show detailed stats
 `
 
@@ -30,7 +40,9 @@ func cmdLoad(args []string) int {
 	fs := flag.NewFlagSet("load", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, loadUsage) }
 
-	strict := fs.Bool("strict", false, "exit non-zero if unresolved references")
+	strict := fs.Bool("strict", false, "use strict RFC compliance mode")
+	permissive := fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
+	level := fs.Int("level", -1, "set strictness level (0-6)")
 	stats := fs.Bool("stats", false, "show detailed statistics")
 	help := fs.Bool("h", false, "show help")
 	fs.BoolVar(help, "help", false, "show help")
@@ -51,7 +63,17 @@ func cmdLoad(args []string) int {
 		return 1
 	}
 
-	mib, err := loadMib(modules)
+	// Determine strictness
+	var opts []gomib.LoadOption
+	if *strict {
+		opts = append(opts, gomib.WithStrictness(gomib.StrictnessStrict))
+	} else if *permissive {
+		opts = append(opts, gomib.WithStrictness(gomib.StrictnessPermissive))
+	} else if *level >= 0 {
+		opts = append(opts, gomib.WithStrictness(gomib.StrictnessLevel(*level)))
+	}
+
+	mib, err := loadMibWithOpts(modules, opts...)
 	if err != nil {
 		printError("failed to load: %v", err)
 		return 1
@@ -67,18 +89,18 @@ func cmdLoad(args []string) int {
 
 	// Print diagnostics
 	diags := mib.Diagnostics()
-	hasWarnings := false
+	hasSevere := false
 	hasErrors := false
 	for _, d := range diags {
-		switch d.Severity {
-		case gomib.SeverityWarning:
-			hasWarnings = true
-		case gomib.SeverityError:
+		if d.Severity <= gomib.SeveritySevere {
+			hasSevere = true
+		}
+		if d.Severity <= gomib.SeverityError {
 			hasErrors = true
 		}
 	}
 
-	if hasWarnings || hasErrors {
+	if len(diags) > 0 {
 		fmt.Println()
 		fmt.Println("Diagnostics:")
 		for _, d := range diags {
@@ -116,24 +138,19 @@ func cmdLoad(args []string) int {
 	}
 
 	// Exit code
-	if hasErrors {
+	if hasSevere {
 		return 1
 	}
-	if *strict && len(unresolved) > 0 {
+	if *strict && (hasErrors || len(unresolved) > 0) {
 		return 2
 	}
 	return 0
 }
 
 func printDiagnostic(d gomib.Diagnostic) {
-	var prefix string
-	switch d.Severity {
-	case gomib.SeverityError:
-		prefix = "  error: "
-	case gomib.SeverityWarning:
-		prefix = "  warning: "
-	default:
-		prefix = "  "
+	prefix := "  " + d.Severity.String() + ": "
+	if d.Code != "" {
+		prefix += "[" + d.Code + "] "
 	}
 	if d.Module != "" {
 		if d.Line > 0 {

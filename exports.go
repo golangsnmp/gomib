@@ -149,11 +149,36 @@ const (
 	BaseOpaque           = mib.BaseOpaque
 )
 
-// Severity constants.
+// Severity constants (libsmi-compatible, lower = more severe).
 const (
-	SeverityInfo    = mib.SeverityInfo
-	SeverityWarning = mib.SeverityWarning
-	SeverityError   = mib.SeverityError
+	SeverityFatal   = mib.SeverityFatal   // 0: Cannot continue parsing
+	SeveritySevere  = mib.SeveritySevere  // 1: Semantics changed to continue
+	SeverityError   = mib.SeverityError   // 2: Should correct
+	SeverityMinor   = mib.SeverityMinor   // 3: Minor issue
+	SeverityStyle   = mib.SeverityStyle   // 4: Style recommendation
+	SeverityWarning = mib.SeverityWarning // 5: Might be correct
+	SeverityInfo    = mib.SeverityInfo    // 6: Informational
+)
+
+// StrictnessLevel defines preset strictness configurations.
+type StrictnessLevel = mib.StrictnessLevel
+
+// StrictnessLevel constants.
+const (
+	StrictnessStrict     = mib.StrictnessStrict
+	StrictnessNormal     = mib.StrictnessNormal
+	StrictnessPermissive = mib.StrictnessPermissive
+	StrictnessSilent     = mib.StrictnessSilent
+)
+
+// DiagnosticConfig controls strictness and diagnostic filtering.
+type DiagnosticConfig = mib.DiagnosticConfig
+
+// Config constructors.
+var (
+	DefaultConfig     = mib.DefaultConfig
+	StrictConfig      = mib.StrictConfig
+	PermissiveConfig  = mib.PermissiveConfig
 )
 
 // ParseOID parses an OID from a dotted string (e.g., "1.3.6.1.2.1").
