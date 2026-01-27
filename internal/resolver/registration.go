@@ -44,6 +44,11 @@ func registerModules(ctx *ResolverContext) {
 		ctx.Builder.AddModule(resolved)
 		ctx.ModuleToResolved[mod] = resolved
 
+		// Collect diagnostics from parsing and lowering
+		for _, d := range mod.Diagnostics {
+			ctx.Builder.AddDiagnostic(d)
+		}
+
 		if mod.Name == "SNMPv2-SMI" {
 			ctx.Snmpv2SMIModule = mod
 		}

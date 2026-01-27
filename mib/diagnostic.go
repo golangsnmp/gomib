@@ -47,15 +47,29 @@ func StrictConfig() DiagnosticConfig {
 }
 
 // PermissiveConfig returns a permissive configuration for legacy/vendor MIBs.
+// Suppresses common vendor MIB violations like underscores in identifiers.
 func PermissiveConfig() DiagnosticConfig {
 	return DiagnosticConfig{
 		Level:  StrictnessPermissive,
 		FailAt: SeverityFatal,
+		// Suppress diagnostics that are allowed in permissive mode
+		Ignore: []string{
+			"identifier-underscore",
+			"identifier-length-32",
+		},
 	}
 }
 
 // ShouldReport returns true if a diagnostic with the given code and severity
 // should be reported under this configuration.
+//
+// The Level controls reporting threshold:
+//   - Level 0 (Strict): Report all diagnostics (Info and above)
+//   - Level 3 (Normal): Report Minor and above (0-3)
+//   - Level 5 (Permissive): Report Warning and above (0-5)
+//   - Level 6 (Silent): Report nothing
+//
+// Lower severity numbers are more severe (Fatal=0, Info=6).
 func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
 	// Check ignore list
 	for _, pattern := range c.Ignore {
@@ -69,7 +83,19 @@ func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
 		sev = override
 	}
 
-	// Report if severity <= level (lower = more severe)
+	// Silent mode suppresses all reporting
+	if c.Level >= StrictnessSilent {
+		return false
+	}
+
+	// Strict mode reports all diagnostics
+	if c.Level == StrictnessStrict {
+		return true
+	}
+
+	// Normal/Permissive: Report if severity is at or below the threshold
+	// Level 3 (Normal): report sev 0-3 (Fatal, Severe, Error, Minor)
+	// Level 5 (Permissive): report sev 0-5 (all except Info)
 	return int(sev) <= int(c.Level)
 }
 

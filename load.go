@@ -94,13 +94,13 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (Mib,
 				return
 			}
 
-			p := parser.New(content, componentLogger(logger, "parser"))
+			p := parser.New(content, componentLogger(logger, "parser"), cfg.diagConfig)
 			ast := p.ParseModule()
 			if ast == nil {
 				return
 			}
 
-			mod := module.Lower(ast, componentLogger(logger, "module"))
+			mod := module.Lower(ast, componentLogger(logger, "module"), cfg.diagConfig)
 			if mod != nil {
 				results <- parseResult{mod: mod}
 			}
@@ -209,7 +209,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 		}
 
 		// Parse
-		p := parser.New(content, componentLogger(logger, "parser"))
+		p := parser.New(content, componentLogger(logger, "parser"), cfg.diagConfig)
 		ast := p.ParseModule()
 		if ast == nil {
 			if logEnabled(logger, slog.LevelDebug) {
@@ -220,7 +220,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 		}
 
 		// Lower
-		mod := module.Lower(ast, componentLogger(logger, "module"))
+		mod := module.Lower(ast, componentLogger(logger, "module"), cfg.diagConfig)
 		if mod == nil {
 			if logEnabled(logger, slog.LevelDebug) {
 				logger.LogAttrs(ctx, slog.LevelDebug, "lowering failed",

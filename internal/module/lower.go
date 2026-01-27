@@ -15,16 +15,34 @@ type LoweringContext struct {
 	Diagnostics []mib.Diagnostic
 	// Language detected from imports (may be updated as imports are processed).
 	Language Language
+	// DiagConfig controls strictness and diagnostic filtering.
+	DiagConfig mib.DiagnosticConfig
 	types.Logger
 }
 
 // newLoweringContext creates a new lowering context with an optional logger.
 // If logger is nil, logging is disabled (zero overhead).
-func newLoweringContext(logger *slog.Logger) *LoweringContext {
+func newLoweringContext(logger *slog.Logger, diagConfig mib.DiagnosticConfig) *LoweringContext {
 	return &LoweringContext{
-		Language: LanguageUnknown,
-		Logger:   types.Logger{L: logger},
+		Language:   LanguageUnknown,
+		DiagConfig: diagConfig,
+		Logger:     types.Logger{L: logger},
 	}
+}
+
+// emitDiagnostic emits a diagnostic if it should be reported under the current config.
+func (ctx *LoweringContext) emitDiagnostic(code string, severity mib.Severity, moduleName string, message string) {
+	if !ctx.DiagConfig.ShouldReport(code, severity) {
+		return
+	}
+	ctx.Diagnostics = append(ctx.Diagnostics, mib.Diagnostic{
+		Severity: severity,
+		Code:     code,
+		Message:  message,
+		Module:   moduleName,
+		Line:     0,
+		Column:   0,
+	})
 }
 
 // AddDiagnostic adds a diagnostic.
@@ -48,11 +66,12 @@ func isSMIv2BaseModule(module string) bool {
 //  1. Detects the SMI language from imports
 //  2. Lowers imports
 //  3. Lowers each definition
+//  4. Validates structural requirements (e.g., MODULE-IDENTITY for SMIv2)
 //
 // The AST is not needed after lowering.
 // If logger is nil, logging is disabled (zero overhead).
-func Lower(astModule *ast.Module, logger *slog.Logger) *Module {
-	ctx := newLoweringContext(logger)
+func Lower(astModule *ast.Module, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *Module {
+	ctx := newLoweringContext(logger, diagConfig)
 
 	// Create module
 	module := NewModule(astModule.Name.Name, astModule.Span)
@@ -78,7 +97,34 @@ func Lower(astModule *ast.Module, logger *slog.Logger) *Module {
 		slog.String("module", module.Name),
 		slog.Int("definitions", len(module.Definitions)))
 
-	// Collect diagnostics
+	// Check for MODULE-IDENTITY in SMIv2 modules
+	if module.Language == LanguageSMIv2 && !isSMIv2BaseModule(module.Name) {
+		hasModuleIdentity := false
+		for _, def := range module.Definitions {
+			if _, ok := def.(*ModuleIdentity); ok {
+				hasModuleIdentity = true
+				break
+			}
+		}
+		if !hasModuleIdentity {
+			ctx.emitDiagnostic("missing-module-identity", mib.SeverityError, module.Name,
+				fmt.Sprintf("SMIv2 module %s lacks MODULE-IDENTITY", module.Name))
+		}
+	}
+
+	// Convert and collect AST diagnostics (types.Diagnostic -> mib.Diagnostic)
+	for _, d := range astModule.Diagnostics {
+		module.Diagnostics = append(module.Diagnostics, mib.Diagnostic{
+			Severity: mib.Severity(d.Severity),
+			Code:     d.Code,
+			Message:  d.Message,
+			Module:   module.Name,
+			Line:     0, // Could compute from span if needed
+			Column:   0,
+		})
+	}
+
+	// Collect lowering diagnostics
 	module.Diagnostics = append(module.Diagnostics, ctx.Diagnostics...)
 
 	return module

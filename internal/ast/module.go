@@ -31,7 +31,7 @@ func NewModule(name Ident, definitionsKind DefinitionsKind, span types.Span) *Mo
 // HasErrors returns true if this module has parse errors.
 func (m *Module) HasErrors() bool {
 	for _, d := range m.Diagnostics {
-		if d.Severity == types.SeverityError {
+		if d.Severity <= types.SeverityError {
 			return true
 		}
 	}

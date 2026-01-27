@@ -460,6 +460,10 @@ func convertStatus(s module.Status) mib.Status {
 		return mib.StatusDeprecated
 	case module.StatusObsolete:
 		return mib.StatusObsolete
+	case module.StatusMandatory:
+		return mib.StatusMandatory
+	case module.StatusOptional:
+		return mib.StatusOptional
 	default:
 		return mib.StatusCurrent
 	}

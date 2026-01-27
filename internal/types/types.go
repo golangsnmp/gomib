@@ -73,17 +73,23 @@ func (s Span) IsSynthetic() bool {
 	return s.Start == 0 && s.End == 0
 }
 
-// Severity is a diagnostic severity level (internal use during parsing).
-type Severity int
-
-const (
-	SeverityError Severity = iota
-	SeverityWarning
-)
-
 // Diagnostic is a message from the lexer or parser (internal use).
+// This is the internal representation; it gets converted to mib.Diagnostic
+// during lowering with proper module name and line/column info.
 type Diagnostic struct {
-	Severity Severity
+	Severity int    // Uses mib.Severity values (0=Fatal, 1=Severe, etc.)
+	Code     string // Diagnostic code (e.g., "identifier-underscore")
 	Span     Span
 	Message  string
 }
+
+// Severity constants matching mib.Severity values.
+const (
+	SeverityFatal   = 0
+	SeveritySevere  = 1
+	SeverityError   = 2
+	SeverityMinor   = 3
+	SeverityStyle   = 4
+	SeverityWarning = 5
+	SeverityInfo    = 6
+)

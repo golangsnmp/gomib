@@ -1,33 +1,25 @@
 // Package parser provides MIB parsing into an AST.
 //
-// This parser is intentionally lenient rather than strict. The goal is to successfully
-// parse real-world vendor MIBs, which are frequently non-compliant with RFC specifications.
+// The parser supports configurable strictness via DiagnosticConfig:
+//   - Strict mode: Emits diagnostics for RFC violations (underscores, long identifiers, etc.)
+//   - Normal mode: Emits diagnostics for significant issues, warns on RFC violations
+//   - Permissive mode: Accepts most vendor MIBs, minimal diagnostics
 //
-// # Design Principles
-//
-//  1. Accept common deviations silently: Underscores in identifiers, trailing hyphens,
-//     missing or empty descriptions, and other common vendor quirks are accepted without
-//     warnings.
-//
-//  2. Recover from errors: When the parser encounters unexpected tokens, it attempts
-//     to recover and continue parsing the rest of the module. Parse errors are collected
-//     as diagnostics rather than causing immediate failure.
-//
-//  3. No pedantic warnings: Users don't need lectures about RFC compliance. The parser
-//     exists to load MIBs, not to validate them against standards.
-//
-//  4. Errors are blockers only: Diagnostics are emitted only for issues that prevent
-//     successful parsing or would cause incorrect interpretation of the MIB content.
+// Regardless of strictness level, the parser attempts to recover from errors and
+// continue parsing. Parse errors are collected as diagnostics rather than causing
+// immediate failure.
 package parser
 
 import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"github.com/golangsnmp/gomib/internal/ast"
 	"github.com/golangsnmp/gomib/internal/lexer"
 	"github.com/golangsnmp/gomib/internal/types"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 // Parser parses a token stream into an AST.
@@ -36,13 +28,15 @@ type Parser struct {
 	tokens      []lexer.Token
 	pos         int
 	diagnostics []types.Diagnostic
+	diagConfig  mib.DiagnosticConfig
 	eofToken    lexer.Token
 	types.Logger
 }
 
 // New creates a new parser for the given source bytes.
 // The logger parameter is optional; pass nil to disable logging.
-func New(source []byte, logger *slog.Logger) *Parser {
+// The diagConfig controls strictness; use mib.DefaultConfig() for normal mode.
+func New(source []byte, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *Parser {
 	// Derive lexer logger with component tag
 	var lexLogger *slog.Logger
 	if logger != nil {
@@ -57,6 +51,7 @@ func New(source []byte, logger *slog.Logger) *Parser {
 		tokens:      tokens,
 		pos:         0,
 		diagnostics: lexerDiags,
+		diagConfig:  diagConfig,
 		eofToken:    eofToken,
 		Logger:      types.Logger{L: logger},
 	}
@@ -64,6 +59,58 @@ func New(source []byte, logger *slog.Logger) *Parser {
 		slog.Int("tokens", len(tokens)),
 		slog.Int("lexer_diagnostics", len(lexerDiags)))
 	return p
+}
+
+// emitDiagnostic emits a coded diagnostic if it should be reported under the current config.
+func (p *Parser) emitDiagnostic(code string, severity int, span types.Span, message string) {
+	if !p.diagConfig.ShouldReport(code, mib.Severity(severity)) {
+		return
+	}
+	p.diagnostics = append(p.diagnostics, types.Diagnostic{
+		Severity: severity,
+		Code:     code,
+		Span:     span,
+		Message:  message,
+	})
+}
+
+// validateIdentifier checks an identifier for RFC violations and emits diagnostics.
+func (p *Parser) validateIdentifier(name string, span types.Span) {
+	// Check for underscore (RFC violation)
+	if strings.Contains(name, "_") {
+		p.emitDiagnostic("identifier-underscore", types.SeverityStyle, span,
+			fmt.Sprintf("identifier %q contains underscore (RFC violation)", name))
+	}
+
+	// Check for trailing hyphen (RFC violation)
+	if strings.HasSuffix(name, "-") {
+		p.emitDiagnostic("identifier-hyphen-end", types.SeverityError, span,
+			fmt.Sprintf("identifier %q ends with hyphen", name))
+	}
+
+	// Check length limits
+	if len(name) > 64 {
+		p.emitDiagnostic("identifier-length-64", types.SeverityError, span,
+			fmt.Sprintf("identifier %q exceeds 64 character limit (%d chars)", name, len(name)))
+	} else if len(name) > 32 {
+		p.emitDiagnostic("identifier-length-32", types.SeverityWarning, span,
+			fmt.Sprintf("identifier %q exceeds 32 character recommendation (%d chars)", name, len(name)))
+	}
+}
+
+// validateValueReference checks that a value reference starts with lowercase.
+// Per RFC 2578, value references (used in OID assignments) should start with lowercase.
+func (p *Parser) validateValueReference(name string, span types.Span) {
+	if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
+		p.emitDiagnostic("bad-identifier-case", types.SeverityError, span,
+			fmt.Sprintf("%q should start with a lowercase letter", name))
+	}
+}
+
+// isValueRefToken returns true if the token kind can be used as a value reference.
+// This includes both lowercase (RFC-compliant) and uppercase (common vendor violation) identifiers.
+func isValueRefToken(kind lexer.TokenKind) bool {
+	return kind == lexer.TokLowercaseIdent || kind == lexer.TokUppercaseIdent
 }
 
 // ParseModule parses a complete module.
@@ -184,6 +231,15 @@ func (p *Parser) makeIdent(token lexer.Token) ast.Ident {
 	return ast.NewIdent(p.text(token.Span), token.Span)
 }
 
+// makeIdentWithValidation creates an Ident and validates it for RFC compliance.
+// Use this for definition names (module name, OBJECT-TYPE name, etc.) but not
+// for type references or other identifiers where validation is not appropriate.
+func (p *Parser) makeIdentWithValidation(token lexer.Token) ast.Ident {
+	name := p.text(token.Span)
+	p.validateIdentifier(name, token.Span)
+	return ast.NewIdent(name, token.Span)
+}
+
 func (p *Parser) makeError(message string) types.Diagnostic {
 	return types.Diagnostic{
 		Severity: types.SeverityError,
@@ -229,7 +285,7 @@ func (p *Parser) parseModuleHeader() (ast.Ident, ast.DefinitionsKind, *types.Dia
 	if err != nil {
 		return ast.Ident{}, ast.DefinitionsKindDefinitions, err
 	}
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	// Skip obsolete module OID: { iso org(3) dod(6) ... }
 	if p.check(lexer.TokLBrace) {
@@ -284,6 +340,14 @@ func (p *Parser) parseModuleHeader() (ast.Ident, ast.DefinitionsKind, *types.Dia
 func (p *Parser) expectIdentifier() (lexer.Token, *types.Diagnostic) {
 	if p.check(lexer.TokUppercaseIdent) || p.check(lexer.TokLowercaseIdent) {
 		return p.advance(), nil
+	}
+	// Accept forbidden keywords as identifiers (for lenient parsing) but emit diagnostic
+	if p.check(lexer.TokForbiddenKeyword) {
+		token := p.advance()
+		name := p.text(token.Span)
+		p.emitDiagnostic("keyword-reserved", types.SeveritySevere, token.Span,
+			fmt.Sprintf("identifier %q is a reserved ASN.1 keyword", name))
+		return token, nil
 	}
 	diag := p.makeError("expected identifier")
 	return lexer.Token{}, &diag
@@ -392,7 +456,8 @@ func (p *Parser) parseDefinition() (ast.Definition, *types.Diagnostic) {
 
 	switch {
 	// Value assignment: name OBJECT IDENTIFIER ::=
-	case first == lexer.TokLowercaseIdent && second == lexer.TokKwObject && p.peekNth(2).Kind == lexer.TokKwIdentifier:
+	// Accept both lowercase (RFC-compliant) and uppercase (vendor violation) identifiers
+	case isValueRefToken(first) && second == lexer.TokKwObject && p.peekNth(2).Kind == lexer.TokKwIdentifier:
 		return p.parseValueAssignment()
 
 	// OBJECT-TYPE
@@ -466,7 +531,10 @@ func (p *Parser) parseValueAssignment() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
+
+	// Value references should start with lowercase per RFC 2578
+	p.validateValueReference(name.Name, nameToken.Span)
 
 	if _, err := p.expect(lexer.TokKwObject); err != nil {
 		return nil, err
@@ -591,7 +659,7 @@ func (p *Parser) parseObjectType() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokKwObjectType); err != nil {
 		return nil, err
@@ -1333,7 +1401,8 @@ func (p *Parser) parseDefValClause() (ast.DefValClause, *types.Diagnostic) {
 func (p *Parser) parseDefValContent() (ast.DefValContent, *types.Diagnostic) {
 	contentStart := p.currentSpan().Start
 
-	switch p.peek().Kind {
+	kind := p.peek().Kind
+	switch kind {
 	case lexer.TokNegativeNumber, lexer.TokNumber:
 		return p.parseDefValNumber(), nil
 	case lexer.TokQuotedString:
@@ -1349,6 +1418,12 @@ func (p *Parser) parseDefValContent() (ast.DefValContent, *types.Diagnostic) {
 	case lexer.TokLBrace:
 		return p.parseDefValBracedContent()
 	default:
+		// Keywords can be valid enum labels in DEFVAL (e.g., mandatory, optional, true, false)
+		if kind.IsKeyword() {
+			token := p.advance()
+			ident := p.makeIdent(token)
+			return &ast.DefValContentIdentifier{Name: ident}, nil
+		}
 		return p.parseDefValSkipUnknown(contentStart), nil
 	}
 }
@@ -1412,12 +1487,17 @@ func (p *Parser) parseDefValBracedContent() (ast.DefValContent, *types.Diagnosti
 		return &ast.DefValContentBits{Labels: nil, Span: span}, nil
 	}
 
-	switch p.peek().Kind {
+	kind := p.peek().Kind
+	switch kind {
 	case lexer.TokLowercaseIdent, lexer.TokUppercaseIdent:
 		return p.parseDefValBracedIdent(innerStart)
 	case lexer.TokNumber:
 		return p.parseDefValOidNumeric(innerStart)
 	default:
+		// Keywords can be valid BITS labels (e.g., mandatory, optional)
+		if kind.IsKeyword() {
+			return p.parseDefValBracedIdent(innerStart)
+		}
 		return p.parseDefValSkipBraced(innerStart)
 	}
 }
@@ -1438,7 +1518,9 @@ func (p *Parser) parseDefValBitsLabels(first ast.Ident, innerStart types.ByteOff
 	labels := []ast.Ident{first}
 	for p.check(lexer.TokComma) {
 		p.advance()
-		if p.check(lexer.TokLowercaseIdent) || p.check(lexer.TokUppercaseIdent) {
+		kind := p.peek().Kind
+		// Accept identifiers or keywords as BITS labels
+		if kind == lexer.TokLowercaseIdent || kind == lexer.TokUppercaseIdent || kind.IsKeyword() {
 			token := p.advance()
 			labels = append(labels, ast.NewIdent(p.text(token.Span), token.Span))
 		}
@@ -1609,7 +1691,7 @@ func (p *Parser) parseModuleIdentity() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokKwModuleIdentity); err != nil {
 		return nil, err
@@ -1702,7 +1784,7 @@ func (p *Parser) parseObjectIdentity() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokKwObjectIdentity); err != nil {
 		return nil, err
@@ -1759,7 +1841,7 @@ func (p *Parser) parseNotificationType() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokKwNotificationType); err != nil {
 		return nil, err
@@ -1834,7 +1916,7 @@ func (p *Parser) parseTrapType() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokKwTrapType); err != nil {
 		return nil, err
@@ -1916,7 +1998,7 @@ func (p *Parser) parseTextualConvention() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokKwTextualConvention); err != nil {
 		return nil, err
@@ -1985,7 +2067,7 @@ func (p *Parser) parseTextualConventionWithAssignment() (ast.Definition, *types.
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokColonColonEqual); err != nil {
 		return nil, err
@@ -2057,7 +2139,7 @@ func (p *Parser) parseTypeAssignment() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokColonColonEqual); err != nil {
 		return nil, err
@@ -2081,7 +2163,7 @@ func (p *Parser) parseObjectGroup() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokKwObjectGroup); err != nil {
 		return nil, err
@@ -2154,7 +2236,7 @@ func (p *Parser) parseNotificationGroup() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokKwNotificationGroup); err != nil {
 		return nil, err
@@ -2227,7 +2309,7 @@ func (p *Parser) parseModuleCompliance() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokKwModuleCompliance); err != nil {
 		return nil, err
@@ -2468,7 +2550,7 @@ func (p *Parser) parseAgentCapabilities() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
 
 	nameToken := p.advance()
-	name := p.makeIdent(nameToken)
+	name := p.makeIdentWithValidation(nameToken)
 
 	if _, err := p.expect(lexer.TokKwAgentCapabilities); err != nil {
 		return nil, err

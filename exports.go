@@ -126,6 +126,8 @@ const (
 	StatusCurrent    = mib.StatusCurrent
 	StatusDeprecated = mib.StatusDeprecated
 	StatusObsolete   = mib.StatusObsolete
+	StatusMandatory  = mib.StatusMandatory
+	StatusOptional   = mib.StatusOptional
 )
 
 // Language constants.
@@ -176,9 +178,9 @@ type DiagnosticConfig = mib.DiagnosticConfig
 
 // Config constructors.
 var (
-	DefaultConfig     = mib.DefaultConfig
-	StrictConfig      = mib.StrictConfig
-	PermissiveConfig  = mib.PermissiveConfig
+	DefaultConfig    = mib.DefaultConfig
+	StrictConfig     = mib.StrictConfig
+	PermissiveConfig = mib.PermissiveConfig
 )
 
 // ParseOID parses an OID from a dotted string (e.g., "1.3.6.1.2.1").

@@ -5,11 +5,12 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/ast"
 	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 func TestParseEmptyModule(t *testing.T) {
 	source := []byte("TEST-MIB DEFINITIONS ::= BEGIN END")
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name")
@@ -23,7 +24,7 @@ func TestParseModuleWithImports(t *testing.T) {
 			MODULE-IDENTITY, OBJECT-TYPE FROM SNMPv2-SMI
 			DisplayString FROM SNMPv2-TC;
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name")
@@ -37,7 +38,7 @@ func TestParseValueAssignment(t *testing.T) {
 	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
 		testObject OBJECT IDENTIFIER ::= { iso 3 }
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -56,7 +57,7 @@ func TestParseSimpleObjectType(t *testing.T) {
 			DESCRIPTION "Test description"
 			::= { testEntry 1 }
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -79,7 +80,7 @@ func TestParseIntegerEnum(t *testing.T) {
 			DESCRIPTION "Test status"
 			::= { test 1 }
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -101,7 +102,7 @@ func TestParseModuleIdentity(t *testing.T) {
 			DESCRIPTION "Test MIB"
 			::= { enterprises 1 }
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -120,7 +121,7 @@ func TestParseTextualConvention(t *testing.T) {
 			DESCRIPTION "Test string type"
 			SYNTAX OCTET STRING (SIZE (0..255))
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -144,7 +145,7 @@ func TestParseObjectGroup(t *testing.T) {
 			DESCRIPTION "Test group"
 			::= { testConformance 1 }
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -161,7 +162,7 @@ func TestParseTypeAssignment(t *testing.T) {
 			testName DisplayString
 		}
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -183,7 +184,7 @@ func TestParseDefVal(t *testing.T) {
 			DEFVAL { 42 }
 			::= { test 1 }
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -205,7 +206,7 @@ func TestParseIndex(t *testing.T) {
 			INDEX { testIndex, IMPLIED testName }
 			::= { testTable 1 }
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -235,7 +236,7 @@ func TestParseErrorRecovery(t *testing.T) {
 			DESCRIPTION "Good"
 			::= { test 2 }
 		END`)
-	p := New(source, nil)
+	p := New(source, nil, mib.PermissiveConfig())
 	module := p.ParseModule()
 
 	// Should have some diagnostics from the error
@@ -243,4 +244,88 @@ func TestParseErrorRecovery(t *testing.T) {
 
 	// Should have recovered and parsed the second definition
 	testutil.Greater(t, len(module.Body), 0, "expected at least one definition after recovery")
+}
+
+// === Strictness Tests ===
+
+func TestIdentifierUnderscoreDiagnostic(t *testing.T) {
+	source := []byte(`TEST_MIB DEFINITIONS ::= BEGIN
+		test_object OBJECT IDENTIFIER ::= { iso 3 }
+		END`)
+	p := New(source, nil, mib.StrictConfig())
+	module := p.ParseModule()
+
+	// Should have diagnostics for underscores in both module name and object name
+	var underscoreDiags int
+	for _, d := range module.Diagnostics {
+		if d.Code == "identifier-underscore" {
+			underscoreDiags++
+		}
+	}
+	testutil.Equal(t, 2, underscoreDiags, "expected 2 identifier-underscore diagnostics")
+}
+
+func TestIdentifierUnderscorePermissive(t *testing.T) {
+	source := []byte(`TEST_MIB DEFINITIONS ::= BEGIN
+		test_object OBJECT IDENTIFIER ::= { iso 3 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	// In permissive mode, underscore diagnostics should be suppressed
+	var underscoreDiags int
+	for _, d := range module.Diagnostics {
+		if d.Code == "identifier-underscore" {
+			underscoreDiags++
+		}
+	}
+	testutil.Equal(t, 0, underscoreDiags, "expected no identifier-underscore diagnostics in permissive mode")
+}
+
+func TestIdentifierLengthDiagnostic(t *testing.T) {
+	// Create an identifier that exceeds 64 characters
+	longName := "thisIsAReallyLongIdentifierNameThatExceedsSixtyFourCharactersTotal"
+	source := []byte(longName + ` DEFINITIONS ::= BEGIN END`)
+	p := New(source, nil, mib.StrictConfig())
+	module := p.ParseModule()
+
+	// Should have diagnostic for identifier exceeding 64 chars
+	var lengthDiags int
+	for _, d := range module.Diagnostics {
+		if d.Code == "identifier-length-64" {
+			lengthDiags++
+		}
+	}
+	testutil.Equal(t, 1, lengthDiags, "expected identifier-length-64 diagnostic")
+}
+
+func TestIdentifierHyphenEndDiagnostic(t *testing.T) {
+	source := []byte(`TEST-MIB- DEFINITIONS ::= BEGIN END`)
+	p := New(source, nil, mib.StrictConfig())
+	module := p.ParseModule()
+
+	// Should have diagnostic for identifier ending with hyphen
+	var hyphenDiags int
+	for _, d := range module.Diagnostics {
+		if d.Code == "identifier-hyphen-end" {
+			hyphenDiags++
+		}
+	}
+	testutil.Equal(t, 1, hyphenDiags, "expected identifier-hyphen-end diagnostic")
+}
+
+func TestReservedKeywordDiagnostic(t *testing.T) {
+	// "BOOLEAN" is a reserved ASN.1 keyword
+	source := []byte(`BOOLEAN DEFINITIONS ::= BEGIN END`)
+	p := New(source, nil, mib.StrictConfig())
+	module := p.ParseModule()
+
+	// Should have diagnostic for reserved keyword
+	var keywordDiags int
+	for _, d := range module.Diagnostics {
+		if d.Code == "keyword-reserved" {
+			keywordDiags++
+		}
+	}
+	testutil.Equal(t, 1, keywordDiags, "expected keyword-reserved diagnostic")
 }
