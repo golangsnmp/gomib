@@ -3,6 +3,7 @@ package resolver
 import (
 	"log/slog"
 
+	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
@@ -29,56 +30,159 @@ var smiGlobalOidRoots = map[string]struct{}{
 
 func resolveOids(ctx *ResolverContext) {
 	defs := collectOidDefinitions(ctx)
-	pending := defs.oidDefs
-	maxIterations := 20
 
-	for iter := 0; iter < maxIterations && len(pending) > 0; iter++ {
-		initial := len(pending)
-		var still []oidDefinition
-		for _, def := range pending {
-			if !isFirstComponentResolvable(ctx, def) {
-				still = append(still, def)
-				continue
-			}
-			if !resolveOidDefinition(ctx, def) {
-				still = append(still, def)
-			}
-		}
+	// Build dependency graph for OID definitions
+	g := graph.New()
+	defIndex := make(map[graph.Symbol]oidDefinition)
 
-		if ctx.TraceEnabled() {
-			resolved := initial - len(still)
-			ctx.Trace("OID resolution pass",
-				slog.Int("iteration", iter+1),
-				slog.Int("resolved", resolved),
-				slog.Int("still_pending", len(still)))
-		}
+	for _, def := range defs.oidDefs {
+		sym := graph.Symbol{Module: def.mod.Name, Name: def.defName()}
+		g.AddNode(sym, graph.NodeKindOID)
+		defIndex[sym] = def
 
-		if len(still) == initial {
-			for _, def := range still {
-				oid := def.oid()
-				if oid == nil || len(oid.Components) == 0 {
-					continue
-				}
-				defName := def.defName()
-				span := oid.Span
-				first := oid.Components[0]
-				switch c := first.(type) {
-				case *module.OidComponentName:
-					ctx.RecordUnresolvedOid(def.mod, defName, c.NameValue, span)
-				case *module.OidComponentNamedNumber:
-					ctx.RecordUnresolvedOid(def.mod, defName, c.NameValue, span)
-				case *module.OidComponentQualifiedName:
-					ctx.RecordUnresolvedOid(def.mod, defName, c.ModuleValue+"."+c.NameValue, span)
-				case *module.OidComponentQualifiedNamedNumber:
-					ctx.RecordUnresolvedOid(def.mod, defName, c.ModuleValue+"."+c.NameValue, span)
-				}
-			}
-			break
+		// Add edge to the parent OID (first component dependency)
+		if parentSym, ok := getOidParentSymbol(ctx, def); ok {
+			g.AddEdge(sym, parentSym)
 		}
-		pending = still
+	}
+
+	// Check for cycles
+	cycles := g.FindCycles()
+	if len(cycles) > 0 && ctx.TraceEnabled() {
+		for _, cycle := range cycles {
+			names := make([]string, len(cycle))
+			for i, s := range cycle {
+				names[i] = s.Module + "::" + s.Name
+			}
+			ctx.Trace("OID cycle detected", slog.Any("cycle", names))
+		}
+	}
+
+	// Get resolution order (dependencies first)
+	order, cyclic := g.ResolutionOrder()
+
+	if ctx.TraceEnabled() {
+		ctx.Trace("OID resolution order",
+			slog.Int("total", len(order)),
+			slog.Int("cyclic", len(cyclic)))
+	}
+
+	// Resolve OIDs in topological order
+	resolved := 0
+	for _, sym := range order {
+		def, ok := defIndex[sym]
+		if !ok {
+			continue
+		}
+		if resolveOidDefinition(ctx, def) {
+			resolved++
+		}
+	}
+
+	// Handle cyclic OIDs - record as unresolved
+	for _, sym := range cyclic {
+		def, ok := defIndex[sym]
+		if !ok {
+			continue
+		}
+		oid := def.oid()
+		if oid == nil || len(oid.Components) == 0 {
+			continue
+		}
+		recordUnresolvedFirstComponent(ctx, def, oid)
+	}
+
+	if ctx.TraceEnabled() {
+		ctx.Trace("OID resolution complete",
+			slog.Int("resolved", resolved),
+			slog.Int("unresolved", len(cyclic)))
 	}
 
 	resolveTrapTypeDefinitions(ctx, defs.trapDefs)
+}
+
+// getOidParentSymbol returns the symbol that the first component of the OID references.
+func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, bool) {
+	oid := def.oid()
+	if oid == nil || len(oid.Components) == 0 {
+		return graph.Symbol{}, false
+	}
+
+	first := oid.Components[0]
+	switch c := first.(type) {
+	case *module.OidComponentName:
+		// Check if this is a well-known root (no dependency)
+		if wellKnownRootArc(c.NameValue) >= 0 {
+			return graph.Symbol{}, false
+		}
+		// Find which module defines this symbol
+		if parentMod := findOidDefiningModule(ctx, def.mod, c.NameValue); parentMod != "" {
+			return graph.Symbol{Module: parentMod, Name: c.NameValue}, true
+		}
+		// Check SMI global roots as fallback (defined in SNMPv2-SMI or RFC1155-SMI)
+		if _, ok := smiGlobalOidRoots[c.NameValue]; ok {
+			// Return dependency on SNMPv2-SMI's definition
+			return graph.Symbol{Module: "SNMPv2-SMI", Name: c.NameValue}, true
+		}
+	case *module.OidComponentNumber:
+		return graph.Symbol{}, false // Numeric roots have no dependency
+	case *module.OidComponentNamedNumber:
+		if wellKnownRootArc(c.NameValue) >= 0 {
+			return graph.Symbol{}, false
+		}
+		if parentMod := findOidDefiningModule(ctx, def.mod, c.NameValue); parentMod != "" {
+			return graph.Symbol{Module: parentMod, Name: c.NameValue}, true
+		}
+		// Check SMI global roots as fallback
+		if _, ok := smiGlobalOidRoots[c.NameValue]; ok {
+			return graph.Symbol{Module: "SNMPv2-SMI", Name: c.NameValue}, true
+		}
+		// Has a number, so can be resolved without the name
+		return graph.Symbol{}, false
+	case *module.OidComponentQualifiedName:
+		return graph.Symbol{Module: c.ModuleValue, Name: c.NameValue}, true
+	case *module.OidComponentQualifiedNamedNumber:
+		return graph.Symbol{Module: c.ModuleValue, Name: c.NameValue}, true
+	}
+
+	return graph.Symbol{}, false
+}
+
+// findOidDefiningModule finds the module that defines an OID symbol.
+func findOidDefiningModule(ctx *ResolverContext, fromMod *module.Module, name string) string {
+	// Check if defined in the current module
+	for _, def := range fromMod.Definitions {
+		if def.DefinitionName() == name && def.DefinitionOid() != nil {
+			return fromMod.Name
+		}
+	}
+
+	// Check imports
+	if imports := ctx.ModuleImports[fromMod]; imports != nil {
+		if srcMod := imports[name]; srcMod != nil {
+			return srcMod.Name
+		}
+	}
+
+	return ""
+}
+
+// recordUnresolvedFirstComponent records an unresolved OID based on its first component.
+func recordUnresolvedFirstComponent(ctx *ResolverContext, def oidDefinition, oid *module.OidAssignment) {
+	defName := def.defName()
+	span := oid.Span
+	first := oid.Components[0]
+
+	switch c := first.(type) {
+	case *module.OidComponentName:
+		ctx.RecordUnresolvedOid(def.mod, defName, c.NameValue, span)
+	case *module.OidComponentNamedNumber:
+		ctx.RecordUnresolvedOid(def.mod, defName, c.NameValue, span)
+	case *module.OidComponentQualifiedName:
+		ctx.RecordUnresolvedOid(def.mod, defName, c.ModuleValue+"."+c.NameValue, span)
+	case *module.OidComponentQualifiedNamedNumber:
+		ctx.RecordUnresolvedOid(def.mod, defName, c.ModuleValue+"."+c.NameValue, span)
+	}
 }
 
 type oidDefinition struct {
@@ -172,48 +276,6 @@ func collectOidDefinitions(ctx *ResolverContext) collectedOidDefinitions {
 	}
 
 	return defs
-}
-
-func isFirstComponentResolvable(ctx *ResolverContext, def oidDefinition) bool {
-	oid := def.oid()
-	if oid == nil || len(oid.Components) == 0 {
-		return false
-	}
-	first := oid.Components[0]
-	switch c := first.(type) {
-	case *module.OidComponentName:
-		if _, ok := ctx.LookupNodeForModule(def.mod, c.NameValue); ok {
-			return true
-		}
-		if wellKnownRootArc(c.NameValue) >= 0 {
-			return true
-		}
-		if _, ok := lookupSmiGlobalOidRoot(ctx, c.NameValue); ok {
-			return true
-		}
-		return false
-	case *module.OidComponentNumber:
-		return true
-	case *module.OidComponentNamedNumber:
-		if _, ok := ctx.LookupNodeForModule(def.mod, c.NameValue); ok {
-			return true
-		}
-		if wellKnownRootArc(c.NameValue) >= 0 {
-			return true
-		}
-		if _, ok := lookupSmiGlobalOidRoot(ctx, c.NameValue); ok {
-			return true
-		}
-		return true // Has a number, can resolve via that
-	case *module.OidComponentQualifiedName:
-		_, ok := ctx.LookupNodeInModule(c.ModuleValue, c.NameValue)
-		return ok
-	case *module.OidComponentQualifiedNamedNumber:
-		_, ok := ctx.LookupNodeInModule(c.ModuleValue, c.NameValue)
-		return ok
-	default:
-		return false
-	}
 }
 
 func resolveOidDefinition(ctx *ResolverContext, def oidDefinition) bool {

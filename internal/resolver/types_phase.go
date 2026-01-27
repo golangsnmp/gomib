@@ -3,6 +3,7 @@ package resolver
 import (
 	"log/slog"
 
+	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/mib"
@@ -108,70 +109,138 @@ type typeResolutionEntry struct {
 }
 
 func resolveTypeBases(ctx *ResolverContext) {
-	resolveTypeRefParentsMultipass(ctx)
+	resolveTypeRefParentsGraph(ctx)
 	linkPrimitiveSyntaxParents(ctx)
 	linkRFC1213TypesToTCs(ctx)
 	inheritBaseTypes(ctx)
 }
 
-func resolveTypeRefParentsMultipass(ctx *ResolverContext) {
-	var pending []typeResolutionEntry
+// resolveTypeRefParentsGraph uses a dependency graph to resolve type parents
+// in topological order (single pass).
+func resolveTypeRefParentsGraph(ctx *ResolverContext) {
+	// Build index of type entries and dependency graph
+	entries := make(map[graph.Symbol]typeResolutionEntry)
+	g := graph.New()
+
 	for _, mod := range ctx.Modules {
 		for _, def := range mod.Definitions {
 			td, ok := def.(*module.TypeDef)
 			if !ok {
 				continue
 			}
-			if hasTypeRefSyntax(td.Syntax) {
-				if typ, ok := ctx.LookupTypeForModule(mod, td.Name); ok {
-					pending = append(pending, typeResolutionEntry{mod: mod, td: td, typ: typ})
+			typ, ok := ctx.LookupTypeForModule(mod, td.Name)
+			if !ok {
+				continue
+			}
+
+			sym := graph.Symbol{Module: mod.Name, Name: td.Name}
+			g.AddNode(sym, graph.NodeKindType)
+			entries[sym] = typeResolutionEntry{mod: mod, td: td, typ: typ}
+
+			// Add edge to parent type if this is a type reference
+			if baseName := getTypeRefBaseName(td.Syntax); baseName != "" {
+				// Find which module defines the parent type
+				parentMod := findTypeDefiningModule(ctx, mod, baseName)
+				if parentMod != "" {
+					parentSym := graph.Symbol{Module: parentMod, Name: baseName}
+					g.AddEdge(sym, parentSym)
 				}
 			}
 		}
 	}
 
-	maxIterations := 20
-	for iter := 0; iter < maxIterations && len(pending) > 0; iter++ {
-		initial := len(pending)
-		var still []typeResolutionEntry
-		for _, entry := range pending {
-			if !tryResolveTypeParent(ctx, entry) {
-				still = append(still, entry)
+	// Check for cycles
+	cycles := g.FindCycles()
+	if len(cycles) > 0 && ctx.TraceEnabled() {
+		for _, cycle := range cycles {
+			names := make([]string, len(cycle))
+			for i, s := range cycle {
+				names[i] = s.Module + "::" + s.Name
 			}
+			ctx.Trace("type cycle detected", slog.Any("cycle", names))
 		}
+	}
 
-		if ctx.TraceEnabled() {
-			resolved := initial - len(still)
-			ctx.Trace("type resolution pass",
-				slog.Int("iteration", iter+1),
-				slog.Int("resolved", resolved),
-				slog.Int("still_pending", len(still)))
-		}
+	// Get resolution order (dependencies first)
+	order, cyclic := g.ResolutionOrder()
 
-		if len(still) == initial {
-			for _, entry := range still {
-				baseName := getTypeRefBaseName(entry.td.Syntax)
-				if baseName == "" {
-					continue
-				}
-				ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Span)
-			}
-			break
+	if ctx.TraceEnabled() {
+		ctx.Trace("type resolution order",
+			slog.Int("total", len(order)),
+			slog.Int("cyclic", len(cyclic)))
+	}
+
+	// Resolve types in topological order
+	resolved := 0
+	for _, sym := range order {
+		entry, ok := entries[sym]
+		if !ok {
+			continue // External dependency (primitive or from another module)
 		}
-		pending = still
+		if resolveTypeParent(ctx, entry) {
+			resolved++
+		}
+	}
+
+	// Handle cyclic types - record as unresolved
+	for _, sym := range cyclic {
+		entry, ok := entries[sym]
+		if !ok {
+			continue
+		}
+		baseName := getTypeRefBaseName(entry.td.Syntax)
+		if baseName != "" {
+			ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Span)
+		}
+	}
+
+	if ctx.TraceEnabled() {
+		ctx.Trace("type resolution complete",
+			slog.Int("resolved", resolved),
+			slog.Int("unresolved", len(cyclic)))
 	}
 }
 
-func hasTypeRefSyntax(syntax module.TypeSyntax) bool {
-	switch s := syntax.(type) {
-	case *module.TypeSyntaxTypeRef:
-		return true
-	case *module.TypeSyntaxConstrained:
-		_, ok := s.Base.(*module.TypeSyntaxTypeRef)
-		return ok
-	default:
+// findTypeDefiningModule finds the module that defines a type, following imports.
+func findTypeDefiningModule(ctx *ResolverContext, fromMod *module.Module, typeName string) string {
+	// Check if defined in the current module
+	for _, def := range fromMod.Definitions {
+		if td, ok := def.(*module.TypeDef); ok && td.Name == typeName {
+			return fromMod.Name
+		}
+	}
+
+	// Check imports
+	if imports := ctx.ModuleImports[fromMod]; imports != nil {
+		if srcMod := imports[typeName]; srcMod != nil {
+			return srcMod.Name
+		}
+	}
+
+	// Check if it's a primitive in SNMPv2-SMI
+	if ctx.Snmpv2SMIModule != nil {
+		if isASN1Primitive(typeName) || isSmiGlobalType(typeName) {
+			return ctx.Snmpv2SMIModule.Name
+		}
+	}
+
+	return ""
+}
+
+// resolveTypeParent resolves the parent of a single type.
+func resolveTypeParent(ctx *ResolverContext, entry typeResolutionEntry) bool {
+	baseName := getTypeRefBaseName(entry.td.Syntax)
+	if baseName == "" {
 		return false
 	}
+
+	parent, ok := ctx.LookupTypeForModule(entry.mod, baseName)
+	if !ok {
+		return false
+	}
+
+	entry.typ.SetParent(parent)
+	return true
 }
 
 func getTypeRefBaseName(syntax module.TypeSyntax) string {
@@ -184,43 +253,6 @@ func getTypeRefBaseName(syntax module.TypeSyntax) string {
 		}
 	}
 	return ""
-}
-
-func tryResolveTypeParent(ctx *ResolverContext, entry typeResolutionEntry) bool {
-	baseName := getTypeRefBaseName(entry.td.Syntax)
-	if baseName == "" {
-		return false
-	}
-
-	parent, ok := ctx.LookupTypeForModule(entry.mod, baseName)
-	if !ok {
-		return false
-	}
-
-	// Check if parent is ready (has its own parent resolved if needed)
-	// Parent is ready if:
-	// 1. It has a resolved parent (type chain complete), OR
-	// 2. It has a known base type (built-in/primitive), OR
-	// 3. Its definition has no type reference syntax (terminal type)
-	parentReady := parent.InternalParent() != nil ||
-		parent.Base() != 0 ||
-		!hasTypeRefSyntax(findTypeDef(ctx, entry.mod, baseName))
-
-	if parentReady {
-		entry.typ.SetParent(parent)
-		return true
-	}
-
-	return false
-}
-
-func findTypeDef(ctx *ResolverContext, mod *module.Module, name string) module.TypeSyntax {
-	for _, def := range mod.Definitions {
-		if td, ok := def.(*module.TypeDef); ok && td.Name == name {
-			return td.Syntax
-		}
-	}
-	return nil
 }
 
 func getPrimitiveParentName(syntax module.TypeSyntax) string {
