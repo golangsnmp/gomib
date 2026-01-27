@@ -72,3 +72,18 @@ func (s Span) IsEmpty() bool {
 func (s Span) IsSynthetic() bool {
 	return s.Start == 0 && s.End == 0
 }
+
+// Severity is a diagnostic severity level (internal use during parsing).
+type Severity int
+
+const (
+	SeverityError Severity = iota
+	SeverityWarning
+)
+
+// Diagnostic is a message from the lexer or parser (internal use).
+type Diagnostic struct {
+	Severity Severity
+	Span     Span
+	Message  string
+}
