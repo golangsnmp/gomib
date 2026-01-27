@@ -63,23 +63,27 @@ func resolveImportsFromModule(ctx *ResolverContext, importingModule *module.Modu
 		return
 	}
 
-	if aliased := baseModuleImportAlias(fromModuleName); aliased != "" {
-		aliasCandidates := ctx.ModuleIndex[aliased]
-		if chosen, ok := findCandidateWithAllSymbols(ctx, aliasCandidates, userSymbols); ok {
-			if ctx.TraceEnabled() {
-				ctx.Trace("imports resolved via alias",
-					slog.String("from", fromModuleName),
-					slog.String("alias", aliased),
-					slog.Int("symbols", len(userSymbols)))
+	// Safe fallback: module import aliases (normal and above)
+	if ctx.DiagnosticConfig().AllowSafeFallbacks() {
+		if aliased := baseModuleImportAlias(fromModuleName); aliased != "" {
+			aliasCandidates := ctx.ModuleIndex[aliased]
+			if chosen, ok := findCandidateWithAllSymbols(ctx, aliasCandidates, userSymbols); ok {
+				if ctx.TraceEnabled() {
+					ctx.Trace("imports resolved via alias",
+						slog.String("from", fromModuleName),
+						slog.String("alias", aliased),
+						slog.Int("symbols", len(userSymbols)))
+				}
+				for _, sym := range userSymbols {
+					ctx.RegisterImport(importingModule, sym.name, chosen)
+				}
+				return
 			}
-			for _, sym := range userSymbols {
-				ctx.RegisterImport(importingModule, sym.name, chosen)
-			}
-			return
 		}
 	}
 
-	if len(candidates) > 0 {
+	// Safe fallback: import forwarding (normal and above)
+	if ctx.DiagnosticConfig().AllowSafeFallbacks() && len(candidates) > 0 {
 		if forwarded := tryImportForwarding(ctx, candidates, userSymbols); len(forwarded) > 0 {
 			if ctx.TraceEnabled() {
 				ctx.Trace("imports resolved via forwarding",
@@ -93,9 +97,10 @@ func resolveImportsFromModule(ctx *ResolverContext, importingModule *module.Modu
 		}
 	}
 
-	// Try partial resolution - resolve symbols that are found, record unresolved for others.
+	// Safe fallback: partial resolution (normal and above)
+	// Resolve symbols that are found, record unresolved for others.
 	// This handles real-world MIBs that import from the "wrong" module.
-	if len(candidates) > 0 {
+	if ctx.DiagnosticConfig().AllowSafeFallbacks() && len(candidates) > 0 {
 		resolved, unresolved := tryPartialResolution(ctx, candidates, userSymbols)
 		for _, res := range resolved {
 			ctx.RegisterImport(importingModule, res.symbol, res.source)

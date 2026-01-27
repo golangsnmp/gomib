@@ -302,8 +302,9 @@ func createResolvedNotifications(ctx *ResolverContext) {
 
 			// Try module-scoped lookup first
 			objNode, ok = ctx.LookupNodeForModule(ref.mod, objName)
-			if !ok {
-				// Fall back to global lookup for objects not explicitly imported
+
+			// Permissive only: global lookup for objects not explicitly imported
+			if !ok && ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
 				objNode, ok = ctx.LookupNodeGlobal(objName)
 			}
 

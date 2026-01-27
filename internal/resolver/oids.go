@@ -119,10 +119,11 @@ func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, 
 		if parentMod := findOidDefiningModule(ctx, def.mod, c.NameValue); parentMod != "" {
 			return graph.Symbol{Module: parentMod, Name: c.NameValue}, true
 		}
-		// Check SMI global roots as fallback (defined in SNMPv2-SMI or RFC1155-SMI)
-		if _, ok := smiGlobalOidRoots[c.NameValue]; ok {
-			// Return dependency on SNMPv2-SMI's definition
-			return graph.Symbol{Module: "SNMPv2-SMI", Name: c.NameValue}, true
+		// Permissive only: SMI global roots as fallback
+		if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+			if _, ok := smiGlobalOidRoots[c.NameValue]; ok {
+				return graph.Symbol{Module: "SNMPv2-SMI", Name: c.NameValue}, true
+			}
 		}
 	case *module.OidComponentNumber:
 		return graph.Symbol{}, false // Numeric roots have no dependency
@@ -133,9 +134,11 @@ func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, 
 		if parentMod := findOidDefiningModule(ctx, def.mod, c.NameValue); parentMod != "" {
 			return graph.Symbol{Module: parentMod, Name: c.NameValue}, true
 		}
-		// Check SMI global roots as fallback
-		if _, ok := smiGlobalOidRoots[c.NameValue]; ok {
-			return graph.Symbol{Module: "SNMPv2-SMI", Name: c.NameValue}, true
+		// Permissive only: SMI global roots as fallback
+		if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+			if _, ok := smiGlobalOidRoots[c.NameValue]; ok {
+				return graph.Symbol{Module: "SNMPv2-SMI", Name: c.NameValue}, true
+			}
 		}
 		// Has a number, so can be resolved without the name
 		return graph.Symbol{}, false
@@ -328,11 +331,15 @@ func resolveNameComponent(ctx *ResolverContext, def oidDefinition, name string, 
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
 		return node, true
 	}
+	// RFC-compliant: well-known roots (iso, ccitt, joint-iso-ccitt)
 	if node, ok := lookupOrCreateWellKnownRoot(ctx, name); ok {
 		return node, true
 	}
-	if node, ok := lookupSmiGlobalOidRoot(ctx, name); ok {
-		return node, true
+	// Permissive only: SMI global OID roots without explicit import
+	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+		if node, ok := lookupSmiGlobalOidRoot(ctx, name); ok {
+			return node, true
+		}
 	}
 	ctx.RecordUnresolvedOid(def.mod, defName, name, span)
 	return nil, false
@@ -452,7 +459,8 @@ func resolveTrapTypeDefinitions(ctx *ResolverContext, defs []trapTypeRef) {
 		defName := def.defName()
 
 		enterpriseNode, found := ctx.LookupNodeForModule(def.mod, enterprise)
-		if !found {
+		// Permissive only: SMI global OID roots as fallback
+		if !found && ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
 			if node, ok := lookupSmiGlobalOidRoot(ctx, enterprise); ok {
 				enterpriseNode = node
 				found = true

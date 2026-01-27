@@ -162,14 +162,30 @@ func (c *ResolverContext) LookupNodeGlobal(name string) (*mibimpl.Node, bool) {
 }
 
 // LookupType looks up a type by name globally.
+// This is a best-guess fallback only enabled in permissive mode.
 func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
-	// First try SNMPv2-SMI for primitives
+	// RFC-compliant: ASN.1 primitives are always available
+	if isASN1Primitive(name) && c.Snmpv2SMIModule != nil {
+		if symbols := c.ModuleSymbolToType[c.Snmpv2SMIModule]; symbols != nil {
+			if t, ok := symbols[name]; ok {
+				return t, true
+			}
+		}
+	}
+
+	// Permissive only: global type search
+	if !c.diagConfig.AllowBestGuessFallbacks() {
+		return nil, false
+	}
+
+	// Try SNMPv2-SMI for SMI global types
 	if c.Snmpv2SMIModule != nil {
 		if t, ok := c.LookupTypeForModule(c.Snmpv2SMIModule, name); ok {
 			return t, true
 		}
 	}
 
+	// Search all modules
 	for _, symbols := range c.ModuleSymbolToType {
 		if t, ok := symbols[name]; ok {
 			return t, true
@@ -185,9 +201,18 @@ func (c *ResolverContext) LookupTypeForModule(mod *module.Module, name string) (
 		return t, true
 	}
 
-	// ASN.1 primitives and global SMI types (SNMPv2-SMI fallback)
 	if c.Snmpv2SMIModule != nil {
-		if isASN1Primitive(name) || isSmiGlobalType(name) {
+		// RFC-compliant: ASN.1 primitives are always available
+		if isASN1Primitive(name) {
+			if symbols := c.ModuleSymbolToType[c.Snmpv2SMIModule]; symbols != nil {
+				if t, ok := symbols[name]; ok {
+					return t, true
+				}
+			}
+		}
+
+		// Permissive only: SMI global types without explicit import
+		if c.diagConfig.AllowBestGuessFallbacks() && isSmiGlobalType(name) {
 			if symbols := c.ModuleSymbolToType[c.Snmpv2SMIModule]; symbols != nil {
 				if t, ok := symbols[name]; ok {
 					return t, true

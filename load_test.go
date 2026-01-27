@@ -207,3 +207,103 @@ func TestMissingModuleIdentityEmitsDiagnostic(t *testing.T) {
 	}
 	testutil.Equal(t, 1, identityDiags, "expected 1 missing-module-identity diagnostic")
 }
+
+// === Resolution Fallback Tests ===
+
+func TestMissingImportFailsInStrictMode(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+	src := Multi(corpus, violations)
+
+	ctx := context.Background()
+
+	// In strict mode, enterprises without import should fail to resolve
+	mib, err := LoadModules(ctx, []string{"MISSING-IMPORT-TEST-MIB"}, src, WithStrictness(StrictnessStrict))
+	if err != nil {
+		t.Fatalf("LoadModules failed: %v", err)
+	}
+
+	// Should have unresolved OID references
+	unresolved := mib.Unresolved()
+	var oidUnresolved int
+	for _, u := range unresolved {
+		if u.Kind == "oid" {
+			oidUnresolved++
+		}
+	}
+	testutil.Greater(t, oidUnresolved, 0, "strict mode should have unresolved OID references")
+
+	// The test object should not be found since OID resolution failed
+	testObj := mib.FindObject("testObject")
+	testutil.Nil(t, testObj, "testObject should not resolve in strict mode")
+}
+
+func TestMissingImportWorksInPermissiveMode(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+	src := Multi(corpus, violations)
+
+	ctx := context.Background()
+
+	// In permissive mode, enterprises should resolve via global fallback
+	mib, err := LoadModules(ctx, []string{"MISSING-IMPORT-TEST-MIB"}, src, WithStrictness(StrictnessPermissive))
+	if err != nil {
+		t.Fatalf("LoadModules failed: %v", err)
+	}
+
+	// Should have no unresolved OID references for this MIB
+	unresolved := mib.Unresolved()
+	var oidUnresolved int
+	for _, u := range unresolved {
+		if u.Kind == "oid" && u.Module == "MISSING-IMPORT-TEST-MIB" {
+			oidUnresolved++
+		}
+	}
+	testutil.Equal(t, 0, oidUnresolved, "permissive mode should resolve enterprises via fallback")
+
+	// The test object should be found
+	testObj := mib.FindObject("testObject")
+	testutil.NotNil(t, testObj, "testObject should resolve in permissive mode")
+}
+
+func TestMissingImportFailsInNormalMode(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+	src := Multi(corpus, violations)
+
+	ctx := context.Background()
+
+	// In normal mode, best-guess fallbacks are disabled
+	mib, err := LoadModules(ctx, []string{"MISSING-IMPORT-TEST-MIB"}, src, WithStrictness(StrictnessNormal))
+	if err != nil {
+		t.Fatalf("LoadModules failed: %v", err)
+	}
+
+	// Should have unresolved OID references (normal mode doesn't have best-guess fallbacks)
+	unresolved := mib.Unresolved()
+	var oidUnresolved int
+	for _, u := range unresolved {
+		if u.Kind == "oid" && u.Module == "MISSING-IMPORT-TEST-MIB" {
+			oidUnresolved++
+		}
+	}
+	testutil.Greater(t, oidUnresolved, 0, "normal mode should have unresolved OID references")
+}
