@@ -799,7 +799,7 @@ func (p *Parser) parseTypeSyntax() (ast.TypeSyntax, *types.Diagnostic) {
 			}
 		} else {
 			baseSyntax = &ast.TypeSyntaxTypeRef{
-				Name: ast.NewIdent("Integer32", types.NewSpan(start, p.peek().Span.Start)),
+				Name: ast.NewIdent("INTEGER", types.NewSpan(start, p.peek().Span.Start)),
 			}
 		}
 

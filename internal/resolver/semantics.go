@@ -348,8 +348,8 @@ func resolveTypeSyntax(ctx *ResolverContext, syntax module.TypeSyntax, mod *modu
 			ctx.RecordUnresolvedType(mod, objectName, s.Base, span)
 			return nil, false
 		}
-		// Otherwise fall back to Integer32
-		if t, ok := ctx.LookupType("Integer32"); ok {
+		// Otherwise fall back to INTEGER (the ASN.1 primitive, always seeded)
+		if t, ok := ctx.LookupType("INTEGER"); ok {
 			return t, true
 		}
 		return nil, false

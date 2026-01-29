@@ -23,6 +23,7 @@ Commands:
   tables     Table-focused comparison (INDEX, AUGMENTS, columns)
   testgen    Generate Go test cases from net-snmp ground truth
   validate   Validate existing test cases against net-snmp
+  fixturegen Generate JSON fixture files from net-snmp ground truth
 
 Common options:
   -p, --path PATH   Add MIB search path (repeatable)
@@ -110,6 +111,8 @@ func run() int {
 		return cmdTestgen(cmdArgs)
 	case "validate":
 		return cmdValidate(cmdArgs)
+	case "fixturegen":
+		return cmdFixturegen(cmdArgs)
 	case "help":
 		fmt.Fprint(os.Stdout, usage)
 		return 0

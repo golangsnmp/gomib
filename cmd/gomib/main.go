@@ -19,6 +19,7 @@ Usage:
 
 Commands:
   load    Load and resolve MIB modules
+  lint    Check modules for issues (linter mode)
   get     Query OID or name lookups
   dump    Output modules or subtrees as JSON
   trace   Trace symbol resolution for debugging
@@ -101,6 +102,8 @@ func run() int {
 	switch cmd {
 	case "load":
 		return cmdLoad(cmdArgs)
+	case "lint":
+		return cmdLint(cmdArgs)
 	case "get":
 		return cmdGet(cmdArgs)
 	case "dump":
