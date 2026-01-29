@@ -20,13 +20,13 @@ import (
 
 // AcceptResult holds the acceptance test results.
 type AcceptResult struct {
-	TotalModules   int              `json:"total_modules"`
-	BothPass       int              `json:"both_pass"`
-	BothFail       int              `json:"both_fail"`
-	OnlyGomibPass  int              `json:"only_gomib_pass"`
-	OnlyLibsmiPass int              `json:"only_libsmi_pass"`
-	Modules        []ModuleAccept   `json:"modules,omitempty"`
-	Discrepancies  []ModuleAccept   `json:"discrepancies,omitempty"`
+	TotalModules   int            `json:"total_modules"`
+	BothPass       int            `json:"both_pass"`
+	BothFail       int            `json:"both_fail"`
+	OnlyGomibPass  int            `json:"only_gomib_pass"`
+	OnlyLibsmiPass int            `json:"only_libsmi_pass"`
+	Modules        []ModuleAccept `json:"modules,omitempty"`
+	Discrepancies  []ModuleAccept `json:"discrepancies,omitempty"`
 }
 
 // ModuleAccept holds per-module acceptance status.

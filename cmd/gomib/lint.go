@@ -65,18 +65,18 @@ type lintResult struct {
 }
 
 type lintDiagnostic struct {
-	Severity     string `json:"severity"`
-	SeverityNum  int    `json:"severity_num"`
-	Code         string `json:"code"`
-	Message      string `json:"message"`
-	Module       string `json:"module,omitempty"`
-	Line         int    `json:"line,omitempty"`
-	Column       int    `json:"column,omitempty"`
-	RuleID       string `json:"rule_id,omitempty"` // For SARIF
+	Severity    string `json:"severity"`
+	SeverityNum int    `json:"severity_num"`
+	Code        string `json:"code"`
+	Message     string `json:"message"`
+	Module      string `json:"module,omitempty"`
+	Line        int    `json:"line,omitempty"`
+	Column      int    `json:"column,omitempty"`
+	RuleID      string `json:"rule_id,omitempty"` // For SARIF
 }
 
 type lintSummary struct {
-	Total     int            `json:"total"`
+	Total      int            `json:"total"`
 	BySeverity map[string]int `json:"by_severity"`
 	ByCode     map[string]int `json:"by_code,omitempty"`
 	Modules    int            `json:"modules"`
@@ -87,8 +87,8 @@ func cmdLint(args []string) int {
 	fs.Usage = func() { fmt.Fprint(os.Stderr, lintUsage) }
 
 	cfg := lintConfig{
-		level:  3,  // Default: report minor and above
-		failOn: 2,  // Default: fail on error and above
+		level:  3, // Default: report minor and above
+		failOn: 2, // Default: fail on error and above
 		format: "text",
 	}
 
@@ -489,9 +489,9 @@ type sarifDriver struct {
 }
 
 type sarifRule struct {
-	ID               string               `json:"id"`
-	ShortDescription sarifMessage         `json:"shortDescription"`
-	DefaultConfig    sarifDefaultConfig   `json:"defaultConfiguration,omitempty"`
+	ID               string             `json:"id"`
+	ShortDescription sarifMessage       `json:"shortDescription"`
+	DefaultConfig    sarifDefaultConfig `json:"defaultConfiguration,omitempty"`
 }
 
 type sarifDefaultConfig struct {

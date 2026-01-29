@@ -20,13 +20,13 @@ import (
 
 // DiagComparison holds the comparison of diagnostics between gomib and libsmi.
 type DiagComparison struct {
-	Module       string             `json:"module"`
-	Level        int                `json:"level"`
-	GomibDiags   []DiagEntry        `json:"gomib_diagnostics"`
-	LibsmiDiags  []DiagEntry        `json:"libsmi_diagnostics"`
-	OnlyInGomib  []DiagEntry        `json:"only_in_gomib,omitempty"`
-	OnlyInLibsmi []DiagEntry        `json:"only_in_libsmi,omitempty"`
-	Summary      DiagSummary        `json:"summary"`
+	Module       string      `json:"module"`
+	Level        int         `json:"level"`
+	GomibDiags   []DiagEntry `json:"gomib_diagnostics"`
+	LibsmiDiags  []DiagEntry `json:"libsmi_diagnostics"`
+	OnlyInGomib  []DiagEntry `json:"only_in_gomib,omitempty"`
+	OnlyInLibsmi []DiagEntry `json:"only_in_libsmi,omitempty"`
+	Summary      DiagSummary `json:"summary"`
 }
 
 // DiagEntry represents a single diagnostic.

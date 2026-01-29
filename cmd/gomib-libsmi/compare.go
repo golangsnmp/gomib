@@ -17,12 +17,12 @@ import (
 
 // SemanticComparison holds semantic comparison results.
 type SemanticComparison struct {
-	TotalLibsmi     int           `json:"total_libsmi"`
-	TotalGomib      int           `json:"total_gomib"`
-	MatchedNodes    int           `json:"matched_nodes"`
-	MissingInGomib  []string      `json:"missing_in_gomib,omitempty"`
-	MissingInLibsmi []string      `json:"missing_in_libsmi,omitempty"`
-	Mismatches      []NodeCompare `json:"mismatches,omitempty"`
+	TotalLibsmi     int            `json:"total_libsmi"`
+	TotalGomib      int            `json:"total_gomib"`
+	MatchedNodes    int            `json:"matched_nodes"`
+	MissingInGomib  []string       `json:"missing_in_gomib,omitempty"`
+	MissingInLibsmi []string       `json:"missing_in_libsmi,omitempty"`
+	Mismatches      []NodeCompare  `json:"mismatches,omitempty"`
 	Summary         CompareSummary `json:"summary"`
 }
 
@@ -164,9 +164,9 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 				}
 
 				gn := gomibNode{
-					OID:    oid,
-					Name:   node.Name(),
-					Kind:   kindToString(node.Kind()),
+					OID:  oid,
+					Name: node.Name(),
+					Kind: kindToString(node.Kind()),
 				}
 
 				if mod := node.Module(); mod != nil {

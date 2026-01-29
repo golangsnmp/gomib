@@ -26,13 +26,13 @@ type ComparisonResult struct {
 
 // Mismatch describes a difference between gomib and net-snmp.
 type Mismatch struct {
-	OID          string `json:"oid"`
-	Name         string `json:"name"`
-	Module       string `json:"module"`
-	Field        string `json:"field"`
-	Gomib        string `json:"gomib"`
-	NetSnmp      string `json:"netsnmp"`
-	GomibModule  string `json:"gomib_module,omitempty"`  // Module per gomib (for overlap detection)
+	OID           string `json:"oid"`
+	Name          string `json:"name"`
+	Module        string `json:"module"`
+	Field         string `json:"field"`
+	Gomib         string `json:"gomib"`
+	NetSnmp       string `json:"netsnmp"`
+	GomibModule   string `json:"gomib_module,omitempty"`   // Module per gomib (for overlap detection)
 	NetSnmpModule string `json:"netsnmp_module,omitempty"` // Module per net-snmp (for overlap detection)
 }
 
@@ -519,16 +519,16 @@ func isHexZeros(s string) bool {
 func oidSymbolicEquivalent(a, b string) bool {
 	// Well-known OID symbolic names and their numeric equivalents
 	knownOIDs := map[string]string{
-		"zeroDotZero":          "0.0",
-		"snmpUDPDomain":        "1.3.6.1.6.1.1",
-		"usmNoAuthProtocol":    "1.3.6.1.6.3.10.1.1.1",
-		"usmNoPrivProtocol":    "1.3.6.1.6.3.10.1.2.1",
-		"usmHMACMD5AuthProtocol": "1.3.6.1.6.3.10.1.1.2",
-		"usmHMACSHAAuthProtocol": "1.3.6.1.6.3.10.1.1.3",
-		"usmDESPrivProtocol":   "1.3.6.1.6.3.10.1.2.2",
-		"pingIcmpEcho":         "1.3.6.1.2.1.80.3.1",
+		"zeroDotZero":              "0.0",
+		"snmpUDPDomain":            "1.3.6.1.6.1.1",
+		"usmNoAuthProtocol":        "1.3.6.1.6.3.10.1.1.1",
+		"usmNoPrivProtocol":        "1.3.6.1.6.3.10.1.2.1",
+		"usmHMACMD5AuthProtocol":   "1.3.6.1.6.3.10.1.1.2",
+		"usmHMACSHAAuthProtocol":   "1.3.6.1.6.3.10.1.1.3",
+		"usmDESPrivProtocol":       "1.3.6.1.6.3.10.1.2.2",
+		"pingIcmpEcho":             "1.3.6.1.2.1.80.3.1",
 		"traceRouteUsingUdpProbes": "1.3.6.1.2.1.81.3.1",
-		"sysUpTimeInstance":    "1.3.6.1.2.1.1.3.0",
+		"sysUpTimeInstance":        "1.3.6.1.2.1.1.3.0",
 	}
 
 	// Check if one is a known symbol and the other is its numeric form
