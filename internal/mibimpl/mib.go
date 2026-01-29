@@ -45,13 +45,15 @@ func (m *MibData) Nodes() iter.Seq[mib.Node] {
 func (m *MibData) FindNode(query string) mib.Node {
 	// Try qualified name first (MODULE::name)
 	if idx := strings.Index(query, "::"); idx >= 0 {
-		obj := m.findObjectByQualified(query)
-		if obj != nil {
-			return obj.node
+		moduleName := query[:idx]
+		nodeName := query[idx+2:]
+		if m.moduleByName[moduleName] == nil {
+			return nil
 		}
-		notif := m.findNotificationByQualified(query)
-		if notif != nil {
-			return notif.node
+		for _, nd := range m.nameToNodes[nodeName] {
+			if nd.Module() != nil && nd.Module().Name() == moduleName {
+				return nd
+			}
 		}
 		return nil
 	}
@@ -74,19 +76,20 @@ func (m *MibData) FindNode(query string) mib.Node {
 		return m.NodeByOID(oid)
 	}
 
-	// Try name lookup - object first
+	// Try name lookup - prefer object, then notification, then any node
 	nodes := m.nameToNodes[query]
 	for _, nd := range nodes {
 		if nd.obj != nil {
 			return nd
 		}
 	}
-
-	// Try notification
 	for _, nd := range nodes {
 		if nd.notif != nil {
 			return nd
 		}
+	}
+	if len(nodes) > 0 {
+		return nodes[0]
 	}
 
 	return nil
