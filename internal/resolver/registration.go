@@ -52,6 +52,12 @@ func registerModules(ctx *ResolverContext) {
 		if mod.Name == "SNMPv2-SMI" {
 			ctx.Snmpv2SMIModule = mod
 		}
+		if mod.Name == "RFC1155-SMI" {
+			ctx.Rfc1155SMIModule = mod
+		}
+		if mod.Name == "SNMPv2-TC" {
+			ctx.Snmpv2TCModule = mod
+		}
 
 		ctx.ModuleIndex[mod.Name] = append(ctx.ModuleIndex[mod.Name], mod)
 

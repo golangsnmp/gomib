@@ -102,17 +102,17 @@ implicitly).
   - net-snmp: silent
   - gomib: TESTED - resolve_problems_test.go:TestProblemImports
   - Real: adva/CM-SYSTEM-MIB.mib, adva/F3-SYNC-MIB.mib
-- [ ] Missing DisplayString import (from SNMPv2-TC)
+- [x] Missing DisplayString import (from SNMPv2-TC)
   - smilint [2]: "unknown type DisplayString" (line 73)
   - smilint [2]: "type [unknown] does not resolve to a known base type" (line 72)
   - net-snmp: silent
-  - gomib: SKIP - TC fallback not implemented, resolve_problems_test.go documents divergence
+  - gomib: TESTED - resolve_problems_test.go:TestProblemImports, permissive TC fallback
   - Real: misc/RADLAN-MIB.mib (16 occurrences)
-- [ ] Missing TruthValue import (from SNMPv2-TC)
+- [x] Missing TruthValue import (from SNMPv2-TC)
   - smilint [2]: "unknown type TruthValue" (line 83)
   - smilint [2]: "type TruthValue does not resolve to a known base type" (line 81)
   - net-snmp: silent
-  - gomib: SKIP - TC fallback not implemented, resolve_problems_test.go documents divergence
+  - gomib: TESTED - resolve_problems_test.go:TestProblemImports, permissive TC fallback
   - Real: misc/RADLAN-MIB.mib (55 occurrences)
 - [ ] Macro names in import list (MODULE-IDENTITY, OBJECT-TYPE, etc.)
   - gomib: UNTESTED

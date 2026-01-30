@@ -445,15 +445,12 @@ func TestProblemImports(t *testing.T) {
 	}
 
 	// Textual convention types (from SNMPv2-TC) - net-snmp resolves these
-	// implicitly but gomib's permissive fallback only covers SMI base types.
-	// These document the current divergence.
+	// implicitly. gomib resolves them at permissive level via TC fallback.
 	tcTests := []struct {
 		name     string
 		wantType string // net-snmp ground truth
 	}{
-		// net-snmp: resolves DisplayString → OCTET STRING
 		{"problemMissingDisplayString", "OCTET STRING"},
-		// net-snmp: resolves TruthValue → Integer32
 		{"problemMissingTruthValue", "Integer32"},
 	}
 
@@ -466,10 +463,8 @@ func TestProblemImports(t *testing.T) {
 			}
 
 			gotType := testutil.NormalizeType(obj.Type())
-			if gotType != tt.wantType {
-				t.Skipf("divergence: %s type: gomib=%q net-snmp=%q (TC fallback not implemented)",
-					tt.name, gotType, tt.wantType)
-			}
+			testutil.Equal(t, tt.wantType, gotType,
+				"TC base type for %s (matches net-snmp)", tt.name)
 		})
 	}
 }
@@ -568,34 +563,28 @@ func TestProblemSMIv1v2CounterGauge(t *testing.T) {
 
 	t.Run("Counter", func(t *testing.T) {
 		obj := m.FindObject("problemCounterObject")
+		testutil.NotNil(t, obj, "problemCounterObject should resolve via SMIv1 type fallback")
 		if obj == nil {
-			t.Skip("problemCounterObject not found - Counter type may not resolve without RFC1155-SMI import")
 			return
 		}
+		testutil.NotNil(t, obj.Type(), "Counter type should resolve via RFC1155-SMI fallback")
 		if obj.Type() == nil {
-			t.Skip("Counter type unresolved - SMIv1 type fallback not implemented for this context")
 			return
 		}
-		base := obj.Type().EffectiveBase()
-		if base != mib.BaseCounter32 {
-			t.Errorf("Counter base type: got %v, want Counter32", base)
-		}
+		testutil.Equal(t, mib.BaseCounter32, obj.Type().EffectiveBase(), "Counter base type")
 	})
 
 	t.Run("Gauge", func(t *testing.T) {
 		obj := m.FindObject("problemGaugeObject")
+		testutil.NotNil(t, obj, "problemGaugeObject should resolve via SMIv1 type fallback")
 		if obj == nil {
-			t.Skip("problemGaugeObject not found - Gauge type may not resolve without RFC1155-SMI import")
 			return
 		}
+		testutil.NotNil(t, obj.Type(), "Gauge type should resolve via RFC1155-SMI fallback")
 		if obj.Type() == nil {
-			t.Skip("Gauge type unresolved - SMIv1 type fallback not implemented for this context")
 			return
 		}
-		base := obj.Type().EffectiveBase()
-		if base != mib.BaseGauge32 {
-			t.Errorf("Gauge base type: got %v, want Gauge32", base)
-		}
+		testutil.Equal(t, mib.BaseGauge32, obj.Type().EffectiveBase(), "Gauge base type")
 	})
 }
 

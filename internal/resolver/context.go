@@ -36,6 +36,12 @@ type ResolverContext struct {
 	// Snmpv2SMIModule is the SNMPv2-SMI base module (for primitive types)
 	Snmpv2SMIModule *module.Module
 
+	// Rfc1155SMIModule is the RFC1155-SMI base module (for SMIv1 types)
+	Rfc1155SMIModule *module.Module
+
+	// Snmpv2TCModule is the SNMPv2-TC module (for standard textual conventions)
+	Snmpv2TCModule *module.Module
+
 	// Unresolved references collected during resolution
 	unresolvedImports      []unresolvedImport
 	unresolvedTypes        []unresolvedType
@@ -185,6 +191,24 @@ func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
 		}
 	}
 
+	// Try RFC1155-SMI for SMIv1 types (Counter, Gauge, NetworkAddress)
+	if c.Rfc1155SMIModule != nil && isSmiV1GlobalType(name) {
+		if symbols := c.ModuleSymbolToType[c.Rfc1155SMIModule]; symbols != nil {
+			if t, ok := symbols[name]; ok {
+				return t, true
+			}
+		}
+	}
+
+	// Try SNMPv2-TC for standard textual conventions (DisplayString, TruthValue, etc.)
+	if c.Snmpv2TCModule != nil && isSNMPv2TCType(name) {
+		if symbols := c.ModuleSymbolToType[c.Snmpv2TCModule]; symbols != nil {
+			if t, ok := symbols[name]; ok {
+				return t, true
+			}
+		}
+	}
+
 	// Search all modules
 	for _, symbols := range c.ModuleSymbolToType {
 		if t, ok := symbols[name]; ok {
@@ -217,6 +241,24 @@ func (c *ResolverContext) LookupTypeForModule(mod *module.Module, name string) (
 				if t, ok := symbols[name]; ok {
 					return t, true
 				}
+			}
+		}
+	}
+
+	// Permissive only: SMIv1 types (Counter, Gauge, NetworkAddress) from RFC1155-SMI
+	if c.Rfc1155SMIModule != nil && c.diagConfig.AllowBestGuessFallbacks() && isSmiV1GlobalType(name) {
+		if symbols := c.ModuleSymbolToType[c.Rfc1155SMIModule]; symbols != nil {
+			if t, ok := symbols[name]; ok {
+				return t, true
+			}
+		}
+	}
+
+	// Permissive only: SNMPv2-TC textual conventions (DisplayString, TruthValue, etc.)
+	if c.Snmpv2TCModule != nil && c.diagConfig.AllowBestGuessFallbacks() && isSNMPv2TCType(name) {
+		if symbols := c.ModuleSymbolToType[c.Snmpv2TCModule]; symbols != nil {
+			if t, ok := symbols[name]; ok {
+				return t, true
 			}
 		}
 	}
@@ -499,6 +541,33 @@ func isASN1Primitive(name string) bool {
 func isSmiGlobalType(name string) bool {
 	switch name {
 	case "Integer32", "Counter32", "Counter64", "Gauge32", "Unsigned32", "TimeTicks", "IpAddress", "Opaque":
+		return true
+	default:
+		return false
+	}
+}
+
+// isSmiV1GlobalType returns true for SMIv1 type names that only exist in
+// RFC1155-SMI (Counter, Gauge, NetworkAddress). Types shared with SMIv2
+// (IpAddress, TimeTicks, Opaque) are handled by isSmiGlobalType.
+func isSmiV1GlobalType(name string) bool {
+	switch name {
+	case "Counter", "Gauge", "NetworkAddress":
+		return true
+	default:
+		return false
+	}
+}
+
+// isSNMPv2TCType returns true for well-known textual conventions defined
+// in SNMPv2-TC (RFC 2579) that vendor MIBs commonly use without imports.
+func isSNMPv2TCType(name string) bool {
+	switch name {
+	case "DisplayString", "TruthValue", "PhysAddress", "MacAddress",
+		"RowStatus", "TimeStamp", "TimeInterval", "DateAndTime",
+		"StorageType", "TestAndIncr", "AutonomousType",
+		"VariablePointer", "RowPointer", "InstancePointer",
+		"TDomain", "TAddress":
 		return true
 	default:
 		return false

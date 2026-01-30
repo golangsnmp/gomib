@@ -142,50 +142,67 @@ func TestTypeFallbackPermissiveOnly(t *testing.T) {
 	})
 }
 
-// TestTCFallbackUnresolved verifies that textual convention types (DisplayString,
-// TruthValue) from SNMPv2-TC remain unresolved at all levels when not imported.
-// These are NOT SMI global types, so even the global type fallback doesn't cover them.
+// TestTCFallbackStrictness verifies that textual convention types (DisplayString,
+// TruthValue) from SNMPv2-TC resolve at permissive level but remain unresolved
+// at strict/normal levels when not imported.
 //
 // Ground truth:
-//   - net-snmp: resolves implicitly (broader global search than gomib)
-//   - gomib: unresolved at all levels (global fallback only covers SMI base types)
-//
-// This documents a known divergence from net-snmp. The global type fallback
-// intentionally limits scope to SMI base types to avoid false resolution.
-func TestTCFallbackUnresolved(t *testing.T) {
-	tcObjects := []string{
-		"problemMissingDisplayString",
-		"problemMissingTruthValue",
-	}
-
-	levels := []struct {
-		name  string
-		level mib.StrictnessLevel
+//   - net-snmp: resolves implicitly at all levels
+//   - gomib: resolves at permissive (best-guess fallback), unresolved at strict/normal
+func TestTCFallbackStrictness(t *testing.T) {
+	tcObjects := []struct {
+		name     string
+		wantType string
 	}{
-		{"strict", mib.StrictnessStrict},
-		{"normal", mib.StrictnessNormal},
-		{"permissive", mib.StrictnessPermissive},
+		{"problemMissingDisplayString", "OCTET STRING"},
+		{"problemMissingTruthValue", "Integer32"},
 	}
 
-	for _, lvl := range levels {
-		t.Run(lvl.name, func(t *testing.T) {
-			m := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", lvl.level)
+	// Strict and normal: TC types are unresolved (no import, no fallback)
+	for _, lvlName := range []string{"strict", "normal"} {
+		lvl := mib.StrictnessStrict
+		if lvlName == "normal" {
+			lvl = mib.StrictnessNormal
+		}
+		t.Run(lvlName, func(t *testing.T) {
+			m := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", lvl)
 
-			for _, objName := range tcObjects {
-				t.Run(objName, func(t *testing.T) {
-					obj := m.FindObject(objName)
+			for _, tc := range tcObjects {
+				t.Run(tc.name, func(t *testing.T) {
+					obj := m.FindObject(tc.name)
 					testutil.NotNil(t, obj, "object should exist (OID resolves)")
 					if obj == nil {
 						return
 					}
-					// TC types are not covered by the SMI global type fallback,
-					// so they remain unresolved at all strictness levels.
 					testutil.Nil(t, obj.Type(),
-						"TC type should be nil (not in SMI global type set)")
+						"TC type should be nil at %s (not imported)", lvlName)
 				})
 			}
 		})
 	}
+
+	// Permissive: TC types resolve via SNMPv2-TC fallback
+	t.Run("permissive", func(t *testing.T) {
+		m := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.StrictnessPermissive)
+
+		for _, tc := range tcObjects {
+			t.Run(tc.name, func(t *testing.T) {
+				obj := m.FindObject(tc.name)
+				testutil.NotNil(t, obj, "object should resolve")
+				if obj == nil {
+					return
+				}
+				testutil.NotNil(t, obj.Type(),
+					"TC type should resolve at permissive level")
+				if obj.Type() == nil {
+					return
+				}
+				gotType := testutil.NormalizeType(obj.Type())
+				testutil.Equal(t, tc.wantType, gotType,
+					"TC base type (matches net-snmp)")
+			})
+		}
+	})
 }
 
 // --- Safe fallback: module aliases (level >= 3) ---

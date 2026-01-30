@@ -224,6 +224,16 @@ func findTypeDefiningModule(ctx *ResolverContext, fromMod *module.Module, typeNa
 		}
 	}
 
+	// Check if it's an SMIv1 type in RFC1155-SMI
+	if ctx.Rfc1155SMIModule != nil && isSmiV1GlobalType(typeName) {
+		return ctx.Rfc1155SMIModule.Name
+	}
+
+	// Check if it's a standard textual convention in SNMPv2-TC
+	if ctx.Snmpv2TCModule != nil && isSNMPv2TCType(typeName) {
+		return ctx.Snmpv2TCModule.Name
+	}
+
 	return ""
 }
 
