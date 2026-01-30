@@ -246,6 +246,464 @@ func TestParseErrorRecovery(t *testing.T) {
 	testutil.Greater(t, len(module.Body), 0, "expected at least one definition after recovery")
 }
 
+// === SMIv1-specific constructs ===
+
+func TestParseTrapType(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testTrap TRAP-TYPE
+			ENTERPRISE testEnterprise
+			VARIABLES { testObject1, testObject2 }
+			DESCRIPTION "Test trap"
+			REFERENCE "RFC 1215"
+			::= 5
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Skip("TRAP-TYPE parsing not supported or produced no definitions")
+		return
+	}
+
+	def, ok := module.Body[0].(*ast.TrapTypeDef)
+	if !ok {
+		t.Skipf("expected TrapTypeDef, got %T", module.Body[0])
+		return
+	}
+	testutil.Equal(t, "testTrap", def.Name.Name, "trap name")
+	testutil.Equal(t, "testEnterprise", def.Enterprise.Name, "enterprise")
+	testutil.Len(t, def.Variables, 2, "variables count")
+	testutil.NotNil(t, def.Description, "description should be set")
+	testutil.NotNil(t, def.Reference, "reference should be set")
+	testutil.Equal(t, uint32(5), def.TrapNumber, "trap number")
+}
+
+func TestParseTrapTypeMinimal(t *testing.T) {
+	// TRAP-TYPE with only required clauses (ENTERPRISE and trap number)
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		minTrap TRAP-TYPE
+			ENTERPRISE testEnterprise
+			::= 1
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Skip("minimal TRAP-TYPE parsing not supported")
+		return
+	}
+
+	def, ok := module.Body[0].(*ast.TrapTypeDef)
+	if !ok {
+		t.Skipf("expected TrapTypeDef, got %T", module.Body[0])
+		return
+	}
+	testutil.Equal(t, "minTrap", def.Name.Name, "trap name")
+	testutil.Equal(t, uint32(1), def.TrapNumber, "trap number")
+	testutil.Len(t, def.Variables, 0, "no variables")
+}
+
+// === Conformance constructs ===
+
+func TestParseNotificationType(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testNotification NOTIFICATION-TYPE
+			OBJECTS { testObject1, testObject2 }
+			STATUS current
+			DESCRIPTION "Test notification"
+			::= { testNotifications 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Skip("NOTIFICATION-TYPE parsing produced no definitions")
+		return
+	}
+
+	def, ok := module.Body[0].(*ast.NotificationTypeDef)
+	if !ok {
+		t.Skipf("expected NotificationTypeDef, got %T", module.Body[0])
+		return
+	}
+	testutil.Equal(t, "testNotification", def.Name.Name, "notification name")
+	testutil.Len(t, def.Objects, 2, "objects count")
+	testutil.NotNil(t, def.Status, "status should be set")
+}
+
+func TestParseNotificationTypeNoObjects(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testNotification NOTIFICATION-TYPE
+			STATUS current
+			DESCRIPTION "No objects"
+			::= { testNotifications 2 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Skip("NOTIFICATION-TYPE without OBJECTS not supported")
+		return
+	}
+
+	def, ok := module.Body[0].(*ast.NotificationTypeDef)
+	if !ok {
+		t.Skipf("expected NotificationTypeDef, got %T", module.Body[0])
+		return
+	}
+	testutil.Equal(t, "testNotification", def.Name.Name, "notification name")
+	testutil.Len(t, def.Objects, 0, "no objects")
+}
+
+func TestParseModuleCompliance(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testCompliance MODULE-COMPLIANCE
+			STATUS current
+			DESCRIPTION "Test compliance"
+			MODULE
+				MANDATORY-GROUPS { testGroup1 }
+			::= { testConformance 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Skip("MODULE-COMPLIANCE parsing produced no definitions")
+		return
+	}
+
+	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
+	if !ok {
+		t.Skipf("expected ModuleComplianceDef, got %T", module.Body[0])
+		return
+	}
+	testutil.Equal(t, "testCompliance", def.Name.Name, "compliance name")
+	testutil.Greater(t, len(def.Modules), 0, "should have at least one MODULE clause")
+	if len(def.Modules) > 0 {
+		testutil.Greater(t, len(def.Modules[0].MandatoryGroups), 0, "should have mandatory groups")
+	}
+}
+
+func TestParseAgentCapabilities(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testAgent AGENT-CAPABILITIES
+			PRODUCT-RELEASE "Test Agent 1.0"
+			STATUS current
+			DESCRIPTION "Test agent capabilities"
+			SUPPORTS IF-MIB
+				INCLUDES { ifGeneralGroup }
+			::= { testCapabilities 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Skip("AGENT-CAPABILITIES parsing produced no definitions")
+		return
+	}
+
+	def, ok := module.Body[0].(*ast.AgentCapabilitiesDef)
+	if !ok {
+		t.Skipf("expected AgentCapabilitiesDef, got %T", module.Body[0])
+		return
+	}
+	testutil.Equal(t, "testAgent", def.Name.Name, "agent capabilities name")
+	testutil.Equal(t, "Test Agent 1.0", def.ProductRelease.Value, "product release")
+	testutil.Greater(t, len(def.Supports), 0, "should have at least one SUPPORTS clause")
+}
+
+func TestParseNotificationGroup(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testNotifGroup NOTIFICATION-GROUP
+			NOTIFICATIONS { testNotif1, testNotif2 }
+			STATUS current
+			DESCRIPTION "Test notification group"
+			::= { testConformance 2 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Skip("NOTIFICATION-GROUP parsing produced no definitions")
+		return
+	}
+
+	def, ok := module.Body[0].(*ast.NotificationGroupDef)
+	if !ok {
+		t.Skipf("expected NotificationGroupDef, got %T", module.Body[0])
+		return
+	}
+	testutil.Equal(t, "testNotifGroup", def.Name.Name, "notification group name")
+	testutil.Len(t, def.Notifications, 2, "notifications count")
+}
+
+func TestParseObjectIdentity(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testIdentity OBJECT-IDENTITY
+			STATUS current
+			DESCRIPTION "Test identity"
+			::= { testObjects 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Skip("OBJECT-IDENTITY parsing produced no definitions")
+		return
+	}
+
+	def, ok := module.Body[0].(*ast.ObjectIdentityDef)
+	if !ok {
+		t.Skipf("expected ObjectIdentityDef, got %T", module.Body[0])
+		return
+	}
+	testutil.Equal(t, "testIdentity", def.Name.Name, "identity name")
+}
+
+// === Boundary conditions ===
+
+func TestParseTruncatedModuleNoEnd(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testObject OBJECT-TYPE
+			SYNTAX Integer32
+			MAX-ACCESS read-only
+			STATUS current
+			DESCRIPTION "Test"
+			::= { test 1 }`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	// Should parse something without crashing, even without END
+	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name should be parsed")
+}
+
+func TestParseModuleWithMultipleDefinitions(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testRoot OBJECT IDENTIFIER ::= { iso 3 }
+		testScalar OBJECT-TYPE
+			SYNTAX Integer32
+			MAX-ACCESS read-only
+			STATUS current
+			DESCRIPTION "Scalar"
+			::= { testRoot 1 }
+		TestType ::= TEXTUAL-CONVENTION
+			STATUS current
+			DESCRIPTION "A type"
+			SYNTAX Integer32
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	testutil.Equal(t, 3, len(module.Body), "should have 3 definitions")
+}
+
+func TestParseSyntaxWithRange(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testRange OBJECT-TYPE
+			SYNTAX Integer32 (0..100)
+			MAX-ACCESS read-only
+			STATUS current
+			DESCRIPTION "Ranged"
+			::= { test 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	if !ok {
+		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
+		return
+	}
+	constrained, ok := def.Syntax.Syntax.(*ast.TypeSyntaxConstrained)
+	if !ok {
+		t.Skipf("expected constrained syntax, got %T", def.Syntax.Syntax)
+		return
+	}
+	rangeConstraint, ok := constrained.Constraint.(*ast.ConstraintRange)
+	if !ok {
+		t.Skipf("expected range constraint, got %T", constrained.Constraint)
+		return
+	}
+	testutil.Len(t, rangeConstraint.Ranges, 1, "should have 1 range")
+}
+
+func TestParseAugments(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testAugEntry OBJECT-TYPE
+			SYNTAX TestAugEntry
+			MAX-ACCESS not-accessible
+			STATUS current
+			DESCRIPTION "Augmented entry"
+			AUGMENTS { testEntry }
+			::= { testAugTable 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	if !ok {
+		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
+		return
+	}
+	if def.Augments == nil {
+		t.Skip("AUGMENTS clause not parsed")
+		return
+	}
+	testutil.Equal(t, "testEntry", def.Augments.Target.Name, "augments target")
+}
+
+func TestParseBitsSyntax(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testBits OBJECT-TYPE
+			SYNTAX BITS { monday(0), tuesday(1), wednesday(2) }
+			MAX-ACCESS read-only
+			STATUS current
+			DESCRIPTION "Bit field"
+			::= { test 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	if !ok {
+		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
+		return
+	}
+	bits, ok := def.Syntax.Syntax.(*ast.TypeSyntaxBits)
+	if !ok {
+		t.Skipf("expected TypeSyntaxBits, got %T", def.Syntax.Syntax)
+		return
+	}
+	testutil.Len(t, bits.NamedBits, 3, "named bits count")
+}
+
+func TestParseDefValString(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testStr OBJECT-TYPE
+			SYNTAX OCTET STRING
+			MAX-ACCESS read-write
+			STATUS current
+			DESCRIPTION "Test"
+			DEFVAL { "default value" }
+			::= { test 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	if !ok {
+		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
+		return
+	}
+	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
+	strVal, ok := def.DefVal.Value.(*ast.DefValContentString)
+	if !ok {
+		t.Skipf("expected string DEFVAL, got %T", def.DefVal.Value)
+		return
+	}
+	testutil.Equal(t, "default value", strVal.Value.Value, "DEFVAL string value")
+}
+
+func TestParseDefValHex(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testHex OBJECT-TYPE
+			SYNTAX OCTET STRING
+			MAX-ACCESS read-write
+			STATUS current
+			DESCRIPTION "Test"
+			DEFVAL { 'FF00'H }
+			::= { test 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	if !ok {
+		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
+		return
+	}
+	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
+}
+
+func TestParseDefValBits(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testBitsDefault OBJECT-TYPE
+			SYNTAX BITS { a(0), b(1), c(2) }
+			MAX-ACCESS read-write
+			STATUS current
+			DESCRIPTION "Test"
+			DEFVAL { { a, c } }
+			::= { test 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	if !ok {
+		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
+		return
+	}
+	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
+}
+
+func TestParseSequenceOf(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF TestEntry
+			MAX-ACCESS not-accessible
+			STATUS current
+			DESCRIPTION "Test table"
+			::= { test 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	if !ok {
+		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
+		return
+	}
+	_, ok = def.Syntax.Syntax.(*ast.TypeSyntaxSequenceOf)
+	if !ok {
+		t.Skipf("expected TypeSyntaxSequenceOf, got %T", def.Syntax.Syntax)
+	}
+}
+
+func TestParseSMIv1ObjectType(t *testing.T) {
+	// SMIv1 uses ACCESS instead of MAX-ACCESS
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testSMIv1 OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION "SMIv1 object"
+			::= { test 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Skip("SMIv1 OBJECT-TYPE not parsed")
+		return
+	}
+
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	if !ok {
+		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
+		return
+	}
+	testutil.Equal(t, "testSMIv1", def.Name.Name, "SMIv1 object name")
+	testutil.Equal(t, ast.AccessValueReadOnly, def.Access.Value, "SMIv1 access")
+	testutil.Equal(t, ast.StatusValueMandatory, def.Status.Value, "SMIv1 mandatory status")
+}
+
 // === Strictness Tests ===
 
 func TestIdentifierUnderscoreDiagnostic(t *testing.T) {

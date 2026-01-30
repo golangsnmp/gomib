@@ -102,6 +102,9 @@ func (d DefVal) Raw() string { return d.raw }
 
 // String returns a user-friendly representation.
 func (d DefVal) String() string {
+	if d.value == nil {
+		return ""
+	}
 	switch d.kind {
 	case DefValKindInt:
 		return strconv.FormatInt(d.value.(int64), 10)

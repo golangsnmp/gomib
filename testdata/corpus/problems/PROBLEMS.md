@@ -11,7 +11,7 @@ Tool behavior key:
 - net-snmp: error = net-snmp reports an error
 - gomib: TESTED = has test coverage, UNTESTED = no test coverage
 
-Test file: resolve_problems_test.go
+Test files: resolve_problems_test.go, resolve_problems_extra_test.go
 
 ## MIB Index
 
@@ -34,38 +34,38 @@ Test file: resolve_problems_test.go
 SMIv1 constructs used inside SMIv2-style modules. Very common in vendor MIBs
 that were partially migrated from v1 to v2.
 
-gomib test coverage: PARTIAL. divergences_test.go has status/access
-equivalence helpers. No direct tests for TRAP-TYPE parsing, ACCESS keyword
-switching, or Counter/Gauge type resolution.
+gomib test coverage: TESTED. resolve_problems_extra_test.go tests ACCESS keyword,
+mandatory/optional status, TRAP-TYPE coexistence, Counter/Gauge types.
+divergences_test.go has status/access equivalence helpers.
 
 net-snmp: silently accepts all constructs in this MIB.
 
-- [ ] TRAP-TYPE macro in SMIv2 module
+- [x] TRAP-TYPE macro in SMIv2 module
   - smilint [2]: "TRAP-TYPE macro is not allowed in SMIv2" (line 72)
   - smilint [2]: "macro TRAP-TYPE has not been imported from module RFC-1215" (line 72)
   - net-snmp: silent
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemSMIv1v2TrapType (verifies coexistence with SMIv2 objects)
   - Real: misc/RADLAN-MIB.mib (931 occurrences), misc/IFT-SNMP-MIB.mib
-- [ ] ACCESS keyword instead of MAX-ACCESS
+- [x] ACCESS keyword instead of MAX-ACCESS
   - smilint [2]: "ACCESS is SMIv1 style, use MAX-ACCESS in SMIv2 MIBs instead" (lines 32,43,53,93,100)
   - net-snmp: silent
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemSMIv1v2AccessKeyword
   - Real: misc/RADLAN-MIB.mib (477 occurrences), misc/IFT-SNMP-MIB.mib
-- [ ] `mandatory` status in SMIv2 OBJECT-TYPE
+- [x] `mandatory` status in SMIv2 OBJECT-TYPE
   - smilint [2]: "invalid status mandatory in SMIv2 MIB" (lines 33,44,94,101)
   - net-snmp: silent
-  - gomib: PARTIAL - divergences_test.go:187-196 has statusEquivalent() but no parse/load test
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemSMIv1v2MandatoryStatus
   - gomib: internal/resolver/types_phase.go:455-469 (status normalization)
   - Real: misc/RADLAN-MIB.mib, misc/IFT-SNMP-MIB.mib
-- [ ] `optional` status in SMIv2 OBJECT-TYPE
+- [x] `optional` status in SMIv2 OBJECT-TYPE
   - smilint [2]: "invalid status optional in SMIv2 MIB" (line 54)
   - net-snmp: silent
-  - gomib: PARTIAL - divergences_test.go has equivalence helper but no parse/load test
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemSMIv1v2MandatoryStatus/optional
 - [ ] SMIv1 types (Counter, Gauge) used without proper imports
   - smilint [2]: "type Counter/Gauge does not resolve to a known base type" (lines 91,98)
   - smilint [2]: "unknown type Counter/Gauge" (lines 93,100)
   - net-snmp: silent
-  - gomib: UNTESTED
+  - gomib: SKIP - resolve_problems_extra_test.go:TestProblemSMIv1v2CounterGauge (types unresolved, SMIv1 fallback not implemented)
   - Real: ietf/RFC1213-MIB.mib (334 occurrences), ietf/RFC1271-MIB.mib
 
 ## PROBLEM-IMPORTS-MIB
@@ -125,7 +125,9 @@ implicitly).
 
 Uses renamed/aliased module names that require alias table lookup.
 
-gomib test coverage: NONE.
+gomib test coverage: TESTED. resolve_problems_extra_test.go tests alias
+resolution at normal (works) and strict (disabled) levels.
+resolve_strictness_test.go:TestModuleAliasNormalAndAbove also covers this.
 
 net-snmp: "Cannot find module (SNMPv2-SMI-v1)" and "Cannot find module
 (SNMPv2-TC-v1)" - fails to resolve. Also flags current/MAX-ACCESS as
@@ -134,16 +136,16 @@ SMIv1 errors because it treats the module as SMIv1 due to failed imports.
 smilint: treats as SMIv1 (since alias resolution fails), then flags
 MAX-ACCESS and current as v2-in-v1 issues.
 
-- [ ] SNMPv2-SMI-v1 alias for SNMPv2-SMI
+- [x] SNMPv2-SMI-v1 alias for SNMPv2-SMI
   - smilint [2]: "MAX-ACCESS is SMIv2 style, use ACCESS in SMIv1 MIBs instead" (lines 31,38)
   - smilint [2]: "invalid status current in SMIv1 MIB" (lines 32,39)
   - net-snmp: "Cannot find module (SNMPv2-SMI-v1)" (line 10)
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemImportsAliasNormal, TestProblemImportsAliasStrict
   - gomib: internal/resolver/imports.go:298-310 (module aliases)
   - Real: misc/RADLAN-MIB.mib
-- [ ] SNMPv2-TC-v1 alias for SNMPv2-TC
+- [x] SNMPv2-TC-v1 alias for SNMPv2-TC
   - net-snmp: "Cannot find module (SNMPv2-TC-v1)" (line 12)
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemImportsAliasNormal (DisplayString from aliased module)
   - gomib: internal/resolver/imports.go:298-310
 
 ## PROBLEM-KEYWORDS-MIB
@@ -182,95 +184,96 @@ smilint: also silently accepts (no diagnostics beyond conformance noise).
 
 Bare type names and other edge cases in INDEX clauses.
 
-gomib test coverage: NONE. resolve_tables_test.go tests standard indexes
-from fixture MIBs only (IF-MIB, SNMPv2-MIB, IP-MIB, ENTITY-MIB, BRIDGE-MIB).
+gomib test coverage: TESTED. resolve_problems_extra_test.go tests bare INTEGER
+index, MacAddress index, DisplayString index, missing range indexes, and
+table/row/column kind inference for all tables.
 
-- [ ] Bare INTEGER in INDEX
+- [x] Bare INTEGER in INDEX
   - smilint [1]: syntax error (line 41) - rejects entirely
   - net-snmp: silent
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemIndexBareType
   - gomib: internal/resolver/semantics.go:526-533 (isBareTypeIndex)
-- [ ] Index element missing range restriction
+- [x] Index element missing range restriction
   - smilint [2]: "index element must have a range restriction" (lines 165,173)
   - net-snmp: silent
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemIndexNoRange
   - Real: adva/CM-FACILITY-MIB.mib (438 occurrences)
-- [ ] MacAddress as index type
+- [x] MacAddress as index type
   - smilint: silent (accepted)
   - net-snmp: silent
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemIndexMacAddress
   - Real: misc/SIXNET-MIB.mib (8 instances)
-- [ ] DisplayString as index
+- [x] DisplayString as index
   - smilint: silent (accepted with SIZE)
   - net-snmp: silent
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemIndexDisplayString
   - Real: misc/RADLAN-MIB.mib
 
 ## PROBLEM-DEFVAL-MIB
 
 DEFVAL syntax mismatches, OID references, hex edge cases.
 
-gomib test coverage: MINIMAL. resolve_defval_test.go:10-48 compares fixture
-MIBs against net-snmp output. divergences_test.go:204-249 has equivalence
-helpers for zeroDotZero and hex zeros. parser_test.go:177-197 tests basic
-integer/string DEFVAL parsing. No tests for bad enum labels, binary strings,
-empty BITS, or type mismatches.
+gomib test coverage: TESTED. resolve_problems_extra_test.go tests OID ref,
+raw integer for enum, undefined enum label, large hex, binary strings,
+empty BITS, multi BITS, negative integer, and special string DEFVALs.
+resolve_defval_test.go compares fixture MIBs against net-snmp output.
+divergences_test.go has equivalence helpers for zeroDotZero and hex zeros.
 
 net-snmp: silently accepts all constructs in this MIB.
 
-- [ ] DEFVAL with OID reference (zeroDotZero)
+- [x] DEFVAL with OID reference (zeroDotZero)
   - smilint: silent
   - net-snmp: silent
-  - gomib: PARTIAL - divergences_test.go:219 has equivalence check, no direct parse test
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemDefvalOidRef
   - gomib: internal/resolver/semantics.go:377-451
   - gomib normalizes to numeric "0.0"; net-snmp keeps symbolic
-- [ ] DEFVAL with raw integer for enum type
+- [x] DEFVAL with raw integer for enum type
   - smilint: silent (integer 5 accepted for ProblemSeverity)
   - net-snmp: silent
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemDefvalTypeMismatch
   - Real: alcatel/TIMETRA-BGP-MIB.mib (78 occurrences across 10 MIBs)
-- [ ] DEFVAL with undefined enum label
+- [x] DEFVAL with undefined enum label
   - smilint [2]: "default value syntax does not match object syntax" (line 66)
   - smilint [2]: "default value does not match underlying enumeration type" (line 66)
   - net-snmp: silent
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemDefvalBadEnum (stored as raw label)
   - Real: alcatel/TIMETRA-FILTER-MIB.mib (29 occurrences)
-- [ ] Large hex DEFVAL (16 bytes)
+- [x] Large hex DEFVAL (16 bytes)
   - smilint: silent
   - net-snmp: silent
-  - gomib: PARTIAL - divergences_test.go:215 has hex zero equivalence, no direct test
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemDefvalLargeHex
   - gomib preserves full hex; net-snmp truncates zeros to "0"
-- [ ] Binary string DEFVAL (8 bits)
+- [x] Binary string DEFVAL (8 bits)
   - smilint: silent
   - net-snmp: silent
-  - gomib: UNTESTED
-- [ ] Binary string not multiple of 8 bits
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemDefvalBinary (verifies 170 = 0xAA)
+- [x] Binary string not multiple of 8 bits
   - smilint [2]: "length of binary string 101 is not a multiple of 8" (line 102)
   - net-snmp: silent
-  - gomib: UNTESTED - pads to multiple of 8 with leading zeros
-- [ ] Empty BITS DEFVAL
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemDefvalBinaryOdd (verifies 5 = padded)
+- [x] Empty BITS DEFVAL
   - smilint: silent
   - net-snmp: silent
-  - gomib: UNTESTED
-- [ ] Negative integer DEFVAL
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemDefvalEmptyBits
+- [x] Negative integer DEFVAL
   - smilint: silent
   - net-snmp: silent
-  - gomib: UNTESTED
+  - gomib: TESTED - resolve_problems_extra_test.go:TestProblemDefvalNegative
 
 ## PROBLEM-NAMING-MIB
 
 Identifier naming convention violations found in vendor MIBs.
 
-gomib test coverage: GOOD for underscores/hyphens/length. NONE for uppercase
-identifiers. load_test.go:91-183 tests UNDERSCORE-TEST-MIB,
-HYPHEN-END-TEST-MIB, LONG-IDENT-TEST-MIB. parser_test.go:251-315 tests
-parser-level diagnostics for the same.
+gomib test coverage: GOOD for underscores/hyphens/length. SKIP for uppercase
+identifiers (not resolved in permissive mode). load_test.go:91-183 tests
+UNDERSCORE-TEST-MIB, HYPHEN-END-TEST-MIB, LONG-IDENT-TEST-MIB.
+parser_test.go:251-315 tests parser-level diagnostics.
 
 - [ ] Uppercase initial letter on object identifier
   - smilint [2]: "should start with a lower case letter" (lines 30,37,42,47)
   - smilint [1]: syntax error (lines 30,37,42,47) - rejects the declarations
   - net-snmp: silent (accepts uppercase identifiers)
-  - gomib: UNTESTED
+  - gomib: SKIP - resolve_problems_extra_test.go:TestProblemNamingUppercase (identifiers not resolved)
   - Real: huawei/HUAWEI-MIB.mib (92+ occurrences)
   - gomib: internal/parser/parser.go:460 (lenient in normal mode)
 - [ ] Hyphens in SMIv2 object identifier names

@@ -195,6 +195,180 @@ func TestDoubleHyphenBreaksIdentifier(t *testing.T) {
 	testutil.Equal(t, "foo-", text, "first token text")
 }
 
+// === Error handling and edge cases ===
+
+func TestUnterminatedQuotedString(t *testing.T) {
+	source := `"unterminated string`
+	lexer := New([]byte(source), nil)
+	tokens, diagnostics := lexer.Tokenize()
+
+	// Should produce a TokQuotedString token despite being unterminated
+	testutil.Equal(t, TokQuotedString, tokens[0].Kind, "unterminated string token kind")
+	testutil.Greater(t, len(diagnostics), 0, "should emit diagnostic for unterminated string")
+	testutil.Contains(t, diagnostics[0].Message, "unterminated", "diagnostic message")
+}
+
+func TestUnterminatedHexString(t *testing.T) {
+	source := "'0A1B"
+	lexer := New([]byte(source), nil)
+	tokens, diagnostics := lexer.Tokenize()
+
+	// Should produce a TokError for unterminated hex/bin string
+	testutil.Equal(t, TokError, tokens[0].Kind, "unterminated hex string token kind")
+	testutil.Greater(t, len(diagnostics), 0, "should emit diagnostic for unterminated hex string")
+}
+
+func TestHexStringMissingSuffix(t *testing.T) {
+	source := "'0A1B'X"
+	lexer := New([]byte(source), nil)
+	tokens, diagnostics := lexer.Tokenize()
+
+	// 'X' is not H or B, should produce error
+	testutil.Equal(t, TokError, tokens[0].Kind, "bad suffix should produce error token")
+	testutil.Greater(t, len(diagnostics), 0, "should emit diagnostic for bad suffix")
+}
+
+func TestEmptyHexString(t *testing.T) {
+	kinds := tokenKinds("''H")
+	testutil.Equal(t, TokHexString, kinds[0], "empty hex string should tokenize")
+}
+
+func TestEmptyBinString(t *testing.T) {
+	kinds := tokenKinds("''B")
+	testutil.Equal(t, TokBinString, kinds[0], "empty bin string should tokenize")
+}
+
+func TestUnknownCharacter(t *testing.T) {
+	// The lexer skips to end-of-line on unknown characters, so TYPE
+	// on the next line should still be found.
+	source := "OBJECT @ stuff\nTYPE"
+	lexer := New([]byte(source), nil)
+	tokens, diagnostics := lexer.Tokenize()
+
+	var hasObject, hasType bool
+	for _, tok := range tokens {
+		text := source[tok.Span.Start:tok.Span.End]
+		if text == "OBJECT" {
+			hasObject = true
+		}
+		if text == "TYPE" {
+			hasType = true
+		}
+	}
+	testutil.True(t, hasObject, "should parse OBJECT before unknown char")
+	testutil.True(t, hasType, "should parse TYPE on next line after unknown char")
+	testutil.Greater(t, len(diagnostics), 0, "should emit diagnostic for unknown character")
+}
+
+func TestLargeNumber(t *testing.T) {
+	texts := tokenTexts("4294967295 99999999999999")
+	testutil.SliceEqual(t, []string{"4294967295", "99999999999999"}, texts, "large numbers")
+}
+
+func TestIdentifierWithUnderscore(t *testing.T) {
+	// Underscores are allowed in identifiers (real-world vendor MIBs use them)
+	texts := tokenTexts("my_object MY_MODULE")
+	testutil.SliceEqual(t, []string{"my_object", "MY_MODULE"}, texts, "identifiers with underscores")
+}
+
+func TestIdentifierEndingWithHyphen(t *testing.T) {
+	// An identifier ending with hyphen before non-identifier chars
+	source := "test- OBJECT"
+	lexer := New([]byte(source), nil)
+	tokens, _ := lexer.Tokenize()
+
+	// "test-" is the identifier (hyphen is consumed as part of identifier),
+	// then whitespace, then OBJECT
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token kind")
+	text := source[tokens[0].Span.Start:tokens[0].Span.End]
+	testutil.Equal(t, "test-", text, "identifier with trailing hyphen")
+}
+
+func TestMultilineQuotedString(t *testing.T) {
+	source := "\"line1\nline2\nline3\""
+	kinds := tokenKinds(source)
+	testutil.Equal(t, TokQuotedString, kinds[0], "multiline string should tokenize as quoted string")
+}
+
+func TestCommentAtEOF(t *testing.T) {
+	source := "OBJECT -- comment at end"
+	kinds := tokenKinds(source)
+	expected := []TokenKind{TokKwObject, TokEOF}
+	testutil.SliceEqual(t, expected, kinds, "comment at EOF")
+}
+
+func TestOnlyWhitespace(t *testing.T) {
+	kinds := tokenKinds("   \t\n\r\n  ")
+	testutil.SliceEqual(t, []TokenKind{TokEOF}, kinds, "whitespace only")
+}
+
+func TestZeroNumber(t *testing.T) {
+	kinds := tokenKinds("0")
+	testutil.Equal(t, TokNumber, kinds[0], "zero is a number")
+}
+
+func TestConsecutivePunctuation(t *testing.T) {
+	kinds := tokenKinds("{{}}()")
+	expected := []TokenKind{
+		TokLBrace, TokLBrace, TokRBrace, TokRBrace,
+		TokLParen, TokRParen, TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "consecutive punctuation")
+}
+
+func TestSMIv1TypeKeywords(t *testing.T) {
+	kinds := tokenKinds("Counter Gauge NetworkAddress")
+	expected := []TokenKind{
+		TokKwCounter, TokKwGauge, TokKwNetworkAddress, TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "SMIv1 type keywords")
+}
+
+func TestASN1TagKeywords(t *testing.T) {
+	kinds := tokenKinds("APPLICATION IMPLICIT UNIVERSAL")
+	expected := []TokenKind{
+		TokKwApplication, TokKwImplicit, TokKwUniversal, TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "ASN.1 tag keywords")
+}
+
+func TestAccessKeywords(t *testing.T) {
+	kinds := tokenKinds("read-only read-write read-create write-only not-accessible accessible-for-notify not-implemented")
+	expected := []TokenKind{
+		TokKwReadOnly, TokKwReadWrite, TokKwReadCreate, TokKwWriteOnly,
+		TokKwNotAccessible, TokKwAccessibleForNotify, TokKwNotImplemented,
+		TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "access keywords")
+}
+
+func TestStatusKeywords(t *testing.T) {
+	kinds := tokenKinds("current deprecated obsolete mandatory optional")
+	expected := []TokenKind{
+		TokKwCurrent, TokKwDeprecated, TokKwObsolete,
+		TokKwMandatory, TokKwOptional, TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "status keywords")
+}
+
+func TestMacroKeywords(t *testing.T) {
+	kinds := tokenKinds("MODULE-IDENTITY OBJECT-TYPE NOTIFICATION-TYPE TEXTUAL-CONVENTION TRAP-TYPE")
+	expected := []TokenKind{
+		TokKwModuleIdentity, TokKwObjectType, TokKwNotificationType,
+		TokKwTextualConvention, TokKwTrapType, TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "macro keywords")
+}
+
+func TestConformanceKeywords(t *testing.T) {
+	kinds := tokenKinds("OBJECT-GROUP NOTIFICATION-GROUP MODULE-COMPLIANCE AGENT-CAPABILITIES")
+	expected := []TokenKind{
+		TokKwObjectGroup, TokKwNotificationGroup, TokKwModuleCompliance,
+		TokKwAgentCapabilities, TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "conformance keywords")
+}
+
 func TestKeywordLookup(t *testing.T) {
 	tests := []struct {
 		text     string
