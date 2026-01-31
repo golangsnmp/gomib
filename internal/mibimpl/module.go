@@ -16,6 +16,9 @@ type Module struct {
 	objects       []*Object
 	types         []*Type
 	notifications []*Notification
+	groups        []*Group
+	compliances   []*Compliance
+	capabilities  []*Capabilities
 	nodes         []*Node // for OBJECT IDENTIFIER assignments
 }
 
@@ -149,6 +152,57 @@ func (m *Module) Notification(name string) mib.Notification {
 	return nil
 }
 
+func (m *Module) Groups() []mib.Group {
+	result := make([]mib.Group, len(m.groups))
+	for i, g := range m.groups {
+		result[i] = g
+	}
+	return result
+}
+
+func (m *Module) Group(name string) mib.Group {
+	for _, g := range m.groups {
+		if g.name == name {
+			return g
+		}
+	}
+	return nil
+}
+
+func (m *Module) Compliances() []mib.Compliance {
+	result := make([]mib.Compliance, len(m.compliances))
+	for i, c := range m.compliances {
+		result[i] = c
+	}
+	return result
+}
+
+func (m *Module) ComplianceByName(name string) mib.Compliance {
+	for _, c := range m.compliances {
+		if c.name == name {
+			return c
+		}
+	}
+	return nil
+}
+
+func (m *Module) Capabilities() []mib.Capabilities {
+	result := make([]mib.Capabilities, len(m.capabilities))
+	for i, c := range m.capabilities {
+		result[i] = c
+	}
+	return result
+}
+
+func (m *Module) CapabilitiesByName(name string) mib.Capabilities {
+	for _, c := range m.capabilities {
+		if c.name == name {
+			return c
+		}
+	}
+	return nil
+}
+
 // Mutation methods (for resolver use)
 
 func (m *Module) SetLanguage(l mib.Language) {
@@ -185,6 +239,18 @@ func (m *Module) AddType(t *Type) {
 
 func (m *Module) AddNotification(n *Notification) {
 	m.notifications = append(m.notifications, n)
+}
+
+func (m *Module) AddGroup(g *Group) {
+	m.groups = append(m.groups, g)
+}
+
+func (m *Module) AddCompliance(c *Compliance) {
+	m.compliances = append(m.compliances, c)
+}
+
+func (m *Module) AddCapabilities(c *Capabilities) {
+	m.capabilities = append(m.capabilities, c)
 }
 
 func (m *Module) AddNode(n *Node) {
@@ -224,4 +290,19 @@ func (m *Module) InternalTypes() []*Type {
 // InternalNotifications returns the concrete notifications slice for resolver use.
 func (m *Module) InternalNotifications() []*Notification {
 	return m.notifications
+}
+
+// InternalGroups returns the concrete groups slice for resolver use.
+func (m *Module) InternalGroups() []*Group {
+	return m.groups
+}
+
+// InternalCompliances returns the concrete compliances slice for resolver use.
+func (m *Module) InternalCompliances() []*Compliance {
+	return m.compliances
+}
+
+// InternalCapabilities returns the concrete capabilities slice for resolver use.
+func (m *Module) InternalCapabilities() []*Capabilities {
+	return m.capabilities
 }

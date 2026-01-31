@@ -10,14 +10,17 @@ import (
 
 // Node is the concrete implementation of mib.Node.
 type Node struct {
-	arc      uint32
-	name     string
-	kind     mib.Kind
-	module   *Module // defining module (for OID assignments)
-	obj      *Object
-	notif    *Notification
-	parent   *Node
-	children map[uint32]*Node
+	arc          uint32
+	name         string
+	kind         mib.Kind
+	module       *Module // defining module (for OID assignments)
+	obj          *Object
+	notif        *Notification
+	group        *Group
+	compliance   *Compliance
+	capabilities *Capabilities
+	parent       *Node
+	children     map[uint32]*Node
 }
 
 // Interface methods (mib.Node)
@@ -39,12 +42,21 @@ func (n *Node) IsRoot() bool {
 }
 
 func (n *Node) Module() mib.Module {
-	// Check associated object/notification first, then direct module
+	// Check associated object/notification/group first, then direct module
 	if n.obj != nil {
 		return n.obj.module
 	}
 	if n.notif != nil {
 		return n.notif.module
+	}
+	if n.group != nil {
+		return n.group.module
+	}
+	if n.compliance != nil {
+		return n.compliance.module
+	}
+	if n.capabilities != nil {
+		return n.capabilities.module
 	}
 	if n.module != nil {
 		return n.module
@@ -83,6 +95,27 @@ func (n *Node) Notification() mib.Notification {
 		return nil
 	}
 	return n.notif
+}
+
+func (n *Node) Group() mib.Group {
+	if n.group == nil {
+		return nil
+	}
+	return n.group
+}
+
+func (n *Node) Compliance() mib.Compliance {
+	if n.compliance == nil {
+		return nil
+	}
+	return n.compliance
+}
+
+func (n *Node) Capabilities() mib.Capabilities {
+	if n.capabilities == nil {
+		return nil
+	}
+	return n.capabilities
 }
 
 func (n *Node) Parent() mib.Node {
@@ -218,6 +251,18 @@ func (n *Node) SetNotification(notif *Notification) {
 	n.notif = notif
 }
 
+func (n *Node) SetGroup(g *Group) {
+	n.group = g
+}
+
+func (n *Node) SetCompliance(c *Compliance) {
+	n.compliance = c
+}
+
+func (n *Node) SetCapabilities(c *Capabilities) {
+	n.capabilities = c
+}
+
 // InternalObject returns the concrete object for resolver use.
 func (n *Node) InternalObject() *Object {
 	return n.obj
@@ -226,6 +271,21 @@ func (n *Node) InternalObject() *Object {
 // InternalNotification returns the concrete notification for resolver use.
 func (n *Node) InternalNotification() *Notification {
 	return n.notif
+}
+
+// InternalGroup returns the concrete group for resolver use.
+func (n *Node) InternalGroup() *Group {
+	return n.group
+}
+
+// InternalCompliance returns the concrete compliance for resolver use.
+func (n *Node) InternalCompliance() *Compliance {
+	return n.compliance
+}
+
+// InternalCapabilities returns the concrete capabilities for resolver use.
+func (n *Node) InternalCapabilities() *Capabilities {
+	return n.capabilities
 }
 
 // InternalParent returns the concrete parent for resolver use.

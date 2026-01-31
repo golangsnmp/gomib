@@ -461,23 +461,23 @@ func (p *Parser) parseDefinition() (ast.Definition, *types.Diagnostic) {
 		return p.parseValueAssignment()
 
 	// OBJECT-TYPE
-	case first == lexer.TokLowercaseIdent && second == lexer.TokKwObjectType:
+	case isValueRefToken(first) && second == lexer.TokKwObjectType:
 		return p.parseObjectType()
 
 	// MODULE-IDENTITY
-	case first == lexer.TokLowercaseIdent && second == lexer.TokKwModuleIdentity:
+	case isValueRefToken(first) && second == lexer.TokKwModuleIdentity:
 		return p.parseModuleIdentity()
 
 	// OBJECT-IDENTITY
-	case first == lexer.TokLowercaseIdent && second == lexer.TokKwObjectIdentity:
+	case isValueRefToken(first) && second == lexer.TokKwObjectIdentity:
 		return p.parseObjectIdentity()
 
 	// NOTIFICATION-TYPE
-	case first == lexer.TokLowercaseIdent && second == lexer.TokKwNotificationType:
+	case isValueRefToken(first) && second == lexer.TokKwNotificationType:
 		return p.parseNotificationType()
 
 	// TRAP-TYPE
-	case first == lexer.TokLowercaseIdent && second == lexer.TokKwTrapType:
+	case isValueRefToken(first) && second == lexer.TokKwTrapType:
 		return p.parseTrapType()
 
 	// TEXTUAL-CONVENTION
@@ -485,19 +485,19 @@ func (p *Parser) parseDefinition() (ast.Definition, *types.Diagnostic) {
 		return p.parseTextualConvention()
 
 	// OBJECT-GROUP
-	case first == lexer.TokLowercaseIdent && second == lexer.TokKwObjectGroup:
+	case isValueRefToken(first) && second == lexer.TokKwObjectGroup:
 		return p.parseObjectGroup()
 
 	// NOTIFICATION-GROUP
-	case first == lexer.TokLowercaseIdent && second == lexer.TokKwNotificationGroup:
+	case isValueRefToken(first) && second == lexer.TokKwNotificationGroup:
 		return p.parseNotificationGroup()
 
 	// MODULE-COMPLIANCE
-	case first == lexer.TokLowercaseIdent && second == lexer.TokKwModuleCompliance:
+	case isValueRefToken(first) && second == lexer.TokKwModuleCompliance:
 		return p.parseModuleCompliance()
 
 	// AGENT-CAPABILITIES
-	case first == lexer.TokLowercaseIdent && second == lexer.TokKwAgentCapabilities:
+	case isValueRefToken(first) && second == lexer.TokKwAgentCapabilities:
 		return p.parseAgentCapabilities()
 
 	// Type assignment or TEXTUAL-CONVENTION: TypeName ::=
@@ -660,6 +660,7 @@ func (p *Parser) parseObjectType() (ast.Definition, *types.Diagnostic) {
 
 	nameToken := p.advance()
 	name := p.makeIdentWithValidation(nameToken)
+	p.validateValueReference(name.Name, nameToken.Span)
 
 	if _, err := p.expect(lexer.TokKwObjectType); err != nil {
 		return nil, err
@@ -1692,6 +1693,7 @@ func (p *Parser) parseModuleIdentity() (ast.Definition, *types.Diagnostic) {
 
 	nameToken := p.advance()
 	name := p.makeIdentWithValidation(nameToken)
+	p.validateValueReference(name.Name, nameToken.Span)
 
 	if _, err := p.expect(lexer.TokKwModuleIdentity); err != nil {
 		return nil, err
@@ -1785,6 +1787,7 @@ func (p *Parser) parseObjectIdentity() (ast.Definition, *types.Diagnostic) {
 
 	nameToken := p.advance()
 	name := p.makeIdentWithValidation(nameToken)
+	p.validateValueReference(name.Name, nameToken.Span)
 
 	if _, err := p.expect(lexer.TokKwObjectIdentity); err != nil {
 		return nil, err
@@ -1842,6 +1845,7 @@ func (p *Parser) parseNotificationType() (ast.Definition, *types.Diagnostic) {
 
 	nameToken := p.advance()
 	name := p.makeIdentWithValidation(nameToken)
+	p.validateValueReference(name.Name, nameToken.Span)
 
 	if _, err := p.expect(lexer.TokKwNotificationType); err != nil {
 		return nil, err
@@ -1917,6 +1921,7 @@ func (p *Parser) parseTrapType() (ast.Definition, *types.Diagnostic) {
 
 	nameToken := p.advance()
 	name := p.makeIdentWithValidation(nameToken)
+	p.validateValueReference(name.Name, nameToken.Span)
 
 	if _, err := p.expect(lexer.TokKwTrapType); err != nil {
 		return nil, err
@@ -2164,6 +2169,7 @@ func (p *Parser) parseObjectGroup() (ast.Definition, *types.Diagnostic) {
 
 	nameToken := p.advance()
 	name := p.makeIdentWithValidation(nameToken)
+	p.validateValueReference(name.Name, nameToken.Span)
 
 	if _, err := p.expect(lexer.TokKwObjectGroup); err != nil {
 		return nil, err
@@ -2237,6 +2243,7 @@ func (p *Parser) parseNotificationGroup() (ast.Definition, *types.Diagnostic) {
 
 	nameToken := p.advance()
 	name := p.makeIdentWithValidation(nameToken)
+	p.validateValueReference(name.Name, nameToken.Span)
 
 	if _, err := p.expect(lexer.TokKwNotificationGroup); err != nil {
 		return nil, err
@@ -2310,6 +2317,7 @@ func (p *Parser) parseModuleCompliance() (ast.Definition, *types.Diagnostic) {
 
 	nameToken := p.advance()
 	name := p.makeIdentWithValidation(nameToken)
+	p.validateValueReference(name.Name, nameToken.Span)
 
 	if _, err := p.expect(lexer.TokKwModuleCompliance); err != nil {
 		return nil, err
@@ -2551,6 +2559,7 @@ func (p *Parser) parseAgentCapabilities() (ast.Definition, *types.Diagnostic) {
 
 	nameToken := p.advance()
 	name := p.makeIdentWithValidation(nameToken)
+	p.validateValueReference(name.Name, nameToken.Span)
 
 	if _, err := p.expect(lexer.TokKwAgentCapabilities); err != nil {
 		return nil, err

@@ -20,6 +20,15 @@ type Type = mib.Type
 // Notification is a NOTIFICATION-TYPE or TRAP-TYPE.
 type Notification = mib.Notification
 
+// Group is an OBJECT-GROUP or NOTIFICATION-GROUP definition.
+type Group = mib.Group
+
+// Compliance is a MODULE-COMPLIANCE definition.
+type Compliance = mib.Compliance
+
+// Capabilities is an AGENT-CAPABILITIES definition.
+type Capabilities = mib.Capabilities
+
 // Module is a MIB module.
 type Module = mib.Module
 
@@ -61,6 +70,24 @@ type Diagnostic = mib.Diagnostic
 
 // UnresolvedRef describes a symbol that could not be resolved.
 type UnresolvedRef = mib.UnresolvedRef
+
+// ComplianceModule is a MODULE clause within a MODULE-COMPLIANCE definition.
+type ComplianceModule = mib.ComplianceModule
+
+// ComplianceGroup is a GROUP clause within MODULE-COMPLIANCE.
+type ComplianceGroup = mib.ComplianceGroup
+
+// ComplianceObject is an OBJECT refinement within MODULE-COMPLIANCE.
+type ComplianceObject = mib.ComplianceObject
+
+// CapabilitiesModule is a SUPPORTS clause within an AGENT-CAPABILITIES definition.
+type CapabilitiesModule = mib.CapabilitiesModule
+
+// ObjectVariation is an object VARIATION within AGENT-CAPABILITIES.
+type ObjectVariation = mib.ObjectVariation
+
+// NotificationVariation is a notification VARIATION within AGENT-CAPABILITIES.
+type NotificationVariation = mib.NotificationVariation
 
 // DefVal represents a default value with both interpreted value and raw MIB syntax.
 type DefVal = mib.DefVal

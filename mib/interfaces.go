@@ -14,6 +14,9 @@ type Mib interface {
 	FindObject(query string) Object
 	FindType(query string) Type
 	FindNotification(query string) Notification
+	FindGroup(query string) Group
+	FindCompliance(query string) Compliance
+	FindCapabilities(query string) Capabilities
 
 	// By OID (for when you already have an Oid value)
 	NodeByOID(oid Oid) Node
@@ -27,6 +30,9 @@ type Mib interface {
 	Objects() []Object
 	Types() []Type
 	Notifications() []Notification
+	Groups() []Group
+	Compliances() []Compliance
+	Capabilities() []Capabilities
 
 	// Filtered collections
 	Tables() []Object
@@ -39,6 +45,9 @@ type Mib interface {
 	ObjectCount() int
 	TypeCount() int
 	NotificationCount() int
+	GroupCount() int
+	ComplianceCount() int
+	CapabilitiesCount() int
 	NodeCount() int
 
 	// Diagnostics
@@ -58,6 +67,9 @@ type Node interface {
 	// Associated definitions (nil if none)
 	Object() Object
 	Notification() Notification
+	Group() Group
+	Compliance() Compliance
+	Capabilities() Capabilities
 
 	// Tree navigation
 	Parent() Node
@@ -86,6 +98,9 @@ type Module interface {
 	Objects() []Object
 	Types() []Type
 	Notifications() []Notification
+	Groups() []Group
+	Compliances() []Compliance
+	Capabilities() []Capabilities
 
 	// Filtered collections
 	Tables() []Object
@@ -98,6 +113,9 @@ type Module interface {
 	Object(name string) Object
 	Type(name string) Type
 	Notification(name string) Notification
+	Group(name string) Group
+	ComplianceByName(name string) Compliance
+	CapabilitiesByName(name string) Capabilities
 }
 
 // Object is an OBJECT-TYPE definition.
@@ -198,4 +216,52 @@ type Notification interface {
 	Description() string
 	Reference() string
 	Objects() []Object
+}
+
+// Group is an OBJECT-GROUP or NOTIFICATION-GROUP definition.
+type Group interface {
+	Name() string
+	Node() Node
+	Module() Module
+	OID() Oid
+	Status() Status
+	Description() string
+	Reference() string
+
+	// Members returns the resolved OID tree nodes for each member
+	// of this group (objects for OBJECT-GROUP, notifications for
+	// NOTIFICATION-GROUP).
+	Members() []Node
+
+	// IsNotificationGroup reports whether this is a NOTIFICATION-GROUP.
+	IsNotificationGroup() bool
+}
+
+// Compliance is a MODULE-COMPLIANCE definition.
+type Compliance interface {
+	Name() string
+	Node() Node
+	Module() Module
+	OID() Oid
+	Status() Status
+	Description() string
+	Reference() string
+
+	// Modules returns the MODULE clauses in this compliance statement.
+	Modules() []ComplianceModule
+}
+
+// Capabilities is an AGENT-CAPABILITIES definition.
+type Capabilities interface {
+	Name() string
+	Node() Node
+	Module() Module
+	OID() Oid
+	Status() Status
+	Description() string
+	Reference() string
+	ProductRelease() string
+
+	// Supports returns the SUPPORTS clauses in this capabilities statement.
+	Supports() []CapabilitiesModule
 }

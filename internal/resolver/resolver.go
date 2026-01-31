@@ -71,7 +71,8 @@ func (r *resolver) resolve(mods []*module.Module) mib.Mib {
 	analyzeSemantics(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "semantics"),
 		slog.Int("objects", ctx.Builder.ObjectCount()),
-		slog.Int("notifications", ctx.Builder.NotificationCount()))
+		slog.Int("notifications", ctx.Builder.NotificationCount()),
+		slog.Int("groups", ctx.Builder.GroupCount()))
 
 	ctx.DropModules()
 

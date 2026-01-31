@@ -81,6 +81,21 @@ func (b *Builder) AddNotification(n *Notification) {
 	b.data.notifications = append(b.data.notifications, n)
 }
 
+// AddGroup adds a group to the Mib.
+func (b *Builder) AddGroup(g *Group) {
+	b.data.groups = append(b.data.groups, g)
+}
+
+// AddCompliance adds a compliance to the Mib.
+func (b *Builder) AddCompliance(c *Compliance) {
+	b.data.compliances = append(b.data.compliances, c)
+}
+
+// AddCapabilities adds a capabilities to the Mib.
+func (b *Builder) AddCapabilities(c *Capabilities) {
+	b.data.capabilities = append(b.data.capabilities, c)
+}
+
 // AddUnresolved adds an unresolved reference.
 func (b *Builder) AddUnresolved(ref mib.UnresolvedRef) {
 	b.data.unresolved = append(b.data.unresolved, ref)
@@ -109,6 +124,21 @@ func (b *Builder) ObjectCount() int {
 // NotificationCount returns the number of notifications.
 func (b *Builder) NotificationCount() int {
 	return len(b.data.notifications)
+}
+
+// GroupCount returns the number of groups.
+func (b *Builder) GroupCount() int {
+	return len(b.data.groups)
+}
+
+// ComplianceCount returns the number of compliances.
+func (b *Builder) ComplianceCount() int {
+	return len(b.data.compliances)
+}
+
+// CapabilitiesCount returns the number of capabilities.
+func (b *Builder) CapabilitiesCount() int {
+	return len(b.data.capabilities)
 }
 
 // NodeCount returns the total number of nodes in the tree.
@@ -148,6 +178,21 @@ func NewType(name string) *Type {
 // NewNotification creates a new notification with the given name.
 func NewNotification(name string) *Notification {
 	return &Notification{name: name}
+}
+
+// NewGroup creates a new group with the given name.
+func NewGroup(name string) *Group {
+	return &Group{name: name}
+}
+
+// NewCompliance creates a new compliance with the given name.
+func NewCompliance(name string) *Compliance {
+	return &Compliance{name: name}
+}
+
+// NewCapabilities creates a new capabilities with the given name.
+func NewCapabilities(name string) *Capabilities {
+	return &Capabilities{name: name}
 }
 
 // EmptyMib returns a new empty Mib.

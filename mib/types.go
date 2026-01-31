@@ -161,6 +161,49 @@ func bytesToHex(b []byte) string {
 	return string(result)
 }
 
+// ComplianceModule is a MODULE clause within a MODULE-COMPLIANCE definition.
+type ComplianceModule struct {
+	ModuleName      string             // module name (empty = current module)
+	MandatoryGroups []string           // MANDATORY-GROUPS references
+	Groups          []ComplianceGroup  // GROUP refinements
+	Objects         []ComplianceObject // OBJECT refinements
+}
+
+// ComplianceGroup is a GROUP clause within MODULE-COMPLIANCE.
+type ComplianceGroup struct {
+	Group       string // group reference name
+	Description string
+}
+
+// ComplianceObject is an OBJECT refinement within MODULE-COMPLIANCE.
+type ComplianceObject struct {
+	Object      string  // object reference name
+	MinAccess   *Access // MIN-ACCESS restriction (nil if not specified)
+	Description string
+}
+
+// CapabilitiesModule is a SUPPORTS clause within an AGENT-CAPABILITIES definition.
+type CapabilitiesModule struct {
+	ModuleName             string                  // supported module name
+	Includes               []string                // INCLUDES group references
+	ObjectVariations       []ObjectVariation       // object VARIATION clauses
+	NotificationVariations []NotificationVariation // notification VARIATION clauses
+}
+
+// ObjectVariation is an object VARIATION within AGENT-CAPABILITIES.
+type ObjectVariation struct {
+	Object      string  // object reference name
+	Access      *Access // ACCESS restriction (nil if not specified)
+	Description string
+}
+
+// NotificationVariation is a notification VARIATION within AGENT-CAPABILITIES.
+type NotificationVariation struct {
+	Notification string  // notification reference name
+	Access       *Access // ACCESS restriction (nil if not specified)
+	Description  string
+}
+
 // UnresolvedRef describes a symbol that could not be resolved.
 type UnresolvedRef struct {
 	Kind   string // "type", "object", "import"

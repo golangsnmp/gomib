@@ -397,6 +397,52 @@ func TestLongIdentifierViolationEmitsDiagnostic(t *testing.T) {
 	testutil.Equal(t, 1, lengthDiags, "expected 1 identifier-length-64 diagnostic")
 }
 
+func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	problems, err := DirTree("testdata/corpus/problems")
+	if err != nil {
+		t.Fatalf("DirTree problems failed: %v", err)
+	}
+	src := Multi(corpus, problems)
+
+	ctx := context.Background()
+
+	// In normal mode, should emit bad-identifier-case diagnostics
+	m, err := LoadModules(ctx, []string{"PROBLEM-NAMING-MIB"}, src, WithStrictness(StrictnessNormal))
+	if err != nil {
+		t.Fatalf("LoadModules failed: %v", err)
+	}
+
+	var caseDiags int
+	for _, d := range m.Diagnostics() {
+		if d.Code == "bad-identifier-case" {
+			caseDiags++
+		}
+	}
+	testutil.Equal(t, 4, caseDiags, "expected 4 bad-identifier-case diagnostics in normal mode")
+
+	// Objects should still resolve in normal mode (diagnostic is non-fatal)
+	node := m.FindNode("NetEngine8000SysOid")
+	testutil.NotNil(t, node, "uppercase identifier should resolve in normal mode")
+
+	// In permissive mode, diagnostics should be suppressed
+	m, err = LoadModules(ctx, []string{"PROBLEM-NAMING-MIB"}, src, WithStrictness(StrictnessPermissive))
+	if err != nil {
+		t.Fatalf("LoadModules failed: %v", err)
+	}
+
+	caseDiags = 0
+	for _, d := range m.Diagnostics() {
+		if d.Code == "bad-identifier-case" {
+			caseDiags++
+		}
+	}
+	testutil.Equal(t, 0, caseDiags, "expected no bad-identifier-case diagnostics in permissive mode")
+}
+
 func TestMissingModuleIdentityEmitsDiagnostic(t *testing.T) {
 	corpus, err := DirTree("testdata/corpus/primary")
 	if err != nil {

@@ -56,6 +56,7 @@ func PermissiveConfig() DiagnosticConfig {
 		Ignore: []string{
 			"identifier-underscore",
 			"identifier-length-32",
+			"bad-identifier-case",
 		},
 	}
 }

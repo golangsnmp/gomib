@@ -14,6 +14,9 @@ type MibData struct {
 	objects       []*Object
 	types         []*Type
 	notifications []*Notification
+	groups        []*Group
+	compliances   []*Compliance
+	capabilities  []*Capabilities
 
 	moduleByName map[string]*Module
 	nameToNodes  map[string][]*Node
@@ -357,6 +360,180 @@ func (m *MibData) NotificationCount() int {
 	return len(m.notifications)
 }
 
+func (m *MibData) Groups() []mib.Group {
+	result := make([]mib.Group, len(m.groups))
+	for i, g := range m.groups {
+		result[i] = g
+	}
+	return result
+}
+
+func (m *MibData) FindGroup(query string) mib.Group {
+	// Try qualified name first (MODULE::name)
+	if idx := strings.Index(query, "::"); idx >= 0 {
+		g := m.findGroupByQualified(query)
+		if g == nil {
+			return nil
+		}
+		return g
+	}
+
+	// Try numeric OID (starts with digit)
+	if len(query) > 0 && query[0] >= '0' && query[0] <= '9' {
+		oid, err := mib.ParseOID(query)
+		if err != nil || len(oid) == 0 {
+			return nil
+		}
+		nd := m.nodeByOID(oid)
+		if nd == nil || nd.group == nil {
+			return nil
+		}
+		return nd.group
+	}
+
+	// Try partial OID (starts with .)
+	if len(query) > 0 && query[0] == '.' {
+		oid, err := mib.ParseOID(query[1:])
+		if err != nil || len(oid) == 0 {
+			return nil
+		}
+		nd := m.nodeByOID(oid)
+		if nd == nil || nd.group == nil {
+			return nil
+		}
+		return nd.group
+	}
+
+	// Try name lookup
+	nodes := m.nameToNodes[query]
+	for _, nd := range nodes {
+		if nd.group != nil {
+			return nd.group
+		}
+	}
+	return nil
+}
+
+func (m *MibData) GroupCount() int {
+	return len(m.groups)
+}
+
+func (m *MibData) Compliances() []mib.Compliance {
+	result := make([]mib.Compliance, len(m.compliances))
+	for i, c := range m.compliances {
+		result[i] = c
+	}
+	return result
+}
+
+func (m *MibData) FindCompliance(query string) mib.Compliance {
+	// Try qualified name first (MODULE::name)
+	if idx := strings.Index(query, "::"); idx >= 0 {
+		c := m.findComplianceByQualified(query)
+		if c == nil {
+			return nil
+		}
+		return c
+	}
+
+	// Try numeric OID (starts with digit)
+	if len(query) > 0 && query[0] >= '0' && query[0] <= '9' {
+		oid, err := mib.ParseOID(query)
+		if err != nil || len(oid) == 0 {
+			return nil
+		}
+		nd := m.nodeByOID(oid)
+		if nd == nil || nd.compliance == nil {
+			return nil
+		}
+		return nd.compliance
+	}
+
+	// Try partial OID (starts with .)
+	if len(query) > 0 && query[0] == '.' {
+		oid, err := mib.ParseOID(query[1:])
+		if err != nil || len(oid) == 0 {
+			return nil
+		}
+		nd := m.nodeByOID(oid)
+		if nd == nil || nd.compliance == nil {
+			return nil
+		}
+		return nd.compliance
+	}
+
+	// Try name lookup
+	nodes := m.nameToNodes[query]
+	for _, nd := range nodes {
+		if nd.compliance != nil {
+			return nd.compliance
+		}
+	}
+	return nil
+}
+
+func (m *MibData) ComplianceCount() int {
+	return len(m.compliances)
+}
+
+func (m *MibData) Capabilities() []mib.Capabilities {
+	result := make([]mib.Capabilities, len(m.capabilities))
+	for i, c := range m.capabilities {
+		result[i] = c
+	}
+	return result
+}
+
+func (m *MibData) FindCapabilities(query string) mib.Capabilities {
+	// Try qualified name first (MODULE::name)
+	if idx := strings.Index(query, "::"); idx >= 0 {
+		c := m.findCapabilitiesByQualified(query)
+		if c == nil {
+			return nil
+		}
+		return c
+	}
+
+	// Try numeric OID (starts with digit)
+	if len(query) > 0 && query[0] >= '0' && query[0] <= '9' {
+		oid, err := mib.ParseOID(query)
+		if err != nil || len(oid) == 0 {
+			return nil
+		}
+		nd := m.nodeByOID(oid)
+		if nd == nil || nd.capabilities == nil {
+			return nil
+		}
+		return nd.capabilities
+	}
+
+	// Try partial OID (starts with .)
+	if len(query) > 0 && query[0] == '.' {
+		oid, err := mib.ParseOID(query[1:])
+		if err != nil || len(oid) == 0 {
+			return nil
+		}
+		nd := m.nodeByOID(oid)
+		if nd == nil || nd.capabilities == nil {
+			return nil
+		}
+		return nd.capabilities
+	}
+
+	// Try name lookup
+	nodes := m.nameToNodes[query]
+	for _, nd := range nodes {
+		if nd.capabilities != nil {
+			return nd.capabilities
+		}
+	}
+	return nil
+}
+
+func (m *MibData) CapabilitiesCount() int {
+	return len(m.capabilities)
+}
+
 func (m *MibData) NodeCount() int {
 	count := 0
 	for range m.Nodes() {
@@ -417,6 +594,57 @@ func (m *MibData) findNotificationByQualified(qname string) *Notification {
 	for _, notif := range mod.notifications {
 		if notif.name == notifName {
 			return notif
+		}
+	}
+	return nil
+}
+
+func (m *MibData) findGroupByQualified(qname string) *Group {
+	moduleName, groupName, ok := parseQualifiedName(qname)
+	if !ok {
+		return nil
+	}
+	mod := m.moduleByName[moduleName]
+	if mod == nil {
+		return nil
+	}
+	for _, g := range mod.groups {
+		if g.name == groupName {
+			return g
+		}
+	}
+	return nil
+}
+
+func (m *MibData) findComplianceByQualified(qname string) *Compliance {
+	moduleName, compName, ok := parseQualifiedName(qname)
+	if !ok {
+		return nil
+	}
+	mod := m.moduleByName[moduleName]
+	if mod == nil {
+		return nil
+	}
+	for _, c := range mod.compliances {
+		if c.name == compName {
+			return c
+		}
+	}
+	return nil
+}
+
+func (m *MibData) findCapabilitiesByQualified(qname string) *Capabilities {
+	moduleName, capName, ok := parseQualifiedName(qname)
+	if !ok {
+		return nil
+	}
+	mod := m.moduleByName[moduleName]
+	if mod == nil {
+		return nil
+	}
+	for _, c := range mod.capabilities {
+		if c.name == capName {
+			return c
 		}
 	}
 	return nil
