@@ -274,6 +274,28 @@ func TestProblemNotifications(t *testing.T) {
 	})
 }
 
+// TestProblemNotifBadGroup verifies that a diagnostic is emitted when an
+// OBJECT-GROUP includes a not-accessible object.
+// Ground truth: smilint [3] "node is an invalid member of object group"
+func TestProblemNotifBadGroup(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-NOTIFICATIONS-MIB")
+
+	found := false
+	for _, d := range m.Diagnostics() {
+		if d.Code == "group-not-accessible" && d.Module == "PROBLEM-NOTIFICATIONS-MIB" {
+			found = true
+			if !strings.Contains(d.Message, "problemNotifIndex") {
+				t.Errorf("diagnostic should mention problemNotifIndex, got: %s", d.Message)
+			}
+			if !strings.Contains(d.Message, "problemNotifBadGroup") {
+				t.Errorf("diagnostic should mention problemNotifBadGroup, got: %s", d.Message)
+			}
+		}
+	}
+	testutil.True(t, found,
+		"should emit group-not-accessible diagnostic for not-accessible index in OBJECT-GROUP")
+}
+
 // TestProblemRevisions verifies that MODULE-IDENTITY revision handling works
 // for out-of-order revisions and pre-identity object declarations.
 // Ground truth: net-snmp resolves all objects regardless of declaration order.
@@ -353,6 +375,22 @@ func TestProblemRevisions(t *testing.T) {
 		testutil.True(t, has2024, "2024 revision should be present (dates=%v)", dates)
 		testutil.True(t, has2025, "2025 revision should be present (dates=%v)", dates)
 		testutil.True(t, has2023, "2023 revision should be present (dates=%v)", dates)
+	})
+
+	t.Run("missing revision for LAST-UPDATED emits diagnostic", func(t *testing.T) {
+		// LAST-UPDATED "202601280000Z" but no REVISION with that date.
+		// smilint [3]: "revision for last update is missing"
+		found := false
+		for _, d := range m.Diagnostics() {
+			if d.Code == "revision-last-updated" && d.Module == "PROBLEM-REVISIONS-MIB" {
+				found = true
+				if !strings.Contains(d.Message, "202601280000Z") {
+					t.Errorf("diagnostic message should mention the date, got: %s", d.Message)
+				}
+			}
+		}
+		testutil.True(t, found,
+			"should emit revision-last-updated diagnostic for missing revision")
 	})
 }
 
@@ -1075,7 +1113,7 @@ func TestProblemNamingUppercase(t *testing.T) {
 	normalObj := m.FindObject("problemNormalObject")
 	testutil.NotNil(t, normalObj, "normal lowercase object should resolve")
 
-	// Uppercase identifiers - these may or may not resolve depending on parser
+	// Uppercase identifiers should resolve in permissive mode
 	uppercaseNames := []string{
 		"NetEngine8000SysOid",
 		"S6730-H28Y4C",
@@ -1086,11 +1124,44 @@ func TestProblemNamingUppercase(t *testing.T) {
 	for _, name := range uppercaseNames {
 		t.Run(name, func(t *testing.T) {
 			node := m.FindNode(name)
-			if node == nil {
-				t.Skipf("%s not resolved - uppercase identifiers may not be supported in this mode", name)
-				return
-			}
-			t.Logf("%s resolved: OID=%s Kind=%s", name, node.OID(), node.Kind())
+			testutil.NotNil(t, node, "%s should resolve in permissive mode", name)
 		})
+	}
+}
+
+// TestProblemNamingHyphens verifies that a diagnostic is emitted for
+// identifiers containing hyphens in SMIv2 modules.
+// Ground truth: smilint [5] "object identifier name should not include hyphens in SMIv2 MIB"
+// PROBLEMS.md: PROBLEM-NAMING-MIB / Hyphens in SMIv2 object identifier names
+func TestProblemNamingHyphens(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-NAMING-MIB")
+
+	// Collect all hyphen diagnostics for this module
+	hyphenDiags := make(map[string]bool)
+	for _, d := range m.Diagnostics() {
+		if d.Code == "identifier-hyphen-smiv2" && d.Module == "PROBLEM-NAMING-MIB" {
+			hyphenDiags[d.Message] = true
+		}
+	}
+
+	// These three identifiers contain hyphens and should be flagged
+	wantFlagged := []string{"S6730-H28Y4C", "S5735-L8T4X-A1", "NetEngine-A800"}
+	for _, name := range wantFlagged {
+		found := false
+		for msg := range hyphenDiags {
+			if strings.Contains(msg, name) {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found,
+			"should emit identifier-hyphen-smiv2 diagnostic for %s", name)
+	}
+
+	// NetEngine8000SysOid has no hyphens and should NOT be flagged
+	for msg := range hyphenDiags {
+		if strings.Contains(msg, "NetEngine8000SysOid") {
+			t.Errorf("NetEngine8000SysOid should not be flagged (no hyphens), got: %s", msg)
+		}
 	}
 }

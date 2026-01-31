@@ -101,8 +101,9 @@ func Lower(astModule *ast.Module, logger *slog.Logger, diagConfig mib.Diagnostic
 	if module.Language == LanguageSMIv2 && !isSMIv2BaseModule(module.Name) {
 		hasModuleIdentity := false
 		for _, def := range module.Definitions {
-			if _, ok := def.(*ModuleIdentity); ok {
+			if mi, ok := def.(*ModuleIdentity); ok {
 				hasModuleIdentity = true
+				checkRevisionLastUpdated(ctx, module.Name, mi)
 				break
 			}
 		}
@@ -265,6 +266,21 @@ func lowerModuleIdentity(def *ast.ModuleIdentityDef) *ModuleIdentity {
 		Oid:          lowerOidAssignment(def.OidAssignment),
 		Span:         def.Span,
 	}
+}
+
+// checkRevisionLastUpdated emits a diagnostic if the LAST-UPDATED date has no
+// matching REVISION entry. smilint flags this at level 3.
+func checkRevisionLastUpdated(ctx *LoweringContext, moduleName string, mi *ModuleIdentity) {
+	if mi.LastUpdated == "" {
+		return
+	}
+	for _, r := range mi.Revisions {
+		if r.Date == mi.LastUpdated {
+			return
+		}
+	}
+	ctx.emitDiagnostic("revision-last-updated", mib.SeverityMinor, moduleName,
+		fmt.Sprintf("revision for LAST-UPDATED %s is missing", mi.LastUpdated))
 }
 
 func lowerObjectIdentity(def *ast.ObjectIdentityDef) *ObjectIdentity {

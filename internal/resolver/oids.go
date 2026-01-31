@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"log/slog"
+	"strings"
 
 	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/mibimpl"
@@ -30,6 +31,9 @@ var smiGlobalOidRoots = map[string]struct{}{
 
 func resolveOids(ctx *ResolverContext) {
 	defs := collectOidDefinitions(ctx)
+
+	// Check for hyphens in SMIv2 object identifier names
+	checkSmiv2IdentifierHyphens(ctx, defs.oidDefs)
 
 	// Build dependency graph for OID definitions
 	g := graph.New()
@@ -185,6 +189,22 @@ func recordUnresolvedFirstComponent(ctx *ResolverContext, def oidDefinition, oid
 		ctx.RecordUnresolvedOid(def.mod, defName, c.ModuleValue+"."+c.NameValue, span)
 	case *module.OidComponentQualifiedNamedNumber:
 		ctx.RecordUnresolvedOid(def.mod, defName, c.ModuleValue+"."+c.NameValue, span)
+	}
+}
+
+// checkSmiv2IdentifierHyphens emits a diagnostic for OID definition names
+// containing hyphens in SMIv2 modules. smilint flags this at level 5.
+func checkSmiv2IdentifierHyphens(ctx *ResolverContext, defs []oidDefinition) {
+	for _, def := range defs {
+		if def.mod.Language != module.LanguageSMIv2 || module.IsBaseModule(def.mod.Name) {
+			continue
+		}
+		name := def.defName()
+		if strings.Contains(name, "-") {
+			ctx.EmitDiagnostic("identifier-hyphen-smiv2", mib.SeverityWarning,
+				def.mod.Name, 0, 0,
+				"identifier "+name+" should not contain hyphens in SMIv2 MIB")
+		}
 	}
 }
 

@@ -19,6 +19,9 @@ func analyzeSemantics(ctx *ResolverContext) {
 	resolveTableSemantics(ctx, objRefs)
 	createResolvedObjects(ctx, objRefs)
 	createResolvedNotifications(ctx)
+	createResolvedGroups(ctx)
+	createResolvedCompliances(ctx)
+	createResolvedCapabilities(ctx)
 }
 
 func inferNodeKinds(ctx *ResolverContext, objRefs []objectTypeRef) {
@@ -327,6 +330,268 @@ func createResolvedNotifications(ctx *ResolverContext) {
 	if ctx.TraceEnabled() {
 		ctx.Trace("created resolved notifications", slog.Int("count", created))
 	}
+}
+
+type objectGroupRef struct {
+	mod *module.Module
+	grp *module.ObjectGroup
+}
+
+type notificationGroupRef struct {
+	mod *module.Module
+	grp *module.NotificationGroup
+}
+
+func createResolvedGroups(ctx *ResolverContext) {
+	created := 0
+
+	// OBJECT-GROUP definitions
+	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (objectGroupRef, bool) {
+		if grp, ok := def.(*module.ObjectGroup); ok {
+			return objectGroupRef{mod: mod, grp: grp}, true
+		}
+		return objectGroupRef{}, false
+	}) {
+		grp := ref.grp
+		node, ok := ctx.LookupNodeForModule(ref.mod, grp.Name)
+		if !ok {
+			continue
+		}
+
+		resolved := mibimpl.NewGroup(grp.Name)
+		resolved.SetNode(node)
+		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
+		resolved.SetStatus(convertStatus(grp.Status))
+		resolved.SetDescription(grp.Description)
+		resolved.SetReference(grp.Reference)
+
+		for _, memberName := range grp.Objects {
+			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
+				resolved.AddMember(memberNode)
+				if obj := memberNode.InternalObject(); obj != nil && obj.Access() == mib.AccessNotAccessible {
+					ctx.EmitDiagnostic("group-not-accessible", mib.SeverityMinor,
+						ref.mod.Name, 0, 0,
+						"object "+memberName+" of group "+grp.Name+" must not be not-accessible")
+				}
+			}
+		}
+
+		ctx.Builder.AddGroup(resolved)
+		node.SetGroup(resolved)
+		created++
+
+		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+			resolvedMod.AddGroup(resolved)
+		}
+	}
+
+	// NOTIFICATION-GROUP definitions
+	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (notificationGroupRef, bool) {
+		if grp, ok := def.(*module.NotificationGroup); ok {
+			return notificationGroupRef{mod: mod, grp: grp}, true
+		}
+		return notificationGroupRef{}, false
+	}) {
+		grp := ref.grp
+		node, ok := ctx.LookupNodeForModule(ref.mod, grp.Name)
+		if !ok {
+			continue
+		}
+
+		resolved := mibimpl.NewGroup(grp.Name)
+		resolved.SetNode(node)
+		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
+		resolved.SetStatus(convertStatus(grp.Status))
+		resolved.SetDescription(grp.Description)
+		resolved.SetReference(grp.Reference)
+		resolved.SetIsNotificationGroup(true)
+
+		for _, memberName := range grp.Notifications {
+			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
+				resolved.AddMember(memberNode)
+			}
+		}
+
+		ctx.Builder.AddGroup(resolved)
+		node.SetGroup(resolved)
+		created++
+
+		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+			resolvedMod.AddGroup(resolved)
+		}
+	}
+
+	if ctx.TraceEnabled() {
+		ctx.Trace("created resolved groups", slog.Int("count", created))
+	}
+}
+
+type complianceRef struct {
+	mod  *module.Module
+	comp *module.ModuleCompliance
+}
+
+type capabilitiesRef struct {
+	mod *module.Module
+	cap *module.AgentCapabilities
+}
+
+func createResolvedCompliances(ctx *ResolverContext) {
+	created := 0
+	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (complianceRef, bool) {
+		if comp, ok := def.(*module.ModuleCompliance); ok {
+			return complianceRef{mod: mod, comp: comp}, true
+		}
+		return complianceRef{}, false
+	}) {
+		comp := ref.comp
+		node, ok := ctx.LookupNodeForModule(ref.mod, comp.Name)
+		if !ok {
+			continue
+		}
+
+		resolved := mibimpl.NewCompliance(comp.Name)
+		resolved.SetNode(node)
+		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
+		resolved.SetStatus(convertStatus(comp.Status))
+		resolved.SetDescription(comp.Description)
+		resolved.SetReference(comp.Reference)
+		resolved.SetModules(convertComplianceModules(comp.Modules))
+
+		ctx.Builder.AddCompliance(resolved)
+		node.SetCompliance(resolved)
+		created++
+
+		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+			resolvedMod.AddCompliance(resolved)
+		}
+	}
+
+	if ctx.TraceEnabled() {
+		ctx.Trace("created resolved compliances", slog.Int("count", created))
+	}
+}
+
+func convertComplianceModules(modules []module.ComplianceModule) []mib.ComplianceModule {
+	result := make([]mib.ComplianceModule, len(modules))
+	for i, m := range modules {
+		result[i] = mib.ComplianceModule{
+			ModuleName:      m.ModuleName,
+			MandatoryGroups: m.MandatoryGroups,
+		}
+		if len(m.Groups) > 0 {
+			groups := make([]mib.ComplianceGroup, len(m.Groups))
+			for j, g := range m.Groups {
+				groups[j] = mib.ComplianceGroup{
+					Group:       g.Group,
+					Description: g.Description,
+				}
+			}
+			result[i].Groups = groups
+		}
+		if len(m.Objects) > 0 {
+			objects := make([]mib.ComplianceObject, len(m.Objects))
+			for j, o := range m.Objects {
+				objects[j] = mib.ComplianceObject{
+					Object:      o.Object,
+					Description: o.Description,
+				}
+				if o.MinAccess != nil {
+					a := convertAccess(*o.MinAccess)
+					objects[j].MinAccess = &a
+				}
+			}
+			result[i].Objects = objects
+		}
+	}
+	return result
+}
+
+func createResolvedCapabilities(ctx *ResolverContext) {
+	created := 0
+	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (capabilitiesRef, bool) {
+		if cap, ok := def.(*module.AgentCapabilities); ok {
+			return capabilitiesRef{mod: mod, cap: cap}, true
+		}
+		return capabilitiesRef{}, false
+	}) {
+		cap := ref.cap
+		node, ok := ctx.LookupNodeForModule(ref.mod, cap.Name)
+		if !ok {
+			continue
+		}
+
+		resolved := mibimpl.NewCapabilities(cap.Name)
+		resolved.SetNode(node)
+		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
+		resolved.SetStatus(convertStatus(cap.Status))
+		resolved.SetDescription(cap.Description)
+		resolved.SetReference(cap.Reference)
+		resolved.SetProductRelease(cap.ProductRelease)
+		resolved.SetSupports(convertSupportsModules(cap.Supports))
+
+		ctx.Builder.AddCapabilities(resolved)
+		node.SetCapabilities(resolved)
+		created++
+
+		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+			resolvedMod.AddCapabilities(resolved)
+		}
+	}
+
+	if ctx.TraceEnabled() {
+		ctx.Trace("created resolved capabilities", slog.Int("count", created))
+	}
+}
+
+func convertSupportsModules(modules []module.SupportsModule) []mib.CapabilitiesModule {
+	result := make([]mib.CapabilitiesModule, len(modules))
+	for i, m := range modules {
+		result[i] = mib.CapabilitiesModule{
+			ModuleName: m.ModuleName,
+			Includes:   m.Includes,
+		}
+		if len(m.ObjectVariations) > 0 {
+			vars := make([]mib.ObjectVariation, len(m.ObjectVariations))
+			for j, v := range m.ObjectVariations {
+				vars[j] = mib.ObjectVariation{
+					Object:      v.Object,
+					Description: v.Description,
+				}
+				if v.Access != nil {
+					a := convertAccess(*v.Access)
+					vars[j].Access = &a
+				}
+			}
+			result[i].ObjectVariations = vars
+		}
+		if len(m.NotificationVariations) > 0 {
+			vars := make([]mib.NotificationVariation, len(m.NotificationVariations))
+			for j, v := range m.NotificationVariations {
+				vars[j] = mib.NotificationVariation{
+					Notification: v.Notification,
+					Description:  v.Description,
+				}
+				if v.Access != nil {
+					a := convertAccess(*v.Access)
+					vars[j].Access = &a
+				}
+			}
+			result[i].NotificationVariations = vars
+		}
+	}
+	return result
+}
+
+func lookupMemberNode(ctx *ResolverContext, mod *module.Module, name string) (*mibimpl.Node, bool) {
+	node, ok := ctx.LookupNodeForModule(mod, name)
+	if ok {
+		return node, true
+	}
+	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+		return ctx.LookupNodeGlobal(name)
+	}
+	return nil, false
 }
 
 func resolveTypeSyntax(ctx *ResolverContext, syntax module.TypeSyntax, mod *module.Module, objectName string, span types.Span) (*mibimpl.Type, bool) {
