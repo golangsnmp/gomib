@@ -22,12 +22,12 @@ func TestResolveOIDs(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					node := m.FindNode(fn.Name)
 					if node == nil {
-						t.Skipf("divergence: gomib cannot find node %q (fixture OID %s)", fn.Name, oid)
+						t.Errorf("divergence: gomib cannot find node %q (fixture OID %s)", fn.Name, oid)
 						return
 					}
 					gotOID := node.OID().String()
 					if gotOID != oid {
-						t.Skipf("divergence: OID for %s: gomib=%s fixture=%s", fn.Name, gotOID, oid)
+						t.Errorf("divergence: OID for %s: gomib=%s fixture=%s", fn.Name, gotOID, oid)
 					}
 				})
 			}
@@ -53,13 +53,13 @@ func TestResolveTypes(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					obj := m.FindObject(fn.Name)
 					if obj == nil {
-						t.Skipf("divergence: gomib does not have object %q", fn.Name)
+						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
 					}
 
 					gomibType := testutil.NormalizeType(obj.Type())
 					if !typesEquivalent(gomibType, fn.Type) {
-						t.Skipf("divergence: type for %s: gomib=%q fixture=%q",
+						t.Errorf("divergence: type for %s: gomib=%q fixture=%q",
 							fn.Name, gomibType, fn.Type)
 					}
 
@@ -70,7 +70,7 @@ func TestResolveTypes(t *testing.T) {
 							gomibTC = obj.Type().Name()
 						}
 						if gomibTC != fn.TCName {
-							t.Skipf("divergence: TC name for %s: gomib=%q fixture=%q",
+							t.Errorf("divergence: TC name for %s: gomib=%q fixture=%q",
 								fn.Name, gomibTC, fn.TCName)
 						}
 					}
@@ -79,7 +79,7 @@ func TestResolveTypes(t *testing.T) {
 					if fn.Hint != "" {
 						gomibHint := obj.EffectiveDisplayHint()
 						if !hintsEquivalent(gomibHint, fn.Hint) {
-							t.Skipf("divergence: display hint for %s: gomib=%q fixture=%q",
+							t.Errorf("divergence: display hint for %s: gomib=%q fixture=%q",
 								fn.Name, gomibHint, fn.Hint)
 						}
 					}
@@ -110,13 +110,13 @@ func TestResolveEnums(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					obj := m.FindObject(fn.Name)
 					if obj == nil {
-						t.Skipf("divergence: gomib does not have object %q", fn.Name)
+						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
 					}
 
 					gomibEnums := testutil.NormalizeEnums(obj.EffectiveEnums())
 					if !enumsEquivalent(gomibEnums, fn.EnumValues) {
-						t.Skipf("divergence: enums for %s:\n  gomib=%s\n  fixture=%s",
+						t.Errorf("divergence: enums for %s:\n  gomib=%s\n  fixture=%s",
 							fn.Name,
 							testutil.FormatEnums(gomibEnums),
 							testutil.FormatEnums(fn.EnumValues))
@@ -148,13 +148,13 @@ func TestResolveBits(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					obj := m.FindObject(fn.Name)
 					if obj == nil {
-						t.Skipf("divergence: gomib does not have object %q", fn.Name)
+						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
 					}
 
 					gomibBits := testutil.NormalizeEnums(obj.EffectiveBits())
 					if !enumsEquivalent(gomibBits, fn.BitValues) {
-						t.Skipf("divergence: bits for %s:\n  gomib=%s\n  fixture=%s",
+						t.Errorf("divergence: bits for %s:\n  gomib=%s\n  fixture=%s",
 							fn.Name,
 							testutil.FormatEnums(gomibBits),
 							testutil.FormatEnums(fn.BitValues))
@@ -185,7 +185,7 @@ func TestResolveTables(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					obj := m.FindObject(fn.Name)
 					if obj == nil {
-						t.Skipf("divergence: gomib does not have object %q", fn.Name)
+						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
 					}
 
@@ -193,7 +193,7 @@ func TestResolveTables(t *testing.T) {
 					if fn.Kind != "" {
 						gomibKind := testutil.NormalizeKind(obj.Kind())
 						if gomibKind != fn.Kind {
-							t.Skipf("divergence: kind for %s: gomib=%q fixture=%q",
+							t.Errorf("divergence: kind for %s: gomib=%q fixture=%q",
 								fn.Name, gomibKind, fn.Kind)
 						}
 					}
@@ -202,7 +202,7 @@ func TestResolveTables(t *testing.T) {
 					if len(fn.Indexes) > 0 {
 						gomibIndexes := testutil.NormalizeIndexes(obj.Index())
 						if !indexesEquivalent(gomibIndexes, fn.Indexes) {
-							t.Skipf("divergence: indexes for %s:\n  gomib=%s\n  fixture=%s",
+							t.Errorf("divergence: indexes for %s:\n  gomib=%s\n  fixture=%s",
 								fn.Name,
 								testutil.FormatIndexes(gomibIndexes),
 								testutil.FormatIndexes(fn.Indexes))
@@ -216,7 +216,7 @@ func TestResolveTables(t *testing.T) {
 							gomibAugments = aug.Name()
 						}
 						if gomibAugments != fn.Augments {
-							t.Skipf("divergence: augments for %s: gomib=%q fixture=%q",
+							t.Errorf("divergence: augments for %s: gomib=%q fixture=%q",
 								fn.Name, gomibAugments, fn.Augments)
 						}
 					}
@@ -244,13 +244,13 @@ func TestResolveAccess(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					obj := m.FindObject(fn.Name)
 					if obj == nil {
-						t.Skipf("divergence: gomib does not have object %q", fn.Name)
+						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
 					}
 
 					gomibAccess := testutil.NormalizeAccess(obj.Access())
 					if !accessEquivalent(gomibAccess, fn.Access) {
-						t.Skipf("divergence: access for %s: gomib=%q fixture=%q",
+						t.Errorf("divergence: access for %s: gomib=%q fixture=%q",
 							fn.Name, gomibAccess, fn.Access)
 					}
 				})
@@ -282,12 +282,12 @@ func TestResolveStatus(t *testing.T) {
 					} else if notif := m.FindNotification(fn.Name); notif != nil {
 						gomibStatus = testutil.NormalizeStatus(notif.Status())
 					} else {
-						t.Skipf("divergence: gomib does not have node %q", fn.Name)
+						t.Errorf("divergence: gomib does not have node %q", fn.Name)
 						return
 					}
 
 					if !statusEquivalent(gomibStatus, fn.Status) {
-						t.Skipf("divergence: status for %s: gomib=%q fixture=%q",
+						t.Errorf("divergence: status for %s: gomib=%q fixture=%q",
 							fn.Name, gomibStatus, fn.Status)
 					}
 				})
@@ -319,7 +319,7 @@ func TestResolveRanges(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					obj := m.FindObject(fn.Name)
 					if obj == nil {
-						t.Skipf("divergence: gomib does not have object %q", fn.Name)
+						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
 					}
 
@@ -329,7 +329,7 @@ func TestResolveRanges(t *testing.T) {
 					gomibRanges = append(gomibRanges, testutil.NormalizeRanges(obj.EffectiveSizes())...)
 
 					if !rangesEquivalent(gomibRanges, fn.Ranges) {
-						t.Skipf("divergence: ranges for %s:\n  gomib=%s\n  fixture=%s",
+						t.Errorf("divergence: ranges for %s:\n  gomib=%s\n  fixture=%s",
 							fn.Name,
 							testutil.FormatRanges(gomibRanges),
 							testutil.FormatRanges(fn.Ranges))
@@ -358,14 +358,14 @@ func TestResolveNotifications(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					notif := m.FindNotification(fn.Name)
 					if notif == nil {
-						t.Skipf("divergence: gomib does not have notification %q", fn.Name)
+						t.Errorf("divergence: gomib does not have notification %q", fn.Name)
 						return
 					}
 
 					// Verify OID
 					gotOID := notif.OID().String()
 					if gotOID != fn.OID {
-						t.Skipf("divergence: OID for notification %s: gomib=%s fixture=%s",
+						t.Errorf("divergence: OID for notification %s: gomib=%s fixture=%s",
 							fn.Name, gotOID, fn.OID)
 					}
 
@@ -373,7 +373,7 @@ func TestResolveNotifications(t *testing.T) {
 					if len(fn.Varbinds) > 0 {
 						gomibVarbinds := testutil.NormalizeVarbinds(notif.Objects())
 						if !varbindsEquivalent(gomibVarbinds, fn.Varbinds) {
-							t.Skipf("divergence: varbinds for %s:\n  gomib=%v\n  fixture=%v",
+							t.Errorf("divergence: varbinds for %s:\n  gomib=%v\n  fixture=%v",
 								fn.Name, gomibVarbinds, fn.Varbinds)
 						}
 					}
@@ -382,7 +382,7 @@ func TestResolveNotifications(t *testing.T) {
 					if fn.Status != "" {
 						gomibStatus := testutil.NormalizeStatus(notif.Status())
 						if !statusEquivalent(gomibStatus, fn.Status) {
-							t.Skipf("divergence: status for notification %s: gomib=%q fixture=%q",
+							t.Errorf("divergence: status for notification %s: gomib=%q fixture=%q",
 								fn.Name, gomibStatus, fn.Status)
 						}
 					}
@@ -413,13 +413,13 @@ func TestResolveUnits(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					obj := m.FindObject(fn.Name)
 					if obj == nil {
-						t.Skipf("divergence: gomib does not have object %q", fn.Name)
+						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
 					}
 
 					gomibUnits := obj.Units()
 					if gomibUnits != fn.Units {
-						t.Skipf("divergence: units for %s: gomib=%q fixture=%q",
+						t.Errorf("divergence: units for %s: gomib=%q fixture=%q",
 							fn.Name, gomibUnits, fn.Units)
 					}
 				})
@@ -449,20 +449,20 @@ func TestResolveDefval(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					obj := m.FindObject(fn.Name)
 					if obj == nil {
-						t.Skipf("divergence: gomib does not have object %q", fn.Name)
+						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
 					}
 
 					dv := obj.DefaultValue()
 					if dv.IsZero() {
-						t.Skipf("divergence: defval for %s: gomib has no defval, fixture=%q",
+						t.Errorf("divergence: defval for %s: gomib has no defval, fixture=%q",
 							fn.Name, fn.DefaultValue)
 						return
 					}
 
 					gomibDefval := dv.String()
 					if !defvalEquivalent(gomibDefval, fn.DefaultValue) {
-						t.Skipf("divergence: defval for %s: gomib=%q fixture=%q",
+						t.Errorf("divergence: defval for %s: gomib=%q fixture=%q",
 							fn.Name, gomibDefval, fn.DefaultValue)
 					}
 				})
@@ -494,12 +494,12 @@ func TestResolveReference(t *testing.T) {
 					} else if notif := m.FindNotification(fn.Name); notif != nil {
 						gomibRef = notif.Reference()
 					} else {
-						t.Skipf("divergence: gomib does not have node %q", fn.Name)
+						t.Errorf("divergence: gomib does not have node %q", fn.Name)
 						return
 					}
 
 					if !referenceEquivalent(gomibRef, fn.Reference) {
-						t.Skipf("divergence: reference for %s: gomib=%q fixture=%q",
+						t.Errorf("divergence: reference for %s: gomib=%q fixture=%q",
 							fn.Name, gomibRef, fn.Reference)
 					}
 				})
@@ -526,7 +526,7 @@ func TestResolveModule(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					node := m.FindNode(fn.Name)
 					if node == nil {
-						t.Skipf("divergence: gomib cannot find node %q", fn.Name)
+						t.Errorf("divergence: gomib cannot find node %q", fn.Name)
 						return
 					}
 
@@ -536,7 +536,7 @@ func TestResolveModule(t *testing.T) {
 					}
 
 					if gomibModule != fn.Module {
-						t.Skipf("divergence: module for %s: gomib=%q fixture=%q",
+						t.Errorf("divergence: module for %s: gomib=%q fixture=%q",
 							fn.Name, gomibModule, fn.Module)
 					}
 				})
