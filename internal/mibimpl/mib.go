@@ -7,8 +7,8 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// MibData is the concrete implementation of mib.Mib.
-type MibData struct {
+// Data is the concrete implementation of mib.Mib.
+type Data struct {
 	root          *Node
 	modules       []*Module
 	objects       []*Object
@@ -28,14 +28,14 @@ type MibData struct {
 
 // Interface methods (mib.Mib)
 
-func (m *MibData) Root() mib.Node {
+func (m *Data) Root() mib.Node {
 	if m.root == nil {
 		return nil
 	}
 	return m.root
 }
 
-func (m *MibData) Nodes() iter.Seq[mib.Node] {
+func (m *Data) Nodes() iter.Seq[mib.Node] {
 	return func(yield func(mib.Node) bool) {
 		for _, child := range m.root.sortedChildren() {
 			if !child.yieldAll(yield) {
@@ -45,7 +45,7 @@ func (m *MibData) Nodes() iter.Seq[mib.Node] {
 	}
 }
 
-func (m *MibData) FindNode(query string) mib.Node {
+func (m *Data) FindNode(query string) mib.Node {
 	// Try qualified name first (MODULE::name)
 	if moduleName, nodeName, ok := strings.Cut(query, "::"); ok {
 		if m.moduleByName[moduleName] == nil {
@@ -96,15 +96,14 @@ func (m *MibData) FindNode(query string) mib.Node {
 	return nil
 }
 
-func (m *MibData) FindObject(query string) mib.Object {
+func (m *Data) FindObject(query string) mib.Object {
 	if v := findEntity(m, query, func(nd *Node) *Object { return nd.obj }); v != nil {
 		return v
 	}
 	return nil
 }
 
-
-func (m *MibData) FindType(query string) mib.Type {
+func (m *Data) FindType(query string) mib.Type {
 	// Try qualified name first (MODULE::name)
 	if moduleName, typeName, ok := strings.Cut(query, "::"); ok {
 		mod := m.moduleByName[moduleName]
@@ -127,14 +126,14 @@ func (m *MibData) FindType(query string) mib.Type {
 	return t
 }
 
-func (m *MibData) FindNotification(query string) mib.Notification {
+func (m *Data) FindNotification(query string) mib.Notification {
 	if v := findEntity(m, query, func(nd *Node) *Notification { return nd.notif }); v != nil {
 		return v
 	}
 	return nil
 }
 
-func (m *MibData) NodeByOID(oid mib.Oid) mib.Node {
+func (m *Data) NodeByOID(oid mib.Oid) mib.Node {
 	nd := m.nodeByOID(oid)
 	if nd == nil {
 		return nil
@@ -142,7 +141,7 @@ func (m *MibData) NodeByOID(oid mib.Oid) mib.Node {
 	return nd
 }
 
-func (m *MibData) nodeByOID(oid mib.Oid) *Node {
+func (m *Data) nodeByOID(oid mib.Oid) *Node {
 	if len(oid) == 0 {
 		return nil
 	}
@@ -160,7 +159,7 @@ func (m *MibData) nodeByOID(oid mib.Oid) *Node {
 	return nd
 }
 
-func (m *MibData) LongestPrefixByOID(oid mib.Oid) mib.Node {
+func (m *Data) LongestPrefixByOID(oid mib.Oid) mib.Node {
 	if len(oid) == 0 {
 		return nil
 	}
@@ -183,7 +182,7 @@ func (m *MibData) LongestPrefixByOID(oid mib.Oid) mib.Node {
 	return deepest
 }
 
-func (m *MibData) Module(name string) mib.Module {
+func (m *Data) Module(name string) mib.Module {
 	mod := m.moduleByName[name]
 	if mod == nil {
 		return nil
@@ -191,7 +190,7 @@ func (m *MibData) Module(name string) mib.Module {
 	return mod
 }
 
-func (m *MibData) Modules() []mib.Module {
+func (m *Data) Modules() []mib.Module {
 	result := make([]mib.Module, len(m.modules))
 	for i, mod := range m.modules {
 		result[i] = mod
@@ -199,7 +198,7 @@ func (m *MibData) Modules() []mib.Module {
 	return result
 }
 
-func (m *MibData) Objects() []mib.Object {
+func (m *Data) Objects() []mib.Object {
 	result := make([]mib.Object, len(m.objects))
 	for i, obj := range m.objects {
 		result[i] = obj
@@ -207,7 +206,7 @@ func (m *MibData) Objects() []mib.Object {
 	return result
 }
 
-func (m *MibData) Types() []mib.Type {
+func (m *Data) Types() []mib.Type {
 	result := make([]mib.Type, len(m.types))
 	for i, t := range m.types {
 		result[i] = t
@@ -215,7 +214,7 @@ func (m *MibData) Types() []mib.Type {
 	return result
 }
 
-func (m *MibData) Notifications() []mib.Notification {
+func (m *Data) Notifications() []mib.Notification {
 	result := make([]mib.Notification, len(m.notifications))
 	for i, n := range m.notifications {
 		result[i] = n
@@ -223,7 +222,7 @@ func (m *MibData) Notifications() []mib.Notification {
 	return result
 }
 
-func (m *MibData) Tables() []mib.Object {
+func (m *Data) Tables() []mib.Object {
 	var result []mib.Object
 	for _, obj := range m.objects {
 		if obj.IsTable() {
@@ -233,7 +232,7 @@ func (m *MibData) Tables() []mib.Object {
 	return result
 }
 
-func (m *MibData) Scalars() []mib.Object {
+func (m *Data) Scalars() []mib.Object {
 	var result []mib.Object
 	for _, obj := range m.objects {
 		if obj.IsScalar() {
@@ -243,7 +242,7 @@ func (m *MibData) Scalars() []mib.Object {
 	return result
 }
 
-func (m *MibData) Columns() []mib.Object {
+func (m *Data) Columns() []mib.Object {
 	var result []mib.Object
 	for _, obj := range m.objects {
 		if obj.IsColumn() {
@@ -253,7 +252,7 @@ func (m *MibData) Columns() []mib.Object {
 	return result
 }
 
-func (m *MibData) Rows() []mib.Object {
+func (m *Data) Rows() []mib.Object {
 	var result []mib.Object
 	for _, obj := range m.objects {
 		if obj.IsRow() {
@@ -263,23 +262,23 @@ func (m *MibData) Rows() []mib.Object {
 	return result
 }
 
-func (m *MibData) ModuleCount() int {
+func (m *Data) ModuleCount() int {
 	return len(m.modules)
 }
 
-func (m *MibData) ObjectCount() int {
+func (m *Data) ObjectCount() int {
 	return len(m.objects)
 }
 
-func (m *MibData) TypeCount() int {
+func (m *Data) TypeCount() int {
 	return len(m.types)
 }
 
-func (m *MibData) NotificationCount() int {
+func (m *Data) NotificationCount() int {
 	return len(m.notifications)
 }
 
-func (m *MibData) Groups() []mib.Group {
+func (m *Data) Groups() []mib.Group {
 	result := make([]mib.Group, len(m.groups))
 	for i, g := range m.groups {
 		result[i] = g
@@ -287,18 +286,18 @@ func (m *MibData) Groups() []mib.Group {
 	return result
 }
 
-func (m *MibData) FindGroup(query string) mib.Group {
+func (m *Data) FindGroup(query string) mib.Group {
 	if v := findEntity(m, query, func(nd *Node) *Group { return nd.group }); v != nil {
 		return v
 	}
 	return nil
 }
 
-func (m *MibData) GroupCount() int {
+func (m *Data) GroupCount() int {
 	return len(m.groups)
 }
 
-func (m *MibData) Compliances() []mib.Compliance {
+func (m *Data) Compliances() []mib.Compliance {
 	result := make([]mib.Compliance, len(m.compliances))
 	for i, c := range m.compliances {
 		result[i] = c
@@ -306,18 +305,18 @@ func (m *MibData) Compliances() []mib.Compliance {
 	return result
 }
 
-func (m *MibData) FindCompliance(query string) mib.Compliance {
+func (m *Data) FindCompliance(query string) mib.Compliance {
 	if v := findEntity(m, query, func(nd *Node) *Compliance { return nd.compliance }); v != nil {
 		return v
 	}
 	return nil
 }
 
-func (m *MibData) ComplianceCount() int {
+func (m *Data) ComplianceCount() int {
 	return len(m.compliances)
 }
 
-func (m *MibData) Capabilities() []mib.Capabilities {
+func (m *Data) Capabilities() []mib.Capabilities {
 	result := make([]mib.Capabilities, len(m.capabilities))
 	for i, c := range m.capabilities {
 		result[i] = c
@@ -325,18 +324,18 @@ func (m *MibData) Capabilities() []mib.Capabilities {
 	return result
 }
 
-func (m *MibData) FindCapabilities(query string) mib.Capabilities {
+func (m *Data) FindCapabilities(query string) mib.Capabilities {
 	if v := findEntity(m, query, func(nd *Node) *Capabilities { return nd.capabilities }); v != nil {
 		return v
 	}
 	return nil
 }
 
-func (m *MibData) CapabilitiesCount() int {
+func (m *Data) CapabilitiesCount() int {
 	return len(m.capabilities)
 }
 
-func (m *MibData) NodeCount() int {
+func (m *Data) NodeCount() int {
 	count := 0
 	for range m.Nodes() {
 		count++
@@ -344,15 +343,15 @@ func (m *MibData) NodeCount() int {
 	return count
 }
 
-func (m *MibData) Unresolved() []mib.UnresolvedRef {
+func (m *Data) Unresolved() []mib.UnresolvedRef {
 	return m.unresolved
 }
 
-func (m *MibData) Diagnostics() []mib.Diagnostic {
+func (m *Data) Diagnostics() []mib.Diagnostic {
 	return m.diagnostics
 }
 
-func (m *MibData) HasErrors() bool {
+func (m *Data) HasErrors() bool {
 	for _, d := range m.diagnostics {
 		if d.Severity <= mib.SeverityError {
 			return true
@@ -361,7 +360,7 @@ func (m *MibData) HasErrors() bool {
 	return false
 }
 
-func (m *MibData) IsComplete() bool {
+func (m *Data) IsComplete() bool {
 	return len(m.unresolved) == 0
 }
 
@@ -376,7 +375,7 @@ type nodeEntity interface {
 // findEntity dispatches a query string to find a node-attached entity.
 // It handles qualified names (MODULE::name), numeric OIDs, partial OIDs (.1.3...),
 // and plain name lookups.
-func findEntity[T nodeEntity](m *MibData, query string, fromNode func(*Node) T) T {
+func findEntity[T nodeEntity](m *Data, query string, fromNode func(*Node) T) T {
 	var zero T
 
 	// Try qualified name (MODULE::name)

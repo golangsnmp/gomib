@@ -8,13 +8,13 @@ import "github.com/golangsnmp/gomib/mib"
 //
 // This type is intended for internal use by the resolver.
 type Builder struct {
-	data *MibData
+	data *Data
 }
 
 // NewBuilder creates a new Builder with an empty Mib.
 func NewBuilder() *Builder {
 	return &Builder{
-		data: &MibData{
+		data: &Data{
 			root:         &Node{kind: mib.KindInternal},
 			moduleByName: make(map[string]*Module),
 			nameToNodes:  make(map[string][]*Node),
