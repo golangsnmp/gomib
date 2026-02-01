@@ -9,9 +9,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
@@ -233,7 +234,7 @@ func printDiagComparison(w io.Writer, result *DiagComparison) {
 		for k := range result.Summary.BySeverity {
 			keys = append(keys, k)
 		}
-		sort.Strings(keys)
+		slices.Sort(keys)
 		for _, k := range keys {
 			fmt.Fprintf(w, "  %-20s %d\n", k+":", result.Summary.BySeverity[k])
 		}
@@ -293,11 +294,11 @@ func expandDirs(roots []string) []string {
 			continue
 		}
 
-		filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return nil
 			}
-			if info.IsDir() && !seen[path] {
+			if d.IsDir() && !seen[path] {
 				seen[path] = true
 				dirs = append(dirs, path)
 			}
@@ -315,9 +316,3 @@ func truncate(s string, n int) string {
 	return s[:n] + "..."
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

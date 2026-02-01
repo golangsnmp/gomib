@@ -4,11 +4,12 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -136,8 +137,8 @@ func compareTables(netsnmp, gomib map[string]*NormalizedNode, detailed bool) *Ta
 	}
 
 	// Sort by OID for deterministic output
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i].oid < rows[j].oid
+	slices.SortFunc(rows, func(a, b rowEntry) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	result.TotalTables = len(rows)

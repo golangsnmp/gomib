@@ -384,6 +384,15 @@ func (c *ResolverContext) DiagnosticConfig() mib.DiagnosticConfig {
 	return c.diagConfig
 }
 
+// emitUnresolvedDiagnostic extracts the module name and emits a diagnostic.
+func (c *ResolverContext) emitUnresolvedDiagnostic(mod *module.Module, code string, severity mib.Severity, msg string) {
+	modName := ""
+	if mod != nil {
+		modName = mod.Name
+	}
+	c.EmitDiagnostic(code, severity, modName, 0, 0, msg)
+}
+
 // RecordUnresolvedImport records an unresolved import.
 func (c *ResolverContext) RecordUnresolvedImport(importingModule *module.Module, fromModule, symbol, reason string, span types.Span) {
 	c.unresolvedImports = append(c.unresolvedImports, unresolvedImport{
@@ -393,18 +402,11 @@ func (c *ResolverContext) RecordUnresolvedImport(importingModule *module.Module,
 		reason:          reason,
 		span:            span,
 	})
-
-	// Also emit a diagnostic
-	modName := ""
-	if importingModule != nil {
-		modName = importingModule.Name
-	}
 	code := "import-not-found"
 	if reason == "module not found" {
 		code = "import-module-not-found"
 	}
-	// Note: Line/Column are 0 since we only have byte offsets in Span
-	c.EmitDiagnostic(code, mib.SeverityError, modName, 0, 0,
+	c.emitUnresolvedDiagnostic(importingModule, code, mib.SeverityError,
 		"unresolved import: "+symbol+" from "+fromModule+" ("+reason+")")
 }
 
@@ -416,13 +418,7 @@ func (c *ResolverContext) RecordUnresolvedType(mod *module.Module, referrer, ref
 		referenced: referenced,
 		span:       span,
 	})
-
-	// Also emit a diagnostic
-	modName := ""
-	if mod != nil {
-		modName = mod.Name
-	}
-	c.EmitDiagnostic("type-unknown", mib.SeverityError, modName, 0, 0,
+	c.emitUnresolvedDiagnostic(mod, "type-unknown", mib.SeverityError,
 		"unresolved type: "+referrer+" references unknown type "+referenced)
 }
 
@@ -434,13 +430,7 @@ func (c *ResolverContext) RecordUnresolvedOid(mod *module.Module, defName, compo
 		component:  component,
 		span:       span,
 	})
-
-	// Also emit a diagnostic
-	modName := ""
-	if mod != nil {
-		modName = mod.Name
-	}
-	c.EmitDiagnostic("oid-orphan", mib.SeverityWarning, modName, 0, 0,
+	c.emitUnresolvedDiagnostic(mod, "oid-orphan", mib.SeverityWarning,
 		"unresolved OID: "+defName+" references unknown parent "+component)
 }
 
@@ -452,13 +442,7 @@ func (c *ResolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexOb
 		indexObject: indexObject,
 		span:        span,
 	})
-
-	// Also emit a diagnostic
-	modName := ""
-	if mod != nil {
-		modName = mod.Name
-	}
-	c.EmitDiagnostic("index-unresolved", mib.SeverityError, modName, 0, 0,
+	c.emitUnresolvedDiagnostic(mod, "index-unresolved", mib.SeverityError,
 		"unresolved INDEX: "+row+" references unknown object "+indexObject)
 }
 
@@ -470,13 +454,7 @@ func (c *ResolverContext) RecordUnresolvedNotificationObject(mod *module.Module,
 		object:       object,
 		span:         span,
 	})
-
-	// Also emit a diagnostic
-	modName := ""
-	if mod != nil {
-		modName = mod.Name
-	}
-	c.EmitDiagnostic("objects-unresolved", mib.SeverityWarning, modName, 0, 0,
+	c.emitUnresolvedDiagnostic(mod, "objects-unresolved", mib.SeverityWarning,
 		"unresolved OBJECTS: "+notification+" references unknown object "+object)
 }
 

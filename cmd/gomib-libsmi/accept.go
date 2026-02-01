@@ -9,9 +9,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
+	"io/fs"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
@@ -212,8 +212,8 @@ func findAllModules(mibPaths []string) []string {
 	}
 
 	for _, root := range mibPaths {
-		filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
+		filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
 				return nil
 			}
 
@@ -233,7 +233,7 @@ func findAllModules(mibPaths []string) []string {
 		})
 	}
 
-	sort.Strings(modules)
+	slices.Sort(modules)
 	return modules
 }
 

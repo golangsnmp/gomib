@@ -1,11 +1,12 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
@@ -293,7 +294,7 @@ func printLintByModule(result *lintResult) {
 	for m := range byMod {
 		mods = append(mods, m)
 	}
-	sort.Strings(mods)
+	slices.Sort(mods)
 
 	for _, mod := range mods {
 		fmt.Printf("\n%s:\n", mod)
@@ -318,7 +319,7 @@ func printLintByCode(result *lintResult) {
 	for c := range byCode {
 		codes = append(codes, c)
 	}
-	sort.Strings(codes)
+	slices.Sort(codes)
 
 	for _, code := range codes {
 		diags := byCode[code]
@@ -347,7 +348,7 @@ func printLintBySeverity(result *lintResult) {
 	for s := range bySev {
 		sevs = append(sevs, s)
 	}
-	sort.Ints(sevs)
+	slices.Sort(sevs)
 
 	for _, sev := range sevs {
 		diags := bySev[sev]
@@ -543,8 +544,8 @@ func buildSARIFRules(result *lintResult) []sarifRule {
 		})
 	}
 
-	sort.Slice(rules, func(i, j int) bool {
-		return rules[i].ID < rules[j].ID
+	slices.SortFunc(rules, func(a, b sarifRule) int {
+		return cmp.Compare(a.ID, b.ID)
 	})
 	return rules
 }

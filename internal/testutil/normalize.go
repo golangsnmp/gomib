@@ -2,7 +2,7 @@ package testutil
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib/mib"
@@ -161,7 +161,7 @@ func FormatEnums(enums map[int]string) string {
 	for k := range enums {
 		keys = append(keys, k)
 	}
-	sort.Ints(keys)
+	slices.Sort(keys)
 	var parts []string
 	for _, k := range keys {
 		parts = append(parts, fmt.Sprintf("%s(%d)", enums[k], k))

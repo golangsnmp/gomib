@@ -4,10 +4,11 @@
 package main
 
 import (
+	"cmp"
 	"flag"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -112,8 +113,8 @@ func generateTableTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 		}
 	}
 
-	sort.Slice(tables, func(i, j int) bool {
-		return tables[i].oid < tables[j].oid
+	slices.SortFunc(tables, func(a, b tableInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "var %s = []TableTestCase{\n", varName)
@@ -168,8 +169,8 @@ func generateOIDTests(w io.Writer, nodes map[string]*NormalizedNode, modules []s
 		}
 	}
 
-	sort.Slice(oids, func(i, j int) bool {
-		return oids[i].oid < oids[j].oid
+	slices.SortFunc(oids, func(a, b oidInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "// OIDTestCase defines a test case for OID resolution.\n")
@@ -209,8 +210,8 @@ func generateEnumTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 		}
 	}
 
-	sort.Slice(enums, func(i, j int) bool {
-		return enums[i].oid < enums[j].oid
+	slices.SortFunc(enums, func(a, b enumInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "// EnumTestCase defines a test case for enumeration values.\n")
@@ -229,7 +230,7 @@ func generateEnumTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 		for k := range e.node.EnumValues {
 			keys = append(keys, k)
 		}
-		sort.Ints(keys)
+		slices.Sort(keys)
 
 		var enumParts []string
 		for _, k := range keys {
@@ -264,8 +265,8 @@ func generateAccessTests(w io.Writer, nodes map[string]*NormalizedNode, modules 
 		}
 	}
 
-	sort.Slice(objects, func(i, j int) bool {
-		return objects[i].oid < objects[j].oid
+	slices.SortFunc(objects, func(a, b accessInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "// AccessTestCase defines a test case for access level.\n")
@@ -307,8 +308,8 @@ func generateAugmentsTests(w io.Writer, nodes map[string]*NormalizedNode, module
 		}
 	}
 
-	sort.Slice(augs, func(i, j int) bool {
-		return augs[i].oid < augs[j].oid
+	slices.SortFunc(augs, func(a, b augInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "var %s = []AugmentsTestCase{\n", varName)
@@ -343,8 +344,8 @@ func generateRangeTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 		}
 	}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].oid < items[j].oid
+	slices.SortFunc(items, func(a, b rangeInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "// RangeTestCase defines a test case for range constraints.\n")
@@ -395,8 +396,8 @@ func generateBitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 		}
 	}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].oid < items[j].oid
+	slices.SortFunc(items, func(a, b bitsInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "// BitsTestCase defines a test case for BITS values.\n")
@@ -414,7 +415,7 @@ func generateBitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 		for k := range item.node.BitValues {
 			keys = append(keys, k)
 		}
-		sort.Ints(keys)
+		slices.Sort(keys)
 
 		var bitParts []string
 		for _, k := range keys {
@@ -449,8 +450,8 @@ func generateHintTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 		}
 	}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].oid < items[j].oid
+	slices.SortFunc(items, func(a, b hintInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "// HintTestCase defines a test case for display hints.\n")
@@ -491,8 +492,8 @@ func generateUnitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 		}
 	}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].oid < items[j].oid
+	slices.SortFunc(items, func(a, b unitsInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "// UnitsTestCase defines a test case for UNITS clause.\n")
@@ -533,8 +534,8 @@ func generateDefvalTests(w io.Writer, nodes map[string]*NormalizedNode, modules 
 		}
 	}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].oid < items[j].oid
+	slices.SortFunc(items, func(a, b defvalInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "// DefvalTestCase defines a test case for DEFVAL clause.\n")
@@ -575,8 +576,8 @@ func generateNotificationTests(w io.Writer, nodes map[string]*NormalizedNode, mo
 		}
 	}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].oid < items[j].oid
+	slices.SortFunc(items, func(a, b notifInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "// NotificationTestCase defines a test case for notifications.\n")
@@ -626,8 +627,8 @@ func generateTCTests(w io.Writer, nodes map[string]*NormalizedNode, modules []st
 		}
 	}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].oid < items[j].oid
+	slices.SortFunc(items, func(a, b tcInfo) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	fmt.Fprintf(w, "// TCTestCase defines a test case for textual convention names.\n")

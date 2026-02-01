@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 )
 
 func cmdFixturegen(args []string) int {
@@ -66,8 +66,8 @@ Options:
 		for oid, node := range filtered {
 			sorted = append(sorted, oidNode{oid, node})
 		}
-		sort.Slice(sorted, func(i, j int) bool {
-			return compareOIDStrings(sorted[i].oid, sorted[j].oid) < 0
+		slices.SortFunc(sorted, func(a, b oidNode) int {
+			return compareOIDStrings(a.oid, b.oid)
 		})
 
 		// Build ordered map for JSON

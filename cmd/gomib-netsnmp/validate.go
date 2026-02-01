@@ -11,7 +11,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
-	"os"
+	"io/fs"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -115,11 +115,11 @@ func validateTestFiles(dir string, netsnmp map[string]*NormalizedNode) *Validati
 	}
 
 	// Find test files
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-		if !info.IsDir() && strings.HasSuffix(path, "_test.go") {
+		if !d.IsDir() && strings.HasSuffix(path, "_test.go") {
 			result.FilesChecked++
 			validateFile(path, byName, result)
 		}

@@ -370,20 +370,7 @@ func resolveNamedNumberComponent(ctx *ResolverContext, def oidDefinition, curren
 		ctx.RegisterModuleNodeSymbol(def.mod, name, node)
 		return node, true
 	}
-	child := resolveNumericComponent(ctx, currentNode, number)
-	if child == nil {
-		return nil, false
-	}
-	ctx.RegisterModuleNodeSymbol(def.mod, name, child)
-	if !isLast {
-		child.SetName(name)
-		child.SetModule(ctx.ModuleToResolved[def.mod])
-		ctx.Builder.RegisterNode(name, child)
-		if child.Kind() == mib.KindInternal {
-			child.SetKind(mib.KindNode)
-		}
-	}
-	return child, true
+	return createNamedChild(ctx, def, currentNode, name, number, isLast)
 }
 
 func resolveQualifiedNameComponent(ctx *ResolverContext, def oidDefinition, moduleName, name string, span types.Span, defName string) (*mibimpl.Node, bool) {
@@ -399,6 +386,12 @@ func resolveQualifiedNamedNumberComponent(ctx *ResolverContext, def oidDefinitio
 		ctx.RegisterModuleNodeSymbol(def.mod, name, node)
 		return node, true
 	}
+	return createNamedChild(ctx, def, currentNode, name, number, isLast)
+}
+
+// createNamedChild resolves a numeric component and registers it with a name.
+// Shared by resolveNamedNumberComponent and resolveQualifiedNamedNumberComponent.
+func createNamedChild(ctx *ResolverContext, def oidDefinition, currentNode *mibimpl.Node, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
 	child := resolveNumericComponent(ctx, currentNode, number)
 	if child == nil {
 		return nil, false

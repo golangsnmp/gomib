@@ -5,9 +5,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
@@ -93,7 +94,7 @@ func bitsString(bits map[int]string) string {
 	for k := range bits {
 		keys = append(keys, k)
 	}
-	sort.Ints(keys)
+	slices.Sort(keys)
 	var parts []string
 	for _, k := range keys {
 		parts = append(parts, fmt.Sprintf("%s(%d)", bits[k], k))
@@ -147,11 +148,11 @@ func findAllDirs(roots []string) ([]string, error) {
 			return nil, fmt.Errorf("%s is not a directory", root)
 		}
 
-		err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return nil // skip inaccessible
 			}
-			if info.IsDir() && !seen[path] {
+			if d.IsDir() && !seen[path] {
 				seen[path] = true
 				dirs = append(dirs, path)
 			}

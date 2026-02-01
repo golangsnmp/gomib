@@ -9,7 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
@@ -281,8 +281,8 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 		}
 	}
 
-	sort.Strings(result.MissingInGomib)
-	sort.Strings(result.MissingInLibsmi)
+	slices.Sort(result.MissingInGomib)
+	slices.Sort(result.MissingInLibsmi)
 
 	return result
 }

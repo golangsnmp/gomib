@@ -5,7 +5,8 @@ package gomib
 // the ground-truth test suite.
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
@@ -83,11 +84,11 @@ func rangesEquivalent(gomibRanges, fixtureRanges []testutil.RangeInfo) bool {
 }
 
 func sortRanges(rs []testutil.RangeInfo) {
-	sort.Slice(rs, func(i, j int) bool {
-		if rs[i].Low != rs[j].Low {
-			return rs[i].Low < rs[j].Low
+	slices.SortFunc(rs, func(a, b testutil.RangeInfo) int {
+		if c := cmp.Compare(a.Low, b.Low); c != 0 {
+			return c
 		}
-		return rs[i].High < rs[j].High
+		return cmp.Compare(a.High, b.High)
 	})
 }
 

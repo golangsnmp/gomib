@@ -4,12 +4,13 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -321,8 +322,8 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 	}
 
 	// Sort missing lists for deterministic output
-	sort.Strings(result.MissingInGomib)
-	sort.Strings(result.MissingInNetSnmp)
+	slices.Sort(result.MissingInGomib)
+	slices.Sort(result.MissingInNetSnmp)
 
 	return result
 }
@@ -420,17 +421,17 @@ func rangesEqual(a, b []RangeInfo) bool {
 	bCopy := make([]RangeInfo, len(b))
 	copy(aCopy, a)
 	copy(bCopy, b)
-	sort.Slice(aCopy, func(i, j int) bool {
-		if aCopy[i].Low != aCopy[j].Low {
-			return aCopy[i].Low < aCopy[j].Low
+	slices.SortFunc(aCopy, func(a, b RangeInfo) int {
+		if c := cmp.Compare(a.Low, b.Low); c != 0 {
+			return c
 		}
-		return aCopy[i].High < aCopy[j].High
+		return cmp.Compare(a.High, b.High)
 	})
-	sort.Slice(bCopy, func(i, j int) bool {
-		if bCopy[i].Low != bCopy[j].Low {
-			return bCopy[i].Low < bCopy[j].Low
+	slices.SortFunc(bCopy, func(a, b RangeInfo) int {
+		if c := cmp.Compare(a.Low, b.Low); c != 0 {
+			return c
 		}
-		return bCopy[i].High < bCopy[j].High
+		return cmp.Compare(a.High, b.High)
 	})
 	for i := range aCopy {
 		if aCopy[i].Low != bCopy[i].Low || aCopy[i].High != bCopy[i].High {
@@ -615,7 +616,7 @@ func formatEnums(enums map[int]string) string {
 	for k := range enums {
 		keys = append(keys, k)
 	}
-	sort.Ints(keys)
+	slices.Sort(keys)
 
 	var parts []string
 	for _, k := range keys {

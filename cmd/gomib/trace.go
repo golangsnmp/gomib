@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
@@ -124,7 +124,7 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 	if len(definingModules) == 0 {
 		fmt.Println("  (none found)")
 	} else {
-		sort.Strings(definingModules)
+		slices.Sort(definingModules)
 		for _, modName := range definingModules {
 			mod := mib.Module(modName)
 			var kinds []string
