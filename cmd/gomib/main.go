@@ -131,7 +131,14 @@ func setupLogger() *slog.Logger {
 	}))
 }
 
-func getSources() []gomib.Source {
+func loadMib(modules []string) (gomib.Mib, error) {
+	return loadMibWithOpts(modules)
+}
+
+func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (gomib.Mib, error) {
+	var source gomib.Source
+	var opts []gomib.LoadOption
+
 	if len(paths) > 0 {
 		var sources []gomib.Source
 		for _, p := range paths {
@@ -141,59 +148,18 @@ func getSources() []gomib.Source {
 				fmt.Fprintf(os.Stderr, "warning: cannot access path %s: %v\n", p, err)
 			}
 		}
-		return sources
-	}
-	return defaultSources()
-}
-
-func defaultSources() []gomib.Source {
-	var sources []gomib.Source
-	searchPaths := getDefaultSearchPaths()
-	for _, p := range searchPaths {
-		if src, err := gomib.DirTree(p); err == nil {
-			sources = append(sources, src)
+		if len(sources) == 0 {
+			return nil, gomib.ErrNoSources
 		}
-	}
-	return sources
-}
-
-func getDefaultSearchPaths() []string {
-	var paths []string
-
-	if mibdirs := os.Getenv("MIBDIRS"); mibdirs != "" {
-		paths = append(paths, strings.Split(mibdirs, ":")...)
-	}
-
-	if home, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, home+"/.snmp/mibs")
-	}
-
-	paths = append(paths,
-		"/usr/share/snmp/mibs",
-		"/usr/local/share/snmp/mibs",
-	)
-
-	return paths
-}
-
-func loadMib(modules []string) (gomib.Mib, error) {
-	return loadMibWithOpts(modules)
-}
-
-func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (gomib.Mib, error) {
-	sources := getSources()
-	if len(sources) == 0 {
-		return nil, gomib.ErrNoSources
-	}
-
-	var source gomib.Source
-	if len(sources) == 1 {
-		source = sources[0]
+		if len(sources) == 1 {
+			source = sources[0]
+		} else {
+			source = gomib.Multi(sources...)
+		}
 	} else {
-		source = gomib.Multi(sources...)
+		opts = append(opts, gomib.WithSystemPaths())
 	}
 
-	var opts []gomib.LoadOption
 	if logger := setupLogger(); logger != nil {
 		opts = append(opts, gomib.WithLogger(logger))
 	}
