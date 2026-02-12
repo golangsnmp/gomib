@@ -18,7 +18,7 @@ func cmdFixturegen(args []string) int {
 	fs.StringVar(&outDir, "dir", "", "Output directory for fixture files (default: stdout for single module)")
 
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), `Usage: gomib-netsnmp fixturegen [options] MODULE [MODULE...]
+		_, _ = fmt.Fprintf(fs.Output(), `Usage: gomib-netsnmp fixturegen [options] MODULE [MODULE...]
 
 Generate JSON fixture files from net-snmp for ground-truth testing.
 Each module produces a JSON file containing all NormalizedNode entries

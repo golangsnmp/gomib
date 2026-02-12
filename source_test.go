@@ -79,7 +79,7 @@ func TestDirSourceFindExisting(t *testing.T) {
 	result, err := src.Find("IF-MIB")
 	testutil.NoError(t, err, "Find IF-MIB")
 	testutil.NotNil(t, result.Reader, "Reader should not be nil")
-	result.Reader.Close()
+	_ = result.Reader.Close()
 	testutil.True(t, result.Path != "", "Path should be set")
 }
 
@@ -104,7 +104,7 @@ func TestDirTreeSourceFindAcrossSubdirs(t *testing.T) {
 	result, err := src.Find("IF-MIB")
 	testutil.NoError(t, err, "Find IF-MIB across subdirs")
 	testutil.NotNil(t, result.Reader, "Reader should not be nil")
-	result.Reader.Close()
+	_ = result.Reader.Close()
 }
 
 func TestDirTreeSourceFindNotExist(t *testing.T) {
@@ -146,7 +146,7 @@ END
 	result, err := src.Find("TEST-FS-MIB")
 	testutil.NoError(t, err, "Find TEST-FS-MIB in FS source")
 	testutil.NotNil(t, result.Reader, "Reader should not be nil")
-	result.Reader.Close()
+	_ = result.Reader.Close()
 	testutil.Contains(t, result.Path, "test-fs:", "Path should contain FS name prefix")
 
 	// ListFiles should work
@@ -225,7 +225,7 @@ func TestMultiSourceFindOrder(t *testing.T) {
 	// IF-MIB is only in ietf/, so it should be found
 	result, err := multi.Find("IF-MIB")
 	testutil.NoError(t, err, "Find IF-MIB from multi source")
-	result.Reader.Close()
+	_ = result.Reader.Close()
 }
 
 func TestMultiSourceListFilesCombines(t *testing.T) {
