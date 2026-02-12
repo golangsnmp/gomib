@@ -813,14 +813,14 @@ func categorizeDefval(mismatches []Mismatch) []MismatchCategory {
 			emptyVsValue = append(emptyVsValue, m)
 		case nNorm == "" && gNorm != "":
 			emptyVsValue = append(emptyVsValue, m)
-		case isHexZeroDiff(m.Gomib, m.NetSnmp):
+		case isHexZeroDiff(gNorm, nNorm):
 			hexZeros = append(hexZeros, m)
-		case strings.HasPrefix(m.Gomib, "0x") || strings.HasPrefix(m.NetSnmp, "0x") ||
-			strings.Contains(m.Gomib, "'H") || strings.Contains(m.NetSnmp, "'H"):
+		case strings.HasPrefix(gNorm, "0x") || strings.HasPrefix(nNorm, "0x") ||
+			strings.Contains(gNorm, "'H") || strings.Contains(nNorm, "'H"):
 			hexDiff = append(hexDiff, m)
-		case isOidSymbolicDiff(m.Gomib, m.NetSnmp):
+		case isOidSymbolicDiff(gNorm, nNorm):
 			oidSymbolic = append(oidSymbolic, m)
-		case strings.Contains(m.Gomib, "(") || strings.Contains(m.NetSnmp, "("):
+		case strings.Contains(gNorm, "(") || strings.Contains(nNorm, "("):
 			enumDiff = append(enumDiff, m)
 		default:
 			other = append(other, m)
