@@ -721,8 +721,8 @@ func TestProblemIndexTableKinds(t *testing.T) {
 }
 
 // TestProblemDefvalOidRef verifies that OID-valued DEFVALs (e.g., zeroDotZero)
-// are parsed and stored. gomib normalizes to numeric OID form.
-// Ground truth: net-snmp outputs "zeroDotZero", gomib outputs "0.0" (documented divergence).
+// are parsed and stored with the symbolic name from MIB source.
+// Ground truth: net-snmp outputs "zeroDotZero", gomib also outputs "zeroDotZero".
 // PROBLEMS.md: PROBLEM-DEFVAL-MIB / DEFVAL with OID reference
 func TestProblemDefvalOidRef(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
@@ -734,11 +734,7 @@ func TestProblemDefvalOidRef(t *testing.T) {
 	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalOidRef")
 
 	got := dv.String()
-	// gomib normalizes OID defvals to numeric. net-snmp keeps symbolic.
-	// Both "0.0" and "zeroDotZero" are valid.
-	if !defvalEquivalent(got, "zeroDotZero") && got != "0.0" {
-		t.Errorf("defval: got %q, want 0.0 or zeroDotZero", got)
-	}
+	testutil.Equal(t, "zeroDotZero", got, "OID defval should return symbolic name")
 }
 
 // TestProblemDefvalTypeMismatch verifies that a raw integer DEFVAL for an

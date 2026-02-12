@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -53,10 +54,11 @@ type FieldCounts struct {
 	Varbinds     CountPair `json:"varbinds"`
 }
 
-// CountPair holds match and mismatch counts.
+// CountPair holds match, mismatch, and missing counts.
 type CountPair struct {
 	Match    int `json:"match"`
 	Mismatch int `json:"mismatch"`
+	Missing  int `json:"missing,omitempty"` // one side has value, other doesn't
 }
 
 func cmdCompare(args []string) int {
@@ -202,6 +204,9 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			} else if gNode.Type != "" {
 				result.Summary.Type.Mismatch++
 				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "type", gNode.Type, nsNode.Type, gNode, nsNode))
+			} else {
+				result.Summary.Type.Missing++
+				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "type", "", nsNode.Type, gNode, nsNode))
 			}
 		}
 
@@ -211,6 +216,9 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			} else if gNode.Access != "" {
 				result.Summary.Access.Mismatch++
 				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "access", gNode.Access, nsNode.Access, gNode, nsNode))
+			} else {
+				result.Summary.Access.Missing++
+				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "access", "", nsNode.Access, gNode, nsNode))
 			}
 		}
 
@@ -220,6 +228,9 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			} else if gNode.Status != "" {
 				result.Summary.Status.Mismatch++
 				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "status", gNode.Status, nsNode.Status, gNode, nsNode))
+			} else {
+				result.Summary.Status.Missing++
+				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "status", "", nsNode.Status, gNode, nsNode))
 			}
 		}
 
@@ -247,6 +258,9 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			} else if gNode.Hint != "" {
 				result.Summary.Hint.Mismatch++
 				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "hint", gNode.Hint, nsNode.Hint, gNode, nsNode))
+			} else {
+				result.Summary.Hint.Missing++
+				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "hint", "", nsNode.Hint, gNode, nsNode))
 			}
 		}
 
@@ -256,6 +270,9 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			} else if gNode.TCName != "" {
 				result.Summary.TCName.Mismatch++
 				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "tc_name", gNode.TCName, nsNode.TCName, gNode, nsNode))
+			} else {
+				result.Summary.TCName.Missing++
+				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "tc_name", "", nsNode.TCName, gNode, nsNode))
 			}
 		}
 
@@ -265,6 +282,9 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			} else if gNode.Units != "" {
 				result.Summary.Units.Mismatch++
 				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "units", gNode.Units, nsNode.Units, gNode, nsNode))
+			} else {
+				result.Summary.Units.Missing++
+				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "units", "", nsNode.Units, gNode, nsNode))
 			}
 		}
 
@@ -283,6 +303,9 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			} else if gNode.DefaultValue != "" {
 				result.Summary.DefaultValue.Mismatch++
 				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "defval", gNode.DefaultValue, nsNode.DefaultValue, gNode, nsNode))
+			} else {
+				result.Summary.DefaultValue.Missing++
+				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "defval", "", nsNode.DefaultValue, gNode, nsNode))
 			}
 		}
 
@@ -483,8 +506,8 @@ func isHexZeros(s string) bool {
 	return true
 }
 
-// oidSymbolicEquivalent checks if two OID representations are equivalent.
-// Handles numeric OID vs well-known symbolic names.
+// oidSymbolicEquivalent checks if two OID representations are equivalent
+// using a table of known OID name-to-numeric mappings.
 func oidSymbolicEquivalent(a, b string) bool {
 	knownOIDs := map[string]string{
 		"zeroDotZero":              "0.0",
@@ -506,52 +529,7 @@ func oidSymbolicEquivalent(a, b string) bool {
 		return true
 	}
 
-	// Heuristic for vendor-specific OIDs not in the known list
-	aIsNumeric := isNumericOID(a)
-	bIsNumeric := isNumericOID(b)
-
-	if aIsNumeric && !bIsNumeric && isLikelyOIDSymbol(b) {
-		return true
-	}
-	if bIsNumeric && !aIsNumeric && isLikelyOIDSymbol(a) {
-		return true
-	}
-
 	return false
-}
-
-// isNumericOID checks if a string looks like a numeric OID (e.g., "1.3.6.1.2.1").
-func isNumericOID(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, c := range s {
-		if c != '.' && (c < '0' || c > '9') {
-			return false
-		}
-	}
-	// Must have at least one dot to be an OID (not just an integer)
-	return strings.Contains(s, ".")
-}
-
-// isLikelyOIDSymbol checks if a string looks like an OID symbolic name.
-// OID symbols are typically camelCase or contain specific patterns.
-func isLikelyOIDSymbol(s string) bool {
-	if s == "" {
-		return false
-	}
-	if (s[0] < 'a' || s[0] > 'z') && (s[0] < 'A' || s[0] > 'Z') {
-		return false
-	}
-	if strings.Contains(s, ".") {
-		return false
-	}
-	for _, c := range s {
-		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '-' && c != '_' {
-			return false
-		}
-	}
-	return true
 }
 
 func varbindsEqual(a, b []string) bool {
@@ -1095,29 +1073,74 @@ func countRanges(s string) int {
 	return strings.Count(s, "..")
 }
 
-// isSignedUnsignedDiff checks if the range difference is due to signed vs unsigned interpretation.
-// Examples: "4294967295" vs "-1", "4294967294" vs "-2", "2147483648" vs "-2147483648"
+// isSignedUnsignedDiff checks if the range difference is due to signed vs
+// unsigned interpretation. Each value that differs must differ by exactly
+// 2^32, which is the C int overflow that causes net-snmp to display unsigned
+// values as signed (e.g. 4294967295 as -1).
 func isSignedUnsignedDiff(gomib, netsnmp string) bool {
-	if !strings.Contains(netsnmp, "-") {
+	gVals := parseRangeValues(gomib)
+	nVals := parseRangeValues(netsnmp)
+	if len(gVals) == 0 || len(gVals) != len(nVals) {
 		return false
 	}
-
-	// Check for patterns like "..-1)", "..-2)", "| -1)", etc.
-	// These indicate net-snmp is showing signed interpretation
-	if strings.Contains(netsnmp, "..-") || strings.Contains(netsnmp, "| -") ||
-		strings.Contains(netsnmp, "(-") {
-		return true
+	hasDiff := false
+	for i := range gVals {
+		if gVals[i] == nVals[i] {
+			continue
+		}
+		diff := gVals[i] - nVals[i]
+		if diff != 1<<32 && diff != -(1<<32) {
+			return false
+		}
+		hasDiff = true
 	}
+	return hasDiff
+}
 
-	return false
+// parseRangeValues extracts all int64 values from a range string like
+// "(0..255 | 1024..2048)" into a flat slice [0, 255, 1024, 2048].
+func parseRangeValues(s string) []int64 {
+	s = strings.TrimSpace(s)
+	s = strings.Trim(s, "()")
+	var vals []int64
+	for _, part := range strings.Split(s, "|") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if low, high, ok := strings.Cut(part, ".."); ok {
+			if v, err := strconv.ParseInt(strings.TrimSpace(low), 10, 64); err == nil {
+				vals = append(vals, v)
+			} else {
+				return nil
+			}
+			if v, err := strconv.ParseInt(strings.TrimSpace(high), 10, 64); err == nil {
+				vals = append(vals, v)
+			} else {
+				return nil
+			}
+		} else {
+			if v, err := strconv.ParseInt(part, 10, 64); err == nil {
+				vals = append(vals, v)
+			} else {
+				return nil
+			}
+		}
+	}
+	return vals
 }
 
 func printFieldAccuracy(w io.Writer, name string, c CountPair) {
-	total := c.Match + c.Mismatch
+	total := c.Match + c.Mismatch + c.Missing
 	if total == 0 {
 		return
 	}
 	pct := 100.0 * float64(c.Match) / float64(total)
-	fmt.Fprintf(w, "  %-10s %5d match, %5d mismatch (%.1f%% accurate)\n",
-		name+":", c.Match, c.Mismatch, pct)
+	if c.Missing > 0 {
+		fmt.Fprintf(w, "  %-10s %5d match, %5d mismatch, %5d missing (%.1f%% accurate)\n",
+			name+":", c.Match, c.Mismatch, c.Missing, pct)
+	} else {
+		fmt.Fprintf(w, "  %-10s %5d match, %5d mismatch (%.1f%% accurate)\n",
+			name+":", c.Match, c.Mismatch, pct)
+	}
 }

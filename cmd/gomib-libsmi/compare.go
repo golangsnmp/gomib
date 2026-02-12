@@ -379,8 +379,11 @@ func kindsEquivalent(a, b string) bool {
 	if a == b {
 		return true
 	}
-	// libsmi uses "node" for many things gomib classifies more specifically
-	if b == "node" || b == "unknown" {
+	// libsmi uses "node" for MODULE-IDENTITY, OBJECT-IDENTITY, and value
+	// assignments. Only accept equivalence when gomib also reports "node",
+	// which covers the same macro types. Don't give a free pass when gomib
+	// reports a specific kind like "scalar" or "table".
+	if (b == "node" || b == "unknown") && a == "node" {
 		return true
 	}
 	return false

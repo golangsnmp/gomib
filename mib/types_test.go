@@ -19,7 +19,7 @@ func TestDefValString(t *testing.T) {
 		{"bits multiple", NewDefValBits([]string{"read", "write"}, "{ read, write }"), "{ read, write }"},
 		{"bits empty", NewDefValBits([]string{}, "{ }"), "{ }"},
 		{"bits single", NewDefValBits([]string{"read"}, "{ read }"), "{ read }"},
-		{"oid", NewDefValOID(Oid{0, 0}, "0.0"), "0.0"},
+		{"oid", NewDefValOID(Oid{0, 0}, "zeroDotZero"), "zeroDotZero"},
 		{"bytes empty", NewDefValBytes([]byte{}, "''H"), "0"},
 		{"bytes 1 byte", NewDefValBytes([]byte{0xFF}, "'FF'H"), "255"},
 		{"bytes 4 bytes", NewDefValBytes([]byte{0xDE, 0xAD, 0xBE, 0xEF}, "'DEADBEEF'H"), "3735928559"},

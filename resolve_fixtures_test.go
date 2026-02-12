@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 func TestResolveOIDs(t *testing.T) {
@@ -223,7 +224,8 @@ func TestResolveAccess(t *testing.T) {
 					}
 
 					gomibAccess := testutil.NormalizeAccess(obj.Access())
-					if !accessEquivalent(gomibAccess, fn.Access) {
+					isSMIv1 := obj.Module().Language() == mib.LanguageSMIv1
+					if !accessEquivalent(gomibAccess, fn.Access, isSMIv1) {
 						t.Errorf("divergence: access for %s: gomib=%q fixture=%q",
 							fn.Name, gomibAccess, fn.Access)
 					}

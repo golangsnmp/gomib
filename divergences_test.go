@@ -153,14 +153,17 @@ func varbindsEquivalent(gomibVarbinds, fixtureVarbinds []string) bool {
 }
 
 // accessEquivalent treats read-write and read-create as equivalent
-// (SMIv1 vs SMIv2 difference).
-func accessEquivalent(gomibAccess, fixtureAccess string) bool {
+// only for SMIv1 MIBs, where read-create did not exist.
+// For SMIv2 MIBs, read-write and read-create are distinct values.
+func accessEquivalent(gomibAccess, fixtureAccess string, isSMIv1 bool) bool {
 	if gomibAccess == fixtureAccess {
 		return true
 	}
-	if (gomibAccess == "read-write" && fixtureAccess == "read-create") ||
-		(gomibAccess == "read-create" && fixtureAccess == "read-write") {
-		return true
+	if isSMIv1 {
+		if (gomibAccess == "read-write" && fixtureAccess == "read-create") ||
+			(gomibAccess == "read-create" && fixtureAccess == "read-write") {
+			return true
+		}
 	}
 	return false
 }
@@ -179,8 +182,10 @@ func statusEquivalent(gomibStatus, fixtureStatus string) bool {
 }
 
 // defvalEquivalent accounts for representation differences: quoting,
-// hex zero bytes (0x00000000... vs 0), and OID symbolic names
-// (zeroDotZero vs 0.0).
+// hex zero bytes (0x00000000... vs 0), and hex all-ones (0xFFFF... vs -1).
+// The hex-ones case is the same root cause as the range signed/unsigned
+// divergence: net-snmp interprets the value through a C int, which
+// overflows to -1 for all-ones bit patterns.
 func defvalEquivalent(gomibDefval, fixtureDefval string) bool {
 	if gomibDefval == fixtureDefval {
 		return true
@@ -193,7 +198,7 @@ func defvalEquivalent(gomibDefval, fixtureDefval string) bool {
 	if isHexZeros(gNorm) && fNorm == "0" || isHexZeros(fNorm) && gNorm == "0" {
 		return true
 	}
-	if oidDefvalEquivalent(gNorm, fNorm) {
+	if isHexAllOnes(gNorm) && fNorm == "-1" || isHexAllOnes(fNorm) && gNorm == "-1" {
 		return true
 	}
 	return false
@@ -211,16 +216,16 @@ func isHexZeros(s string) bool {
 	return len(s) > 2
 }
 
-func oidDefvalEquivalent(a, b string) bool {
-	known := map[string]string{
-		"zeroDotZero": "0.0",
+func isHexAllOnes(s string) bool {
+	if !strings.HasPrefix(s, "0x") && !strings.HasPrefix(s, "0X") {
+		return false
 	}
-	for sym, num := range known {
-		if (a == sym && b == num) || (a == num && b == sym) {
-			return true
+	for _, c := range strings.ToUpper(s[2:]) {
+		if c != 'F' {
+			return false
 		}
 	}
-	return false
+	return len(s) > 2
 }
 
 func referenceEquivalent(gomibRef, fixtureRef string) bool {

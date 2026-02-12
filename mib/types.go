@@ -134,7 +134,7 @@ func (d DefVal) String() string {
 		}
 		return "{ " + strings.Join(labels, ", ") + " }"
 	case DefValKindOID:
-		return d.value.(Oid).String()
+		return d.raw
 	default:
 		return d.raw
 	}
