@@ -437,6 +437,13 @@ func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mibimp
 	}
 	if shouldPreferModule(newMod, currentMod, def.mod, ctx) {
 		node.SetModule(newMod)
+		// Register node-kind definitions with their module.
+		// Object types, notifications, groups, compliance, and capabilities
+		// are registered later in the semantics phase.
+		switch def.kind {
+		case defValueAssignment, defObjectIdentity, defModuleIdentity:
+			newMod.AddNode(node)
+		}
 	}
 
 	// For MODULE-IDENTITY, set the module's OID
