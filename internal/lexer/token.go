@@ -5,33 +5,33 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// Token is a token with kind and source span.
+// Token represents a lexed unit with its classification and source location.
 type Token struct {
 	Kind TokenKind
 	Span types.Span
 }
 
-// NewToken creates a new token.
+// NewToken creates a Token from a kind and source span.
 func NewToken(kind TokenKind, span types.Span) Token {
 	return Token{Kind: kind, Span: span}
 }
 
-// TokenKind identifies a token type.
+// TokenKind classifies a token (punctuation, keyword, literal, etc.).
 type TokenKind int
 
 const (
-	// === Special ===
+	// Special
 
 	TokError TokenKind = iota
 	TokEOF
 	TokForbiddenKeyword
 
-	// === Identifiers ===
+	// Identifiers
 
 	TokUppercaseIdent
 	TokLowercaseIdent
 
-	// === Literals ===
+	// Literals
 
 	TokNumber
 	TokNegativeNumber
@@ -39,7 +39,7 @@ const (
 	TokHexString
 	TokBinString
 
-	// === Single-character punctuation ===
+	// Single-character punctuation
 
 	TokLBracket
 	TokRBracket
@@ -54,12 +54,12 @@ const (
 	TokPipe
 	TokMinus
 
-	// === Multi-character operators ===
+	// Multi-character operators
 
 	TokDotDot
 	TokColonColonEqual
 
-	// === Structural keywords ===
+	// Structural keywords
 
 	TokKwDefinitions
 	TokKwBegin
@@ -74,7 +74,7 @@ const (
 	TokKwChoice
 	TokKwMacro
 
-	// === Clause keywords ===
+	// Clause keywords
 
 	TokKwSyntax
 	TokKwMaxAccess
@@ -108,7 +108,7 @@ const (
 	TokKwEnterprise
 	TokKwVariables
 
-	// === MACRO invocation keywords ===
+	// MACRO invocation keywords
 
 	TokKwModuleIdentity
 	TokKwModuleCompliance
@@ -121,7 +121,7 @@ const (
 	TokKwTextualConvention
 	TokKwTrapType
 
-	// === Type keywords ===
+	// Type keywords
 
 	TokKwInteger
 	TokKwInteger32
@@ -136,19 +136,19 @@ const (
 	TokKwOctet
 	TokKwString
 
-	// === SMIv1 type aliases ===
+	// SMIv1 type aliases
 
 	TokKwCounter
 	TokKwGauge
 	TokKwNetworkAddress
 
-	// === ASN.1 tag keywords ===
+	// ASN.1 tag keywords
 
 	TokKwApplication
 	TokKwImplicit
 	TokKwUniversal
 
-	// === Status/Access value keywords ===
+	// Status/Access value keywords
 
 	TokKwCurrent
 	TokKwDeprecated
@@ -164,12 +164,13 @@ const (
 	TokKwNotImplemented
 )
 
-// IsKeyword returns true if this token is a keyword.
+// IsKeyword reports whether k is any keyword token.
 func (k TokenKind) IsKeyword() bool {
 	return k >= TokKwDefinitions && k <= TokKwNotImplemented
 }
 
-// IsTypeKeyword returns true if this token is a type keyword.
+// IsTypeKeyword reports whether k is a built-in type keyword
+// (INTEGER, Counter32, OCTET STRING components, etc.).
 func (k TokenKind) IsTypeKeyword() bool {
 	switch k {
 	case TokKwInteger, TokKwInteger32, TokKwUnsigned32, TokKwCounter32,
@@ -182,7 +183,8 @@ func (k TokenKind) IsTypeKeyword() bool {
 	}
 }
 
-// IsMacroKeyword returns true if this token is a macro keyword.
+// IsMacroKeyword reports whether k is a macro invocation keyword
+// (OBJECT-TYPE, MODULE-IDENTITY, etc.).
 func (k TokenKind) IsMacroKeyword() bool {
 	switch k {
 	case TokKwModuleIdentity, TokKwModuleCompliance, TokKwObjectGroup,

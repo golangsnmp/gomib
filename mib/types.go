@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Range for size/value constraints.
+// Range represents a min..max constraint for sizes or values.
 type Range struct {
 	Min, Max int64
 }

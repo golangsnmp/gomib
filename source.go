@@ -18,26 +18,24 @@ func DefaultExtensions() []string {
 	return []string{"", ".mib", ".smi", ".txt", ".my"}
 }
 
-// FindResult contains the result of a Source.Find operation.
+// FindResult holds the content and location of a found MIB file.
 type FindResult struct {
-	// Reader provides access to the file content.
 	Reader io.ReadCloser
-	// Path is the source path for diagnostics.
+	// Path is used in diagnostic messages to identify the source.
 	Path string
 }
 
-// Source finds MIB files by module name.
+// Source provides access to MIB files for loading.
 type Source interface {
-	// Find locates a module by name.
-	// Returns fs.ErrNotExist if not found.
+	// Find returns the MIB content for the named module,
+	// or fs.ErrNotExist if the module is not available.
 	Find(name string) (FindResult, error)
 
 	// ListFiles returns all MIB file paths known to this source.
-	// Used for parallel loading.
 	ListFiles() ([]string, error)
 }
 
-// SourceOption configures a source.
+// SourceOption modifies source behavior (extensions, heuristics).
 type SourceOption func(*sourceConfig)
 
 type sourceConfig struct {
@@ -51,21 +49,20 @@ func defaultSourceConfig() sourceConfig {
 	}
 }
 
-// WithExtensions sets the file extensions to recognize for this source.
+// WithExtensions overrides the default file extensions used to match MIB files.
 func WithExtensions(exts ...string) SourceOption {
 	return func(c *sourceConfig) {
 		c.extensions = exts
 	}
 }
 
-// WithNoHeuristic disables content validation for this source.
+// WithNoHeuristic disables the DEFINITIONS/::= content check,
+// treating all matched files as MIB sources.
 func WithNoHeuristic() SourceOption {
 	return func(c *sourceConfig) {
 		c.noHeuristic = true
 	}
 }
-
-// --- Dir Source (single directory, lazy) ---
 
 type dirSource struct {
 	path   string
@@ -132,8 +129,6 @@ func (s *dirSource) ListFiles() ([]string, error) {
 	}
 	return files, nil
 }
-
-// --- DirTree Source (recursive directory, indexed) ---
 
 type treeSource struct {
 	index  map[string]string // module name -> file path
@@ -212,8 +207,6 @@ func (s *treeSource) ListFiles() ([]string, error) {
 	return slices.Collect(maps.Values(s.index)), nil
 }
 
-// --- FS Source (for embed.FS, testing, http filesystems) ---
-
 type fsSource struct {
 	name   string
 	fsys   fs.FS
@@ -225,8 +218,8 @@ type fsSource struct {
 }
 
 // FS creates a Source backed by an fs.FS (e.g., embed.FS).
-// The name is used for error messages and path reporting.
-// It lazily indexes the filesystem on first Find() call.
+// The name is used in diagnostic paths. The filesystem is lazily
+// indexed on first use.
 func FS(name string, fsys fs.FS, opts ...SourceOption) Source {
 	cfg := defaultSourceConfig()
 	for _, opt := range opts {
@@ -301,8 +294,6 @@ func (s *fsSource) buildIndex() (map[string]string, error) {
 	return index, err
 }
 
-// --- Multi Source (combines multiple sources) ---
-
 type multiSource struct {
 	sources []Source
 }
@@ -337,8 +328,6 @@ func (s *multiSource) ListFiles() ([]string, error) {
 	}
 	return files, nil
 }
-
-// --- Helpers ---
 
 func makeExtensionSet(extensions []string) map[string]struct{} {
 	set := make(map[string]struct{}, len(extensions))

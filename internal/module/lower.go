@@ -9,19 +9,15 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// LoweringContext tracks state during the lowering process.
+// LoweringContext tracks state accumulated during the lowering pass.
 type LoweringContext struct {
-	// Diagnostics collected during lowering.
 	Diagnostics []mib.Diagnostic
-	// Language detected from imports (may be updated as imports are processed).
-	Language Language
-	// DiagConfig controls strictness and diagnostic filtering.
-	DiagConfig mib.DiagnosticConfig
+	Language    Language
+	DiagConfig  mib.DiagnosticConfig
 	types.Logger
 }
 
-// newLoweringContext creates a new lowering context with an optional logger.
-// If logger is nil, logging is disabled (zero overhead).
+// newLoweringContext returns a LoweringContext. A nil logger disables logging.
 func newLoweringContext(logger *slog.Logger, diagConfig mib.DiagnosticConfig) *LoweringContext {
 	return &LoweringContext{
 		Language:   LanguageUnknown,
@@ -30,7 +26,7 @@ func newLoweringContext(logger *slog.Logger, diagConfig mib.DiagnosticConfig) *L
 	}
 }
 
-// emitDiagnostic emits a diagnostic if it should be reported under the current config.
+// emitDiagnostic records a diagnostic if the current config allows it.
 func (ctx *LoweringContext) emitDiagnostic(code string, severity mib.Severity, moduleName string, message string) {
 	if !ctx.DiagConfig.ShouldReport(code, severity) {
 		return
@@ -45,12 +41,12 @@ func (ctx *LoweringContext) emitDiagnostic(code string, severity mib.Severity, m
 	})
 }
 
-// AddDiagnostic adds a diagnostic.
+// AddDiagnostic appends a diagnostic to the context.
 func (ctx *LoweringContext) AddDiagnostic(d mib.Diagnostic) {
 	ctx.Diagnostics = append(ctx.Diagnostics, d)
 }
 
-// isSMIv2BaseModule returns true if the module name is an SMIv2 base module.
+// isSMIv2BaseModule reports whether name is an SMIv2 base module.
 func isSMIv2BaseModule(module string) bool {
 	switch module {
 	case "SNMPv2-SMI", "SNMPv2-TC", "SNMPv2-CONF", "SNMPv2-MIB":
@@ -60,25 +56,15 @@ func isSMIv2BaseModule(module string) bool {
 	}
 }
 
-// Lower transforms an AST module into a normalized Module.
-//
-// This is the main entry point for lowering. It:
-//  1. Detects the SMI language from imports
-//  2. Lowers imports
-//  3. Lowers each definition
-//  4. Validates structural requirements (e.g., MODULE-IDENTITY for SMIv2)
-//
-// The AST is not needed after lowering.
-// If logger is nil, logging is disabled (zero overhead).
+// Lower transforms an AST module into a normalized Module. The AST is not
+// needed after lowering. A nil logger disables logging.
 func Lower(astModule *ast.Module, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *Module {
 	ctx := newLoweringContext(logger, diagConfig)
 
-	// Create module
 	module := NewModule(astModule.Name.Name, astModule.Span)
 
 	ctx.Log(slog.LevelDebug, "lowering module", slog.String("module", module.Name))
 
-	// Lower imports and detect language
 	module.Imports = lowerImports(astModule.Imports, ctx)
 	module.Language = ctx.Language
 
@@ -86,7 +72,6 @@ func Lower(astModule *ast.Module, logger *slog.Logger, diagConfig mib.Diagnostic
 		slog.String("module", module.Name),
 		slog.String("language", module.Language.String()))
 
-	// Lower definitions
 	for _, def := range astModule.Body {
 		if lowered := lowerDefinition(def, ctx); lowered != nil {
 			module.Definitions = append(module.Definitions, lowered)
@@ -97,7 +82,6 @@ func Lower(astModule *ast.Module, logger *slog.Logger, diagConfig mib.Diagnostic
 		slog.String("module", module.Name),
 		slog.Int("definitions", len(module.Definitions)))
 
-	// Check for MODULE-IDENTITY in SMIv2 modules
 	if module.Language == LanguageSMIv2 && !isSMIv2BaseModule(module.Name) {
 		hasModuleIdentity := false
 		for _, def := range module.Definitions {
@@ -113,43 +97,38 @@ func Lower(astModule *ast.Module, logger *slog.Logger, diagConfig mib.Diagnostic
 		}
 	}
 
-	// Convert and collect AST diagnostics (types.Diagnostic -> mib.Diagnostic)
 	for _, d := range astModule.Diagnostics {
 		module.Diagnostics = append(module.Diagnostics, mib.Diagnostic{
 			Severity: mib.Severity(d.Severity),
 			Code:     d.Code,
 			Message:  d.Message,
 			Module:   module.Name,
-			Line:     0, // Could compute from span if needed
+			Line:     0,
 			Column:   0,
 		})
 	}
 
-	// Collect lowering diagnostics
 	module.Diagnostics = append(module.Diagnostics, ctx.Diagnostics...)
 
 	return module
 }
 
-// lowerImports lowers import clauses and detects SMI language.
+// lowerImports flattens import clauses and detects the SMI language.
 func lowerImports(importClauses []ast.ImportClause, ctx *LoweringContext) []Import {
 	var imports []Import
 
 	for _, clause := range importClauses {
 		fromModule := clause.FromModule.Name
 
-		// Detect language from imports
 		if isSMIv2BaseModule(fromModule) {
 			ctx.Language = LanguageSMIv2
 		}
 
-		// Flatten each symbol
 		for _, symbol := range clause.Symbols {
 			imports = append(imports, NewImport(fromModule, symbol.Name, clause.Span))
 		}
 	}
 
-	// Default to SMIv1 if no SMIv2 imports detected
 	if ctx.Language == LanguageUnknown {
 		ctx.Language = LanguageSMIv1
 	}
@@ -157,8 +136,8 @@ func lowerImports(importClauses []ast.ImportClause, ctx *LoweringContext) []Impo
 	return imports
 }
 
-// lowerDefinition lowers a single definition.
-// Returns nil for definitions that are filtered out (MACRO, Error).
+// lowerDefinition converts an AST definition into a normalized Definition.
+// Returns nil for non-semantic definitions (MACROs, errors).
 func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 	switch d := def.(type) {
 	case *ast.ObjectTypeDef:
@@ -186,7 +165,7 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 	case *ast.AgentCapabilitiesDef:
 		return lowerAgentCapabilities(d)
 	case *ast.MacroDefinitionDef, *ast.ErrorDef:
-		// Filter out non-semantic definitions
+		// Non-semantic definitions
 		return nil
 	default:
 		ctx.Log(slog.LevelWarn, "unknown definition type",
@@ -194,8 +173,6 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 		return nil
 	}
 }
-
-// === Definition lowering functions ===
 
 func lowerObjectType(def *ast.ObjectTypeDef, _ *LoweringContext) *ObjectType {
 	var status Status
@@ -268,8 +245,7 @@ func lowerModuleIdentity(def *ast.ModuleIdentityDef) *ModuleIdentity {
 	}
 }
 
-// checkRevisionLastUpdated emits a diagnostic if the LAST-UPDATED date has no
-// matching REVISION entry. smilint flags this at level 3.
+// checkRevisionLastUpdated warns if LAST-UPDATED has no matching REVISION.
 func checkRevisionLastUpdated(ctx *LoweringContext, moduleName string, mi *ModuleIdentity) {
 	if mi.LastUpdated == "" {
 		return
@@ -343,14 +319,14 @@ func lowerTrapType(def *ast.TrapTypeDef) *Notification {
 	return &Notification{
 		Name:        def.Name.Name,
 		Objects:     variables,
-		Status:      StatusCurrent, // TRAP-TYPE doesn't have STATUS
+		Status:      StatusCurrent, // TRAP-TYPE has no STATUS clause
 		Description: description,
 		Reference:   reference,
 		TrapInfo: &TrapInfo{
 			Enterprise: def.Enterprise.Name,
 			TrapNumber: def.TrapNumber,
 		},
-		Oid:  nil, // TRAP-TYPE OID is derived from enterprise + trap_number
+		Oid:  nil, // derived from enterprise + trap number
 		Span: def.Span,
 	}
 }
@@ -369,7 +345,7 @@ func lowerTextualConvention(def *ast.TextualConventionDef) *TypeDef {
 	return &TypeDef{
 		Name:                def.Name.Name,
 		Syntax:              lowerTypeSyntax(def.Syntax.Syntax),
-		BaseType:            nil, // Derived from syntax during resolution
+		BaseType:            nil,
 		DisplayHint:         displayHint,
 		Status:              lowerStatus(def.Status.Value),
 		Description:         def.Description.Value,
@@ -383,7 +359,7 @@ func lowerTypeAssignment(def *ast.TypeAssignmentDef) *TypeDef {
 	return &TypeDef{
 		Name:                def.Name.Name,
 		Syntax:              lowerTypeSyntax(def.Syntax),
-		BaseType:            nil, // Derived from syntax during resolution
+		BaseType:            nil,
 		DisplayHint:         "",
 		Status:              StatusCurrent,
 		Description:         "",
@@ -631,8 +607,6 @@ func lowerNotificationVariation(v *ast.NotificationVariation) NotificationVariat
 	}
 }
 
-// === Helper lowering functions ===
-
 func lowerTypeSyntax(syntax ast.TypeSyntax) TypeSyntax {
 	switch s := syntax.(type) {
 	case *ast.TypeSyntaxTypeRef:
@@ -674,13 +648,11 @@ func lowerTypeSyntax(syntax ast.TypeSyntax) TypeSyntax {
 		return &TypeSyntaxSequence{Fields: fields}
 
 	case *ast.TypeSyntaxChoice:
-		// CHOICE is normalized to its first alternative's type.
-		// CHOICE only appears in SMI base modules (not user MIBs), and the only
-		// CHOICE usable as OBJECT-TYPE SYNTAX is NetworkAddress which has one alternative.
+		// CHOICE only appears in SMI base modules; normalize to the first alternative.
 		if len(s.Alternatives) > 0 {
 			return lowerTypeSyntax(s.Alternatives[0].Syntax)
 		}
-		// Empty CHOICE (shouldn't happen) - fall back to OCTET STRING
+		// Empty CHOICE fallback
 		return &TypeSyntaxOctetString{}
 
 	case *ast.TypeSyntaxOctetString:
@@ -690,7 +662,6 @@ func lowerTypeSyntax(syntax ast.TypeSyntax) TypeSyntax {
 		return &TypeSyntaxObjectIdentifier{}
 
 	default:
-		// Unknown type - fall back to type ref
 		return &TypeSyntaxOctetString{}
 	}
 }
@@ -736,14 +707,14 @@ func lowerRangeValue(value ast.RangeValue) RangeValue {
 		return &RangeValueUnsigned{Value: v.Value}
 
 	case *ast.RangeValueIdent:
-		// Handle MIN/MAX keywords
+		// MIN/MAX keywords
 		switch v.Name.Name {
 		case "MIN":
 			return &RangeValueMin{}
 		case "MAX":
 			return &RangeValueMax{}
 		default:
-			// Shouldn't happen, but fallback to unsigned 0
+			// Fallback
 			return &RangeValueUnsigned{Value: 0}
 		}
 
@@ -792,8 +763,7 @@ func lowerOidComponent(comp ast.OidComponent) OidComponent {
 	}
 }
 
-// lowerAccess converts AST access values to module Access.
-// PRESERVES all values without normalization per V2 design.
+// lowerAccess converts AST access values without normalization.
 func lowerAccess(access ast.AccessValue) Access {
 	switch access {
 	case ast.AccessValueReadOnly:
@@ -808,14 +778,12 @@ func lowerAccess(access ast.AccessValue) Access {
 		return AccessAccessibleForNotify
 	case ast.AccessValueWriteOnly:
 		return AccessWriteOnly
-	// SPPI values - preserve as-is
 	case ast.AccessValueInstall:
 		return AccessInstall
 	case ast.AccessValueInstallNotify:
 		return AccessInstallNotify
 	case ast.AccessValueReportOnly:
 		return AccessReportOnly
-	// AGENT-CAPABILITIES
 	case ast.AccessValueNotImplemented:
 		return AccessNotImplemented
 	default:
@@ -823,7 +791,6 @@ func lowerAccess(access ast.AccessValue) Access {
 	}
 }
 
-// lowerAccessKeyword converts AST access keyword to module AccessKeyword.
 func lowerAccessKeyword(keyword ast.AccessKeyword) AccessKeyword {
 	switch keyword {
 	case ast.AccessKeywordAccess:
@@ -839,9 +806,8 @@ func lowerAccessKeyword(keyword ast.AccessKeyword) AccessKeyword {
 	}
 }
 
-// lowerStatus converts AST status values to module Status.
-// PRESERVES all values without normalization per V2 design.
-// SMIv1 mandatory/optional are kept distinct from SMIv2 current/deprecated.
+// lowerStatus converts AST status values without normalization. SMIv1
+// mandatory/optional are kept distinct from SMIv2 current/deprecated.
 func lowerStatus(status ast.StatusValue) Status {
 	switch status {
 	case ast.StatusValueCurrent:
@@ -888,8 +854,7 @@ func lowerDefValContent(content ast.DefValContent) DefVal {
 		return &DefValString{Value: c.Value.Value}
 
 	case *ast.DefValContentIdentifier:
-		// Could be enum label or OID reference - we can't distinguish
-		// until semantic analysis, so treat as Enum (most common case)
+		// Could be enum label or OID reference; treat as enum until semantic analysis.
 		return &DefValEnum{Name: c.Name.Name}
 
 	case *ast.DefValContentBits:

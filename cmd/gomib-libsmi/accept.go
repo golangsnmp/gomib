@@ -18,7 +18,8 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// AcceptResult holds the acceptance test results.
+// AcceptResult holds pass/fail tallies from running both parsers on a
+// module set.
 type AcceptResult struct {
 	TotalModules   int            `json:"total_modules"`
 	BothPass       int            `json:"both_pass"`
@@ -29,7 +30,7 @@ type AcceptResult struct {
 	Discrepancies  []ModuleAccept `json:"discrepancies,omitempty"`
 }
 
-// ModuleAccept holds per-module acceptance status.
+// ModuleAccept records whether a module loaded successfully in each parser.
 type ModuleAccept struct {
 	Name         string   `json:"name"`
 	GomibPass    bool     `json:"gomib_pass"`
@@ -76,7 +77,6 @@ Options:
 	}
 	defer cleanup()
 
-	// If no modules specified, find all
 	if len(modules) == 0 {
 		modules = findAllModules(mibPaths)
 	}
@@ -105,7 +105,6 @@ func testAcceptance(modules []string, mibPaths []string, level int, showAll bool
 		TotalModules: len(modules),
 	}
 
-	// Build gomib source
 	var sources []gomib.Source
 	for _, p := range mibPaths {
 		src, err := gomib.DirTree(p)
@@ -122,16 +121,13 @@ func testAcceptance(modules []string, mibPaths []string, level int, showAll bool
 		gomibSource = gomib.Multi(sources...)
 	}
 
-	// Initialize libsmi
 	libsmiPath := BuildMIBPath(expandDirs(mibPaths))
 	InitLibsmi(libsmiPath, level)
 	defer CleanupLibsmi()
 
-	// Test each module
 	for _, mod := range modules {
 		ma := ModuleAccept{Name: mod}
 
-		// Test with gomib
 		if gomibSource != nil {
 			cfg := mib.DiagnosticConfig{
 				Level:  mib.StrictnessLevel(level),
@@ -141,7 +137,6 @@ func testAcceptance(modules []string, mibPaths []string, level int, showAll bool
 			ctx := context.Background()
 			m, err := gomib.LoadModules(ctx, []string{mod}, gomibSource, gomib.WithDiagnosticConfig(cfg))
 			if err == nil && m != nil {
-				// Count errors at or above threshold
 				for _, d := range m.Diagnostics() {
 					if int(d.Severity) <= level {
 						ma.GomibErrors++
@@ -154,7 +149,6 @@ func testAcceptance(modules []string, mibPaths []string, level int, showAll bool
 			}
 		}
 
-		// Test with libsmi
 		ClearErrors()
 		loaded := LoadModule(mod)
 		diags := GetDiagnostics()
@@ -169,7 +163,6 @@ func testAcceptance(modules []string, mibPaths []string, level int, showAll bool
 		}
 		ma.LibsmiPass = loaded && ma.LibsmiErrors == 0
 
-		// Categorize
 		isDiscrepancy := false
 		if ma.GomibPass && ma.LibsmiPass {
 			result.BothPass++
@@ -186,7 +179,6 @@ func testAcceptance(modules []string, mibPaths []string, level int, showAll bool
 		if isDiscrepancy {
 			result.Discrepancies = append(result.Discrepancies, ma)
 		} else if !collectDiags {
-			// Clear diags if not a discrepancy and not collecting
 			ma.GomibDiags = nil
 			ma.LibsmiDiags = nil
 		}

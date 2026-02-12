@@ -1,18 +1,11 @@
 package gomib
 
-// resolve_navigation_test.go tests OID tree navigation, table structure
-// navigation, filtered collections, label lookups, type predicates, module
-// metadata, and other API surface areas not covered by ground-truth fixture
-// tests.
-
 import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/mib"
 )
-
-// === Node tree navigation ===
 
 func TestNodeRoot(t *testing.T) {
 	m := loadTestMIB(t)
@@ -46,7 +39,6 @@ func TestNodeParent(t *testing.T) {
 func TestNodeChildren(t *testing.T) {
 	m := loadTestMIB(t)
 
-	// ifEntry has multiple children (columns)
 	entry := m.FindNode("ifEntry")
 	testutil.NotNil(t, entry, "FindNode(ifEntry)")
 
@@ -54,7 +46,6 @@ func TestNodeChildren(t *testing.T) {
 	testutil.Greater(t, len(children), 0,
 		"ifEntry should have children (table columns)")
 
-	// ifIndex should be among children (arc 1)
 	found := false
 	for _, child := range children {
 		if child.Name() == "ifIndex" {
@@ -76,7 +67,6 @@ func TestNodeChild(t *testing.T) {
 	testutil.NotNil(t, child, "Child(1) of ifEntry")
 	testutil.Equal(t, "ifIndex", child.Name(), "Child(1) of ifEntry should be ifIndex")
 
-	// Non-existent arc
 	noChild := entry.Child(99999)
 	testutil.Nil(t, noChild, "Child(99999) should return nil for non-existent arc")
 }
@@ -84,7 +74,6 @@ func TestNodeChild(t *testing.T) {
 func TestNodeDescendants(t *testing.T) {
 	m := loadTestMIB(t)
 
-	// ifTable has descendants (ifEntry + columns)
 	table := m.FindNode("ifTable")
 	testutil.NotNil(t, table, "FindNode(ifTable)")
 
@@ -111,7 +100,6 @@ func TestNodeArc(t *testing.T) {
 func TestNodeObjectAndNotification(t *testing.T) {
 	m := loadTestMIB(t)
 
-	// ifIndex node should have an associated Object
 	node := m.FindNode("ifIndex")
 	if node == nil {
 		t.Fatal("ifIndex not found")
@@ -122,18 +110,14 @@ func TestNodeObjectAndNotification(t *testing.T) {
 		testutil.Equal(t, "ifIndex", obj.Name(), "associated object name")
 	}
 
-	// ifIndex should not have a notification
 	testutil.Nil(t, node.Notification(), "ifIndex should not have a notification")
 
-	// linkDown should have a notification
 	linkDown := m.FindNode("linkDown")
 	testutil.NotNil(t, linkDown, "FindNode(linkDown)")
 	notif := linkDown.Notification()
 	testutil.NotNil(t, notif, "linkDown node should have an associated notification")
 	testutil.Equal(t, "linkDown", notif.Name(), "linkDown notification name")
 }
-
-// === Object table navigation ===
 
 func TestObjectTableNavigation(t *testing.T) {
 	m := loadTestMIB(t)
@@ -183,7 +167,6 @@ func TestObjectTableNavigation(t *testing.T) {
 		cols := row.Columns()
 		testutil.Greater(t, len(cols), 5, "ifEntry should have many columns")
 
-		// Verify ifIndex is among them
 		found := false
 		for _, c := range cols {
 			if c.Name() == "ifIndex" {
@@ -217,24 +200,19 @@ func TestObjectEffectiveIndexes(t *testing.T) {
 	testutil.Equal(t, "ifIndex", indexes[0].Object.Name(), "index should be ifIndex")
 }
 
-// === Label lookups ===
-
 func TestObjectEnumLookup(t *testing.T) {
 	m := loadTestMIB(t)
 
-	// ifType has enum values
 	obj := m.FindObject("ifType")
 	testutil.NotNil(t, obj, "FindObject(ifType)")
 
 	enums := obj.EffectiveEnums()
 	testutil.NotEmpty(t, enums, "EffectiveEnums() for ifType")
 
-	// Look up "ethernetCsmacd" which should be value 6
 	nv, ok := obj.Enum("ethernetCsmacd")
 	testutil.True(t, ok, "Enum(ethernetCsmacd) should be found")
 	testutil.Equal(t, int64(6), nv.Value, "ethernetCsmacd should be 6")
 
-	// Non-existent label
 	_, ok = obj.Enum("totallyFakeLabel")
 	testutil.False(t, ok, "non-existent label should return false")
 }
@@ -249,22 +227,17 @@ func TestObjectBitLookup(t *testing.T) {
 	bits := obj.EffectiveBits()
 	testutil.NotEmpty(t, bits, "EffectiveBits() for problemDefvalMultiBits")
 
-	// Look up "read" which should be bit 0
 	nv, ok := obj.Bit("read")
 	testutil.True(t, ok, "Bit(read) should be found")
 	testutil.Equal(t, int64(0), nv.Value, "read bit should be 0")
 
-	// Look up "write" which should be bit 1
 	nv, ok = obj.Bit("write")
 	testutil.True(t, ok, "Bit(write) should be found")
 	testutil.Equal(t, int64(1), nv.Value, "write bit should be 1")
 
-	// Non-existent bit
 	_, ok = obj.Bit("totallyFakeBit")
 	testutil.False(t, ok, "non-existent bit should return false")
 }
-
-// === Type predicates ===
 
 func TestTypePredicates(t *testing.T) {
 	m := loadTestMIB(t)
@@ -282,7 +255,6 @@ func TestTypePredicates(t *testing.T) {
 		obj := m.FindObject("ifType")
 		testutil.NotNil(t, obj, "FindObject(ifType)")
 		testutil.NotNil(t, obj.Type(), "ifType type")
-		// The effective type might be an enumeration
 		enums := obj.EffectiveEnums()
 		testutil.NotEmpty(t, enums, "EffectiveEnums() for ifType")
 		testutil.True(t, obj.Type().IsEnumeration(), "ifType type should report IsEnumeration()")
@@ -311,7 +283,6 @@ func TestTypePredicates(t *testing.T) {
 		obj := pm.FindObject("problemDefvalMultiBits")
 		testutil.NotNil(t, obj, "FindObject(problemDefvalMultiBits)")
 		testutil.NotNil(t, obj.Type(), "problemDefvalMultiBits type")
-		// BITS is the effective base type
 		testutil.Equal(t, mib.BaseBits, obj.Type().EffectiveBase(),
 			"BITS object should have BaseBits effective base")
 		// IsBits() checks EffectiveBits() which requires named bits on the type.
@@ -338,14 +309,12 @@ func TestTypeParent(t *testing.T) {
 }
 
 func TestTypeEnumLookup(t *testing.T) {
-	// Use a type that has direct enums
 	pm := loadTypeChainsMIB(t)
 
 	obj := pm.FindObject("problemEnumChain")
 	testutil.NotNil(t, obj, "FindObject(problemEnumChain)")
 	testutil.NotNil(t, obj.Type(), "problemEnumChain type")
 
-	// Walk up the type chain to find the type with enums
 	typ := obj.Type()
 	for typ != nil {
 		if len(typ.Enums()) > 0 {
@@ -358,8 +327,6 @@ func TestTypeEnumLookup(t *testing.T) {
 	}
 	t.Fatal("no type in chain has direct enums")
 }
-
-// === Module metadata ===
 
 func TestModuleLanguage(t *testing.T) {
 	m := loadTestMIB(t)
@@ -452,8 +419,6 @@ func TestModuleFilteredCollections(t *testing.T) {
 	}
 }
 
-// === Mib filtered collections ===
-
 func TestMibFilteredCollections(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -463,13 +428,11 @@ func TestMibFilteredCollections(t *testing.T) {
 	testutil.Greater(t, len(columns), 0, "should have columns")
 	testutil.Greater(t, len(rows), 0, "should have rows")
 
-	// Every column should have Kind == column
 	for _, col := range columns {
 		testutil.Equal(t, mib.KindColumn, col.Kind(),
 			"Columns() entry %s should have KindColumn", col.Name())
 	}
 
-	// Every row should have Kind == row
 	for _, row := range rows {
 		testutil.Equal(t, mib.KindRow, row.Kind(),
 			"Rows() entry %s should have KindRow", row.Name())
@@ -495,14 +458,11 @@ func TestMibHasErrors(t *testing.T) {
 	// (they may have diagnostics, but not errors)
 	_ = m.HasErrors() // just verify it doesn't panic
 
-	// Load a problem MIB with known issues at strict level
 	strict := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.StrictnessStrict)
 	// The strict load may or may not report HasErrors depending on what
 	// severity threshold is used. We just verify the method works.
 	_ = strict.HasErrors()
 }
-
-// === OID-based lookups ===
 
 func TestNodeByOID(t *testing.T) {
 	m := loadTestMIB(t)
@@ -542,7 +502,6 @@ func TestNodeLongestPrefix(t *testing.T) {
 		t.Fatal("Root() returned nil")
 	}
 
-	// Look up from root with an instance OID
 	oid, err := mib.ParseOID("1.3.6.1.2.1.2.2.1.1.5")
 	if err != nil {
 		t.Fatalf("ParseOID failed: %v", err)
@@ -554,8 +513,6 @@ func TestNodeLongestPrefix(t *testing.T) {
 		"Node.LongestPrefix for ifIndex.5 should find ifIndex")
 }
 
-// === Object metadata ===
-
 func TestObjectDescription(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -566,7 +523,6 @@ func TestObjectDescription(t *testing.T) {
 
 	desc := obj.Description()
 	testutil.True(t, desc != "", "sysDescr should have a non-empty description")
-	// sysDescr DESCRIPTION contains text about system description
 	testutil.Greater(t, len(desc), 10,
 		"sysDescr description should be non-trivial")
 }
@@ -586,36 +542,27 @@ func TestObjectNode(t *testing.T) {
 		"Object OID should match Node OID")
 }
 
-// === Notification metadata ===
-
 func TestNotificationMetadataFields(t *testing.T) {
 	m := loadTestMIB(t)
 
 	notif := m.FindNotification("linkDown")
 	testutil.NotNil(t, notif, "FindNotification(linkDown)")
 
-	// Node
 	node := notif.Node()
 	testutil.NotNil(t, node, "Notification.Node() should not be nil")
 	if node != nil {
 		testutil.Equal(t, "linkDown", node.Name(), "notification node name")
 	}
 
-	// Module
 	mod := notif.Module()
 	testutil.NotNil(t, mod, "Notification.Module() should not be nil")
 
-	// OID should be set
 	oid := notif.OID()
 	testutil.Greater(t, len(oid), 0, "notification OID should not be empty")
 
-	// Status
 	status := notif.Status()
-	// linkDown is current
 	testutil.Equal(t, mib.StatusCurrent, status, "linkDown should be current")
 }
-
-// === Types collection ===
 
 func TestTypesCollection(t *testing.T) {
 	m := loadTestMIB(t)
@@ -626,7 +573,6 @@ func TestTypesCollection(t *testing.T) {
 		"TypeCount() should match Types() length")
 	testutil.Greater(t, count, 0, "should have types (DisplayString, etc.)")
 
-	// Find DisplayString in the list
 	found := false
 	for _, typ := range types {
 		if typ.Name() == "DisplayString" {
@@ -636,8 +582,6 @@ func TestTypesCollection(t *testing.T) {
 	}
 	testutil.True(t, found, "DisplayString should be in Types() list")
 }
-
-// === Module notifications ===
 
 func TestModuleNotifications(t *testing.T) {
 	m := loadTestMIB(t)
@@ -653,12 +597,9 @@ func TestModuleNotifications(t *testing.T) {
 		names[n.Name()] = true
 	}
 
-	// At minimum coldStart should be there
 	testutil.True(t, names["coldStart"],
 		"coldStart should be in SNMPv2-MIB.Notifications()")
 }
-
-// === Notification objects (varbinds) ===
 
 func TestNotificationObjects(t *testing.T) {
 	m := loadTestMIB(t)
@@ -676,8 +617,6 @@ func TestNotificationObjects(t *testing.T) {
 	testutil.Equal(t, 3, len(objects),
 		"linkDown should have 3 OBJECTS (ifIndex, ifAdminStatus, ifOperStatus), got %v", names)
 }
-
-// === Augments with effective indexes ===
 
 func TestAugmentsEffectiveIndexes(t *testing.T) {
 	pm := loadSemanticsMIB(t)

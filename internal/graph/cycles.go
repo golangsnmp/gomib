@@ -1,7 +1,7 @@
 package graph
 
-// FindCycles uses Tarjan's algorithm to find all strongly connected components
-// with more than one node (cycles).
+// FindCycles returns all strongly connected components with more than one
+// node, found via Tarjan's algorithm.
 func (g *Graph) FindCycles() [][]Symbol {
 	var (
 		index    int
@@ -33,7 +33,6 @@ func (g *Graph) FindCycles() [][]Symbol {
 			}
 		}
 
-		// If sym is a root node, pop the stack and generate an SCC
 		if lowlinks[sym] == indices[sym] {
 			var scc []Symbol
 			for {
@@ -45,7 +44,6 @@ func (g *Graph) FindCycles() [][]Symbol {
 					break
 				}
 			}
-			// Only report SCCs with more than one node (actual cycles)
 			if len(scc) > 1 {
 				sccs = append(sccs, scc)
 			}
@@ -61,7 +59,7 @@ func (g *Graph) FindCycles() [][]Symbol {
 	return sccs
 }
 
-// HasCycles returns true if the graph contains any cycles.
+// HasCycles reports whether the graph contains any cycles.
 func (g *Graph) HasCycles() bool {
 	return len(g.FindCycles()) > 0
 }

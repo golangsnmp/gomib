@@ -4,14 +4,14 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// Definition is a definition in a MIB module body.
+// Definition is a top-level construct in a MIB module body.
 type Definition interface {
 	DefinitionName() *Ident
 	DefinitionSpan() types.Span
 	definition()
 }
 
-// ObjectTypeDef is an OBJECT-TYPE definition.
+// ObjectTypeDef represents an OBJECT-TYPE macro invocation (SMIv1/v2).
 type ObjectTypeDef struct {
 	Name          Ident
 	Syntax        SyntaxClause
@@ -31,7 +31,7 @@ func (d *ObjectTypeDef) DefinitionName() *Ident     { return &d.Name }
 func (d *ObjectTypeDef) DefinitionSpan() types.Span { return d.Span }
 func (*ObjectTypeDef) definition()                  {}
 
-// ModuleIdentityDef is a MODULE-IDENTITY definition.
+// ModuleIdentityDef represents a MODULE-IDENTITY macro invocation (SMIv2).
 type ModuleIdentityDef struct {
 	Name          Ident
 	LastUpdated   QuotedString
@@ -47,7 +47,7 @@ func (d *ModuleIdentityDef) DefinitionName() *Ident     { return &d.Name }
 func (d *ModuleIdentityDef) DefinitionSpan() types.Span { return d.Span }
 func (*ModuleIdentityDef) definition()                  {}
 
-// ObjectIdentityDef is an OBJECT-IDENTITY definition.
+// ObjectIdentityDef represents an OBJECT-IDENTITY macro invocation (SMIv2).
 type ObjectIdentityDef struct {
 	Name          Ident
 	Status        StatusClause
@@ -61,7 +61,7 @@ func (d *ObjectIdentityDef) DefinitionName() *Ident     { return &d.Name }
 func (d *ObjectIdentityDef) DefinitionSpan() types.Span { return d.Span }
 func (*ObjectIdentityDef) definition()                  {}
 
-// NotificationTypeDef is a NOTIFICATION-TYPE definition (SMIv2).
+// NotificationTypeDef represents a NOTIFICATION-TYPE macro invocation (SMIv2).
 type NotificationTypeDef struct {
 	Name          Ident
 	Objects       []Ident
@@ -76,7 +76,7 @@ func (d *NotificationTypeDef) DefinitionName() *Ident     { return &d.Name }
 func (d *NotificationTypeDef) DefinitionSpan() types.Span { return d.Span }
 func (*NotificationTypeDef) definition()                  {}
 
-// TrapTypeDef is a TRAP-TYPE definition (SMIv1).
+// TrapTypeDef represents a TRAP-TYPE macro invocation (SMIv1).
 type TrapTypeDef struct {
 	Name        Ident
 	Enterprise  Ident
@@ -91,7 +91,7 @@ func (d *TrapTypeDef) DefinitionName() *Ident     { return &d.Name }
 func (d *TrapTypeDef) DefinitionSpan() types.Span { return d.Span }
 func (*TrapTypeDef) definition()                  {}
 
-// TextualConventionDef is a TEXTUAL-CONVENTION definition.
+// TextualConventionDef represents a TEXTUAL-CONVENTION definition (SMIv2).
 type TextualConventionDef struct {
 	Name        Ident
 	DisplayHint *QuotedString
@@ -106,7 +106,7 @@ func (d *TextualConventionDef) DefinitionName() *Ident     { return &d.Name }
 func (d *TextualConventionDef) DefinitionSpan() types.Span { return d.Span }
 func (*TextualConventionDef) definition()                  {}
 
-// TypeAssignmentDef is a type assignment definition.
+// TypeAssignmentDef represents a type assignment (TypeName ::= TypeSyntax).
 type TypeAssignmentDef struct {
 	Name   Ident
 	Syntax TypeSyntax
@@ -117,7 +117,8 @@ func (d *TypeAssignmentDef) DefinitionName() *Ident     { return &d.Name }
 func (d *TypeAssignmentDef) DefinitionSpan() types.Span { return d.Span }
 func (*TypeAssignmentDef) definition()                  {}
 
-// ValueAssignmentDef is a value assignment definition (OID definition).
+// ValueAssignmentDef represents an OID value assignment
+// (name OBJECT IDENTIFIER ::= { ... }).
 type ValueAssignmentDef struct {
 	Name          Ident
 	OidAssignment OidAssignment
@@ -128,7 +129,7 @@ func (d *ValueAssignmentDef) DefinitionName() *Ident     { return &d.Name }
 func (d *ValueAssignmentDef) DefinitionSpan() types.Span { return d.Span }
 func (*ValueAssignmentDef) definition()                  {}
 
-// ObjectGroupDef is an OBJECT-GROUP definition.
+// ObjectGroupDef represents an OBJECT-GROUP macro invocation (SMIv2).
 type ObjectGroupDef struct {
 	Name          Ident
 	Objects       []Ident
@@ -143,7 +144,7 @@ func (d *ObjectGroupDef) DefinitionName() *Ident     { return &d.Name }
 func (d *ObjectGroupDef) DefinitionSpan() types.Span { return d.Span }
 func (*ObjectGroupDef) definition()                  {}
 
-// NotificationGroupDef is a NOTIFICATION-GROUP definition.
+// NotificationGroupDef represents a NOTIFICATION-GROUP macro invocation (SMIv2).
 type NotificationGroupDef struct {
 	Name          Ident
 	Notifications []Ident
@@ -158,7 +159,7 @@ func (d *NotificationGroupDef) DefinitionName() *Ident     { return &d.Name }
 func (d *NotificationGroupDef) DefinitionSpan() types.Span { return d.Span }
 func (*NotificationGroupDef) definition()                  {}
 
-// ModuleComplianceDef is a MODULE-COMPLIANCE definition.
+// ModuleComplianceDef represents a MODULE-COMPLIANCE macro invocation (SMIv2).
 type ModuleComplianceDef struct {
 	Name          Ident
 	Status        StatusClause
@@ -173,7 +174,7 @@ func (d *ModuleComplianceDef) DefinitionName() *Ident     { return &d.Name }
 func (d *ModuleComplianceDef) DefinitionSpan() types.Span { return d.Span }
 func (*ModuleComplianceDef) definition()                  {}
 
-// ComplianceModule is a MODULE clause in MODULE-COMPLIANCE.
+// ComplianceModule represents a MODULE clause within MODULE-COMPLIANCE.
 type ComplianceModule struct {
 	ModuleName      *Ident
 	ModuleOid       *OidAssignment
@@ -182,12 +183,12 @@ type ComplianceModule struct {
 	Span            types.Span
 }
 
-// Compliance is a compliance item (GROUP or OBJECT refinement).
+// Compliance represents a GROUP or OBJECT refinement in MODULE-COMPLIANCE.
 type Compliance interface {
 	compliance()
 }
 
-// ComplianceGroup is a GROUP clause in MODULE-COMPLIANCE.
+// ComplianceGroup represents a GROUP clause within MODULE-COMPLIANCE.
 type ComplianceGroup struct {
 	Group       Ident
 	Description QuotedString
@@ -196,7 +197,7 @@ type ComplianceGroup struct {
 
 func (*ComplianceGroup) compliance() {}
 
-// ComplianceObject is an OBJECT refinement in MODULE-COMPLIANCE.
+// ComplianceObject represents an OBJECT refinement within MODULE-COMPLIANCE.
 type ComplianceObject struct {
 	Object      Ident
 	Syntax      *SyntaxClause
@@ -208,7 +209,7 @@ type ComplianceObject struct {
 
 func (*ComplianceObject) compliance() {}
 
-// AgentCapabilitiesDef is an AGENT-CAPABILITIES definition.
+// AgentCapabilitiesDef represents an AGENT-CAPABILITIES macro invocation (SMIv2).
 type AgentCapabilitiesDef struct {
 	Name           Ident
 	ProductRelease QuotedString
@@ -224,7 +225,7 @@ func (d *AgentCapabilitiesDef) DefinitionName() *Ident     { return &d.Name }
 func (d *AgentCapabilitiesDef) DefinitionSpan() types.Span { return d.Span }
 func (*AgentCapabilitiesDef) definition()                  {}
 
-// SupportsModule is a SUPPORTS clause in AGENT-CAPABILITIES.
+// SupportsModule represents a SUPPORTS clause within AGENT-CAPABILITIES.
 type SupportsModule struct {
 	ModuleName Ident
 	ModuleOid  *OidAssignment
@@ -233,12 +234,12 @@ type SupportsModule struct {
 	Span       types.Span
 }
 
-// Variation is a VARIATION clause in AGENT-CAPABILITIES.
+// Variation represents a VARIATION clause within AGENT-CAPABILITIES.
 type Variation interface {
 	variation()
 }
 
-// ObjectVariation is an object VARIATION in AGENT-CAPABILITIES.
+// ObjectVariation represents an object VARIATION within AGENT-CAPABILITIES.
 type ObjectVariation struct {
 	Object           Ident
 	Syntax           *SyntaxClause
@@ -252,7 +253,8 @@ type ObjectVariation struct {
 
 func (*ObjectVariation) variation() {}
 
-// NotificationVariation is a notification VARIATION in AGENT-CAPABILITIES.
+// NotificationVariation represents a notification VARIATION within
+// AGENT-CAPABILITIES.
 type NotificationVariation struct {
 	Notification Ident
 	Access       *AccessClause
@@ -262,7 +264,7 @@ type NotificationVariation struct {
 
 func (*NotificationVariation) variation() {}
 
-// MacroDefinitionDef is a MACRO definition (skipped content).
+// MacroDefinitionDef represents a MACRO definition whose body is skipped.
 type MacroDefinitionDef struct {
 	Name Ident
 	Span types.Span
@@ -272,7 +274,7 @@ func (d *MacroDefinitionDef) DefinitionName() *Ident     { return &d.Name }
 func (d *MacroDefinitionDef) DefinitionSpan() types.Span { return d.Span }
 func (*MacroDefinitionDef) definition()                  {}
 
-// ErrorDef is a parse error with recovery.
+// ErrorDef records a parse error from which the parser recovered.
 type ErrorDef struct {
 	Message string
 	Span    types.Span

@@ -195,8 +195,6 @@ func TestDoubleHyphenBreaksIdentifier(t *testing.T) {
 	testutil.Equal(t, "foo-", text, "first token text")
 }
 
-// === Error handling and edge cases ===
-
 func TestUnterminatedQuotedString(t *testing.T) {
 	source := `"unterminated string`
 	lexer := New([]byte(source), nil)

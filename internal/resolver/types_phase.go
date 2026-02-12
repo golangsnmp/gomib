@@ -9,7 +9,7 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// resolveTypes resolves all types across all modules.
+// resolveTypes is the type resolution phase entry point.
 func resolveTypes(ctx *ResolverContext) {
 	seedPrimitiveTypes(ctx)
 	createUserTypes(ctx)
@@ -73,8 +73,6 @@ func createUserTypes(ctx *ResolverContext) {
 			typ.SetDisplayHint(td.DisplayHint)
 			typ.SetDescription(td.Description)
 
-			// Extract constraints and named values
-			// Route to bits or enums based on base type
 			namedValues := extractNamedValues(td.Syntax)
 			if base == mib.BaseBits {
 				typ.SetBits(namedValues)
@@ -101,7 +99,7 @@ func createUserTypes(ctx *ResolverContext) {
 	}
 }
 
-// typeResolutionEntry tracks a type that needs parent resolution.
+// typeResolutionEntry pairs a parsed type definition with its resolved type.
 type typeResolutionEntry struct {
 	mod *module.Module
 	td  *module.TypeDef
@@ -118,7 +116,6 @@ func resolveTypeBases(ctx *ResolverContext) {
 // resolveTypeRefParentsGraph uses a dependency graph to resolve type parents
 // in topological order (single pass).
 func resolveTypeRefParentsGraph(ctx *ResolverContext) {
-	// Build index of type entries and dependency graph
 	entries := make(map[graph.Symbol]typeResolutionEntry)
 	g := graph.New()
 
@@ -137,9 +134,7 @@ func resolveTypeRefParentsGraph(ctx *ResolverContext) {
 			g.AddNode(sym, graph.NodeKindType)
 			entries[sym] = typeResolutionEntry{mod: mod, td: td, typ: typ}
 
-			// Add edge to parent type if this is a type reference
 			if baseName := getTypeRefBaseName(td.Syntax); baseName != "" {
-				// Find which module defines the parent type
 				parentMod := findTypeDefiningModule(ctx, mod, baseName)
 				if parentMod != "" {
 					parentSym := graph.Symbol{Module: parentMod, Name: baseName}
@@ -149,7 +144,6 @@ func resolveTypeRefParentsGraph(ctx *ResolverContext) {
 		}
 	}
 
-	// Check for cycles
 	cycles := g.FindCycles()
 	if len(cycles) > 0 && ctx.TraceEnabled() {
 		for _, cycle := range cycles {
@@ -161,7 +155,6 @@ func resolveTypeRefParentsGraph(ctx *ResolverContext) {
 		}
 	}
 
-	// Get resolution order (dependencies first)
 	order, cyclic := g.ResolutionOrder()
 
 	if ctx.TraceEnabled() {
@@ -170,7 +163,6 @@ func resolveTypeRefParentsGraph(ctx *ResolverContext) {
 			slog.Int("cyclic", len(cyclic)))
 	}
 
-	// Resolve types in topological order
 	resolved := 0
 	for _, sym := range order {
 		entry, ok := entries[sym]
@@ -182,7 +174,6 @@ func resolveTypeRefParentsGraph(ctx *ResolverContext) {
 		}
 	}
 
-	// Handle cyclic types - record as unresolved
 	for _, sym := range cyclic {
 		entry, ok := entries[sym]
 		if !ok {
@@ -203,33 +194,28 @@ func resolveTypeRefParentsGraph(ctx *ResolverContext) {
 
 // findTypeDefiningModule finds the module that defines a type, following imports.
 func findTypeDefiningModule(ctx *ResolverContext, fromMod *module.Module, typeName string) string {
-	// Check if defined in the current module
 	for _, def := range fromMod.Definitions {
 		if td, ok := def.(*module.TypeDef); ok && td.Name == typeName {
 			return fromMod.Name
 		}
 	}
 
-	// Check imports
 	if imports := ctx.ModuleImports[fromMod]; imports != nil {
 		if srcMod := imports[typeName]; srcMod != nil {
 			return srcMod.Name
 		}
 	}
 
-	// Check if it's a primitive in SNMPv2-SMI
 	if ctx.Snmpv2SMIModule != nil {
 		if isASN1Primitive(typeName) || isSmiGlobalType(typeName) {
 			return ctx.Snmpv2SMIModule.Name
 		}
 	}
 
-	// Check if it's an SMIv1 type in RFC1155-SMI
 	if ctx.Rfc1155SMIModule != nil && isSmiV1GlobalType(typeName) {
 		return ctx.Rfc1155SMIModule.Name
 	}
 
-	// Check if it's a standard textual convention in SNMPv2-TC
 	if ctx.Snmpv2TCModule != nil && isSNMPv2TCType(typeName) {
 		return ctx.Snmpv2TCModule.Name
 	}
@@ -237,7 +223,6 @@ func findTypeDefiningModule(ctx *ResolverContext, fromMod *module.Module, typeNa
 	return ""
 }
 
-// resolveTypeParent resolves the parent of a single type.
 func resolveTypeParent(ctx *ResolverContext, entry typeResolutionEntry) bool {
 	baseName := getTypeRefBaseName(entry.td.Syntax)
 	if baseName == "" {
@@ -346,7 +331,6 @@ func linkRFC1213TypesToTCs(ctx *ResolverContext) {
 
 func inheritBaseTypes(ctx *ResolverContext) {
 	for _, t := range ctx.Builder.Types() {
-		// Skip types that already have an application base type (explicitly set)
 		if t.InternalParent() != nil && !isApplicationBaseType(t.Base()) {
 			if base, ok := resolveBaseFromChain(t); ok {
 				t.SetBase(base)
@@ -380,7 +364,7 @@ func resolveBaseFromChain(t *mibimpl.Type) (mib.BaseType, bool) {
 			return current.Base(), true
 		}
 		// Stop at application base types - their base is explicitly set
-		// and should not be overridden by walking further up the chain
+		// and should not be overridden by walking further up the chain.
 		if isApplicationBaseType(current.Base()) {
 			return current.Base(), true
 		}

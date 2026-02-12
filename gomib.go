@@ -113,9 +113,8 @@ func LoadModules(ctx context.Context, names []string, source Source, opts ...Loa
 	return loadFromSources(ctx, sources, names, cfg)
 }
 
-// loadFromSources is the internal implementation.
-// If names is nil, loads all modules from sources.
-// If names is non-nil, loads only those modules (plus dependencies).
+// loadFromSources loads all modules if names is nil, or only named
+// modules (plus dependencies) if names is non-nil.
 func loadFromSources(ctx context.Context, sources []Source, names []string, cfg loadConfig) (Mib, error) {
 	if len(sources) == 0 {
 		return nil, ErrNoSources
@@ -127,7 +126,6 @@ func loadFromSources(ctx context.Context, sources []Source, names []string, cfg 
 	return loadAllModules(ctx, sources, cfg)
 }
 
-// logEnabled returns true if logging is enabled at the given level.
 func logEnabled(logger *slog.Logger, level slog.Level) bool {
 	return logger != nil && logger.Enabled(context.Background(), level)
 }

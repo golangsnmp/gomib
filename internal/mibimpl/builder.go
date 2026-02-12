@@ -2,16 +2,12 @@ package mibimpl
 
 import "github.com/golangsnmp/gomib/mib"
 
-// Builder constructs a Mib incrementally.
-// Use NewBuilder() to create a builder, add modules/objects/types,
-// then call Mib() to get the final immutable Mib.
-//
-// This type is intended for internal use by the resolver.
+// Builder constructs a Mib incrementally during resolution.
 type Builder struct {
 	data *Data
 }
 
-// NewBuilder creates a new Builder with an empty Mib.
+// NewBuilder returns a Builder with an initialized, empty Mib.
 func NewBuilder() *Builder {
 	return &Builder{
 		data: &Data{
@@ -23,25 +19,25 @@ func NewBuilder() *Builder {
 	}
 }
 
-// Mib returns the constructed Mib as an interface.
-// After calling this, the Builder should not be used further.
+// Mib returns the constructed Mib. The Builder should not be used after
+// this call.
 func (b *Builder) Mib() mib.Mib {
 	return b.data
 }
 
-// Root returns the concrete pseudo-root of the OID tree for mutations.
+// Root returns the pseudo-root of the OID tree.
 func (b *Builder) Root() *Node {
 	return b.data.root
 }
 
-// RegisterNode adds a node to the name index.
+// RegisterNode indexes a named node for lookup by name.
 func (b *Builder) RegisterNode(name string, n *Node) {
 	if name != "" {
 		b.data.nameToNodes[name] = append(b.data.nameToNodes[name], n)
 	}
 }
 
-// GetOrCreateNode returns the node at the given OID, creating nodes along the path as needed.
+// GetOrCreateNode walks the OID tree, creating intermediate nodes as needed.
 func (b *Builder) GetOrCreateNode(oid mib.Oid) *Node {
 	nd := b.data.root
 	for _, arc := range oid {
@@ -50,12 +46,13 @@ func (b *Builder) GetOrCreateNode(oid mib.Oid) *Node {
 	return nd
 }
 
-// GetOrCreateRoot returns the root node with the given arc (0, 1, or 2), creating if needed.
+// GetOrCreateRoot returns a top-level node (arc 0, 1, or 2), creating
+// it if needed.
 func (b *Builder) GetOrCreateRoot(arc uint32) *Node {
 	return b.data.root.GetOrCreateChild(arc)
 }
 
-// AddModule adds a module to the Mib.
+// AddModule registers a resolved module.
 func (b *Builder) AddModule(mod *Module) {
 	b.data.modules = append(b.data.modules, mod)
 	if mod.name != "" {
@@ -63,7 +60,7 @@ func (b *Builder) AddModule(mod *Module) {
 	}
 }
 
-// AddType adds a type to the Mib.
+// AddType registers a resolved type, indexing the first occurrence by name.
 func (b *Builder) AddType(t *Type) {
 	b.data.types = append(b.data.types, t)
 	if t.name != "" && b.data.typeByName[t.name] == nil {
@@ -71,77 +68,77 @@ func (b *Builder) AddType(t *Type) {
 	}
 }
 
-// AddObject adds an object to the Mib.
+// AddObject registers a resolved object.
 func (b *Builder) AddObject(obj *Object) {
 	b.data.objects = append(b.data.objects, obj)
 }
 
-// AddNotification adds a notification to the Mib.
+// AddNotification registers a resolved notification.
 func (b *Builder) AddNotification(n *Notification) {
 	b.data.notifications = append(b.data.notifications, n)
 }
 
-// AddGroup adds a group to the Mib.
+// AddGroup registers a resolved group.
 func (b *Builder) AddGroup(g *Group) {
 	b.data.groups = append(b.data.groups, g)
 }
 
-// AddCompliance adds a compliance to the Mib.
+// AddCompliance registers a resolved compliance statement.
 func (b *Builder) AddCompliance(c *Compliance) {
 	b.data.compliances = append(b.data.compliances, c)
 }
 
-// AddCapabilities adds a capabilities to the Mib.
+// AddCapabilities registers a resolved agent capabilities statement.
 func (b *Builder) AddCapabilities(c *Capabilities) {
 	b.data.capabilities = append(b.data.capabilities, c)
 }
 
-// AddUnresolved adds an unresolved reference.
+// AddUnresolved records a reference that could not be resolved.
 func (b *Builder) AddUnresolved(ref mib.UnresolvedRef) {
 	b.data.unresolved = append(b.data.unresolved, ref)
 }
 
-// AddDiagnostic adds a diagnostic message.
+// AddDiagnostic records a warning or error encountered during resolution.
 func (b *Builder) AddDiagnostic(d mib.Diagnostic) {
 	b.data.diagnostics = append(b.data.diagnostics, d)
 }
 
-// ModuleCount returns the number of modules.
+// ModuleCount reports the number of registered modules.
 func (b *Builder) ModuleCount() int {
 	return len(b.data.modules)
 }
 
-// TypeCount returns the number of types.
+// TypeCount reports the number of registered types.
 func (b *Builder) TypeCount() int {
 	return len(b.data.types)
 }
 
-// ObjectCount returns the number of objects.
+// ObjectCount reports the number of registered objects.
 func (b *Builder) ObjectCount() int {
 	return len(b.data.objects)
 }
 
-// NotificationCount returns the number of notifications.
+// NotificationCount reports the number of registered notifications.
 func (b *Builder) NotificationCount() int {
 	return len(b.data.notifications)
 }
 
-// GroupCount returns the number of groups.
+// GroupCount reports the number of registered groups.
 func (b *Builder) GroupCount() int {
 	return len(b.data.groups)
 }
 
-// ComplianceCount returns the number of compliances.
+// ComplianceCount reports the number of registered compliance statements.
 func (b *Builder) ComplianceCount() int {
 	return len(b.data.compliances)
 }
 
-// CapabilitiesCount returns the number of capabilities.
+// CapabilitiesCount reports the number of registered capabilities.
 func (b *Builder) CapabilitiesCount() int {
 	return len(b.data.capabilities)
 }
 
-// NodeCount returns the total number of nodes in the tree.
+// NodeCount walks the OID tree and returns the total node count.
 func (b *Builder) NodeCount() int {
 	count := 0
 	for range b.data.Nodes() {
@@ -150,52 +147,52 @@ func (b *Builder) NodeCount() int {
 	return count
 }
 
-// Types returns all types for iteration during resolution.
+// Types returns all registered types.
 func (b *Builder) Types() []*Type {
 	return b.data.types
 }
 
-// Module returns the concrete module by name for resolver use.
+// Module looks up a module by name.
 func (b *Builder) Module(name string) *Module {
 	return b.data.moduleByName[name]
 }
 
-// NewModule creates a new module with the given name.
+// NewModule returns a Module initialized with the given name.
 func NewModule(name string) *Module {
 	return &Module{name: name}
 }
 
-// NewObject creates a new object with the given name.
+// NewObject returns an Object initialized with the given name.
 func NewObject(name string) *Object {
 	return &Object{name: name}
 }
 
-// NewType creates a new type with the given name.
+// NewType returns a Type initialized with the given name.
 func NewType(name string) *Type {
 	return &Type{name: name}
 }
 
-// NewNotification creates a new notification with the given name.
+// NewNotification returns a Notification initialized with the given name.
 func NewNotification(name string) *Notification {
 	return &Notification{name: name}
 }
 
-// NewGroup creates a new group with the given name.
+// NewGroup returns a Group initialized with the given name.
 func NewGroup(name string) *Group {
 	return &Group{name: name}
 }
 
-// NewCompliance creates a new compliance with the given name.
+// NewCompliance returns a Compliance initialized with the given name.
 func NewCompliance(name string) *Compliance {
 	return &Compliance{name: name}
 }
 
-// NewCapabilities creates a new capabilities with the given name.
+// NewCapabilities returns a Capabilities initialized with the given name.
 func NewCapabilities(name string) *Capabilities {
 	return &Capabilities{name: name}
 }
 
-// EmptyMib returns a new empty Mib.
+// EmptyMib returns a Mib with no modules or definitions loaded.
 func EmptyMib() mib.Mib {
 	return NewBuilder().Mib()
 }

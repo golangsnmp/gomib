@@ -9,7 +9,7 @@ type Mib interface {
 	Root() Node
 	Nodes() iter.Seq[Node]
 
-	// Lookups - Find* methods handle name, OID string, qualified name
+	// Lookups by name, OID string, or qualified name (e.g. "IF-MIB::ifIndex")
 	FindNode(query string) Node
 	FindObject(query string) Object
 	FindType(query string) Type
@@ -18,7 +18,7 @@ type Mib interface {
 	FindCompliance(query string) Compliance
 	FindCapabilities(query string) Capabilities
 
-	// By OID (for when you already have an Oid value)
+	// By OID value
 	NodeByOID(oid Oid) Node
 	LongestPrefixByOID(oid Oid) Node
 
@@ -84,7 +84,7 @@ type Node interface {
 	IsRoot() bool
 }
 
-// Module is a MIB module.
+// Module represents a loaded and resolved MIB module.
 type Module interface {
 	Name() string
 	Language() Language

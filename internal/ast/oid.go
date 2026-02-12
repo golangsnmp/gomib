@@ -4,18 +4,19 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// OidAssignment represents an OID value assignment.
+// OidAssignment holds the parsed components of an OBJECT IDENTIFIER
+// value, e.g. { iso org(3) dod(6) 1 }.
 type OidAssignment struct {
 	Components []OidComponent
 	Span       types.Span
 }
 
-// NewOidAssignment creates a new OID assignment.
+// NewOidAssignment creates an OidAssignment from its components.
 func NewOidAssignment(components []OidComponent, span types.Span) OidAssignment {
 	return OidAssignment{Components: components, Span: span}
 }
 
-// OidComponent is a component of an OID value.
+// OidComponent is a single element in an OID value assignment.
 type OidComponent interface {
 	ComponentSpan() types.Span
 	Number() (uint32, bool)
@@ -24,7 +25,7 @@ type OidComponent interface {
 	oidComponent()
 }
 
-// OidComponentName is a named reference: internet, ifEntry
+// OidComponentName is a named reference, e.g. internet, ifEntry.
 type OidComponentName struct {
 	Name Ident
 }
@@ -35,7 +36,7 @@ func (c *OidComponentName) ComponentName() *Ident     { return &c.Name }
 func (c *OidComponentName) Module() *Ident            { return nil }
 func (c *OidComponentName) oidComponent()             {}
 
-// OidComponentNumber is a numeric subid: 1, 31
+// OidComponentNumber is a numeric sub-identifier, e.g. 1, 31.
 type OidComponentNumber struct {
 	Value uint32
 	Span  types.Span
@@ -47,7 +48,7 @@ func (c *OidComponentNumber) ComponentName() *Ident     { return nil }
 func (c *OidComponentNumber) Module() *Ident            { return nil }
 func (c *OidComponentNumber) oidComponent()             {}
 
-// OidComponentNamedNumber is name with number: iso(1), org(3)
+// OidComponentNamedNumber is a name with number, e.g. iso(1), org(3).
 type OidComponentNamedNumber struct {
 	Name Ident
 	Num  uint32
@@ -60,7 +61,8 @@ func (c *OidComponentNamedNumber) ComponentName() *Ident     { return &c.Name }
 func (c *OidComponentNamedNumber) Module() *Ident            { return nil }
 func (c *OidComponentNamedNumber) oidComponent()             {}
 
-// OidComponentQualifiedName is a qualified name reference: SNMPv2-SMI.enterprises
+// OidComponentQualifiedName is a module-qualified reference,
+// e.g. SNMPv2-SMI.enterprises.
 type OidComponentQualifiedName struct {
 	ModuleName Ident
 	Name       Ident
@@ -73,7 +75,8 @@ func (c *OidComponentQualifiedName) ComponentName() *Ident     { return &c.Name 
 func (c *OidComponentQualifiedName) Module() *Ident            { return &c.ModuleName }
 func (c *OidComponentQualifiedName) oidComponent()             {}
 
-// OidComponentQualifiedNamedNumber is a qualified name with number
+// OidComponentQualifiedNamedNumber is a module-qualified name with
+// number, e.g. SNMPv2-SMI.enterprises(1).
 type OidComponentQualifiedNamedNumber struct {
 	ModuleName Ident
 	Name       Ident

@@ -4,24 +4,25 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// SyntaxClause is a SYNTAX clause specifying the type of an object.
+// SyntaxClause wraps a TypeSyntax with its source span.
 type SyntaxClause struct {
 	Syntax TypeSyntax
 	Span   types.Span
 }
 
-// NewSyntaxClause creates a new syntax clause.
+// NewSyntaxClause creates a SyntaxClause from a type syntax and span.
 func NewSyntaxClause(syntax TypeSyntax, span types.Span) SyntaxClause {
 	return SyntaxClause{Syntax: syntax, Span: span}
 }
 
-// TypeSyntax is type syntax in a SYNTAX clause or type assignment.
+// TypeSyntax represents a type expression in a SYNTAX clause or
+// type assignment.
 type TypeSyntax interface {
 	SyntaxSpan() types.Span
 	typeSyntax()
 }
 
-// TypeSyntaxTypeRef is a simple type reference.
+// TypeSyntaxTypeRef is an unqualified type name reference.
 type TypeSyntaxTypeRef struct {
 	Name Ident
 }
@@ -29,7 +30,7 @@ type TypeSyntaxTypeRef struct {
 func (t *TypeSyntaxTypeRef) SyntaxSpan() types.Span { return t.Name.Span }
 func (*TypeSyntaxTypeRef) typeSyntax()              {}
 
-// TypeSyntaxIntegerEnum is INTEGER with named numbers.
+// TypeSyntaxIntegerEnum is an INTEGER type with enumerated named values.
 type TypeSyntaxIntegerEnum struct {
 	Base         *Ident
 	NamedNumbers []NamedNumber
@@ -39,7 +40,7 @@ type TypeSyntaxIntegerEnum struct {
 func (t *TypeSyntaxIntegerEnum) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxIntegerEnum) typeSyntax()              {}
 
-// TypeSyntaxBits is BITS with named bits.
+// TypeSyntaxBits is a BITS type with named bit positions.
 type TypeSyntaxBits struct {
 	NamedBits []NamedNumber
 	Span      types.Span
@@ -48,7 +49,7 @@ type TypeSyntaxBits struct {
 func (t *TypeSyntaxBits) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxBits) typeSyntax()              {}
 
-// TypeSyntaxConstrained is a constrained type.
+// TypeSyntaxConstrained is a type with a SIZE or range constraint.
 type TypeSyntaxConstrained struct {
 	Base       TypeSyntax
 	Constraint Constraint
@@ -58,7 +59,7 @@ type TypeSyntaxConstrained struct {
 func (t *TypeSyntaxConstrained) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxConstrained) typeSyntax()              {}
 
-// TypeSyntaxSequenceOf is SEQUENCE OF.
+// TypeSyntaxSequenceOf is a SEQUENCE OF entry-type reference.
 type TypeSyntaxSequenceOf struct {
 	EntryType Ident
 	Span      types.Span
@@ -67,7 +68,7 @@ type TypeSyntaxSequenceOf struct {
 func (t *TypeSyntaxSequenceOf) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxSequenceOf) typeSyntax()              {}
 
-// TypeSyntaxSequence is SEQUENCE (row definition).
+// TypeSyntaxSequence is a SEQUENCE with named fields (table row definition).
 type TypeSyntaxSequence struct {
 	Fields []SequenceField
 	Span   types.Span
@@ -76,7 +77,7 @@ type TypeSyntaxSequence struct {
 func (t *TypeSyntaxSequence) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxSequence) typeSyntax()              {}
 
-// TypeSyntaxChoice is a CHOICE type.
+// TypeSyntaxChoice is a CHOICE type with named alternatives.
 type TypeSyntaxChoice struct {
 	Alternatives []ChoiceAlternative
 	Span         types.Span
@@ -85,7 +86,7 @@ type TypeSyntaxChoice struct {
 func (t *TypeSyntaxChoice) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxChoice) typeSyntax()              {}
 
-// TypeSyntaxOctetString is OCTET STRING (explicit form).
+// TypeSyntaxOctetString is the explicit OCTET STRING type.
 type TypeSyntaxOctetString struct {
 	Span types.Span
 }
@@ -93,7 +94,7 @@ type TypeSyntaxOctetString struct {
 func (t *TypeSyntaxOctetString) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxOctetString) typeSyntax()              {}
 
-// TypeSyntaxObjectIdentifier is OBJECT IDENTIFIER type.
+// TypeSyntaxObjectIdentifier is the OBJECT IDENTIFIER type.
 type TypeSyntaxObjectIdentifier struct {
 	Span types.Span
 }
@@ -101,27 +102,27 @@ type TypeSyntaxObjectIdentifier struct {
 func (t *TypeSyntaxObjectIdentifier) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxObjectIdentifier) typeSyntax()              {}
 
-// SequenceField is a field in a SEQUENCE definition.
+// SequenceField is a named field within a SEQUENCE definition.
 type SequenceField struct {
 	Name   Ident
 	Syntax TypeSyntax
 	Span   types.Span
 }
 
-// ChoiceAlternative is an alternative in a CHOICE type.
+// ChoiceAlternative is a named alternative within a CHOICE type.
 type ChoiceAlternative struct {
 	Name   Ident
 	Syntax TypeSyntax
 	Span   types.Span
 }
 
-// Constraint is a type constraint (SIZE or range).
+// Constraint represents a type sub-typing constraint (SIZE or range).
 type Constraint interface {
 	ConstraintSpan() types.Span
 	constraint()
 }
 
-// ConstraintSize is a SIZE constraint.
+// ConstraintSize is a SIZE(...) constraint on length.
 type ConstraintSize struct {
 	Ranges []Range
 	Span   types.Span
@@ -130,7 +131,7 @@ type ConstraintSize struct {
 func (c *ConstraintSize) ConstraintSpan() types.Span { return c.Span }
 func (*ConstraintSize) constraint()                  {}
 
-// ConstraintRange is a value range constraint.
+// ConstraintRange is a value range constraint, e.g. (0..65535).
 type ConstraintRange struct {
 	Ranges []Range
 	Span   types.Span
@@ -139,47 +140,47 @@ type ConstraintRange struct {
 func (c *ConstraintRange) ConstraintSpan() types.Span { return c.Span }
 func (*ConstraintRange) constraint()                  {}
 
-// Range is a range in a constraint.
+// Range is a single range element within a constraint (min..max).
 type Range struct {
 	Min  RangeValue
 	Max  RangeValue
 	Span types.Span
 }
 
-// RangeValue is a value in a range constraint.
+// RangeValue is an endpoint in a range (numeric literal or MIN/MAX).
 type RangeValue interface {
 	rangeValue()
 }
 
-// RangeValueSigned is a signed numeric value.
+// RangeValueSigned is a signed integer range endpoint.
 type RangeValueSigned struct {
 	Value int64
 }
 
 func (*RangeValueSigned) rangeValue() {}
 
-// RangeValueUnsigned is an unsigned numeric value.
+// RangeValueUnsigned is an unsigned integer range endpoint.
 type RangeValueUnsigned struct {
 	Value uint64
 }
 
 func (*RangeValueUnsigned) rangeValue() {}
 
-// RangeValueIdent is a named value (MIN, MAX).
+// RangeValueIdent is a symbolic range endpoint (MIN or MAX).
 type RangeValueIdent struct {
 	Name Ident
 }
 
 func (*RangeValueIdent) rangeValue() {}
 
-// AccessClause is an access clause (MAX-ACCESS or ACCESS).
+// AccessClause holds a parsed ACCESS, MAX-ACCESS, or MIN-ACCESS clause.
 type AccessClause struct {
 	Keyword AccessKeyword
 	Value   AccessValue
 	Span    types.Span
 }
 
-// AccessKeyword is the access keyword type.
+// AccessKeyword distinguishes ACCESS, MAX-ACCESS, and MIN-ACCESS.
 type AccessKeyword int
 
 const (
@@ -189,7 +190,7 @@ const (
 	AccessKeywordPibAccess
 )
 
-// AccessValue is an access value.
+// AccessValue enumerates the possible access levels for MIB objects.
 type AccessValue int
 
 const (
@@ -205,13 +206,13 @@ const (
 	AccessValueReportOnly
 )
 
-// StatusClause is a status clause.
+// StatusClause holds a parsed STATUS clause value and span.
 type StatusClause struct {
 	Value StatusValue
 	Span  types.Span
 }
 
-// StatusValue is a status value.
+// StatusValue enumerates the possible status values for MIB objects.
 type StatusValue int
 
 const (
@@ -222,14 +223,14 @@ const (
 	StatusValueOptional
 )
 
-// IndexClause is an index clause (INDEX or PIB-INDEX).
+// IndexClause represents an INDEX or PIB-INDEX clause in OBJECT-TYPE.
 type IndexClause interface {
 	IndexClauseSpan() types.Span
 	Indexes() []IndexItem
 	indexClause()
 }
 
-// IndexClauseIndex is INDEX { ... }
+// IndexClauseIndex is an INDEX { ... } clause.
 type IndexClauseIndex struct {
 	Items []IndexItem
 	Span  types.Span
@@ -239,7 +240,7 @@ func (c *IndexClauseIndex) IndexClauseSpan() types.Span { return c.Span }
 func (c *IndexClauseIndex) Indexes() []IndexItem        { return c.Items }
 func (*IndexClauseIndex) indexClause()                  {}
 
-// IndexClausePibIndex is PIB-INDEX { ... } (SPPI)
+// IndexClausePibIndex is a PIB-INDEX { ... } clause (SPPI).
 type IndexClausePibIndex struct {
 	Items []IndexItem
 	Span  types.Span
@@ -249,59 +250,59 @@ func (c *IndexClausePibIndex) IndexClauseSpan() types.Span { return c.Span }
 func (c *IndexClausePibIndex) Indexes() []IndexItem        { return c.Items }
 func (*IndexClausePibIndex) indexClause()                  {}
 
-// IndexItem is an item in an INDEX clause.
+// IndexItem is a single entry in an INDEX clause, possibly IMPLIED.
 type IndexItem struct {
 	Implied bool
 	Object  Ident
 	Span    types.Span
 }
 
-// AugmentsClause is an AUGMENTS clause.
+// AugmentsClause holds the target row referenced by AUGMENTS.
 type AugmentsClause struct {
 	Target Ident
 	Span   types.Span
 }
 
-// DefValClause is a DEFVAL clause.
+// DefValClause holds the default value for an OBJECT-TYPE.
 type DefValClause struct {
 	Value DefValContent
 	Span  types.Span
 }
 
-// DefValContent is the content of a DEFVAL clause.
+// DefValContent represents the typed content within a DEFVAL { ... } clause.
 type DefValContent interface {
 	defValContent()
 }
 
-// DefValContentInteger is an integer value.
+// DefValContentInteger is a signed integer default value.
 type DefValContentInteger struct {
 	Value int64
 }
 
 func (*DefValContentInteger) defValContent() {}
 
-// DefValContentUnsigned is an unsigned integer.
+// DefValContentUnsigned is an unsigned integer default value.
 type DefValContentUnsigned struct {
 	Value uint64
 }
 
 func (*DefValContentUnsigned) defValContent() {}
 
-// DefValContentString is a quoted string.
+// DefValContentString is a quoted string default value.
 type DefValContentString struct {
 	Value QuotedString
 }
 
 func (*DefValContentString) defValContent() {}
 
-// DefValContentIdentifier is an identifier (enum label or OID reference).
+// DefValContentIdentifier is a named default (enum label or OID reference).
 type DefValContentIdentifier struct {
 	Name Ident
 }
 
 func (*DefValContentIdentifier) defValContent() {}
 
-// DefValContentBits is a BITS value.
+// DefValContentBits is a BITS default value with named bit labels.
 type DefValContentBits struct {
 	Labels []Ident
 	Span   types.Span
@@ -309,7 +310,7 @@ type DefValContentBits struct {
 
 func (*DefValContentBits) defValContent() {}
 
-// DefValContentHexString is a hex string.
+// DefValContentHexString is a hex string default value ('...'H).
 type DefValContentHexString struct {
 	Content string
 	Span    types.Span
@@ -317,7 +318,7 @@ type DefValContentHexString struct {
 
 func (*DefValContentHexString) defValContent() {}
 
-// DefValContentBinaryString is a binary string.
+// DefValContentBinaryString is a binary string default value ('...'B).
 type DefValContentBinaryString struct {
 	Content string
 	Span    types.Span
@@ -325,7 +326,7 @@ type DefValContentBinaryString struct {
 
 func (*DefValContentBinaryString) defValContent() {}
 
-// DefValContentObjectIdentifier is an object identifier value.
+// DefValContentObjectIdentifier is an OID default value.
 type DefValContentObjectIdentifier struct {
 	Components []OidComponent
 	Span       types.Span
@@ -333,7 +334,7 @@ type DefValContentObjectIdentifier struct {
 
 func (*DefValContentObjectIdentifier) defValContent() {}
 
-// RevisionClause is a REVISION clause in MODULE-IDENTITY.
+// RevisionClause represents a REVISION clause within MODULE-IDENTITY.
 type RevisionClause struct {
 	Date        QuotedString
 	Description QuotedString

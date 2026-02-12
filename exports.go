@@ -3,8 +3,6 @@ package gomib
 
 import "github.com/golangsnmp/gomib/mib"
 
-// Type aliases for public API - all types come from mib subpackage.
-
 // Mib is the top-level container for loaded MIB data.
 type Mib = mib.Mib
 
@@ -17,7 +15,7 @@ type Object = mib.Object
 // Type is a type definition (textual convention or type reference).
 type Type = mib.Type
 
-// Notification is a NOTIFICATION-TYPE or TRAP-TYPE.
+// Notification is a NOTIFICATION-TYPE or TRAP-TYPE definition.
 type Notification = mib.Notification
 
 // Group is an OBJECT-GROUP or NOTIFICATION-GROUP definition.
@@ -29,7 +27,7 @@ type Compliance = mib.Compliance
 // Capabilities is an AGENT-CAPABILITIES definition.
 type Capabilities = mib.Capabilities
 
-// Module is a MIB module.
+// Module is a parsed MIB module with its definitions.
 type Module = mib.Module
 
 // Oid is a sequence of arc values representing an SNMP Object Identifier.
@@ -38,10 +36,10 @@ type Oid = mib.Oid
 // Kind identifies what an OID node represents.
 type Kind = mib.Kind
 
-// Access levels for OBJECT-TYPE definitions.
+// Access represents the access level of an OBJECT-TYPE definition.
 type Access = mib.Access
 
-// Status values for MIB definitions.
+// Status represents the lifecycle status of a MIB definition.
 type Status = mib.Status
 
 // Language identifies the SMI version of a module.
@@ -50,10 +48,10 @@ type Language = mib.Language
 // BaseType identifies the fundamental SMI type.
 type BaseType = mib.BaseType
 
-// Severity for diagnostics.
+// Severity represents how critical a diagnostic is.
 type Severity = mib.Severity
 
-// Range for size/value constraints.
+// Range represents a size or value constraint bound.
 type Range = mib.Range
 
 // NamedValue represents a labeled integer from an enum or BITS definition.
@@ -62,10 +60,10 @@ type NamedValue = mib.NamedValue
 // IndexEntry describes an index component for a table row.
 type IndexEntry = mib.IndexEntry
 
-// Revision describes a module revision.
+// Revision describes a module revision entry.
 type Revision = mib.Revision
 
-// Diagnostic represents a parse or resolution issue.
+// Diagnostic represents an issue found during parsing or resolution.
 type Diagnostic = mib.Diagnostic
 
 // UnresolvedRef describes a symbol that could not be resolved.
@@ -80,7 +78,7 @@ type ComplianceGroup = mib.ComplianceGroup
 // ComplianceObject is an OBJECT refinement within MODULE-COMPLIANCE.
 type ComplianceObject = mib.ComplianceObject
 
-// CapabilitiesModule is a SUPPORTS clause within an AGENT-CAPABILITIES definition.
+// CapabilitiesModule is a SUPPORTS clause within AGENT-CAPABILITIES.
 type CapabilitiesModule = mib.CapabilitiesModule
 
 // ObjectVariation is an object VARIATION within AGENT-CAPABILITIES.
@@ -89,13 +87,12 @@ type ObjectVariation = mib.ObjectVariation
 // NotificationVariation is a notification VARIATION within AGENT-CAPABILITIES.
 type NotificationVariation = mib.NotificationVariation
 
-// DefVal represents a default value with both interpreted value and raw MIB syntax.
+// DefVal holds a default value with both interpreted value and raw MIB syntax.
 type DefVal = mib.DefVal
 
 // DefValKind identifies the type of default value.
 type DefValKind = mib.DefValKind
 
-// DefVal kind constants.
 const (
 	DefValKindInt    = mib.DefValKindInt
 	DefValKindUint   = mib.DefValKindUint
@@ -106,7 +103,7 @@ const (
 	DefValKindOID    = mib.DefValKindOID
 )
 
-// DefVal constructors.
+// DefVal constructors for each value kind.
 var (
 	NewDefValInt    = mib.NewDefValInt
 	NewDefValUint   = mib.NewDefValUint
@@ -123,7 +120,6 @@ func DefValAs[T any](d DefVal) (T, bool) {
 	return mib.DefValAs[T](d)
 }
 
-// Kind constants.
 const (
 	KindUnknown      = mib.KindUnknown
 	KindInternal     = mib.KindInternal
@@ -138,7 +134,6 @@ const (
 	KindCapabilities = mib.KindCapabilities
 )
 
-// Access constants.
 const (
 	AccessNotAccessible       = mib.AccessNotAccessible
 	AccessAccessibleForNotify = mib.AccessAccessibleForNotify
@@ -148,7 +143,6 @@ const (
 	AccessWriteOnly           = mib.AccessWriteOnly
 )
 
-// Status constants.
 const (
 	StatusCurrent    = mib.StatusCurrent
 	StatusDeprecated = mib.StatusDeprecated
@@ -157,13 +151,11 @@ const (
 	StatusOptional   = mib.StatusOptional
 )
 
-// Language constants.
 const (
 	LanguageSMIv1 = mib.LanguageSMIv1
 	LanguageSMIv2 = mib.LanguageSMIv2
 )
 
-// BaseType constants.
 const (
 	BaseInteger32        = mib.BaseInteger32
 	BaseUnsigned32       = mib.BaseUnsigned32
@@ -192,7 +184,6 @@ const (
 // StrictnessLevel defines preset strictness configurations.
 type StrictnessLevel = mib.StrictnessLevel
 
-// StrictnessLevel constants.
 const (
 	StrictnessStrict     = mib.StrictnessStrict
 	StrictnessNormal     = mib.StrictnessNormal
@@ -203,7 +194,7 @@ const (
 // DiagnosticConfig controls strictness and diagnostic filtering.
 type DiagnosticConfig = mib.DiagnosticConfig
 
-// Config constructors.
+// Preset diagnostic configuration constructors.
 var (
 	DefaultConfig    = mib.DefaultConfig
 	StrictConfig     = mib.StrictConfig

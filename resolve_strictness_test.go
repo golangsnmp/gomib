@@ -20,8 +20,6 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// loadAtStrictness loads a MIB at the given strictness level using both the
-// primary corpus (for dependencies) and the problems directory.
 func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) mib.Mib {
 	t.Helper()
 	corpus, err := DirTree("testdata/corpus/primary")
@@ -41,8 +39,6 @@ func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) mib.
 	return m
 }
 
-// unresolvedSymbols returns the set of unresolved symbol names for a given
-// module and kind (e.g., "type", "oid", "import").
 func unresolvedSymbols(m mib.Mib, module, kind string) map[string]bool {
 	result := make(map[string]bool)
 	for _, u := range m.Unresolved() {
@@ -52,8 +48,6 @@ func unresolvedSymbols(m mib.Mib, module, kind string) map[string]bool {
 	}
 	return result
 }
-
-// --- Best-guess fallback: global SMI type lookup (level >= 5) ---
 
 // TestTypeFallbackPermissiveOnly verifies that SMI global types (Counter64,
 // Gauge32, etc.) resolve only in permissive mode when not explicitly imported.
@@ -205,8 +199,6 @@ func TestTCFallbackStrictness(t *testing.T) {
 	})
 }
 
-// --- Safe fallback: module aliases (level >= 3) ---
-
 // TestModuleAliasNormalAndAbove verifies that module alias resolution
 // (SNMPv2-SMI-v1 -> SNMPv2-SMI, SNMPv2-TC-v1 -> SNMPv2-TC) is gated by
 // AllowSafeFallbacks (level >= 3).
@@ -235,12 +227,10 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 		testutil.True(t, unresolvedImports["DisplayString"],
 			"DisplayString should be unresolved (aliased module not found)")
 
-		// OID chain fails because enterprises is not in scope
 		unresolvedOids := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", "oid")
 		testutil.True(t, unresolvedOids["enterprises"],
 			"enterprises OID should be unresolved")
 
-		// Objects are not resolvable
 		testutil.Nil(t, m.FindObject("problemAliasString"),
 			"problemAliasString should not resolve in strict mode")
 		testutil.Nil(t, m.FindObject("problemAliasInteger"),
@@ -257,7 +247,6 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 		testutil.Equal(t, 0, len(unresolvedImports),
 			"no imports should be unresolved with alias fallback")
 
-		// Objects resolve with correct types (matches net-snmp)
 		str := m.FindObject("problemAliasString")
 		testutil.NotNil(t, str, "problemAliasString should resolve in normal mode")
 		if str != nil {
@@ -303,8 +292,6 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 		}
 	})
 }
-
-// --- Best-guess fallback: SMI global OID roots (level >= 5) ---
 
 // TestOIDGlobalRootPermissiveOnly verifies that OID definitions referencing
 // "enterprises" without importing it only resolve in permissive mode.
@@ -378,13 +365,10 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 	})
 }
 
-// --- Behavioral boundary verification ---
-
 // TestStrictnessLevelBoundaries verifies the exact boundary conditions of
 // the two guard functions: AllowSafeFallbacks (level >= 3) and
 // AllowBestGuessFallbacks (level >= 5).
 func TestStrictnessLevelBoundaries(t *testing.T) {
-	// Test the guard functions directly via DiagnosticConfig
 	tests := []struct {
 		level     mib.StrictnessLevel
 		wantSafe  bool
@@ -410,8 +394,6 @@ func TestStrictnessLevelBoundaries(t *testing.T) {
 	}
 }
 
-// === Import forwarding ===
-
 // TestImportForwardingTypeResolution verifies that a type imported via a
 // forwarding chain resolves to the same base type as a direct import.
 //
@@ -425,7 +407,6 @@ func TestStrictnessLevelBoundaries(t *testing.T) {
 func TestImportForwardingTypeResolution(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-FORWARDING-MIB", mib.StrictnessNormal)
 
-	// The forwarded type object should resolve
 	obj := m.FindObject("problemForwardedTypeObject")
 	testutil.NotNil(t, obj, "FindObject(problemForwardedTypeObject)")
 
@@ -480,7 +461,6 @@ func TestImportForwardingRequiresSafeFallbacks(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
 		m := loadAtStrictness(t, "PROBLEM-FORWARDING-MIB", mib.StrictnessNormal)
 
-		// In normal mode, forwarding should be active.
 		unresolvedImports := unresolvedSymbols(m, "PROBLEM-FORWARDING-MIB", "import")
 		testutil.Equal(t, 0, len(unresolvedImports),
 			"normal mode should resolve all imports via forwarding")
@@ -493,7 +473,6 @@ func TestImportForwardingRequiresSafeFallbacks(t *testing.T) {
 func TestImportForwardingSourceModuleCorrectness(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-FORWARDING-MIB", mib.StrictnessNormal)
 
-	// The source object (defined in source MIB) should have source module attribution
 	srcObj := m.FindObject("forwardedSourceObject")
 	testutil.NotNil(t, srcObj, "FindObject(forwardedSourceObject)")
 
@@ -525,8 +504,6 @@ func TestImportForwardingRelayOwnObjects(t *testing.T) {
 func TestPartialResolution(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.StrictnessStrict)
 
-	// Integer32 and enterprises are imported from SNMPv2-SMI and should resolve
-	// at all levels since that module exists and exports them.
 	unresolvedImports := unresolvedSymbols(m, "PROBLEM-IMPORTS-MIB", "import")
 	testutil.False(t, unresolvedImports["Integer32"],
 		"Integer32 should resolve (directly imported from SNMPv2-SMI)")

@@ -7,23 +7,17 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// Module is a normalized MIB module.
+// Module is a normalized, language-independent MIB module.
 type Module struct {
-	// Name is the module name.
-	Name string
-	// Language is the detected SMI language.
-	Language Language
-	// Imports are the imports (flattened to individual symbols).
-	Imports []Import
-	// Definitions are the definitions.
+	Name        string
+	Language    Language
+	Imports     []Import
 	Definitions []Definition
-	// Span is the source span for diagnostics.
-	Span types.Span
-	// Diagnostics are the lowering diagnostics.
+	Span        types.Span
 	Diagnostics []mib.Diagnostic
 }
 
-// NewModule creates a new module.
+// NewModule returns a Module with the given name and no definitions.
 func NewModule(name string, span types.Span) *Module {
 	return &Module{
 		Name:        name,
@@ -35,7 +29,7 @@ func NewModule(name string, span types.Span) *Module {
 	}
 }
 
-// HasErrors returns true if this module has any error diagnostics.
+// HasErrors reports whether this module has any error-level diagnostics.
 func (m *Module) HasErrors() bool {
 	for _, d := range m.Diagnostics {
 		if d.Severity <= mib.SeverityError {
@@ -45,7 +39,7 @@ func (m *Module) HasErrors() bool {
 	return false
 }
 
-// DefinitionNames returns an iterator over all definition names.
+// DefinitionNames returns an iterator over the names of all definitions.
 func (m *Module) DefinitionNames() iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for _, def := range m.Definitions {
@@ -56,18 +50,14 @@ func (m *Module) DefinitionNames() iter.Seq[string] {
 	}
 }
 
-// Import is a single imported symbol from a module.
-// Each import is flattened from the AST's grouped format.
+// Import is a single imported symbol, flattened from the AST's grouped format.
 type Import struct {
-	// Module is the source module name.
 	Module string
-	// Symbol is the symbol name.
 	Symbol string
-	// Span is the original source span.
-	Span types.Span
+	Span   types.Span
 }
 
-// NewImport creates a new import.
+// NewImport returns an Import for the given symbol from the given module.
 func NewImport(module, symbol string, span types.Span) Import {
 	return Import{
 		Module: module,

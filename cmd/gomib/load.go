@@ -63,7 +63,6 @@ func cmdLoad(args []string) int {
 		return 1
 	}
 
-	// Determine strictness
 	var opts []gomib.LoadOption
 	if *strict {
 		opts = append(opts, gomib.WithStrictness(gomib.StrictnessStrict))
@@ -79,7 +78,6 @@ func cmdLoad(args []string) int {
 		return 1
 	}
 
-	// Print summary
 	if *stats {
 		printDetailedStats(mib)
 	} else {
@@ -87,7 +85,6 @@ func cmdLoad(args []string) int {
 			mib.ModuleCount(), mib.TypeCount(), mib.ObjectCount(), mib.NotificationCount())
 	}
 
-	// Print diagnostics
 	diags := mib.Diagnostics()
 	hasSevere := false
 	hasErrors := false
@@ -108,7 +105,6 @@ func cmdLoad(args []string) int {
 		}
 	}
 
-	// Print unresolved references summary
 	unresolved := mib.Unresolved()
 	if len(unresolved) > 0 {
 		fmt.Println()
@@ -137,7 +133,6 @@ func cmdLoad(args []string) int {
 		}
 	}
 
-	// Exit code
 	if hasSevere {
 		return 1
 	}
@@ -172,7 +167,6 @@ func printDetailedStats(m gomib.Mib) {
 	fmt.Printf("  OID nodes:      %d\n", m.NodeCount())
 	fmt.Printf("  Diagnostics:    %d\n", len(m.Diagnostics()))
 
-	// Count nodes by kind
 	kindCounts := make(map[gomib.Kind]int)
 	for node := range m.Nodes() {
 		kindCounts[node.Kind()]++

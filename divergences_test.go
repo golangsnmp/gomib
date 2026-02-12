@@ -1,8 +1,7 @@
 package gomib
 
-// divergences_test.go documents known benign differences between gomib and
-// net-snmp ground-truth fixtures, along with equivalence helpers used by
-// the ground-truth test suite.
+// Equivalence helpers for comparing gomib output against net-snmp
+// ground-truth fixtures, accounting for known benign divergences.
 
 import (
 	"cmp"
@@ -12,8 +11,6 @@ import (
 	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
-// typesEquivalent checks if gomib and fixture type strings are semantically equivalent.
-// Handles naming differences between net-snmp and gomib representations.
 func typesEquivalent(gomibType, fixtureType string) bool {
 	if gomibType == fixtureType {
 		return true
@@ -50,9 +47,9 @@ func normalizeTypeName(t string) string {
 	}
 }
 
-// rangesEquivalent compares two range lists allowing for order differences
-// and the known signed/unsigned divergence where net-snmp displays unsigned
-// values as signed (e.g., 4294967295 as -1).
+// rangesEquivalent allows order differences and the signed/unsigned
+// divergence where net-snmp displays unsigned values as signed
+// (e.g., 4294967295 as -1).
 func rangesEquivalent(gomibRanges, fixtureRanges []testutil.RangeInfo) bool {
 	if len(gomibRanges) != len(fixtureRanges) {
 		return false
@@ -61,7 +58,6 @@ func rangesEquivalent(gomibRanges, fixtureRanges []testutil.RangeInfo) bool {
 		return true
 	}
 
-	// Sort both for order-independent comparison
 	g := make([]testutil.RangeInfo, len(gomibRanges))
 	f := make([]testutil.RangeInfo, len(fixtureRanges))
 	copy(g, gomibRanges)
@@ -73,8 +69,6 @@ func rangesEquivalent(gomibRanges, fixtureRanges []testutil.RangeInfo) bool {
 		if g[i] == f[i] {
 			continue
 		}
-		// Known divergence: signed/unsigned representation
-		// net-snmp may show large unsigned values as negative signed values
 		if isSignedUnsignedEquivalent(g[i], f[i]) {
 			continue
 		}
@@ -92,9 +86,6 @@ func sortRanges(rs []testutil.RangeInfo) {
 	})
 }
 
-// isSignedUnsignedEquivalent checks if a range difference is due to
-// signed vs unsigned interpretation. net-snmp sometimes shows unsigned
-// values (like 4294967295) as signed (-1).
 func isSignedUnsignedEquivalent(gomibR, fixtureR testutil.RangeInfo) bool {
 	return signedEquiv(gomibR.Low, fixtureR.Low) && signedEquiv(gomibR.High, fixtureR.High)
 }
@@ -103,7 +94,6 @@ func signedEquiv(a, b int64) bool {
 	if a == b {
 		return true
 	}
-	// Check 32-bit signed/unsigned wrap
 	if a >= 0 && b < 0 && a == b+1<<32 {
 		return true
 	}
@@ -113,9 +103,6 @@ func signedEquiv(a, b int64) bool {
 	return false
 }
 
-// enumsEquivalent compares two enum maps, accounting for the known
-// import-shadowing divergence where gomib may resolve a different set of
-// enum values than net-snmp for objects using imported textual conventions.
 func enumsEquivalent(gomibEnums, fixtureEnums map[int]string) bool {
 	if len(gomibEnums) == 0 && len(fixtureEnums) == 0 {
 		return true
@@ -131,8 +118,6 @@ func enumsEquivalent(gomibEnums, fixtureEnums map[int]string) bool {
 	return true
 }
 
-// hintsEquivalent checks if two display hints are semantically equivalent,
-// accounting for whitespace and case differences.
 func hintsEquivalent(gomibHint, fixtureHint string) bool {
 	if gomibHint == fixtureHint {
 		return true
@@ -140,7 +125,6 @@ func hintsEquivalent(gomibHint, fixtureHint string) bool {
 	return strings.EqualFold(strings.TrimSpace(gomibHint), strings.TrimSpace(fixtureHint))
 }
 
-// indexesEquivalent compares two index lists.
 func indexesEquivalent(gomibIndexes, fixtureIndexes []testutil.IndexInfo) bool {
 	if len(gomibIndexes) != len(fixtureIndexes) {
 		return false
@@ -156,7 +140,6 @@ func indexesEquivalent(gomibIndexes, fixtureIndexes []testutil.IndexInfo) bool {
 	return true
 }
 
-// varbindsEquivalent compares two varbind (OBJECTS) lists.
 func varbindsEquivalent(gomibVarbinds, fixtureVarbinds []string) bool {
 	if len(gomibVarbinds) != len(fixtureVarbinds) {
 		return false
@@ -169,13 +152,12 @@ func varbindsEquivalent(gomibVarbinds, fixtureVarbinds []string) bool {
 	return true
 }
 
-// accessEquivalent compares access levels, treating read-write/read-create
-// as equivalent (SMIv1 vs SMIv2 difference).
+// accessEquivalent treats read-write and read-create as equivalent
+// (SMIv1 vs SMIv2 difference).
 func accessEquivalent(gomibAccess, fixtureAccess string) bool {
 	if gomibAccess == fixtureAccess {
 		return true
 	}
-	// SMIv1 read-write is equivalent to SMIv2 read-create in many cases
 	if (gomibAccess == "read-write" && fixtureAccess == "read-create") ||
 		(gomibAccess == "read-create" && fixtureAccess == "read-write") {
 		return true
@@ -183,13 +165,12 @@ func accessEquivalent(gomibAccess, fixtureAccess string) bool {
 	return false
 }
 
-// statusEquivalent compares status values, treating mandatory/current
-// as equivalent (SMIv1 vs SMIv2 difference).
+// statusEquivalent treats mandatory and current as equivalent
+// (SMIv1 vs SMIv2 difference).
 func statusEquivalent(gomibStatus, fixtureStatus string) bool {
 	if gomibStatus == fixtureStatus {
 		return true
 	}
-	// SMIv1 mandatory is equivalent to SMIv2 current
 	if (gomibStatus == "mandatory" && fixtureStatus == "current") ||
 		(gomibStatus == "current" && fixtureStatus == "mandatory") {
 		return true
@@ -197,33 +178,27 @@ func statusEquivalent(gomibStatus, fixtureStatus string) bool {
 	return false
 }
 
-// defvalEquivalent compares default value strings, accounting for known
-// representation differences between gomib and net-snmp:
-//   - quoting differences ("" vs \"\")
-//   - hex zero bytes (0x00000000... vs 0)
-//   - OID symbolic names (zeroDotZero vs 0.0)
+// defvalEquivalent accounts for representation differences: quoting,
+// hex zero bytes (0x00000000... vs 0), and OID symbolic names
+// (zeroDotZero vs 0.0).
 func defvalEquivalent(gomibDefval, fixtureDefval string) bool {
 	if gomibDefval == fixtureDefval {
 		return true
 	}
-	// Normalize: strip quotes, whitespace
 	gNorm := strings.Trim(strings.TrimSpace(gomibDefval), "\"'")
 	fNorm := strings.Trim(strings.TrimSpace(fixtureDefval), "\"'")
 	if gNorm == fNorm {
 		return true
 	}
-	// Hex zeros: 0x0000... == 0
 	if isHexZeros(gNorm) && fNorm == "0" || isHexZeros(fNorm) && gNorm == "0" {
 		return true
 	}
-	// OID symbolic equivalence
 	if oidDefvalEquivalent(gNorm, fNorm) {
 		return true
 	}
 	return false
 }
 
-// isHexZeros checks if a string is 0x followed by only zeroes.
 func isHexZeros(s string) bool {
 	if !strings.HasPrefix(s, "0x") && !strings.HasPrefix(s, "0X") {
 		return false
@@ -236,8 +211,6 @@ func isHexZeros(s string) bool {
 	return len(s) > 2
 }
 
-// oidDefvalEquivalent checks if one value is a well-known OID symbolic name
-// and the other is its numeric form.
 func oidDefvalEquivalent(a, b string) bool {
 	known := map[string]string{
 		"zeroDotZero": "0.0",
@@ -250,8 +223,6 @@ func oidDefvalEquivalent(a, b string) bool {
 	return false
 }
 
-// referenceEquivalent compares REFERENCE clause strings, accounting for
-// whitespace normalization differences.
 func referenceEquivalent(gomibRef, fixtureRef string) bool {
 	if gomibRef == fixtureRef {
 		return true
@@ -259,7 +230,6 @@ func referenceEquivalent(gomibRef, fixtureRef string) bool {
 	return normalizeWhitespace(gomibRef) == normalizeWhitespace(fixtureRef)
 }
 
-// normalizeWhitespace collapses runs of whitespace to single spaces and trims.
 func normalizeWhitespace(s string) string {
 	fields := strings.Fields(s)
 	return strings.Join(fields, " ")

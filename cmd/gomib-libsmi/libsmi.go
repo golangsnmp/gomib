@@ -311,7 +311,7 @@ import (
 	"unsafe"
 )
 
-// LibsmiDiagnostic represents a diagnostic from libsmi parsing.
+// LibsmiDiagnostic holds a diagnostic emitted during libsmi parsing.
 type LibsmiDiagnostic struct {
 	Path     string
 	Line     int
@@ -320,7 +320,7 @@ type LibsmiDiagnostic struct {
 	Tag      string
 }
 
-// LibsmiModule holds parsed module information.
+// LibsmiModule holds module metadata retrieved from libsmi.
 type LibsmiModule struct {
 	Name         string
 	Path         string
@@ -331,7 +331,7 @@ type LibsmiModule struct {
 	Description  string
 }
 
-// LibsmiNode holds parsed node information for comparison.
+// LibsmiNode holds node attributes retrieved from libsmi for comparison.
 type LibsmiNode struct {
 	OID         string
 	Name        string
@@ -344,31 +344,32 @@ type LibsmiNode struct {
 	Description string
 }
 
-// InitLibsmi initializes libsmi with the given MIB path and error level (0-6).
+// InitLibsmi initializes libsmi with the given MIB path and error
+// level (0=fatal through 6=info).
 func InitLibsmi(mibPath string, errorLevel int) {
 	cPath := C.CString(mibPath)
 	defer C.free(unsafe.Pointer(cPath))
 	C.init_libsmi(cPath, C.int(errorLevel))
 }
 
-// CleanupLibsmi releases libsmi resources.
+// CleanupLibsmi frees all collected data and calls smiExit.
 func CleanupLibsmi() {
 	C.cleanup_libsmi()
 }
 
-// ClearErrors clears collected errors for a new parsing session.
+// ClearErrors resets the collected error list for a new parsing session.
 func ClearErrors() {
 	C.clear_errors()
 }
 
-// LoadModule loads a MIB module. Returns true if successful.
+// LoadModule parses a named MIB module via smiLoadModule.
 func LoadModule(name string) bool {
 	cName := C.CString(name)
 	defer C.free(unsafe.Pointer(cName))
 	return C.load_module(cName) != 0
 }
 
-// GetDiagnostics returns all diagnostics collected during parsing.
+// GetDiagnostics returns diagnostics collected since the last ClearErrors.
 func GetDiagnostics() []LibsmiDiagnostic {
 	count := int(C.get_error_count())
 	diags := make([]LibsmiDiagnostic, 0, count)
@@ -400,7 +401,7 @@ func GetDiagnostics() []LibsmiDiagnostic {
 	return diags
 }
 
-// GetModuleInfo returns parsed module information.
+// GetModuleInfo returns metadata for a loaded module, or nil if not found.
 func GetModuleInfo(name string) *LibsmiModule {
 	cName := C.CString(name)
 	defer C.free(unsafe.Pointer(cName))
@@ -421,14 +422,15 @@ func GetModuleInfo(name string) *LibsmiModule {
 	}
 }
 
-// CollectNodes collects all nodes from a loaded module.
+// CollectNodes walks all nodes in a module and appends them to the
+// internal collection. Call GetNodes to retrieve and ClearNodes to reset.
 func CollectNodes(moduleName string) {
 	cName := C.CString(moduleName)
 	defer C.free(unsafe.Pointer(cName))
 	C.collect_all_nodes_from_module(cName)
 }
 
-// GetNodes returns all collected nodes.
+// GetNodes returns all nodes accumulated by CollectNodes calls.
 func GetNodes() []LibsmiNode {
 	count := int(C.get_node_count())
 	nodes := make([]LibsmiNode, 0, count)
@@ -457,17 +459,17 @@ func GetNodes() []LibsmiNode {
 	return nodes
 }
 
-// ClearNodes clears collected nodes.
+// ClearNodes frees the internal node collection.
 func ClearNodes() {
 	C.clear_nodes()
 }
 
-// SeverityName returns the name for a severity level.
+// SeverityName maps a numeric severity (0-6) to its string label.
 func SeverityName(severity int) string {
 	return C.GoString(C.severity_name(C.int(severity)))
 }
 
-// BuildMIBPath creates a colon-separated path from multiple directories.
+// BuildMIBPath joins directory paths with colons for libsmi's smiSetPath.
 func BuildMIBPath(paths []string) string {
 	return strings.Join(paths, ":")
 }

@@ -2,7 +2,8 @@ package mibimpl
 
 import "github.com/golangsnmp/gomib/mib"
 
-// Group is the concrete implementation of mib.Group.
+// Group implements mib.Group for OBJECT-GROUP and NOTIFICATION-GROUP
+// definitions.
 type Group struct {
 	name                string
 	node                *Node
@@ -13,8 +14,6 @@ type Group struct {
 	ref                 string
 	isNotificationGroup bool
 }
-
-// Interface methods (mib.Group)
 
 func (g *Group) Name() string {
 	return g.name
@@ -73,8 +72,6 @@ func (g *Group) String() string {
 	return g.name + " (" + g.OID().String() + ")"
 }
 
-// Mutation methods (for resolver use)
-
 func (g *Group) SetName(name string) {
 	g.name = name
 }
@@ -111,12 +108,12 @@ func (g *Group) SetIsNotificationGroup(v bool) {
 	g.isNotificationGroup = v
 }
 
-// InternalNode returns the concrete node for resolver use.
+// InternalNode returns the concrete node.
 func (g *Group) InternalNode() *Node {
 	return g.node
 }
 
-// InternalMembers returns the concrete member nodes for resolver use.
+// InternalMembers returns the concrete member nodes.
 func (g *Group) InternalMembers() []*Node {
 	return g.members
 }

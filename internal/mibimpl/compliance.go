@@ -2,7 +2,7 @@ package mibimpl
 
 import "github.com/golangsnmp/gomib/mib"
 
-// Compliance is the concrete implementation of mib.Compliance.
+// Compliance implements mib.Compliance for MODULE-COMPLIANCE definitions.
 type Compliance struct {
 	name    string
 	node    *Node
@@ -12,8 +12,6 @@ type Compliance struct {
 	ref     string
 	modules []mib.ComplianceModule
 }
-
-// Interface methods (mib.Compliance)
 
 func (c *Compliance) Name() string {
 	return c.name
@@ -64,8 +62,6 @@ func (c *Compliance) String() string {
 	return c.name + " (" + c.OID().String() + ")"
 }
 
-// Mutation methods (for resolver use)
-
 func (c *Compliance) SetNode(nd *Node) {
 	c.node = nd
 }
@@ -90,12 +86,12 @@ func (c *Compliance) SetModules(modules []mib.ComplianceModule) {
 	c.modules = modules
 }
 
-// InternalNode returns the concrete node for resolver use.
+// InternalNode returns the concrete node.
 func (c *Compliance) InternalNode() *Node {
 	return c.node
 }
 
-// InternalModule returns the concrete module for resolver use.
+// InternalModule returns the concrete module.
 func (c *Compliance) InternalModule() *Module {
 	return c.module
 }

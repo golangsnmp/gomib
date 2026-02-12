@@ -19,16 +19,13 @@ func TestLoadSingleMIB(t *testing.T) {
 		t.Fatalf("LoadModules failed: %v", err)
 	}
 
-	// Basic sanity checks
 	testutil.NotNil(t, mib, "mib should not be nil")
 	testutil.Greater(t, mib.ModuleCount(), 0, "should have loaded modules")
 	testutil.Greater(t, mib.ObjectCount(), 0, "should have resolved objects")
 
-	// Check IF-MIB specifically
 	ifMIB := mib.Module("IF-MIB")
 	testutil.NotNil(t, ifMIB, "IF-MIB module should be found")
 
-	// Check a well-known object
 	ifIndex := mib.FindObject("ifIndex")
 	testutil.NotNil(t, ifIndex, "ifIndex object should be found")
 }
@@ -55,8 +52,6 @@ func TestLoadAllCorpus(t *testing.T) {
 	t.Logf("Loaded %d modules, %d objects, %d types",
 		mib.ModuleCount(), mib.ObjectCount(), mib.TypeCount())
 }
-
-// === Source Interface Tests ===
 
 func TestDirSource(t *testing.T) {
 	src, err := Dir("testdata/corpus/primary/ietf")
@@ -96,7 +91,6 @@ func TestMultiSource(t *testing.T) {
 
 	src := Multi(primary, problems)
 
-	// Should find modules from both sources
 	ctx := context.Background()
 	m, err := LoadModules(ctx, []string{"IF-MIB"}, src)
 	if err != nil {
@@ -114,10 +108,8 @@ func TestLoadNonexistentModule(t *testing.T) {
 	ctx := context.Background()
 	m, err := LoadModules(ctx, []string{"TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST"}, src)
 	if err != nil {
-		// Some implementations return an error for missing modules
 		return
 	}
-	// Others return a Mib with no matching content
 	if m != nil {
 		mod := m.Module("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST")
 		testutil.Nil(t, mod, "nonexistent module should not be in the result")
@@ -130,8 +122,6 @@ func TestLoadNoSources(t *testing.T) {
 	testutil.Error(t, err, "loading with nil source should fail")
 }
 
-// === Query Format Tests ===
-
 func TestFindNodeByName(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -142,7 +132,6 @@ func TestFindNodeByName(t *testing.T) {
 func TestFindNodeByNumericOID(t *testing.T) {
 	m := loadTestMIB(t)
 
-	// ifIndex OID is 1.3.6.1.2.1.2.2.1.1
 	node := m.FindNode("1.3.6.1.2.1.2.2.1.1")
 	testutil.NotNil(t, node, "FindNode(1.3.6.1.2.1.2.2.1.1)")
 	testutil.Equal(t, "ifIndex", node.Name(), "node found by OID should be ifIndex")
@@ -151,7 +140,6 @@ func TestFindNodeByNumericOID(t *testing.T) {
 func TestFindNodeByDottedOID(t *testing.T) {
 	m := loadTestMIB(t)
 
-	// Leading dot format
 	node := m.FindNode(".1.3.6.1.2.1.2.2.1.1")
 	testutil.NotNil(t, node, "FindNode(.1.3.6.1.2.1.2.2.1.1)")
 	testutil.Equal(t, "ifIndex", node.Name(), "node found by dotted OID should be ifIndex")
@@ -207,8 +195,6 @@ func TestFindNotification(t *testing.T) {
 	testutil.Equal(t, "linkDown", notif.Name(), "notification name")
 }
 
-// === Collection Tests ===
-
 func TestModulesCollection(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -253,8 +239,6 @@ func TestTablesAndScalars(t *testing.T) {
 	testutil.Greater(t, len(scalars), 0, "should have scalars (SNMPv2-MIB has sysDescr)")
 }
 
-// === Strictness Tests ===
-
 func TestStrictMIBsPassAtStrictLevel(t *testing.T) {
 	corpus, err := DirTree("testdata/corpus/primary")
 	if err != nil {
@@ -298,7 +282,6 @@ func TestUnderscoreViolationEmitsDiagnostic(t *testing.T) {
 
 	ctx := context.Background()
 
-	// In strict mode, should emit identifier-underscore diagnostics
 	mib, err := LoadModules(ctx, []string{"UNDERSCORE-TEST-MIB"}, src, WithStrictness(StrictnessStrict))
 	if err != nil {
 		t.Fatalf("LoadModules failed: %v", err)
@@ -312,7 +295,6 @@ func TestUnderscoreViolationEmitsDiagnostic(t *testing.T) {
 	}
 	testutil.Equal(t, 2, underscoreDiags, "expected 2 identifier-underscore diagnostics")
 
-	// In permissive mode, diagnostics should be suppressed
 	mib, err = LoadModules(ctx, []string{"UNDERSCORE-TEST-MIB"}, src, WithStrictness(StrictnessPermissive))
 	if err != nil {
 		t.Fatalf("LoadModules failed: %v", err)
@@ -392,7 +374,6 @@ func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
 
 	ctx := context.Background()
 
-	// In normal mode, should emit bad-identifier-case diagnostics
 	m, err := LoadModules(ctx, []string{"PROBLEM-NAMING-MIB"}, src, WithStrictness(StrictnessNormal))
 	if err != nil {
 		t.Fatalf("LoadModules failed: %v", err)
@@ -406,11 +387,9 @@ func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
 	}
 	testutil.Equal(t, 4, caseDiags, "expected 4 bad-identifier-case diagnostics in normal mode")
 
-	// Objects should still resolve in normal mode (diagnostic is non-fatal)
 	node := m.FindNode("NetEngine8000SysOid")
 	testutil.NotNil(t, node, "uppercase identifier should resolve in normal mode")
 
-	// In permissive mode, diagnostics should be suppressed
 	m, err = LoadModules(ctx, []string{"PROBLEM-NAMING-MIB"}, src, WithStrictness(StrictnessPermissive))
 	if err != nil {
 		t.Fatalf("LoadModules failed: %v", err)
@@ -451,8 +430,6 @@ func TestMissingModuleIdentityEmitsDiagnostic(t *testing.T) {
 	testutil.Equal(t, 1, identityDiags, "expected 1 missing-module-identity diagnostic")
 }
 
-// === Resolution Fallback Tests ===
-
 func TestMissingImportFailsInStrictMode(t *testing.T) {
 	corpus, err := DirTree("testdata/corpus/primary")
 	if err != nil {
@@ -466,13 +443,11 @@ func TestMissingImportFailsInStrictMode(t *testing.T) {
 
 	ctx := context.Background()
 
-	// In strict mode, enterprises without import should fail to resolve
 	mib, err := LoadModules(ctx, []string{"MISSING-IMPORT-TEST-MIB"}, src, WithStrictness(StrictnessStrict))
 	if err != nil {
 		t.Fatalf("LoadModules failed: %v", err)
 	}
 
-	// Should have unresolved OID references
 	unresolved := mib.Unresolved()
 	var oidUnresolved int
 	for _, u := range unresolved {
@@ -482,7 +457,6 @@ func TestMissingImportFailsInStrictMode(t *testing.T) {
 	}
 	testutil.Greater(t, oidUnresolved, 0, "strict mode should have unresolved OID references")
 
-	// The test object should not be found since OID resolution failed
 	testObj := mib.FindObject("testObject")
 	testutil.Nil(t, testObj, "testObject should not resolve in strict mode")
 }
@@ -500,13 +474,11 @@ func TestMissingImportWorksInPermissiveMode(t *testing.T) {
 
 	ctx := context.Background()
 
-	// In permissive mode, enterprises should resolve via global fallback
 	mib, err := LoadModules(ctx, []string{"MISSING-IMPORT-TEST-MIB"}, src, WithStrictness(StrictnessPermissive))
 	if err != nil {
 		t.Fatalf("LoadModules failed: %v", err)
 	}
 
-	// Should have no unresolved OID references for this MIB
 	unresolved := mib.Unresolved()
 	var oidUnresolved int
 	for _, u := range unresolved {
@@ -516,7 +488,6 @@ func TestMissingImportWorksInPermissiveMode(t *testing.T) {
 	}
 	testutil.Equal(t, 0, oidUnresolved, "permissive mode should resolve enterprises via fallback")
 
-	// The test object should be found
 	testObj := mib.FindObject("testObject")
 	testutil.NotNil(t, testObj, "testObject should resolve in permissive mode")
 }
@@ -534,13 +505,11 @@ func TestMissingImportFailsInNormalMode(t *testing.T) {
 
 	ctx := context.Background()
 
-	// In normal mode, best-guess fallbacks are disabled
 	mib, err := LoadModules(ctx, []string{"MISSING-IMPORT-TEST-MIB"}, src, WithStrictness(StrictnessNormal))
 	if err != nil {
 		t.Fatalf("LoadModules failed: %v", err)
 	}
 
-	// Should have unresolved OID references (normal mode doesn't have best-guess fallbacks)
 	unresolved := mib.Unresolved()
 	var oidUnresolved int
 	for _, u := range unresolved {
@@ -551,9 +520,6 @@ func TestMissingImportFailsInNormalMode(t *testing.T) {
 	testutil.Greater(t, oidUnresolved, 0, "normal mode should have unresolved OID references")
 }
 
-// === Invalid MIB Tests ===
-
-// loadInvalidMIB loads a MIB from the strictness/invalid directory at the given level.
 func loadInvalidMIB(t testing.TB, name string, level StrictnessLevel) Mib {
 	t.Helper()
 	corpus, err := DirTree("testdata/corpus/primary")
@@ -573,7 +539,6 @@ func loadInvalidMIB(t testing.TB, name string, level StrictnessLevel) Mib {
 	return m
 }
 
-// moduleObjects returns objects belonging to the given module name.
 func moduleObjects(m Mib, moduleName string) []Object {
 	var result []Object
 	for _, o := range m.Objects() {
@@ -584,7 +549,6 @@ func moduleObjects(m Mib, moduleName string) []Object {
 	return result
 }
 
-// moduleDiagnostics returns diagnostics for the given module.
 func moduleDiagnostics(m Mib, moduleName string) []Diagnostic {
 	var result []Diagnostic
 	for _, d := range m.Diagnostics() {
@@ -595,9 +559,6 @@ func moduleDiagnostics(m Mib, moduleName string) []Diagnostic {
 	return result
 }
 
-// TestInvalidSyntaxMIBProducesNoBrokenObjects verifies that a MIB with a
-// malformed OBJECT-TYPE (missing SYNTAX clause) emits a diagnostic and
-// produces no objects from the broken definition, at all strictness levels.
 func TestInvalidSyntaxMIBProducesNoBrokenObjects(t *testing.T) {
 	levels := []struct {
 		name  string
@@ -612,12 +573,10 @@ func TestInvalidSyntaxMIBProducesNoBrokenObjects(t *testing.T) {
 		t.Run(lvl.name, func(t *testing.T) {
 			m := loadInvalidMIB(t, "INVALID-SYNTAX-MIB", lvl.level)
 
-			// The broken OBJECT-TYPE should not produce any objects
 			objs := moduleObjects(m, "INVALID-SYNTAX-MIB")
 			testutil.Equal(t, 0, len(objs),
 				"broken OBJECT-TYPE should not produce objects at %s level", lvl.name)
 
-			// Should have at least one diagnostic about the syntax error
 			diags := moduleDiagnostics(m, "INVALID-SYNTAX-MIB")
 			testutil.Greater(t, len(diags), 0,
 				"should emit diagnostic for missing SYNTAX at %s level", lvl.name)
@@ -625,9 +584,6 @@ func TestInvalidSyntaxMIBProducesNoBrokenObjects(t *testing.T) {
 	}
 }
 
-// TestInvalidTruncatedMIBProducesNoObjects verifies that a truncated MIB
-// (missing END, cut off mid-definition) emits a diagnostic and produces
-// no objects from the incomplete definition.
 func TestInvalidTruncatedMIBProducesNoObjects(t *testing.T) {
 	levels := []struct {
 		name  string
@@ -642,12 +598,10 @@ func TestInvalidTruncatedMIBProducesNoObjects(t *testing.T) {
 		t.Run(lvl.name, func(t *testing.T) {
 			m := loadInvalidMIB(t, "INVALID-TRUNCATED-MIB", lvl.level)
 
-			// Truncated definition should not produce any objects
 			objs := moduleObjects(m, "INVALID-TRUNCATED-MIB")
 			testutil.Equal(t, 0, len(objs),
 				"truncated OBJECT-TYPE should not produce objects at %s level", lvl.name)
 
-			// Should have at least one diagnostic about unexpected EOF
 			diags := moduleDiagnostics(m, "INVALID-TRUNCATED-MIB")
 			testutil.Greater(t, len(diags), 0,
 				"should emit diagnostic for truncated definition at %s level", lvl.name)
@@ -655,9 +609,6 @@ func TestInvalidTruncatedMIBProducesNoObjects(t *testing.T) {
 	}
 }
 
-// TestInvalidDuplicateOIDMIBBothObjectsLoad verifies that when two objects
-// share the same OID assignment, both are loaded (the resolver does not
-// reject duplicates within a module). This documents current behavior.
 func TestInvalidDuplicateOIDMIBBothObjectsLoad(t *testing.T) {
 	m := loadInvalidMIB(t, "INVALID-DUPLICATE-OID-MIB", StrictnessPermissive)
 
@@ -665,7 +616,6 @@ func TestInvalidDuplicateOIDMIBBothObjectsLoad(t *testing.T) {
 	testutil.Equal(t, 2, len(objs),
 		"both duplicate-OID objects should load")
 
-	// Both should have the same OID
 	if len(objs) == 2 {
 		testutil.Equal(t, objs[0].OID().String(), objs[1].OID().String(),
 			"duplicate objects should share the same OID")

@@ -15,7 +15,7 @@ import (
 	"github.com/golangsnmp/gomib"
 )
 
-// SemanticComparison holds semantic comparison results.
+// SemanticComparison holds the results of comparing gomib and libsmi output.
 type SemanticComparison struct {
 	TotalLibsmi     int            `json:"total_libsmi"`
 	TotalGomib      int            `json:"total_gomib"`
@@ -26,7 +26,7 @@ type SemanticComparison struct {
 	Summary         CompareSummary `json:"summary"`
 }
 
-// NodeCompare describes a difference between gomib and libsmi.
+// NodeCompare describes a field-level difference for one OID node.
 type NodeCompare struct {
 	OID    string `json:"oid"`
 	Name   string `json:"name"`
@@ -36,7 +36,7 @@ type NodeCompare struct {
 	Libsmi string `json:"libsmi"`
 }
 
-// CompareSummary tracks field comparison statistics.
+// CompareSummary tracks per-field match and mismatch counts.
 type CompareSummary struct {
 	Kind     MatchCount `json:"kind"`
 	Status   MatchCount `json:"status"`
@@ -44,7 +44,7 @@ type CompareSummary struct {
 	BaseType MatchCount `json:"basetype"`
 }
 
-// MatchCount tracks matches and mismatches.
+// MatchCount holds a match and mismatch tally for one field.
 type MatchCount struct {
 	Match    int `json:"match"`
 	Mismatch int `json:"mismatch"`
@@ -105,12 +105,10 @@ Options:
 func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 	result := &SemanticComparison{}
 
-	// Load with libsmi
 	libsmiPath := BuildMIBPath(expandDirs(mibPaths))
 	InitLibsmi(libsmiPath, 6) // Info level - collect everything
 	defer CleanupLibsmi()
 
-	// Load modules
 	for _, mod := range modules {
 		LoadModule(mod)
 		CollectNodes(mod)
@@ -126,7 +124,6 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 
 	result.TotalLibsmi = len(libsmiNodes)
 
-	// Load with gomib
 	var sources []gomib.Source
 	for _, p := range mibPaths {
 		src, err := gomib.DirTree(p)
@@ -188,7 +185,6 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 
 	result.TotalGomib = len(gomibNodes)
 
-	// Compare
 	allOIDs := make(map[string]bool)
 	for oid := range libsmiNodes {
 		allOIDs[oid] = true
@@ -212,7 +208,6 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 
 		result.MatchedNodes++
 
-		// Compare kind
 		if ls.NodeKind != "" && gm.Kind != "" {
 			if kindsEquivalent(gm.Kind, ls.NodeKind) {
 				result.Summary.Kind.Match++
@@ -229,7 +224,6 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 			}
 		}
 
-		// Compare status
 		if ls.Status != "" && gm.Status != "" {
 			if gm.Status == ls.Status {
 				result.Summary.Status.Match++
@@ -246,7 +240,6 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 			}
 		}
 
-		// Compare access
 		if ls.Access != "" && gm.Access != "" {
 			if accessEquivalent(gm.Access, ls.Access) {
 				result.Summary.Access.Match++
@@ -263,7 +256,6 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 			}
 		}
 
-		// Compare basetype
 		if ls.BaseType != "" && gm.BaseType != "" {
 			if baseTypesEquivalent(gm.BaseType, ls.BaseType) {
 				result.Summary.BaseType.Match++
@@ -452,7 +444,6 @@ func printSemanticComparison(w io.Writer, result *SemanticComparison) {
 	printMatchCount(w, "basetype", result.Summary.BaseType)
 
 	if len(result.Mismatches) > 0 {
-		// Group by field
 		byField := make(map[string][]NodeCompare)
 		for _, m := range result.Mismatches {
 			byField[m.Field] = append(byField[m.Field], m)

@@ -7,7 +7,8 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// Data is the concrete implementation of mib.Mib.
+// Data implements mib.Mib, holding all resolved modules, objects, types,
+// and the OID tree.
 type Data struct {
 	root          *Node
 	modules       []*Module
@@ -25,8 +26,6 @@ type Data struct {
 	diagnostics []mib.Diagnostic
 	unresolved  []mib.UnresolvedRef
 }
-
-// Interface methods (mib.Mib)
 
 func (m *Data) Root() mib.Node {
 	if m.root == nil {
@@ -46,7 +45,6 @@ func (m *Data) Nodes() iter.Seq[mib.Node] {
 }
 
 func (m *Data) FindNode(query string) mib.Node {
-	// Try qualified name first (MODULE::name)
 	if moduleName, nodeName, ok := strings.Cut(query, "::"); ok {
 		if m.moduleByName[moduleName] == nil {
 			return nil
@@ -59,7 +57,6 @@ func (m *Data) FindNode(query string) mib.Node {
 		return nil
 	}
 
-	// Try numeric OID (starts with digit)
 	if len(query) > 0 && query[0] >= '0' && query[0] <= '9' {
 		oid, err := mib.ParseOID(query)
 		if err != nil || len(oid) == 0 {
@@ -68,7 +65,6 @@ func (m *Data) FindNode(query string) mib.Node {
 		return m.NodeByOID(oid)
 	}
 
-	// Try partial OID (starts with .)
 	if len(query) > 0 && query[0] == '.' {
 		oid, err := mib.ParseOID(query[1:])
 		if err != nil || len(oid) == 0 {
@@ -77,7 +73,7 @@ func (m *Data) FindNode(query string) mib.Node {
 		return m.NodeByOID(oid)
 	}
 
-	// Try name lookup - prefer object, then notification, then any node
+	// Prefer nodes with objects, then notifications, then any match.
 	nodes := m.nameToNodes[query]
 	for _, nd := range nodes {
 		if nd.obj != nil {
@@ -104,7 +100,6 @@ func (m *Data) FindObject(query string) mib.Object {
 }
 
 func (m *Data) FindType(query string) mib.Type {
-	// Try qualified name first (MODULE::name)
 	if moduleName, typeName, ok := strings.Cut(query, "::"); ok {
 		mod := m.moduleByName[moduleName]
 		if mod == nil {
@@ -118,7 +113,6 @@ func (m *Data) FindType(query string) mib.Type {
 		return nil
 	}
 
-	// Try name lookup
 	t := m.typeByName[query]
 	if t == nil {
 		return nil
@@ -364,21 +358,18 @@ func (m *Data) IsComplete() bool {
 	return len(m.unresolved) == 0
 }
 
-// Internal helpers
-
-// nodeEntity is the constraint for types that live on a Node.
+// nodeEntity constrains the entity types that can be attached to a Node.
 type nodeEntity interface {
 	comparable
 	*Object | *Notification | *Group | *Compliance | *Capabilities
 }
 
-// findEntity dispatches a query string to find a node-attached entity.
-// It handles qualified names (MODULE::name), numeric OIDs, partial OIDs (.1.3...),
-// and plain name lookups.
+// findEntity resolves a query to a node-attached entity. It accepts
+// qualified names (MODULE::name), numeric OIDs, dot-prefixed OIDs,
+// and plain names.
 func findEntity[T nodeEntity](m *Data, query string, fromNode func(*Node) T) T {
 	var zero T
 
-	// Try qualified name (MODULE::name)
 	if moduleName, itemName, ok := strings.Cut(query, "::"); ok {
 		if m.moduleByName[moduleName] == nil {
 			return zero
@@ -393,7 +384,6 @@ func findEntity[T nodeEntity](m *Data, query string, fromNode func(*Node) T) T {
 		return zero
 	}
 
-	// Try numeric OID (starts with digit)
 	if len(query) > 0 && query[0] >= '0' && query[0] <= '9' {
 		oid, err := mib.ParseOID(query)
 		if err != nil || len(oid) == 0 {
@@ -405,7 +395,6 @@ func findEntity[T nodeEntity](m *Data, query string, fromNode func(*Node) T) T {
 		return zero
 	}
 
-	// Try partial OID (starts with .)
 	if len(query) > 0 && query[0] == '.' {
 		oid, err := mib.ParseOID(query[1:])
 		if err != nil || len(oid) == 0 {
@@ -417,7 +406,6 @@ func findEntity[T nodeEntity](m *Data, query string, fromNode func(*Node) T) T {
 		return zero
 	}
 
-	// Try name lookup
 	for _, nd := range m.nameToNodes[query] {
 		if v := fromNode(nd); v != zero {
 			return v

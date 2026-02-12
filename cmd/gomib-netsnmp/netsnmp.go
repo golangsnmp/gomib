@@ -379,8 +379,6 @@ import (
 	"unsafe"
 )
 
-// initNetSnmp initializes net-snmp with the given MIB directory.
-// If modules is empty, loads all MIBs; otherwise loads only specified modules.
 func initNetSnmp(mibDir string, modules []string) {
 	cMibDir := C.CString(mibDir)
 	defer C.free(unsafe.Pointer(cMibDir))
@@ -394,7 +392,6 @@ func initNetSnmp(mibDir string, modules []string) {
 	}
 }
 
-// collectNetSnmpNodes collects all nodes from net-snmp into NormalizedNode format.
 func collectNetSnmpNodes() map[string]*NormalizedNode {
 	C.collect_all_nodes()
 	defer C.cleanup_nodes()
@@ -431,12 +428,10 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 			BitValues:    make(map[int]string),
 		}
 
-		// Determine kind based on type and structure
 		node.Kind = inferNetSnmpKind(cNode._type, int(cNode.index_count), node.Augments)
 
-		// Get enums
-		// Note: net-snmp uses the same enum list for both INTEGER enums and BITS
-		// We distinguish based on type
+		// net-snmp uses the same enum list for INTEGER enums and BITS;
+		// distinguish based on type code
 		isBitsType := cNode._type == 12 // TYPE_BITSTRING
 		for j := 0; j < int(cNode.enum_count); j++ {
 			val := int(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.enum_values)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
@@ -449,7 +444,6 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 			}
 		}
 
-		// Get indexes with IMPLIED flags
 		for j := 0; j < int(cNode.index_count); j++ {
 			idxPtr := *(**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.indexes)) + uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
 			implied := *(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.implied_flags)) + uintptr(j)*unsafe.Sizeof(C.int(0))))
@@ -459,14 +453,12 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 			})
 		}
 
-		// Get ranges
 		for j := 0; j < int(cNode.range_count); j++ {
 			low := int64(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.range_lows)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
 			high := int64(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.range_highs)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
 			node.Ranges = append(node.Ranges, RangeInfo{Low: low, High: high})
 		}
 
-		// Get varbinds (OBJECTS for notifications)
 		for j := 0; j < int(cNode.varbind_count); j++ {
 			vbPtr := *(**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.varbinds)) + uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
 			node.Varbinds = append(node.Varbinds, C.GoString(vbPtr))
@@ -479,17 +471,12 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 }
 
 // inferNetSnmpKind infers the node kind from net-snmp type and structure.
-// net-snmp doesn't directly expose table/row/column/scalar, but we can infer:
-// - row: has INDEX clause or AUGMENTS
-// - table: parent of a row (name ends in "Table" with child ending in "Entry")
-// - column: child of a row entry
-// - scalar: leaf node without index
+// net-snmp does not directly expose table/row/column/scalar, so we
+// use heuristics: nodes with INDEX or AUGMENTS are rows; the rest
+// cannot be reliably classified without tree context.
 func inferNetSnmpKind(nodeType C.int, indexCount int, augments string) string {
-	// Nodes with INDEX or AUGMENTS are rows
 	if indexCount > 0 || augments != "" {
 		return "row"
 	}
-	// We can't reliably infer table/column/scalar from net-snmp without tree context
-	// Leave empty and compare only when gomib has a value
 	return ""
 }

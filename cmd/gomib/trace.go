@@ -67,14 +67,12 @@ func cmdTrace(args []string) int {
 
 	symbol := remaining[0]
 
-	// Determine load mode
 	if !*loadAll && len(modules) == 0 {
 		printError("specify -m MODULE or --all")
 		fmt.Fprint(os.Stderr, traceUsage)
 		return 1
 	}
 
-	// Load with appropriate method
 	var mib gomib.Mib
 	var err error
 	var loadMode string
@@ -92,12 +90,10 @@ func cmdTrace(args []string) int {
 		return 2
 	}
 
-	// Print load summary
 	fmt.Printf("Load mode: %s\n", loadMode)
 	fmt.Printf("Loaded: %d modules, %d objects, %d types\n\n",
 		mib.ModuleCount(), mib.ObjectCount(), mib.TypeCount())
 
-	// Trace the symbol
 	traceSymbol(mib, symbol)
 
 	return 0
@@ -106,7 +102,6 @@ func cmdTrace(args []string) int {
 func traceSymbol(mib gomib.Mib, symbol string) {
 	fmt.Printf("=== Tracing symbol: %s ===\n\n", symbol)
 
-	// Find all definitions of this symbol across modules
 	var definingModules []string
 	for _, mod := range mib.Modules() {
 		if mod.Object(symbol) != nil || mod.Type(symbol) != nil || mod.Node(symbol) != nil {
@@ -114,12 +109,10 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		}
 	}
 
-	// Also check for qualified lookups
 	node := mib.FindNode(symbol)
 	obj := mib.FindObject(symbol)
 	typ := mib.FindType(symbol)
 
-	// Report definitions
 	fmt.Println("DEFINITIONS:")
 	if len(definingModules) == 0 {
 		fmt.Println("  (none found)")
@@ -142,7 +135,6 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 	}
 	fmt.Println()
 
-	// Report global lookup results
 	fmt.Println("GLOBAL LOOKUPS (unqualified):")
 	if node != nil {
 		modName := "(no module)"
@@ -180,7 +172,6 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 	}
 	fmt.Println()
 
-	// Per-module lookups for each defining module
 	if len(definingModules) > 1 {
 		fmt.Println("PER-MODULE LOOKUPS:")
 		for _, modName := range definingModules {
@@ -204,7 +195,6 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		fmt.Println()
 	}
 
-	// If this is a row object, show INDEX details
 	if obj != nil && obj.Kind() == gomib.KindRow {
 		fmt.Println("INDEX RESOLUTION (row object):")
 		directIndex := obj.Index()
@@ -253,7 +243,6 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		fmt.Println()
 	}
 
-	// If this is a table, show row info
 	if obj != nil && obj.Kind() == gomib.KindTable {
 		fmt.Println("TABLE STRUCTURE:")
 		if obj.Entry() != nil {
@@ -269,7 +258,6 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		fmt.Println()
 	}
 
-	// Show related unresolved references
 	unresolved := mib.Unresolved()
 	var related []gomib.UnresolvedRef
 	for _, u := range unresolved {
@@ -286,13 +274,11 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		fmt.Println()
 	}
 
-	// Check for potential duplicates that might cause issues
 	if len(definingModules) > 1 {
 		fmt.Println("WARNING: Multiple modules define this symbol!")
 		fmt.Println("  This can cause resolution ambiguity depending on load order.")
 		fmt.Println("  Modules:", strings.Join(definingModules, ", "))
 
-		// Check if objects point to the same or different nodes
 		var nodes []gomib.Node
 		var nodeInfo []string
 		for _, modName := range definingModules {
@@ -313,7 +299,6 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		fmt.Println()
 	}
 
-	// Show all unresolved if requested with verbose
 	if verbose > 0 && len(unresolved) > 0 {
 		fmt.Printf("ALL UNRESOLVED REFERENCES (%d total):\n", len(unresolved))
 		for _, u := range unresolved {

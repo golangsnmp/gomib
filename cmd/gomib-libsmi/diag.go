@@ -19,7 +19,7 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// DiagComparison holds the comparison of diagnostics between gomib and libsmi.
+// DiagComparison holds side-by-side diagnostic output from gomib and libsmi.
 type DiagComparison struct {
 	Module       string      `json:"module"`
 	Level        int         `json:"level"`
@@ -30,7 +30,7 @@ type DiagComparison struct {
 	Summary      DiagSummary `json:"summary"`
 }
 
-// DiagEntry represents a single diagnostic.
+// DiagEntry holds one diagnostic from either parser.
 type DiagEntry struct {
 	Line     int    `json:"line"`
 	Severity int    `json:"severity"`
@@ -39,7 +39,7 @@ type DiagEntry struct {
 	Message  string `json:"message"`
 }
 
-// DiagSummary summarizes diagnostic comparison.
+// DiagSummary tallies diagnostics from each parser by severity.
 type DiagSummary struct {
 	GomibTotal   int            `json:"gomib_total"`
 	LibsmiTotal  int            `json:"libsmi_total"`
@@ -125,7 +125,6 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 		},
 	}
 
-	// Load with libsmi
 	libsmiPath := BuildMIBPath(expandDirs(mibPaths))
 	InitLibsmi(libsmiPath, level)
 	defer CleanupLibsmi()
@@ -147,7 +146,6 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 		result.Summary.BySeverity["libsmi:"+entry.SevName]++
 	}
 
-	// Load with gomib
 	var sources []gomib.Source
 	for _, p := range mibPaths {
 		src, err := gomib.DirTree(p)
@@ -165,7 +163,6 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 			source = gomib.Multi(sources...)
 		}
 
-		// Configure strictness to match libsmi level
 		cfg := mib.DiagnosticConfig{
 			Level:  mib.StrictnessLevel(level),
 			FailAt: mib.SeverityFatal,
@@ -190,7 +187,7 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 		}
 	}
 
-	// Find common/unique diagnostics (simple line-based matching)
+	// Simple line-based matching to approximate common diagnostics
 	gomibLines := make(map[int]bool)
 	for _, d := range result.GomibDiags {
 		gomibLines[d.Line] = true

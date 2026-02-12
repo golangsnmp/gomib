@@ -1,4 +1,3 @@
-// resolve_fixtures_test.go verifies gomib output against net-snmp JSON fixtures.
 package gomib
 
 import (
@@ -7,10 +6,6 @@ import (
 	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
-// TestResolveOIDs verifies that gomib resolves the same OIDs as net-snmp
-// for all nodes in each fixture module.
-// Disagreements are skipped rather than failed, since the cause may be
-// differences in what each library exposes (conformance nodes, etc.).
 func TestResolveOIDs(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -35,9 +30,6 @@ func TestResolveOIDs(t *testing.T) {
 	}
 }
 
-// TestResolveTypes verifies that gomib resolves the same base type and TC name
-// as net-snmp for OBJECT-TYPE nodes in each fixture module.
-// Disagreements are skipped rather than failed.
 func TestResolveTypes(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -63,7 +55,6 @@ func TestResolveTypes(t *testing.T) {
 							fn.Name, gomibType, fn.Type)
 					}
 
-					// TC name
 					if fn.TCName != "" {
 						gomibTC := ""
 						if obj.Type() != nil {
@@ -75,7 +66,6 @@ func TestResolveTypes(t *testing.T) {
 						}
 					}
 
-					// Display hint
 					if fn.Hint != "" {
 						gomibHint := obj.EffectiveDisplayHint()
 						if !hintsEquivalent(gomibHint, fn.Hint) {
@@ -89,9 +79,6 @@ func TestResolveTypes(t *testing.T) {
 	}
 }
 
-// TestResolveEnums verifies that gomib resolves the same effective enum values
-// as net-snmp for OBJECT-TYPE nodes in each fixture module.
-// Disagreements are skipped rather than failed.
 func TestResolveEnums(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -127,9 +114,6 @@ func TestResolveEnums(t *testing.T) {
 	}
 }
 
-// TestResolveBits verifies that gomib resolves the same BITS named values
-// as net-snmp for OBJECT-TYPE nodes in each fixture module.
-// Disagreements are skipped rather than failed.
 func TestResolveBits(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -165,9 +149,6 @@ func TestResolveBits(t *testing.T) {
 	}
 }
 
-// TestResolveTables verifies that gomib resolves table structure (kind,
-// indexes, augments) consistently with net-snmp.
-// Disagreements are skipped rather than failed.
 func TestResolveTables(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -176,7 +157,6 @@ func TestResolveTables(t *testing.T) {
 			fixture := loadFixtureNodes(t, mod)
 
 			for _, fn := range fixture {
-				// Only test nodes with table-related info
 				hasTableInfo := fn.Kind != "" || len(fn.Indexes) > 0 || fn.Augments != ""
 				if !hasTableInfo {
 					continue
@@ -189,7 +169,6 @@ func TestResolveTables(t *testing.T) {
 						return
 					}
 
-					// Kind (table/row/column/scalar)
 					if fn.Kind != "" {
 						gomibKind := testutil.NormalizeKind(obj.Kind())
 						if gomibKind != fn.Kind {
@@ -198,7 +177,6 @@ func TestResolveTables(t *testing.T) {
 						}
 					}
 
-					// Indexes
 					if len(fn.Indexes) > 0 {
 						gomibIndexes := testutil.NormalizeIndexes(obj.Index())
 						if !indexesEquivalent(gomibIndexes, fn.Indexes) {
@@ -209,7 +187,6 @@ func TestResolveTables(t *testing.T) {
 						}
 					}
 
-					// Augments
 					if fn.Augments != "" {
 						gomibAugments := ""
 						if aug := obj.Augments(); aug != nil {
@@ -226,9 +203,6 @@ func TestResolveTables(t *testing.T) {
 	}
 }
 
-// TestResolveAccess verifies that gomib resolves the same access level
-// as net-snmp for OBJECT-TYPE nodes in each fixture module.
-// Disagreements are skipped rather than failed.
 func TestResolveAccess(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -259,9 +233,6 @@ func TestResolveAccess(t *testing.T) {
 	}
 }
 
-// TestResolveStatus verifies that gomib resolves the same status value
-// as net-snmp for nodes in each fixture module.
-// Disagreements are skipped rather than failed.
 func TestResolveStatus(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -275,7 +246,6 @@ func TestResolveStatus(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					// Try object first, then notification
 					gomibStatus := ""
 					if obj := m.FindObject(fn.Name); obj != nil {
 						gomibStatus = testutil.NormalizeStatus(obj.Status())
@@ -296,11 +266,6 @@ func TestResolveStatus(t *testing.T) {
 	}
 }
 
-// TestResolveRanges verifies that gomib resolves the same effective range
-// constraints as net-snmp for OBJECT-TYPE nodes in each fixture module.
-// This covers both value ranges (INTEGER types) and size constraints
-// (OCTET STRING types).
-// Disagreements are skipped rather than failed.
 func TestResolveRanges(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -323,7 +288,6 @@ func TestResolveRanges(t *testing.T) {
 						return
 					}
 
-					// Combine ranges and sizes (same as fixture generation)
 					var gomibRanges []testutil.RangeInfo
 					gomibRanges = append(gomibRanges, testutil.NormalizeRanges(obj.EffectiveRanges())...)
 					gomibRanges = append(gomibRanges, testutil.NormalizeRanges(obj.EffectiveSizes())...)
@@ -340,9 +304,6 @@ func TestResolveRanges(t *testing.T) {
 	}
 }
 
-// TestResolveNotifications verifies that gomib resolves the same notification
-// OBJECTS (varbinds) and status as net-snmp for NOTIFICATION-TYPE nodes.
-// Disagreements are skipped rather than failed.
 func TestResolveNotifications(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -362,14 +323,12 @@ func TestResolveNotifications(t *testing.T) {
 						return
 					}
 
-					// Verify OID
 					gotOID := notif.OID().String()
 					if gotOID != fn.OID {
 						t.Errorf("divergence: OID for notification %s: gomib=%s fixture=%s",
 							fn.Name, gotOID, fn.OID)
 					}
 
-					// Verify varbinds (OBJECTS clause)
 					if len(fn.Varbinds) > 0 {
 						gomibVarbinds := testutil.NormalizeVarbinds(notif.Objects())
 						if !varbindsEquivalent(gomibVarbinds, fn.Varbinds) {
@@ -378,7 +337,6 @@ func TestResolveNotifications(t *testing.T) {
 						}
 					}
 
-					// Verify status if present
 					if fn.Status != "" {
 						gomibStatus := testutil.NormalizeStatus(notif.Status())
 						if !statusEquivalent(gomibStatus, fn.Status) {
@@ -392,9 +350,6 @@ func TestResolveNotifications(t *testing.T) {
 	}
 }
 
-// TestResolveUnits verifies that gomib resolves the same UNITS clause
-// as net-snmp for OBJECT-TYPE nodes in each fixture module.
-// Disagreements are skipped rather than failed.
 func TestResolveUnits(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -428,9 +383,6 @@ func TestResolveUnits(t *testing.T) {
 	}
 }
 
-// TestResolveDefval verifies that gomib resolves the same DEFVAL clause
-// as net-snmp for OBJECT-TYPE nodes in each fixture module.
-// Disagreements are skipped rather than failed.
 func TestResolveDefval(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -471,9 +423,6 @@ func TestResolveDefval(t *testing.T) {
 	}
 }
 
-// TestResolveReference verifies that gomib resolves the same REFERENCE clause
-// as net-snmp for nodes in each fixture module.
-// Disagreements are skipped rather than failed.
 func TestResolveReference(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -487,7 +436,6 @@ func TestResolveReference(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					// Try object first, then notification
 					gomibRef := ""
 					if obj := m.FindObject(fn.Name); obj != nil {
 						gomibRef = obj.Reference()
@@ -508,9 +456,6 @@ func TestResolveReference(t *testing.T) {
 	}
 }
 
-// TestResolveModule verifies that gomib attributes each node to the same
-// module as net-snmp.
-// Disagreements are skipped rather than failed.
 func TestResolveModule(t *testing.T) {
 	m := loadTestMIB(t)
 

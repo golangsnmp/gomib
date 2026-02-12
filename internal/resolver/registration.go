@@ -8,7 +8,9 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// registerModules registers modules and definitions.
+// registerModules indexes all modules and seeds the resolver context.
+// Synthetic base modules are prepended to user modules so that later
+// phases can resolve primitives and well-known types.
 func registerModules(ctx *ResolverContext) {
 	baseModules := module.CreateBaseModules()
 
@@ -30,7 +32,6 @@ func registerModules(ctx *ResolverContext) {
 		resolved := mibimpl.NewModule(mod.Name)
 		resolved.SetLanguage(convertLanguage(mod.Language))
 
-		// Extract MODULE-IDENTITY metadata
 		for _, def := range mod.Definitions {
 			if mi, ok := def.(*module.ModuleIdentity); ok {
 				resolved.SetOrganization(mi.Organization)
@@ -49,6 +50,10 @@ func registerModules(ctx *ResolverContext) {
 			ctx.Builder.AddDiagnostic(d)
 		}
 
+		// Cache pointers to base modules used by the type resolution
+		// fallback chain (LookupTypeForModule, LookupType). Many vendor
+		// MIBs use types from these modules without importing them, so
+		// the resolver needs direct access for permissive-mode lookups.
 		if mod.Name == "SNMPv2-SMI" {
 			ctx.Snmpv2SMIModule = mod
 		}

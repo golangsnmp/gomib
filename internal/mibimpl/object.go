@@ -2,7 +2,8 @@ package mibimpl
 
 import "github.com/golangsnmp/gomib/mib"
 
-// Object is the concrete implementation of mib.Object.
+// Object implements mib.Object, linking an OBJECT-TYPE definition to its
+// node in the OID tree.
 type Object struct {
 	name     string
 	node     *Node
@@ -17,15 +18,12 @@ type Object struct {
 	augments *Object
 	index    []mib.IndexEntry
 
-	// Pre-computed effective values (from inline constraints + type chain)
 	hint   string
 	sizes  []mib.Range
 	ranges []mib.Range
 	enums  []mib.NamedValue
 	bits   []mib.NamedValue
 }
-
-// Interface methods (mib.Object)
 
 func (o *Object) Name() string {
 	return o.name
@@ -142,7 +140,7 @@ func (o *Object) Index() []mib.IndexEntry {
 	return o.index
 }
 
-// Table navigation
+// Table returns the table object that contains this row or column, or nil.
 func (o *Object) Table() mib.Object {
 	if o.node == nil {
 		return nil
@@ -178,7 +176,6 @@ func (o *Object) Entry() mib.Object {
 	if o.node == nil || o.node.kind != mib.KindTable {
 		return nil
 	}
-	// The row entry is the first child with KindRow
 	for _, child := range o.node.sortedChildren() {
 		if child.kind == mib.KindRow && child.obj != nil {
 			return child.obj
@@ -194,7 +191,6 @@ func (o *Object) Columns() []mib.Object {
 	var rowNode *Node
 	switch o.node.kind {
 	case mib.KindTable:
-		// Find the row entry first
 		for _, child := range o.node.sortedChildren() {
 			if child.kind == mib.KindRow {
 				rowNode = child
@@ -231,7 +227,6 @@ func (o *Object) EffectiveIndexes() []mib.IndexEntry {
 	return nil
 }
 
-// Predicates
 func (o *Object) IsTable() bool {
 	return o.node != nil && o.node.kind == mib.KindTable
 }
@@ -255,8 +250,6 @@ func (o *Object) String() string {
 	}
 	return o.name + " (" + o.OID().String() + ")"
 }
-
-// Mutation methods (for resolver use)
 
 func (o *Object) SetNode(n *Node) {
 	o.node = n
@@ -322,22 +315,22 @@ func (o *Object) SetEffectiveBits(b []mib.NamedValue) {
 	o.bits = b
 }
 
-// InternalNode returns the concrete node for resolver use.
+// InternalNode returns the concrete node.
 func (o *Object) InternalNode() *Node {
 	return o.node
 }
 
-// InternalType returns the concrete type for resolver use.
+// InternalType returns the concrete type.
 func (o *Object) InternalType() *Type {
 	return o.typ
 }
 
-// InternalAugments returns the concrete augments object for resolver use.
+// InternalAugments returns the concrete augments target.
 func (o *Object) InternalAugments() *Object {
 	return o.augments
 }
 
-// InternalModule returns the concrete module for resolver use.
+// InternalModule returns the concrete module.
 func (o *Object) InternalModule() *Module {
 	return o.module
 }

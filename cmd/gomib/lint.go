@@ -126,7 +126,6 @@ func cmdLint(args []string) int {
 		return 1
 	}
 
-	// Validate format
 	switch cfg.format {
 	case "text", "json", "sarif", "compact":
 		// ok
@@ -135,7 +134,6 @@ func cmdLint(args []string) int {
 		return 1
 	}
 
-	// Validate group-by
 	switch cfg.groupBy {
 	case "", "module", "code", "severity":
 		// ok
@@ -163,7 +161,6 @@ func cmdLint(args []string) int {
 }
 
 func runLint(modules []string, cfg lintConfig) *lintResult {
-	// Build diagnostic config for loading
 	diagCfg := gomib.DiagnosticConfig{
 		Level:  gomib.StrictnessLevel(cfg.level),
 		FailAt: gomib.SeverityFatal, // We handle failure ourselves
@@ -180,7 +177,6 @@ func runLint(modules []string, cfg lintConfig) *lintResult {
 	}
 
 	if err != nil {
-		// Parse error is a lint issue
 		result.Diagnostics = append(result.Diagnostics, lintDiagnostic{
 			Severity:    "fatal",
 			SeverityNum: 0,
@@ -195,9 +191,7 @@ func runLint(modules []string, cfg lintConfig) *lintResult {
 
 	result.Summary.Modules = mib.ModuleCount()
 
-	// Collect diagnostics
 	for _, d := range mib.Diagnostics() {
-		// Filter by --only (diagnostics are already filtered by level during collection)
 		if len(cfg.only) > 0 && !matchesAny(d.Code, cfg.only) {
 			continue
 		}
@@ -217,7 +211,6 @@ func runLint(modules []string, cfg lintConfig) *lintResult {
 		result.Summary.BySeverity[d.Severity.String()]++
 		result.Summary.ByCode[d.Code]++
 
-		// Check failure threshold
 		if int(d.Severity) <= cfg.failOn {
 			result.ExitCode = 1
 		}
@@ -397,7 +390,6 @@ func printLintDiagLineNoSeverity(d lintDiagnostic) {
 func printLintSummary(result *lintResult) {
 	fmt.Printf("Checked %d modules, found %d issues:\n", result.Summary.Modules, result.Summary.Total)
 
-	// Print by severity in order
 	sevOrder := []string{"fatal", "severe", "error", "minor", "style", "warning", "info"}
 	for _, sev := range sevOrder {
 		if count := result.Summary.BySeverity[sev]; count > 0 {
@@ -427,7 +419,6 @@ func printLintCompact(result *lintResult, cfg lintConfig) {
 	}
 
 	for _, d := range result.Diagnostics {
-		// module:line:col: severity code message
 		loc := d.Module
 		if d.Line > 0 {
 			loc = fmt.Sprintf("%s:%d", d.Module, d.Line)
@@ -582,7 +573,6 @@ func buildSARIFResults(result *lintResult) []sarifResult {
 }
 
 func severityToSARIF(sev int) string {
-	// SARIF levels: error, warning, note, none
 	switch {
 	case sev <= 2: // fatal, severe, error
 		return "error"

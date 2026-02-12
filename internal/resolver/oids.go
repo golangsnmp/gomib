@@ -29,13 +29,11 @@ var smiGlobalOidRoots = map[string]struct{}{
 	"snmp":         {},
 }
 
+// resolveOids is the OID resolution phase entry point.
 func resolveOids(ctx *ResolverContext) {
 	defs := collectOidDefinitions(ctx)
-
-	// Check for hyphens in SMIv2 object identifier names
 	checkSmiv2IdentifierHyphens(ctx, defs.oidDefs)
 
-	// Build dependency graph for OID definitions
 	g := graph.New()
 	defIndex := make(map[graph.Symbol]oidDefinition)
 
@@ -44,13 +42,11 @@ func resolveOids(ctx *ResolverContext) {
 		g.AddNode(sym, graph.NodeKindOID)
 		defIndex[sym] = def
 
-		// Add edge to the parent OID (first component dependency)
 		if parentSym, ok := getOidParentSymbol(ctx, def); ok {
 			g.AddEdge(sym, parentSym)
 		}
 	}
 
-	// Check for cycles
 	cycles := g.FindCycles()
 	if len(cycles) > 0 && ctx.TraceEnabled() {
 		for _, cycle := range cycles {
@@ -62,7 +58,6 @@ func resolveOids(ctx *ResolverContext) {
 		}
 	}
 
-	// Get resolution order (dependencies first)
 	order, cyclic := g.ResolutionOrder()
 
 	if ctx.TraceEnabled() {
@@ -71,7 +66,6 @@ func resolveOids(ctx *ResolverContext) {
 			slog.Int("cyclic", len(cyclic)))
 	}
 
-	// Resolve OIDs in topological order
 	resolved := 0
 	for _, sym := range order {
 		def, ok := defIndex[sym]
@@ -83,7 +77,6 @@ func resolveOids(ctx *ResolverContext) {
 		}
 	}
 
-	// Handle cyclic OIDs - record as unresolved
 	for _, sym := range cyclic {
 		def, ok := defIndex[sym]
 		if !ok {
@@ -115,11 +108,9 @@ func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, 
 	first := oid.Components[0]
 	switch c := first.(type) {
 	case *module.OidComponentName:
-		// Check if this is a well-known root (no dependency)
 		if wellKnownRootArc(c.NameValue) >= 0 {
 			return graph.Symbol{}, false
 		}
-		// Find which module defines this symbol
 		if parentMod := findOidDefiningModule(ctx, def.mod, c.NameValue); parentMod != "" {
 			return graph.Symbol{Module: parentMod, Name: c.NameValue}, true
 		}
@@ -130,7 +121,7 @@ func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, 
 			}
 		}
 	case *module.OidComponentNumber:
-		return graph.Symbol{}, false // Numeric roots have no dependency
+		return graph.Symbol{}, false // Numeric roots have no dependency.
 	case *module.OidComponentNamedNumber:
 		if wellKnownRootArc(c.NameValue) >= 0 {
 			return graph.Symbol{}, false
@@ -144,7 +135,7 @@ func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, 
 				return graph.Symbol{Module: "SNMPv2-SMI", Name: c.NameValue}, true
 			}
 		}
-		// Has a number, so can be resolved without the name
+		// Has a number, so can be resolved without the name.
 		return graph.Symbol{}, false
 	case *module.OidComponentQualifiedName:
 		return graph.Symbol{Module: c.ModuleValue, Name: c.NameValue}, true
@@ -155,16 +146,15 @@ func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, 
 	return graph.Symbol{}, false
 }
 
-// findOidDefiningModule finds the module that defines an OID symbol.
+// findOidDefiningModule finds the module that defines an OID symbol,
+// checking local definitions first, then imports.
 func findOidDefiningModule(ctx *ResolverContext, fromMod *module.Module, name string) string {
-	// Check if defined in the current module
 	for _, def := range fromMod.Definitions {
 		if def.DefinitionName() == name && def.DefinitionOid() != nil {
 			return fromMod.Name
 		}
 	}
 
-	// Check imports
 	if imports := ctx.ModuleImports[fromMod]; imports != nil {
 		if srcMod := imports[name]; srcMod != nil {
 			return srcMod.Name
@@ -425,8 +415,7 @@ func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mibimp
 	}
 	node.SetName(label)
 
-	// Set module with preference: SMIv2 > SMIv1 > Unknown
-	// This ensures modern modules (IF-MIB) are preferred over legacy (RFC1213-MIB)
+	// Prefer SMIv2 over SMIv1 when multiple modules define the same OID
 	newMod := ctx.ModuleToResolved[def.mod]
 	currentMod := node.InternalModule()
 	if currentMod != nil && ctx.TraceEnabled() {
@@ -437,16 +426,14 @@ func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mibimp
 	}
 	if shouldPreferModule(newMod, currentMod, def.mod, ctx) {
 		node.SetModule(newMod)
-		// Register node-kind definitions with their module.
-		// Object types, notifications, groups, compliance, and capabilities
-		// are registered later in the semantics phase.
+		// Only register non-semantic definitions here; object types,
+		// notifications, etc. are registered in the semantics phase.
 		switch def.kind {
 		case defValueAssignment, defObjectIdentity, defModuleIdentity:
 			newMod.AddNode(node)
 		}
 	}
 
-	// For MODULE-IDENTITY, set the module's OID
 	if def.kind == defModuleIdentity {
 		newMod.SetOID(node.OID())
 	}
@@ -466,7 +453,6 @@ func resolveNumericComponent(ctx *ResolverContext, parent *mibimpl.Node, arc uin
 	if parent != nil {
 		return parent.GetOrCreateChild(arc)
 	}
-	// No parent - this is a root
 	return ctx.Builder.GetOrCreateRoot(arc)
 }
 
@@ -491,7 +477,7 @@ func resolveTrapTypeDefinitions(ctx *ResolverContext, defs []trapTypeRef) {
 			continue
 		}
 
-		// .0 node
+		// SNMPv1 trap OID convention: enterprise.0.trapNumber
 		zeroNode := enterpriseNode.GetOrCreateChild(0)
 		trapNode := zeroNode.GetOrCreateChild(trapNumber)
 
@@ -547,12 +533,10 @@ func wellKnownRootArc(name string) int {
 // shouldPreferModule determines if newMod should replace currentMod as the node's module.
 // Preference order: SMIv2 > SMIv1 > Unknown, with newer LAST-UPDATED as tiebreaker.
 func shouldPreferModule(newMod, currentMod *mibimpl.Module, srcMod *module.Module, ctx *ResolverContext) bool {
-	// Always set if no current module
 	if currentMod == nil {
 		return true
 	}
 
-	// Find the source module for the current resolved module
 	var currentSrcMod *module.Module
 	for _, mod := range ctx.Modules {
 		if ctx.ModuleToResolved[mod] == currentMod {
@@ -564,7 +548,6 @@ func shouldPreferModule(newMod, currentMod *mibimpl.Module, srcMod *module.Modul
 		return true
 	}
 
-	// Compare languages: SMIv2 > SMIv1 > Unknown
 	newRank := languageRank(srcMod.Language)
 	currentRank := languageRank(currentSrcMod.Language)
 

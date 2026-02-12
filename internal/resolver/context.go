@@ -9,37 +9,37 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// ResolverContext holds indices and working state during resolution.
+// ResolverContext holds indices and working state for all resolution phases.
 type ResolverContext struct {
 	Builder *mibimpl.Builder
 
 	Modules []*module.Module
 
-	// ModuleIndex maps module name to parsed modules (multiple versions possible)
+	// ModuleIndex maps module name to parsed modules (multiple versions possible).
 	ModuleIndex map[string][]*module.Module
 
-	// ModuleToResolved maps parsed module to resolved module
+	// ModuleToResolved maps parsed module to resolved module.
 	ModuleToResolved map[*module.Module]*mibimpl.Module
 
-	// ModuleSymbolToNode maps module -> symbol -> Node for OID lookups
+	// ModuleSymbolToNode maps module -> symbol -> Node for OID lookups.
 	ModuleSymbolToNode map[*module.Module]map[string]*mibimpl.Node
 
-	// ModuleImports maps module -> symbol -> source module for import chain traversal
+	// ModuleImports maps module -> symbol -> source module for import chain traversal.
 	ModuleImports map[*module.Module]map[string]*module.Module
 
-	// ModuleSymbolToType maps module -> symbol -> Type for type lookups
+	// ModuleSymbolToType maps module -> symbol -> Type for type lookups.
 	ModuleSymbolToType map[*module.Module]map[string]*mibimpl.Type
 
-	// ModuleDefNames caches definition names per module for import resolution
+	// ModuleDefNames caches definition names per module for import resolution.
 	ModuleDefNames map[*module.Module]map[string]struct{}
 
-	// Snmpv2SMIModule is the SNMPv2-SMI base module (for primitive types)
+	// Snmpv2SMIModule is the SNMPv2-SMI base module (for primitive types).
 	Snmpv2SMIModule *module.Module
 
-	// Rfc1155SMIModule is the RFC1155-SMI base module (for SMIv1 types)
+	// Rfc1155SMIModule is the RFC1155-SMI base module (for SMIv1 types).
 	Rfc1155SMIModule *module.Module
 
-	// Snmpv2TCModule is the SNMPv2-TC module (for standard textual conventions)
+	// Snmpv2TCModule is the SNMPv2-TC module (for standard textual conventions).
 	Snmpv2TCModule *module.Module
 
 	// Unresolved references collected during resolution
@@ -92,7 +92,6 @@ type unresolvedNotifObject struct {
 	span         types.Span
 }
 
-// capacityHints holds pre-computed capacity hints from scanning modules.
 type capacityHints struct {
 	modules       int
 	objects       int
@@ -102,7 +101,6 @@ type capacityHints struct {
 	imports       int
 }
 
-// scanCapacityHints scans modules to compute capacity hints.
 func scanCapacityHints(mods []*module.Module) capacityHints {
 	h := capacityHints{modules: len(mods)}
 	for _, mod := range mods {
@@ -124,7 +122,6 @@ func scanCapacityHints(mods []*module.Module) capacityHints {
 	return h
 }
 
-// newResolverContext creates a new context with an optional logger and diagnostic config.
 func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *ResolverContext {
 	h := scanCapacityHints(mods)
 	return &ResolverContext{
@@ -141,12 +138,12 @@ func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig m
 	}
 }
 
-// LookupNodeForModule resolves a node by name in a module scope.
+// LookupNodeForModule resolves a node by name, traversing imports from mod.
 func (c *ResolverContext) LookupNodeForModule(mod *module.Module, name string) (*mibimpl.Node, bool) {
 	return c.lookupNodeInModuleScope(mod, name)
 }
 
-// LookupNodeInModule resolves a node by module name and symbol.
+// LookupNodeInModule resolves a node across all versions of a named module.
 func (c *ResolverContext) LookupNodeInModule(moduleName, name string) (*mibimpl.Node, bool) {
 	candidates := c.ModuleIndex[moduleName]
 	for _, mod := range candidates {
@@ -157,7 +154,7 @@ func (c *ResolverContext) LookupNodeInModule(moduleName, name string) (*mibimpl.
 	return nil, false
 }
 
-// LookupNodeGlobal looks up a node by name across all modules.
+// LookupNodeGlobal searches all modules for a node with the given name.
 func (c *ResolverContext) LookupNodeGlobal(name string) (*mibimpl.Node, bool) {
 	for _, symbols := range c.ModuleSymbolToNode {
 		if node, ok := symbols[name]; ok {
@@ -167,8 +164,8 @@ func (c *ResolverContext) LookupNodeGlobal(name string) (*mibimpl.Node, bool) {
 	return nil, false
 }
 
-// LookupType looks up a type by name globally.
-// This is a best-guess fallback only enabled in permissive mode.
+// LookupType searches for a type by name, trying well-known modules first.
+// Beyond ASN.1 primitives, global search is only enabled in permissive mode.
 func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
 	// RFC-compliant: ASN.1 primitives are always available
 	if isASN1Primitive(name) && c.Snmpv2SMIModule != nil {
@@ -209,7 +206,6 @@ func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
 		}
 	}
 
-	// Search all modules
 	for _, symbols := range c.ModuleSymbolToType {
 		if t, ok := symbols[name]; ok {
 			return t, true
@@ -218,9 +214,9 @@ func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
 	return nil, false
 }
 
-// LookupTypeForModule looks up a type by name in a module scope.
+// LookupTypeForModule resolves a type by name, traversing imports from mod.
+// Falls back to well-known base modules when permissive mode is enabled.
 func (c *ResolverContext) LookupTypeForModule(mod *module.Module, name string) (*mibimpl.Type, bool) {
-	// Try the module scope traversal first
 	if t, ok := c.lookupTypeInModuleScope(mod, name); ok {
 		return t, true
 	}
@@ -313,7 +309,6 @@ func lookupInModuleScope[T any](
 	}
 }
 
-// lookupNodeInModuleScope traverses module imports to find a node.
 func (c *ResolverContext) lookupNodeInModuleScope(mod *module.Module, name string) (*mibimpl.Node, bool) {
 	return lookupInModuleScope(mod, name,
 		func(m *module.Module) map[string]*mibimpl.Node { return c.ModuleSymbolToNode[m] },
@@ -321,7 +316,6 @@ func (c *ResolverContext) lookupNodeInModuleScope(mod *module.Module, name strin
 	)
 }
 
-// lookupTypeInModuleScope traverses module imports to find a type.
 func (c *ResolverContext) lookupTypeInModuleScope(mod *module.Module, name string) (*mibimpl.Type, bool) {
 	return lookupInModuleScope(mod, name,
 		func(m *module.Module) map[string]*mibimpl.Type { return c.ModuleSymbolToType[m] },
@@ -329,7 +323,7 @@ func (c *ResolverContext) lookupTypeInModuleScope(mod *module.Module, name strin
 	)
 }
 
-// RegisterImport records an import declaration for later lookup.
+// RegisterImport maps a symbol in importingModule to its source module.
 func (c *ResolverContext) RegisterImport(importingModule *module.Module, symbol string, sourceModule *module.Module) {
 	imports := c.ModuleImports[importingModule]
 	if imports == nil {
@@ -339,7 +333,7 @@ func (c *ResolverContext) RegisterImport(importingModule *module.Module, symbol 
 	imports[symbol] = sourceModule
 }
 
-// RegisterModuleNodeSymbol registers a module-scoped symbol -> node mapping.
+// RegisterModuleNodeSymbol binds a symbol name to a node within a module scope.
 func (c *ResolverContext) RegisterModuleNodeSymbol(mod *module.Module, symbol string, node *mibimpl.Node) {
 	symbols := c.ModuleSymbolToNode[mod]
 	if symbols == nil {
@@ -349,7 +343,7 @@ func (c *ResolverContext) RegisterModuleNodeSymbol(mod *module.Module, symbol st
 	symbols[symbol] = node
 }
 
-// RegisterModuleTypeSymbol registers a module-scoped symbol -> type mapping.
+// RegisterModuleTypeSymbol binds a symbol name to a type within a module scope.
 func (c *ResolverContext) RegisterModuleTypeSymbol(mod *module.Module, name string, t *mibimpl.Type) {
 	symbols := c.ModuleSymbolToType[mod]
 	if symbols == nil {
@@ -359,7 +353,7 @@ func (c *ResolverContext) RegisterModuleTypeSymbol(mod *module.Module, name stri
 	symbols[name] = t
 }
 
-// EmitDiagnostic records a diagnostic if it should be reported under the current config.
+// EmitDiagnostic records a diagnostic, filtered by the current config's severity and code rules.
 func (c *ResolverContext) EmitDiagnostic(code string, severity mib.Severity, moduleName string, line, col int, message string) {
 	if !c.diagConfig.ShouldReport(code, severity) {
 		return
@@ -374,17 +368,16 @@ func (c *ResolverContext) EmitDiagnostic(code string, severity mib.Severity, mod
 	})
 }
 
-// Diagnostics returns all collected diagnostics.
+// Diagnostics returns all diagnostics collected during resolution.
 func (c *ResolverContext) Diagnostics() []mib.Diagnostic {
 	return c.diagnostics
 }
 
-// DiagnosticConfig returns the diagnostic configuration.
+// DiagnosticConfig returns the active strictness and filtering configuration.
 func (c *ResolverContext) DiagnosticConfig() mib.DiagnosticConfig {
 	return c.diagConfig
 }
 
-// emitUnresolvedDiagnostic extracts the module name and emits a diagnostic.
 func (c *ResolverContext) emitUnresolvedDiagnostic(mod *module.Module, code string, severity mib.Severity, msg string) {
 	modName := ""
 	if mod != nil {
@@ -393,7 +386,7 @@ func (c *ResolverContext) emitUnresolvedDiagnostic(mod *module.Module, code stri
 	c.EmitDiagnostic(code, severity, modName, 0, 0, msg)
 }
 
-// RecordUnresolvedImport records an unresolved import.
+// RecordUnresolvedImport tracks a symbol that could not be resolved from its source module.
 func (c *ResolverContext) RecordUnresolvedImport(importingModule *module.Module, fromModule, symbol, reason string, span types.Span) {
 	c.unresolvedImports = append(c.unresolvedImports, unresolvedImport{
 		importingModule: importingModule,
@@ -410,7 +403,7 @@ func (c *ResolverContext) RecordUnresolvedImport(importingModule *module.Module,
 		"unresolved import: "+symbol+" from "+fromModule+" ("+reason+")")
 }
 
-// RecordUnresolvedType records an unresolved type reference.
+// RecordUnresolvedType tracks a type definition whose parent type could not be found.
 func (c *ResolverContext) RecordUnresolvedType(mod *module.Module, referrer, referenced string, span types.Span) {
 	c.unresolvedTypes = append(c.unresolvedTypes, unresolvedType{
 		module:     mod,
@@ -422,7 +415,7 @@ func (c *ResolverContext) RecordUnresolvedType(mod *module.Module, referrer, ref
 		"unresolved type: "+referrer+" references unknown type "+referenced)
 }
 
-// RecordUnresolvedOid records an unresolved OID component.
+// RecordUnresolvedOid tracks an OID definition whose parent component could not be resolved.
 func (c *ResolverContext) RecordUnresolvedOid(mod *module.Module, defName, component string, span types.Span) {
 	c.unresolvedOids = append(c.unresolvedOids, unresolvedOid{
 		module:     mod,
@@ -434,7 +427,7 @@ func (c *ResolverContext) RecordUnresolvedOid(mod *module.Module, defName, compo
 		"unresolved OID: "+defName+" references unknown parent "+component)
 }
 
-// RecordUnresolvedIndex records an unresolved index object.
+// RecordUnresolvedIndex tracks a row's INDEX entry that references a missing object.
 func (c *ResolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexObject string, span types.Span) {
 	c.unresolvedIndexes = append(c.unresolvedIndexes, unresolvedIndex{
 		module:      mod,
@@ -446,7 +439,7 @@ func (c *ResolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexOb
 		"unresolved INDEX: "+row+" references unknown object "+indexObject)
 }
 
-// RecordUnresolvedNotificationObject records an unresolved notification object reference.
+// RecordUnresolvedNotificationObject tracks a notification's OBJECTS entry that references a missing object.
 func (c *ResolverContext) RecordUnresolvedNotificationObject(mod *module.Module, notification, object string, span types.Span) {
 	c.unresolvedNotifObjects = append(c.unresolvedNotifObjects, unresolvedNotifObject{
 		module:       mod,
@@ -458,14 +451,14 @@ func (c *ResolverContext) RecordUnresolvedNotificationObject(mod *module.Module,
 		"unresolved OBJECTS: "+notification+" references unknown object "+object)
 }
 
-// DropModules drops modules to free memory after resolution.
+// DropModules releases parsed module data to free memory after resolution completes.
 func (c *ResolverContext) DropModules() {
 	c.Modules = nil
 	c.ModuleIndex = nil
 	c.ModuleDefNames = nil
 }
 
-// FinalizeUnresolved copies unresolved references and diagnostics to the Mib.
+// FinalizeUnresolved copies collected unresolved references and diagnostics into the Mib builder.
 func (c *ResolverContext) FinalizeUnresolved() {
 	for _, u := range c.unresolvedImports {
 		modName := ""
@@ -501,7 +494,6 @@ func (c *ResolverContext) FinalizeUnresolved() {
 		})
 	}
 
-	// Copy diagnostics to the Mib
 	for _, d := range c.diagnostics {
 		c.Builder.AddDiagnostic(d)
 	}

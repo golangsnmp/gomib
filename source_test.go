@@ -11,15 +11,12 @@ import (
 	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
-// === Dir Source error cases ===
-
 func TestDirNonExistentPath(t *testing.T) {
 	_, err := Dir("/this/path/does/not/exist/at/all")
 	testutil.Error(t, err, "Dir with non-existent path should fail")
 }
 
 func TestDirNotADirectory(t *testing.T) {
-	// Use a known file, not a directory
 	_, err := Dir("testdata/corpus/primary/ietf/IF-MIB.mib")
 	testutil.Error(t, err, "Dir with a file path should fail")
 }
@@ -40,8 +37,6 @@ func TestMustDirSucceeds(t *testing.T) {
 	testutil.NoError(t, err, "ListFiles")
 	testutil.Greater(t, len(files), 0, "should list files")
 }
-
-// === DirTree Source error cases ===
 
 func TestDirTreeNonExistentPath(t *testing.T) {
 	_, err := DirTree("/this/path/does/not/exist/at/all")
@@ -70,8 +65,6 @@ func TestMustDirTreeSucceeds(t *testing.T) {
 	testutil.Greater(t, len(files), 10, "should list many files")
 }
 
-// === Dir Source Find ===
-
 func TestDirSourceFindExisting(t *testing.T) {
 	src, err := Dir("testdata/corpus/primary/ietf")
 	testutil.NoError(t, err, "Dir")
@@ -94,13 +87,10 @@ func TestDirSourceFindNotExist(t *testing.T) {
 	testutil.True(t, err == fs.ErrNotExist, "error should be fs.ErrNotExist, got %v", err)
 }
 
-// === DirTree Source Find ===
-
 func TestDirTreeSourceFindAcrossSubdirs(t *testing.T) {
 	src, err := DirTree("testdata/corpus/primary")
 	testutil.NoError(t, err, "DirTree")
 
-	// IF-MIB is in ietf/ subdirectory
 	result, err := src.Find("IF-MIB")
 	testutil.NoError(t, err, "Find IF-MIB across subdirs")
 	testutil.NotNil(t, result.Reader, "Reader should not be nil")
@@ -118,10 +108,7 @@ func TestDirTreeSourceFindNotExist(t *testing.T) {
 	testutil.True(t, err == fs.ErrNotExist, "error should be fs.ErrNotExist")
 }
 
-// === FS Source ===
-
 func TestFSSource(t *testing.T) {
-	// Create an in-memory filesystem with a minimal MIB
 	mibContent := `TEST-FS-MIB DEFINITIONS ::= BEGIN
 IMPORTS
     MODULE-IDENTITY, enterprises
@@ -142,14 +129,12 @@ END
 
 	src := FS("test-fs", memFS)
 
-	// Find should work
 	result, err := src.Find("TEST-FS-MIB")
 	testutil.NoError(t, err, "Find TEST-FS-MIB in FS source")
 	testutil.NotNil(t, result.Reader, "Reader should not be nil")
 	_ = result.Reader.Close()
 	testutil.Contains(t, result.Path, "test-fs:", "Path should contain FS name prefix")
 
-	// ListFiles should work
 	files, err := src.ListFiles()
 	testutil.NoError(t, err, "ListFiles")
 	testutil.Equal(t, 1, len(files), "should list 1 file")
@@ -176,7 +161,6 @@ func TestFSSourceListFilesEmpty(t *testing.T) {
 }
 
 func TestFSSourceWithLoad(t *testing.T) {
-	// Verify FS source integrates with Load/LoadModules
 	mibContent := `TEST-FS-LOAD-MIB DEFINITIONS ::= BEGIN
 IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
@@ -210,10 +194,7 @@ END
 	testutil.NotNil(t, obj, "testFsScalar should resolve from FS source")
 }
 
-// === Multi Source ===
-
 func TestMultiSourceFindOrder(t *testing.T) {
-	// Multi should return the first match
 	src1, err := Dir("testdata/corpus/primary/ietf")
 	testutil.NoError(t, err, "Dir ietf")
 
@@ -222,7 +203,6 @@ func TestMultiSourceFindOrder(t *testing.T) {
 
 	multi := Multi(src1, src2)
 
-	// IF-MIB is only in ietf/, so it should be found
 	result, err := multi.Find("IF-MIB")
 	testutil.NoError(t, err, "Find IF-MIB from multi source")
 	_ = result.Reader.Close()
@@ -240,7 +220,6 @@ func TestMultiSourceListFilesCombines(t *testing.T) {
 	files, err := multi.ListFiles()
 	testutil.NoError(t, err, "ListFiles")
 
-	// Should have files from both sources
 	files1, _ := src1.ListFiles()
 	files2, _ := src2.ListFiles()
 	testutil.Equal(t, len(files1)+len(files2), len(files),
@@ -256,10 +235,7 @@ func TestMultiSourceFindNotExist(t *testing.T) {
 	testutil.True(t, err == fs.ErrNotExist, "Multi.Find should return fs.ErrNotExist")
 }
 
-// === WithExtensions ===
-
 func TestWithExtensions(t *testing.T) {
-	// Create a temp dir with a .custom extension file
 	tmpDir := t.TempDir()
 	content := `EXT-TEST-MIB DEFINITIONS ::= BEGIN
 IMPORTS MODULE-IDENTITY, enterprises FROM SNMPv2-SMI;
@@ -274,14 +250,12 @@ END
 	err := os.WriteFile(filepath.Join(tmpDir, "EXT-TEST-MIB.custom"), []byte(content), 0644)
 	testutil.NoError(t, err, "write test file")
 
-	// Default extensions should NOT find .custom files
 	srcDefault, err := Dir(tmpDir)
 	testutil.NoError(t, err, "Dir default")
 	files, err := srcDefault.ListFiles()
 	testutil.NoError(t, err, "ListFiles default")
 	testutil.Equal(t, 0, len(files), "default extensions should not find .custom files")
 
-	// Custom extensions should find .custom files
 	srcCustom, err := Dir(tmpDir, WithExtensions(".custom"))
 	testutil.NoError(t, err, "Dir custom")
 	files, err = srcCustom.ListFiles()
@@ -289,23 +263,17 @@ END
 	testutil.Equal(t, 1, len(files), "custom extensions should find .custom files")
 }
 
-// === WithNoHeuristic ===
-
 func TestWithNoHeuristicLoadsNonMIBContent(t *testing.T) {
-	// Create a temp dir with a file that doesn't look like MIB content
 	tmpDir := t.TempDir()
 	err := os.WriteFile(filepath.Join(tmpDir, "NOT-A-MIB.mib"), []byte("this is not a MIB file"), 0644)
 	testutil.NoError(t, err, "write test file")
 
-	// With heuristic (default), the file should be listed but rejected during parse
 	src, err := Dir(tmpDir)
 	testutil.NoError(t, err, "Dir")
 	files, err := src.ListFiles()
 	testutil.NoError(t, err, "ListFiles")
 	testutil.Equal(t, 1, len(files), "file should be listed (heuristic is checked at load time, not list time)")
 }
-
-// === Context cancellation ===
 
 func TestLoadContextCancellation(t *testing.T) {
 	src, err := DirTree("testdata/corpus/primary")
@@ -341,8 +309,6 @@ func TestLoadModulesContextCancellation(t *testing.T) {
 	}
 }
 
-// === Heuristic content detection ===
-
 func TestHeuristicLooksLikeMIBContent(t *testing.T) {
 	h := defaultHeuristic()
 
@@ -375,22 +341,14 @@ func TestHeuristicDisabled(t *testing.T) {
 	h := defaultHeuristic()
 	h.enabled = false
 
-	// With heuristic disabled, everything (except empty) should pass
 	if !h.looksLikeMIBContent([]byte("total garbage")) {
 		t.Error("disabled heuristic should accept anything non-empty")
 	}
-	// But empty is still rejected (check is before enabled check)
-	// Actually looking at the code: if !h.enabled { return true }
-	// comes first, then len check. So disabled + empty = true.
+	// When disabled, the early return bypasses the length check
 	if !h.looksLikeMIBContent([]byte("")) {
-		// Actually, let me check: the empty check is AFTER the enabled check.
-		// Code: if !h.enabled { return true } then if len == 0 { return false }
-		// So disabled heuristic returns true for empty content too.
 		t.Error("disabled heuristic should return true even for empty content")
 	}
 }
-
-// === moduleNameFromPath ===
 
 func TestModuleNameFromPath(t *testing.T) {
 	tests := []struct {
@@ -416,15 +374,12 @@ func TestModuleNameFromPath(t *testing.T) {
 	}
 }
 
-// === DefaultExtensions ===
-
 func TestDefaultExtensions(t *testing.T) {
 	exts := DefaultExtensions()
 	if len(exts) == 0 {
 		t.Fatal("DefaultExtensions should return non-empty list")
 	}
 
-	// Should include common MIB extensions
 	extSet := make(map[string]bool)
 	for _, ext := range exts {
 		extSet[ext] = true
@@ -433,8 +388,6 @@ func TestDefaultExtensions(t *testing.T) {
 	testutil.True(t, extSet[""], "should include empty string (extensionless files)")
 	testutil.True(t, extSet[".mib"], "should include .mib")
 }
-
-// === Load edge cases ===
 
 func TestLoadEmptyDirProducesEmptyMib(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -445,7 +398,6 @@ func TestLoadEmptyDirProducesEmptyMib(t *testing.T) {
 	m, err := Load(ctx, src)
 	testutil.NoError(t, err, "Load from empty dir should succeed")
 	testutil.NotNil(t, m, "should return non-nil Mib")
-	// No user modules loaded, but base modules should exist
 	testutil.Equal(t, 0, m.ObjectCount(), "empty source should have no user objects")
 }
 
@@ -470,8 +422,6 @@ func TestLoadModulesEmptyList(t *testing.T) {
 	testutil.NoError(t, err, "LoadModules with empty list should succeed")
 	testutil.NotNil(t, m, "should return non-nil Mib")
 }
-
-// === ErrNoSources ===
 
 func TestLoadModulesNilSource(t *testing.T) {
 	ctx := context.Background()

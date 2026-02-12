@@ -49,7 +49,6 @@ Options:
 		return 1
 	}
 
-	// Generate one fixture per module
 	for _, mod := range modules {
 		filtered := filterByModules(netsnmpNodes, []string{mod})
 		if len(filtered) == 0 {
@@ -70,7 +69,6 @@ Options:
 			return compareOIDStrings(a.oid, b.oid)
 		})
 
-		// Build ordered map for JSON
 		ordered := make(map[string]*NormalizedNode, len(sorted))
 		for _, s := range sorted {
 			ordered[s.oid] = s.node
@@ -116,7 +114,6 @@ func compareOIDStrings(a, b string) int {
 	return len(aArcs) - len(bArcs)
 }
 
-// parseOIDArcs splits a dotted OID string into integer arcs.
 func parseOIDArcs(s string) []int {
 	var arcs []int
 	n := 0

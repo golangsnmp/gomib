@@ -7,8 +7,6 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// === Compliance collection access ===
-
 func TestComplianceCount(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -62,8 +60,6 @@ func TestModuleComplianceLookup(t *testing.T) {
 		"non-existent compliance should return nil")
 }
 
-// === FindCompliance lookups ===
-
 func TestFindComplianceByName(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -83,7 +79,6 @@ func TestFindComplianceByQualifiedName(t *testing.T) {
 		testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
 	}
 
-	// Wrong module
 	testutil.Nil(t, m.FindCompliance("IF-MIB::snmpBasicComplianceRev2"),
 		"snmpBasicComplianceRev2 should not be in IF-MIB")
 }
@@ -96,14 +91,12 @@ func TestFindComplianceByOID(t *testing.T) {
 
 	oid := c.OID().String()
 
-	// Numeric OID lookup
 	c2 := m.FindCompliance(oid)
 	testutil.NotNil(t, c2, "FindCompliance by numeric OID %s should work", oid)
 	if c2 != nil {
 		testutil.Equal(t, "snmpBasicComplianceRev2", c2.Name(), "compliance found by OID")
 	}
 
-	// Dotted OID lookup
 	c3 := m.FindCompliance("." + oid)
 	testutil.NotNil(t, c3, "FindCompliance by dotted OID .%s should work", oid)
 }
@@ -119,8 +112,6 @@ func TestFindComplianceNotFound(t *testing.T) {
 		"non-existent module should return nil")
 }
 
-// === Compliance metadata ===
-
 func TestComplianceMetadata(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -129,10 +120,8 @@ func TestComplianceMetadata(t *testing.T) {
 		t.Fatal("snmpBasicComplianceRev2 not found")
 	}
 
-	// Name
 	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
 
-	// Node
 	node := c.Node()
 	testutil.NotNil(t, node, "Compliance.Node() should not be nil")
 	if node != nil {
@@ -140,21 +129,17 @@ func TestComplianceMetadata(t *testing.T) {
 		testutil.Equal(t, mib.KindCompliance, node.Kind(), "node kind should be KindCompliance")
 	}
 
-	// Module
 	mod := c.Module()
 	testutil.NotNil(t, mod, "Compliance.Module() should not be nil")
 	if mod != nil {
 		testutil.Equal(t, "SNMPv2-MIB", mod.Name(), "compliance module")
 	}
 
-	// OID
 	oid := c.OID()
 	testutil.Greater(t, len(oid), 0, "compliance OID should not be empty")
 
-	// Status
 	testutil.Equal(t, mib.StatusCurrent, c.Status(), "snmpBasicComplianceRev2 should be current")
 
-	// Description
 	desc := c.Description()
 	testutil.Greater(t, len(desc), 0, "snmpBasicComplianceRev2 should have a description")
 }
@@ -168,8 +153,6 @@ func TestDeprecatedCompliance(t *testing.T) {
 	testutil.Equal(t, mib.StatusDeprecated, c.Status(),
 		"snmpBasicCompliance should be deprecated")
 }
-
-// === Compliance modules (MODULE clauses) ===
 
 func TestComplianceModules(t *testing.T) {
 	m := loadTestMIB(t)
@@ -205,12 +188,9 @@ func TestComplianceModules(t *testing.T) {
 		"should have 2 GROUP refinements")
 }
 
-// === Node.Compliance() ===
-
 func TestNodeCompliance(t *testing.T) {
 	m := loadTestMIB(t)
 
-	// Compliance node should have associated compliance
 	node := m.FindNode("snmpBasicComplianceRev2")
 	if node == nil {
 		t.Fatal("snmpBasicComplianceRev2 node not found")
@@ -222,15 +202,12 @@ func TestNodeCompliance(t *testing.T) {
 		testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "node Compliance() name")
 	}
 
-	// Non-compliance node should return nil
 	ifIndex := m.FindNode("ifIndex")
 	if ifIndex == nil {
 		t.Fatal("ifIndex not found")
 	}
 	testutil.Nil(t, ifIndex.Compliance(), "ifIndex should not have a Compliance()")
 }
-
-// === Node.Module() for compliance nodes ===
 
 func TestComplianceNodeModule(t *testing.T) {
 	m := loadTestMIB(t)

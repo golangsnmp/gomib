@@ -1,6 +1,5 @@
 package lexer
 
-// keywords maps keyword text to token kind.
 var keywords = map[string]TokenKind{
 	"ACCESS":             TokKwAccess,
 	"AGENT-CAPABILITIES": TokKwAgentCapabilities,
@@ -88,7 +87,8 @@ var keywords = map[string]TokenKind{
 	"write-only":            TokKwWriteOnly,
 }
 
-// LookupKeyword returns the TokenKind for a keyword, or (TokError, false) if not found.
+// LookupKeyword resolves a keyword string to its token kind.
+// Returns (TokError, false) if the text is not a recognized keyword.
 func LookupKeyword(text string) (TokenKind, bool) {
 	kind, ok := keywords[text]
 	if !ok {
@@ -97,7 +97,7 @@ func LookupKeyword(text string) (TokenKind, bool) {
 	return kind, true
 }
 
-// forbiddenKeywords is the set of forbidden ASN.1 keywords.
+// ASN.1 reserved keywords that must not be used as identifiers in MIBs.
 var forbiddenKeywords = map[string]struct{}{
 	"ABSENT":         {},
 	"ANY":            {},
@@ -127,7 +127,7 @@ var forbiddenKeywords = map[string]struct{}{
 	"WITH":           {},
 }
 
-// IsForbiddenKeyword returns true if the text is a forbidden ASN.1 keyword.
+// IsForbiddenKeyword reports whether text is a reserved ASN.1 keyword.
 func IsForbiddenKeyword(text string) bool {
 	_, ok := forbiddenKeywords[text]
 	return ok

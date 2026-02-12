@@ -27,15 +27,14 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// resolver resolves modules into a Mib.
 type resolver struct {
 	types.Logger
 	diagConfig mib.DiagnosticConfig
 }
 
-// Resolve resolves parsed modules into a Mib.
-// If logger is nil, logging is disabled (zero overhead).
-// If diagConfig is nil, defaults to Normal strictness.
+// Resolve transforms parsed modules into a fully resolved Mib.
+// If logger is nil, logging is disabled. If diagConfig is nil,
+// defaults to Normal strictness.
 func Resolve(mods []*module.Module, logger *slog.Logger, diagConfig *mib.DiagnosticConfig) mib.Mib {
 	cfg := mib.DefaultConfig()
 	if diagConfig != nil {
@@ -45,7 +44,6 @@ func Resolve(mods []*module.Module, logger *slog.Logger, diagConfig *mib.Diagnos
 	return r.resolve(mods)
 }
 
-// resolve resolves modules into a Mib.
 func (r *resolver) resolve(mods []*module.Module) mib.Mib {
 	ctx := newResolverContext(mods, r.L, r.diagConfig)
 
@@ -76,10 +74,8 @@ func (r *resolver) resolve(mods []*module.Module) mib.Mib {
 
 	ctx.DropModules()
 
-	// Finalize unresolved references
 	ctx.FinalizeUnresolved()
 
-	// Log warnings for unresolved references
 	if len(ctx.unresolvedImports) > 0 {
 		r.Log(slog.LevelWarn, "unresolved imports",
 			slog.Int("count", len(ctx.unresolvedImports)))

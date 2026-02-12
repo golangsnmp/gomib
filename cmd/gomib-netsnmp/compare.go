@@ -102,7 +102,6 @@ Options:
 	}
 	defer cleanup()
 
-	// Progress to stderr, results to out
 	fmt.Fprintln(os.Stderr, "Loading MIBs with net-snmp...")
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, modules)
 	if err != nil {
@@ -117,7 +116,6 @@ Options:
 		return 1
 	}
 
-	// Filter by modules if specified
 	if len(modules) > 0 {
 		netsnmpNodes = filterByModules(netsnmpNodes, modules)
 		gomibNodes = filterByModules(gomibNodes, modules)
@@ -127,7 +125,6 @@ Options:
 
 	result := compareNodes(netsnmpNodes, gomibNodes)
 
-	// Filter mismatches by field if requested
 	if fieldFilter != "" {
 		var filtered []Mismatch
 		for _, m := range result.Mismatches {
@@ -176,7 +173,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 		TotalGomib:   len(gomib),
 	}
 
-	// Find all OIDs
 	allOIDs := make(map[string]bool)
 	for oid := range netsnmp {
 		allOIDs[oid] = true
@@ -200,7 +196,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 
 		result.MatchedNodes++
 
-		// Compare type (using normalized forms for semantic equivalence)
 		if nsNode.Type != "" && nsNode.Type != "OTHER" && nsNode.Type != "UNKNOWN" {
 			if typesEquivalent(gNode.Type, nsNode.Type) {
 				result.Summary.Type.Match++
@@ -210,7 +205,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare access
 		if nsNode.Access != "" {
 			if gNode.Access == nsNode.Access {
 				result.Summary.Access.Match++
@@ -220,7 +214,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare status
 		if nsNode.Status != "" {
 			if gNode.Status == nsNode.Status {
 				result.Summary.Status.Match++
@@ -230,7 +223,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare enums
 		if len(nsNode.EnumValues) > 0 {
 			if enumsEqual(nsNode.EnumValues, gNode.EnumValues) {
 				result.Summary.Enums.Match++
@@ -240,7 +232,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare indexes
 		if len(nsNode.Indexes) > 0 {
 			if indexesEqual(nsNode.Indexes, gNode.Indexes) {
 				result.Summary.Index.Match++
@@ -250,7 +241,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare display hint
 		if nsNode.Hint != "" {
 			if hintsEquivalent(gNode.Hint, nsNode.Hint) {
 				result.Summary.Hint.Match++
@@ -260,7 +250,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare TC name
 		if nsNode.TCName != "" {
 			if gNode.TCName == nsNode.TCName {
 				result.Summary.TCName.Match++
@@ -270,7 +259,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare units
 		if nsNode.Units != "" {
 			if gNode.Units == nsNode.Units {
 				result.Summary.Units.Match++
@@ -280,7 +268,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare ranges
 		if len(nsNode.Ranges) > 0 {
 			if rangesEqual(nsNode.Ranges, gNode.Ranges) {
 				result.Summary.Ranges.Match++
@@ -290,7 +277,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare default value
 		if nsNode.DefaultValue != "" {
 			if defaultValuesEquivalent(gNode.DefaultValue, nsNode.DefaultValue) {
 				result.Summary.DefaultValue.Match++
@@ -300,7 +286,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare BITS values
 		if len(nsNode.BitValues) > 0 {
 			if enumsEqual(nsNode.BitValues, gNode.BitValues) {
 				result.Summary.Bits.Match++
@@ -310,7 +295,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 			}
 		}
 
-		// Compare varbinds (notification OBJECTS)
 		if len(nsNode.Varbinds) > 0 {
 			if varbindsEqual(nsNode.Varbinds, gNode.Varbinds) {
 				result.Summary.Varbinds.Match++
@@ -340,37 +324,26 @@ func typesEquivalent(a, b string) bool {
 // normalizeTypeName maps type names to canonical forms for comparison.
 func normalizeTypeName(t string) string {
 	switch t {
-	// INTEGER and Integer32 are semantically equivalent
 	case "INTEGER", "Integer32":
 		return "Integer32"
-	// Counter and Counter32 are equivalent
 	case "COUNTER", "Counter", "Counter32":
 		return "Counter32"
-	// Gauge and Gauge32 are equivalent
 	case "GAUGE", "Gauge", "Gauge32":
 		return "Gauge32"
-	// Unsigned32 variations
 	case "UNSIGNED32", "Unsigned32", "UInteger32":
 		return "Unsigned32"
-	// TimeTicks variations
 	case "TIMETICKS", "TimeTicks":
 		return "TimeTicks"
-	// IpAddress variations
 	case "IPADDR", "IpAddress":
 		return "IpAddress"
-	// OctetString variations
 	case "OCTETSTR", "OCTET STRING", "OctetString":
 		return "OCTET STRING"
-	// ObjectIdentifier variations
 	case "OBJID", "OBJECT IDENTIFIER", "ObjectIdentifier":
 		return "OBJECT IDENTIFIER"
-	// Counter64 variations
 	case "COUNTER64", "Counter64":
 		return "Counter64"
-	// BITS variations
 	case "BITS", "BITSTRING":
 		return "BITS"
-	// Opaque variations
 	case "OPAQUE", "Opaque":
 		return "Opaque"
 	default:
@@ -407,7 +380,6 @@ func hintsEquivalent(a, b string) bool {
 	if a == b {
 		return true
 	}
-	// Normalize common variations (whitespace, case for hex digits)
 	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
@@ -446,24 +418,20 @@ func defaultValuesEquivalent(a, b string) bool {
 	if a == b {
 		return true
 	}
-	// Normalize: strip quotes, whitespace
 	aNorm := strings.Trim(strings.TrimSpace(a), "\"'")
 	bNorm := strings.Trim(strings.TrimSpace(b), "\"'")
 	if aNorm == bNorm {
 		return true
 	}
 
-	// Check hex zeros equivalence: 0x0000... == 0
 	if hexZerosEquivalent(aNorm, bNorm) {
 		return true
 	}
 
-	// Check hex all-ones equivalence: 0xFFFF... == -1 (signed interpretation)
 	if hexOnesEquivalent(aNorm, bNorm) {
 		return true
 	}
 
-	// Check OID symbolic equivalence: 0.0 == zeroDotZero, etc.
 	if oidSymbolicEquivalent(aNorm, bNorm) {
 		return true
 	}
@@ -518,7 +486,6 @@ func isHexZeros(s string) bool {
 // oidSymbolicEquivalent checks if two OID representations are equivalent.
 // Handles numeric OID vs well-known symbolic names.
 func oidSymbolicEquivalent(a, b string) bool {
-	// Well-known OID symbolic names and their numeric equivalents
 	knownOIDs := map[string]string{
 		"zeroDotZero":              "0.0",
 		"snmpUDPDomain":            "1.3.6.1.6.1.1",
@@ -532,7 +499,6 @@ func oidSymbolicEquivalent(a, b string) bool {
 		"sysUpTimeInstance":        "1.3.6.1.2.1.1.3.0",
 	}
 
-	// Check if one is a known symbol and the other is its numeric form
 	if numeric, ok := knownOIDs[a]; ok && numeric == b {
 		return true
 	}
@@ -540,17 +506,14 @@ func oidSymbolicEquivalent(a, b string) bool {
 		return true
 	}
 
-	// Check pattern: if one looks like a numeric OID and the other is a symbol
-	// that might resolve to it (heuristic for vendor-specific OIDs)
+	// Heuristic for vendor-specific OIDs not in the known list
 	aIsNumeric := isNumericOID(a)
 	bIsNumeric := isNumericOID(b)
 
 	if aIsNumeric && !bIsNumeric && isLikelyOIDSymbol(b) {
-		// a is numeric, b is symbolic - likely equivalent
 		return true
 	}
 	if bIsNumeric && !aIsNumeric && isLikelyOIDSymbol(a) {
-		// b is numeric, a is symbolic - likely equivalent
 		return true
 	}
 
@@ -577,15 +540,12 @@ func isLikelyOIDSymbol(s string) bool {
 	if s == "" {
 		return false
 	}
-	// Must start with a letter
 	if (s[0] < 'a' || s[0] > 'z') && (s[0] < 'A' || s[0] > 'Z') {
 		return false
 	}
-	// Should not contain dots (that would be a numeric OID)
 	if strings.Contains(s, ".") {
 		return false
 	}
-	// Should be alphanumeric (possibly with some special chars)
 	for _, c := range s {
 		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '-' && c != '_' {
 			return false
@@ -594,7 +554,6 @@ func isLikelyOIDSymbol(s string) bool {
 	return true
 }
 
-// varbindsEqual checks if two varbind lists are equivalent.
 func varbindsEqual(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -652,14 +611,12 @@ func printComparisonResult(w io.Writer, result *ComparisonResult, exampleLimit i
 	printFieldAccuracy(w, "varbinds", result.Summary.Varbinds)
 
 	if len(result.Mismatches) > 0 {
-		// Count benign vs investigate
 		benign, investigate := countBenignAndInvestigate(result.Mismatches)
 		fmt.Fprintf(w, "\nMismatch classification:\n")
 		fmt.Fprintf(w, "  total:       %6d\n", len(result.Mismatches))
 		fmt.Fprintf(w, "  benign:      %6d  (known representation differences)\n", benign)
 		fmt.Fprintf(w, "  investigate: %6d  (potential real issues)\n", investigate)
 
-		// Group mismatches by field type
 		byField := make(map[string][]Mismatch)
 		for _, m := range result.Mismatches {
 			byField[m.Field] = append(byField[m.Field], m)
@@ -733,11 +690,9 @@ type MismatchCategory struct {
 	Mismatches  []Mismatch
 }
 
-// printCategorizedMismatches prints mismatches grouped by likely cause.
 func printCategorizedMismatches(w io.Writer, field string, mismatches []Mismatch, limit int, investigateOnly bool) {
 	categories := categorizeMismatches(field, mismatches)
 
-	// Count what we'll show
 	var totalToShow int
 	for _, cat := range categories {
 		if investigateOnly && cat.Benign {
@@ -787,7 +742,6 @@ func printCategorizedMismatches(w io.Writer, field string, mismatches []Mismatch
 	}
 }
 
-// categorizeMismatches groups mismatches by likely cause based on field type.
 func categorizeMismatches(field string, mismatches []Mismatch) []MismatchCategory {
 	switch field {
 	case "ranges":
@@ -811,7 +765,6 @@ func categorizeMismatches(field string, mismatches []Mismatch) []MismatchCategor
 	}
 }
 
-// countBenignAndInvestigate counts mismatches by benign status across all fields.
 func countBenignAndInvestigate(mismatches []Mismatch) (benign, investigate int) {
 	byField := make(map[string][]Mismatch)
 	for _, m := range mismatches {
@@ -835,7 +788,6 @@ func categorizeRanges(mismatches []Mismatch) []MismatchCategory {
 	var overlap, signedUnsigned, countDiff, valueDiff, other []Mismatch
 
 	for _, m := range mismatches {
-		// Check for overlapping definitions first
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
 			overlap = append(overlap, m)
 			continue
@@ -843,7 +795,6 @@ func categorizeRanges(mismatches []Mismatch) []MismatchCategory {
 
 		switch {
 		case isSignedUnsignedDiff(m.Gomib, m.NetSnmp):
-			// net-snmp shows signed interpretation of unsigned values
 			signedUnsigned = append(signedUnsigned, m)
 		case countRanges(m.Gomib) != countRanges(m.NetSnmp):
 			countDiff = append(countDiff, m)
@@ -867,38 +818,31 @@ func categorizeDefval(mismatches []Mismatch) []MismatchCategory {
 	var overlap, quoteDiff, hexZeros, hexDiff, oidSymbolic, enumDiff, emptyVsValue, spaceDiff, other []Mismatch
 
 	for _, m := range mismatches {
-		// Check for overlapping definitions first
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
 			overlap = append(overlap, m)
 			continue
 		}
 
-		// Normalize: strip all quote escaping and outer quotes
 		gNorm := normalizeDefval(m.Gomib)
 		nNorm := normalizeDefval(m.NetSnmp)
 
 		switch {
 		case gNorm == nNorm:
-			// Only differs by quoting/escaping
 			quoteDiff = append(quoteDiff, m)
 		case strings.ReplaceAll(gNorm, " ", "") == strings.ReplaceAll(nNorm, " ", ""):
-			// Only differs by whitespace
 			spaceDiff = append(spaceDiff, m)
 		case gNorm == "" && nNorm != "":
 			emptyVsValue = append(emptyVsValue, m)
 		case nNorm == "" && gNorm != "":
 			emptyVsValue = append(emptyVsValue, m)
 		case isHexZeroDiff(m.Gomib, m.NetSnmp):
-			// gomib shows 0x0000... net-snmp shows 0
 			hexZeros = append(hexZeros, m)
 		case strings.HasPrefix(m.Gomib, "0x") || strings.HasPrefix(m.NetSnmp, "0x") ||
 			strings.Contains(m.Gomib, "'H") || strings.Contains(m.NetSnmp, "'H"):
 			hexDiff = append(hexDiff, m)
 		case isOidSymbolicDiff(m.Gomib, m.NetSnmp):
-			// gomib shows numeric OID, net-snmp shows symbolic name
 			oidSymbolic = append(oidSymbolic, m)
 		case strings.Contains(m.Gomib, "(") || strings.Contains(m.NetSnmp, "("):
-			// Enum name vs value
 			enumDiff = append(enumDiff, m)
 		default:
 			other = append(other, m)
@@ -920,28 +864,23 @@ func categorizeDefval(mismatches []Mismatch) []MismatchCategory {
 
 // isHexZeroDiff checks if gomib shows 0x0000... and net-snmp shows "0".
 func isHexZeroDiff(gomib, netsnmp string) bool {
-	// gomib shows hex zeros like 0x00000000...
 	if !strings.HasPrefix(gomib, "0x") {
 		return false
 	}
-	// Check if all hex digits are zeros
 	hexPart := strings.TrimPrefix(gomib, "0x")
 	for _, c := range hexPart {
 		if c != '0' {
 			return false
 		}
 	}
-	// net-snmp shows just "0"
 	return netsnmp == "0"
 }
 
 // isOidSymbolicDiff checks if gomib shows numeric OID and net-snmp shows symbolic name.
 func isOidSymbolicDiff(gomib, netsnmp string) bool {
-	// gomib shows numeric OID like "0.0" or "1.3.6.1..."
 	if !strings.Contains(gomib, ".") {
 		return false
 	}
-	// Check if gomib looks like a numeric OID (digits and dots only)
 	isNumericOID := true
 	for _, c := range gomib {
 		if c != '.' && (c < '0' || c > '9') {
@@ -952,7 +891,6 @@ func isOidSymbolicDiff(gomib, netsnmp string) bool {
 	if !isNumericOID {
 		return false
 	}
-	// net-snmp shows symbolic name (no dots, contains letters)
 	hasLetter := false
 	for _, c := range netsnmp {
 		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
@@ -965,11 +903,8 @@ func isOidSymbolicDiff(gomib, netsnmp string) bool {
 
 // normalizeDefval removes quoting/escaping to get the semantic value.
 func normalizeDefval(s string) string {
-	// Remove escaped quotes: \" -> "
 	s = strings.ReplaceAll(s, "\\\"", "\"")
-	// Remove backslash escapes
 	s = strings.ReplaceAll(s, "\\\\", "\\")
-	// Trim outer quotes
 	s = strings.Trim(strings.TrimSpace(s), "\"'")
 	return s
 }
@@ -978,7 +913,6 @@ func categorizeStatus(mismatches []Mismatch) []MismatchCategory {
 	var overlap, deprecatedObsolete, currentMandatory, other []Mismatch
 
 	for _, m := range mismatches {
-		// Check for overlapping definitions first
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
 			overlap = append(overlap, m)
 			continue
@@ -1007,7 +941,6 @@ func categorizeAccess(mismatches []Mismatch) []MismatchCategory {
 	var overlap, rwCreate, naReadOnly, other []Mismatch
 
 	for _, m := range mismatches {
-		// Check for overlapping definitions first
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
 			overlap = append(overlap, m)
 			continue
@@ -1036,7 +969,6 @@ func categorizeType(mismatches []Mismatch) []MismatchCategory {
 	var overlap, networkAddr, intVariants, other []Mismatch
 
 	for _, m := range mismatches {
-		// Check for overlapping definitions first
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
 			overlap = append(overlap, m)
 			continue
@@ -1065,7 +997,6 @@ func categorizeEnums(mismatches []Mismatch) []MismatchCategory {
 	var overlap, gomibMoreValues, netsnmpMoreValues, valueDiff, other []Mismatch
 
 	for _, m := range mismatches {
-		// Check for overlapping definitions (different modules for same OID)
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
 			overlap = append(overlap, m)
 			continue
@@ -1075,10 +1006,8 @@ func categorizeEnums(mismatches []Mismatch) []MismatchCategory {
 		nCount := strings.Count(m.NetSnmp, "(")
 		switch {
 		case gCount > nCount:
-			// gomib has more enum values
 			gomibMoreValues = append(gomibMoreValues, m)
 		case nCount > gCount:
-			// net-snmp has more enum values
 			netsnmpMoreValues = append(netsnmpMoreValues, m)
 		case gCount != nCount:
 			other = append(other, m)
@@ -1111,13 +1040,10 @@ func categorizeVarbinds(mismatches []Mismatch) []MismatchCategory {
 
 		switch {
 		case nCount > gCount:
-			// net-snmp has more OBJECTS (possibly unresolved refs gomib excludes)
 			netsnmpMore = append(netsnmpMore, m)
 		case gCount > nCount:
-			// gomib has more OBJECTS
 			gomibMore = append(gomibMore, m)
 		case gCount == nCount && gCount > 0:
-			// Same count but different names
 			different = append(different, m)
 		default:
 			other = append(other, m)
@@ -1147,13 +1073,10 @@ func categorizeIndex(mismatches []Mismatch) []MismatchCategory {
 
 		switch {
 		case nCount > gCount:
-			// net-snmp has more INDEX items (possibly unresolved refs gomib excludes)
 			netsnmpMore = append(netsnmpMore, m)
 		case gCount > nCount:
-			// gomib has more INDEX items
 			gomibMore = append(gomibMore, m)
 		case gCount == nCount && gCount > 0:
-			// Same count but different names
 			different = append(different, m)
 		default:
 			other = append(other, m)
@@ -1175,7 +1098,6 @@ func countRanges(s string) int {
 // isSignedUnsignedDiff checks if the range difference is due to signed vs unsigned interpretation.
 // Examples: "4294967295" vs "-1", "4294967294" vs "-2", "2147483648" vs "-2147483648"
 func isSignedUnsignedDiff(gomib, netsnmp string) bool {
-	// Quick check: net-snmp must contain a negative number
 	if !strings.Contains(netsnmp, "-") {
 		return false
 	}

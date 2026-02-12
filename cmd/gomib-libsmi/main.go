@@ -116,7 +116,6 @@ func run() int {
 	}
 }
 
-// getOutput returns the output writer based on -o flag.
 func getOutput() (*os.File, func(), error) {
 	if outputFile == "" {
 		return os.Stdout, func() {}, nil
@@ -128,7 +127,6 @@ func getOutput() (*os.File, func(), error) {
 	return f, func() { _ = f.Close() }, nil
 }
 
-// getMIBPaths returns MIB paths from -p flags.
 func getMIBPaths() []string {
 	return paths
 }

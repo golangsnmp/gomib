@@ -4,134 +4,89 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// Definition is a definition in a MIB module.
-//
-// Each definition type is normalized from its AST counterpart.
-// SMIv1 and SMIv2 forms are unified where appropriate.
-//
-// Use type switches to dispatch on specific definition types.
+// Definition is a normalized MIB definition. SMIv1 and SMIv2 forms are
+// unified where appropriate. Use type switches to dispatch on concrete types.
 type Definition interface {
-	// DefinitionName returns the name of this definition.
 	DefinitionName() string
-	// DefinitionSpan returns the source location.
 	DefinitionSpan() types.Span
-	// DefinitionOid returns the OID assignment if this definition has one.
+	// DefinitionOid returns the OID assignment, or nil if none.
 	DefinitionOid() *OidAssignment
 }
 
 // ObjectType is an OBJECT-TYPE definition.
 type ObjectType struct {
-	// Name is the object name.
-	Name string
-	// Syntax is the SYNTAX clause.
-	Syntax TypeSyntax
-	// Units is the UNITS clause.
-	Units string
-	// Access is the access level.
-	Access Access
-	// AccessKeyword records which keyword was used (ACCESS, MAX-ACCESS, etc.).
+	Name          string
+	Syntax        TypeSyntax
+	Units         string
+	Access        Access
 	AccessKeyword AccessKeyword
-	// Status is the STATUS (preserved, not normalized).
-	Status Status
-	// Description is the DESCRIPTION.
-	Description string
-	// Reference is the REFERENCE clause.
-	Reference string
-	// Index is the INDEX items (object references).
-	Index []IndexItem
-	// Augments is the AUGMENTS target.
-	Augments string
-	// DefVal is the DEFVAL clause (default value).
-	DefVal DefVal
-	// Oid is the OID assignment.
-	Oid OidAssignment
-	// Span is the source span.
-	Span types.Span
+	Status        Status
+	Description   string
+	Reference     string
+	Index         []IndexItem
+	Augments      string
+	DefVal        DefVal
+	Oid           OidAssignment
+	Span          types.Span
 }
 
 func (d *ObjectType) DefinitionName() string        { return d.Name }
 func (d *ObjectType) DefinitionSpan() types.Span    { return d.Span }
 func (d *ObjectType) DefinitionOid() *OidAssignment { return &d.Oid }
 
-// IndexItem is an item in an INDEX clause.
+// IndexItem is an entry in an OBJECT-TYPE INDEX clause.
 type IndexItem struct {
-	// Implied indicates whether this index is IMPLIED.
 	Implied bool
-	// Object is the object reference.
-	Object string
+	Object  string
 }
 
 // ModuleIdentity is a MODULE-IDENTITY definition.
 type ModuleIdentity struct {
-	// Name is the identity name.
-	Name string
-	// LastUpdated is the LAST-UPDATED value.
-	LastUpdated string
-	// Organization is the ORGANIZATION value.
+	Name         string
+	LastUpdated  string
 	Organization string
-	// ContactInfo is the CONTACT-INFO value.
-	ContactInfo string
-	// Description is the DESCRIPTION value.
-	Description string
-	// Revisions are the REVISION clauses.
-	Revisions []Revision
-	// Oid is the OID assignment.
-	Oid OidAssignment
-	// Span is the source span.
-	Span types.Span
+	ContactInfo  string
+	Description  string
+	Revisions    []Revision
+	Oid          OidAssignment
+	Span         types.Span
 }
 
 func (d *ModuleIdentity) DefinitionName() string        { return d.Name }
 func (d *ModuleIdentity) DefinitionSpan() types.Span    { return d.Span }
 func (d *ModuleIdentity) DefinitionOid() *OidAssignment { return &d.Oid }
 
-// Revision is a REVISION clause.
+// Revision is a REVISION clause within a MODULE-IDENTITY.
 type Revision struct {
-	// Date is the revision date.
-	Date string
-	// Description is the revision description.
+	Date        string
 	Description string
 }
 
 // ObjectIdentity is an OBJECT-IDENTITY definition.
 type ObjectIdentity struct {
-	// Name is the identity name.
-	Name string
-	// Status is the STATUS.
-	Status Status
-	// Description is the DESCRIPTION.
+	Name        string
+	Status      Status
 	Description string
-	// Reference is the REFERENCE.
-	Reference string
-	// Oid is the OID assignment.
-	Oid OidAssignment
-	// Span is the source span.
-	Span types.Span
+	Reference   string
+	Oid         OidAssignment
+	Span        types.Span
 }
 
 func (d *ObjectIdentity) DefinitionName() string        { return d.Name }
 func (d *ObjectIdentity) DefinitionSpan() types.Span    { return d.Span }
 func (d *ObjectIdentity) DefinitionOid() *OidAssignment { return &d.Oid }
 
-// Notification is a unified notification definition.
-//
-// Represents both SMIv1 TRAP-TYPE and SMIv2 NOTIFICATION-TYPE.
+// Notification represents both SMIv1 TRAP-TYPE and SMIv2 NOTIFICATION-TYPE.
 type Notification struct {
-	// Name is the notification name.
-	Name string
-	// Objects is the OBJECTS/VARIABLES list.
-	Objects []string
-	// Status is the STATUS.
-	Status Status
-	// Description is the DESCRIPTION.
+	Name        string
+	Objects     []string
+	Status      Status
 	Description string
-	// Reference is the REFERENCE.
-	Reference string
-	// TrapInfo is SMIv1 TRAP-TYPE specific information (nil for NOTIFICATION-TYPE).
+	Reference   string
+	// TrapInfo holds SMIv1 TRAP-TYPE fields. Nil for NOTIFICATION-TYPE.
 	TrapInfo *TrapInfo
-	// Oid is the OID assignment (nil for TRAP-TYPE; OID derived from enterprise + trap number).
-	Oid *OidAssignment
-	// Span is the source span.
+	// Oid is nil for TRAP-TYPE; its OID is derived from enterprise + trap number.
+	Oid  *OidAssignment
 	Span types.Span
 }
 
@@ -139,57 +94,40 @@ func (d *Notification) DefinitionName() string        { return d.Name }
 func (d *Notification) DefinitionSpan() types.Span    { return d.Span }
 func (d *Notification) DefinitionOid() *OidAssignment { return d.Oid }
 
-// IsTrap returns true if this is an SMIv1 TRAP-TYPE.
+// IsTrap reports whether this is an SMIv1 TRAP-TYPE.
 func (d *Notification) IsTrap() bool { return d.TrapInfo != nil }
 
-// TrapInfo is SMIv1 TRAP-TYPE specific information.
+// TrapInfo holds fields specific to SMIv1 TRAP-TYPE definitions.
 type TrapInfo struct {
-	// Enterprise is the ENTERPRISE OID reference.
 	Enterprise string
-	// TrapNumber is the trap number.
 	TrapNumber uint32
 }
 
-// TypeDef is a type definition.
-//
-// Represents both TEXTUAL-CONVENTION and simple type assignments.
+// TypeDef represents both TEXTUAL-CONVENTION and simple type assignments.
 type TypeDef struct {
-	// Name is the type name.
-	Name string
-	// Syntax is the base syntax.
+	Name   string
 	Syntax TypeSyntax
-	// BaseType is an explicit base type override.
-	//
-	// For most types, the base type is derived from Syntax. However, some
-	// SMI base types like IpAddress are syntactically `OCTET STRING (SIZE 4)`
-	// but have distinct semantic base types (for index encoding, etc.).
-	// This field allows synthetic base modules to specify the correct base type.
-	BaseType *BaseType
-	// DisplayHint is the DISPLAY-HINT.
-	DisplayHint string
-	// Status is the STATUS.
-	Status Status
-	// Description is the DESCRIPTION.
-	Description string
-	// Reference is the REFERENCE.
-	Reference string
-	// IsTextualConvention is true if this was a TEXTUAL-CONVENTION (vs simple type assignment).
+	// BaseType overrides the base type derived from Syntax. Some SMI base
+	// types like IpAddress are syntactically OCTET STRING (SIZE 4) but have
+	// distinct semantic base types (for index encoding, etc.). This field
+	// allows synthetic base modules to specify the correct base type.
+	BaseType            *BaseType
+	DisplayHint         string
+	Status              Status
+	Description         string
+	Reference           string
 	IsTextualConvention bool
-	// Span is the source span.
-	Span types.Span
+	Span                types.Span
 }
 
 func (d *TypeDef) DefinitionName() string        { return d.Name }
 func (d *TypeDef) DefinitionSpan() types.Span    { return d.Span }
 func (d *TypeDef) DefinitionOid() *OidAssignment { return nil }
 
-// ValueAssignment is a value assignment (OID definition).
+// ValueAssignment is a plain OID value assignment.
 type ValueAssignment struct {
-	// Name is the value name.
 	Name string
-	// Oid is the OID assignment.
-	Oid OidAssignment
-	// Span is the source span.
+	Oid  OidAssignment
 	Span types.Span
 }
 
@@ -199,20 +137,13 @@ func (d *ValueAssignment) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // ObjectGroup is an OBJECT-GROUP definition.
 type ObjectGroup struct {
-	// Name is the group name.
-	Name string
-	// Objects is the OBJECTS in this group.
-	Objects []string
-	// Status is the STATUS.
-	Status Status
-	// Description is the DESCRIPTION.
+	Name        string
+	Objects     []string
+	Status      Status
 	Description string
-	// Reference is the REFERENCE.
-	Reference string
-	// Oid is the OID assignment.
-	Oid OidAssignment
-	// Span is the source span.
-	Span types.Span
+	Reference   string
+	Oid         OidAssignment
+	Span        types.Span
 }
 
 func (d *ObjectGroup) DefinitionName() string        { return d.Name }
@@ -221,20 +152,13 @@ func (d *ObjectGroup) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // NotificationGroup is a NOTIFICATION-GROUP definition.
 type NotificationGroup struct {
-	// Name is the group name.
-	Name string
-	// Notifications is the NOTIFICATIONS in this group.
+	Name          string
 	Notifications []string
-	// Status is the STATUS.
-	Status Status
-	// Description is the DESCRIPTION.
-	Description string
-	// Reference is the REFERENCE.
-	Reference string
-	// Oid is the OID assignment.
-	Oid OidAssignment
-	// Span is the source span.
-	Span types.Span
+	Status        Status
+	Description   string
+	Reference     string
+	Oid           OidAssignment
+	Span          types.Span
 }
 
 func (d *NotificationGroup) DefinitionName() string        { return d.Name }
@@ -243,20 +167,13 @@ func (d *NotificationGroup) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // ModuleCompliance is a MODULE-COMPLIANCE definition.
 type ModuleCompliance struct {
-	// Name is the compliance name.
-	Name string
-	// Status is the STATUS.
-	Status Status
-	// Description is the DESCRIPTION.
+	Name        string
+	Status      Status
 	Description string
-	// Reference is the REFERENCE.
-	Reference string
-	// Modules are the MODULE clauses.
-	Modules []ComplianceModule
-	// Oid is the OID assignment.
-	Oid OidAssignment
-	// Span is the source span.
-	Span types.Span
+	Reference   string
+	Modules     []ComplianceModule
+	Oid         OidAssignment
+	Span        types.Span
 }
 
 func (d *ModuleCompliance) DefinitionName() string        { return d.Name }
@@ -265,56 +182,38 @@ func (d *ModuleCompliance) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // ComplianceModule is a MODULE clause in MODULE-COMPLIANCE.
 type ComplianceModule struct {
-	// ModuleName is the module name (empty = current module).
-	ModuleName string
-	// MandatoryGroups is the MANDATORY-GROUPS.
+	// ModuleName is empty when referring to the current module.
+	ModuleName      string
 	MandatoryGroups []string
-	// Groups are the GROUP refinements.
-	Groups []ComplianceGroup
-	// Objects are the OBJECT refinements.
-	Objects []ComplianceObject
+	Groups          []ComplianceGroup
+	Objects         []ComplianceObject
 }
 
-// ComplianceGroup is a GROUP clause.
+// ComplianceGroup is a GROUP clause within MODULE-COMPLIANCE.
 type ComplianceGroup struct {
-	// Group is the group reference.
-	Group string
-	// Description is the description.
+	Group       string
 	Description string
 }
 
-// ComplianceObject is an OBJECT refinement.
+// ComplianceObject is an OBJECT refinement within MODULE-COMPLIANCE.
 type ComplianceObject struct {
-	// Object is the object reference.
-	Object string
-	// Syntax is the SYNTAX restriction.
-	Syntax TypeSyntax
-	// WriteSyntax is the WRITE-SYNTAX restriction.
+	Object      string
+	Syntax      TypeSyntax
 	WriteSyntax TypeSyntax
-	// MinAccess is the MIN-ACCESS restriction.
-	MinAccess *Access
-	// Description is the description.
+	MinAccess   *Access
 	Description string
 }
 
 // AgentCapabilities is an AGENT-CAPABILITIES definition.
 type AgentCapabilities struct {
-	// Name is the capabilities name.
-	Name string
-	// ProductRelease is the PRODUCT-RELEASE value.
+	Name           string
 	ProductRelease string
-	// Status is the STATUS.
-	Status Status
-	// Description is the DESCRIPTION.
-	Description string
-	// Reference is the REFERENCE.
-	Reference string
-	// Supports are the SUPPORTS clauses.
-	Supports []SupportsModule
-	// Oid is the OID assignment.
-	Oid OidAssignment
-	// Span is the source span.
-	Span types.Span
+	Status         Status
+	Description    string
+	Reference      string
+	Supports       []SupportsModule
+	Oid            OidAssignment
+	Span           types.Span
 }
 
 func (d *AgentCapabilities) DefinitionName() string        { return d.Name }
@@ -323,40 +222,27 @@ func (d *AgentCapabilities) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // SupportsModule is a SUPPORTS clause in AGENT-CAPABILITIES.
 type SupportsModule struct {
-	// ModuleName is the module name.
-	ModuleName string
-	// Includes is the INCLUDES list of group references.
-	Includes []string
-	// ObjectVariations are the object variations.
-	ObjectVariations []ObjectVariation
-	// NotificationVariations are the notification variations.
+	ModuleName             string
+	Includes               []string
+	ObjectVariations       []ObjectVariation
 	NotificationVariations []NotificationVariation
 }
 
-// ObjectVariation is an object VARIATION.
+// ObjectVariation is an object VARIATION in AGENT-CAPABILITIES.
 type ObjectVariation struct {
-	// Object is the object reference.
-	Object string
-	// Syntax is the SYNTAX restriction.
-	Syntax TypeSyntax
-	// WriteSyntax is the WRITE-SYNTAX restriction.
-	WriteSyntax TypeSyntax
-	// Access is the ACCESS restriction.
-	Access *Access
-	// CreationRequires is the CREATION-REQUIRES list.
+	Object           string
+	Syntax           TypeSyntax
+	WriteSyntax      TypeSyntax
+	Access           *Access
 	CreationRequires []string
-	// DefVal is the DEFVAL override.
-	DefVal DefVal
-	// Description is the description.
-	Description string
+	DefVal           DefVal
+	Description      string
 }
 
-// NotificationVariation is a notification VARIATION.
+// NotificationVariation is a notification VARIATION in AGENT-CAPABILITIES.
 type NotificationVariation struct {
-	// Notification is the notification reference.
 	Notification string
-	// Access is the ACCESS restriction (only "not-implemented" is valid per RFC 2580).
-	Access *Access
-	// Description is the description.
+	// Access is only "not-implemented" per RFC 2580.
+	Access      *Access
 	Description string
 }

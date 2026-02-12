@@ -52,7 +52,6 @@ func PermissiveConfig() DiagnosticConfig {
 	return DiagnosticConfig{
 		Level:  StrictnessPermissive,
 		FailAt: SeverityFatal,
-		// Suppress diagnostics that are allowed in permissive mode
 		Ignore: []string{
 			"identifier-underscore",
 			"identifier-length-32",
@@ -72,31 +71,24 @@ func PermissiveConfig() DiagnosticConfig {
 //
 // Lower severity numbers are more severe (Fatal=0, Info=6).
 func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
-	// Check ignore list
 	for _, pattern := range c.Ignore {
 		if matchGlob(pattern, code) {
 			return false
 		}
 	}
 
-	// Check overrides
 	if override, ok := c.Overrides[code]; ok {
 		sev = override
 	}
 
-	// Silent mode suppresses all reporting
 	if c.Level >= StrictnessSilent {
 		return false
 	}
 
-	// Strict mode reports all diagnostics
 	if c.Level == StrictnessStrict {
 		return true
 	}
 
-	// Normal/Permissive: Report if severity is at or below the threshold
-	// Level 3 (Normal): report sev 0-3 (Fatal, Severe, Error, Minor)
-	// Level 5 (Permissive): report sev 0-5 (all except Info)
 	return int(sev) <= int(c.Level)
 }
 
@@ -132,13 +124,11 @@ func matchGlob(pattern, s string) bool {
 		return true
 	}
 
-	// Handle trailing wildcard
 	if len(pattern) > 0 && pattern[len(pattern)-1] == '*' {
 		prefix := pattern[:len(pattern)-1]
 		return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 	}
 
-	// Handle leading wildcard
 	if len(pattern) > 0 && pattern[0] == '*' {
 		suffix := pattern[1:]
 		return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix

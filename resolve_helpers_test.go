@@ -19,7 +19,9 @@ var (
 	loadErr        error
 )
 
-// loadTestMIB loads all fixture modules once and returns the shared Mib.
+// loadTestMIB loads all fixture modules once (via sync.Once) and returns
+// the shared Mib, so that tests sharing the same fixture set avoid
+// redundant parsing.
 func loadTestMIB(t testing.TB) mib.Mib {
 	t.Helper()
 	loadOnce.Do(func() {
@@ -36,19 +38,17 @@ func loadTestMIB(t testing.TB) mib.Mib {
 	return loadedMib
 }
 
-// fixturePath returns the path to a fixture JSON file.
 func fixturePath(module string) string {
 	return filepath.Join(fixtureDir, module+".json")
 }
 
-// loadFixtureNodes loads fixture nodes keyed by OID for a given module.
 func loadFixtureNodes(t testing.TB, module string) map[string]*testutil.FixtureNode {
 	t.Helper()
 	return testutil.LoadFixture(t, fixturePath(module))
 }
 
-// isObjectTypeNode returns true if the fixture node represents an OBJECT-TYPE
-// with a recognizable data type (not a container or notification).
+// isObjectTypeNode filters out containers and conformance nodes that
+// don't carry data type information in the fixture format.
 func isObjectTypeNode(fn *testutil.FixtureNode) bool {
 	switch fn.Type {
 	case "", "OTHER", "NOTIFICATION-TYPE", "TRAP-TYPE", "MODULE-IDENTITY",
@@ -59,7 +59,6 @@ func isObjectTypeNode(fn *testutil.FixtureNode) bool {
 	return true
 }
 
-// isNotificationNode returns true if the fixture node represents a notification.
 func isNotificationNode(fn *testutil.FixtureNode) bool {
 	return fn.NodeType == "NOTIFICATION-TYPE" || fn.NodeType == "TRAP-TYPE"
 }

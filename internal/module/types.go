@@ -24,10 +24,9 @@ package module
 
 import "github.com/golangsnmp/gomib/mib"
 
-// Language is an alias to the mib type.
+// Language is the detected SMI language variant for a module.
 type Language = mib.Language
 
-// Re-export constants for convenience.
 const (
 	LanguageUnknown = mib.LanguageUnknown
 	LanguageSMIv1   = mib.LanguageSMIv1
@@ -35,10 +34,9 @@ const (
 	LanguageSPPI    = mib.LanguageSPPI
 )
 
-// Status is an alias to the mib type.
+// Status is the lifecycle status of a MIB definition.
 type Status = mib.Status
 
-// Re-export status constants.
 const (
 	StatusCurrent    = mib.StatusCurrent
 	StatusDeprecated = mib.StatusDeprecated
@@ -47,10 +45,9 @@ const (
 	StatusOptional   = mib.StatusOptional
 )
 
-// Access is an alias to the mib type.
+// Access is the access level of an OBJECT-TYPE definition.
 type Access = mib.Access
 
-// Re-export access constants.
 const (
 	AccessNotAccessible       = mib.AccessNotAccessible
 	AccessAccessibleForNotify = mib.AccessAccessibleForNotify
@@ -64,10 +61,9 @@ const (
 	AccessNotImplemented      = mib.AccessNotImplemented
 )
 
-// AccessKeyword is an alias to the mib type.
+// AccessKeyword records which keyword was used (ACCESS, MAX-ACCESS, etc.).
 type AccessKeyword = mib.AccessKeyword
 
-// Re-export access keyword constants.
 const (
 	AccessKeywordAccess    = mib.AccessKeywordAccess
 	AccessKeywordMaxAccess = mib.AccessKeywordMaxAccess
@@ -75,10 +71,9 @@ const (
 	AccessKeywordPibAccess = mib.AccessKeywordPibAccess
 )
 
-// BaseType is an alias to the mib type.
+// BaseType is the underlying ASN.1 type of a MIB object.
 type BaseType = mib.BaseType
 
-// Re-export base type constants.
 const (
 	BaseUnknown          = mib.BaseUnknown
 	BaseInteger32        = mib.BaseInteger32

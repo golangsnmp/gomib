@@ -1,9 +1,9 @@
-// Package mib provides MIB parsing and querying for SNMP management.
+// Package mib defines the public types and interfaces for MIB data.
 package mib
 
 import "fmt"
 
-// Severity levels for diagnostics (libsmi-compatible).
+// Severity indicates how serious a diagnostic issue is (libsmi-compatible).
 // Lower values are more severe.
 type Severity int
 
@@ -129,7 +129,7 @@ func (k Kind) IsConformance() bool {
 	}
 }
 
-// Access levels for OBJECT-TYPE definitions.
+// Access represents the access level for OBJECT-TYPE definitions.
 // Includes SMIv1, SMIv2, SPPI (RFC 3159), and AGENT-CAPABILITIES values.
 type Access int
 
@@ -201,7 +201,7 @@ func (k AccessKeyword) String() string {
 	}
 }
 
-// Status values for MIB definitions.
+// Status represents the lifecycle state of a MIB definition.
 // Preserves SMIv1-specific values (mandatory, optional) without normalizing.
 type Status int
 

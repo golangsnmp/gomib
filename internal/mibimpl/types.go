@@ -1,8 +1,11 @@
+// Package mibimpl provides concrete implementations of the mib package
+// interfaces, along with a Builder for constructing a Mib incrementally.
 package mibimpl
 
 import "github.com/golangsnmp/gomib/mib"
 
-// Type is the concrete implementation of mib.Type.
+// Type implements mib.Type with a parent chain for textual convention
+// inheritance.
 type Type struct {
 	name   string
 	module *Module
@@ -18,8 +21,6 @@ type Type struct {
 	bits   []mib.NamedValue
 	isTC   bool
 }
-
-// Interface methods (mib.Type)
 
 func (t *Type) Name() string {
 	return t.name
@@ -97,8 +98,6 @@ func (t *Type) IsTextualConvention() bool {
 	return t.isTC
 }
 
-// Classification predicates (use effective values)
-
 func (t *Type) IsCounter() bool {
 	b := t.EffectiveBase()
 	return b == mib.BaseCounter32 || b == mib.BaseCounter64
@@ -120,10 +119,8 @@ func (t *Type) IsBits() bool {
 	return len(t.EffectiveBits()) > 0
 }
 
-// Effective (walks type chain)
-
 func (t *Type) EffectiveBase() mib.BaseType {
-	return t.base // Base is already the resolved base type
+	return t.base
 }
 
 func (t *Type) EffectiveDisplayHint() string {
@@ -171,7 +168,8 @@ func (t *Type) EffectiveBits() []mib.NamedValue {
 	return nil
 }
 
-// String returns a brief summary: "Name (BaseType)" or just "BaseType" for anonymous types.
+// String returns a brief summary: "Name (BaseType)" or just "BaseType"
+// for anonymous types.
 func (t *Type) String() string {
 	if t == nil {
 		return "<nil>"
@@ -181,8 +179,6 @@ func (t *Type) String() string {
 	}
 	return t.name + " (" + t.base.String() + ")"
 }
-
-// Mutation methods (for resolver use)
 
 func (t *Type) SetName(name string) {
 	t.name = name
@@ -236,12 +232,12 @@ func (t *Type) SetIsTC(isTC bool) {
 	t.isTC = isTC
 }
 
-// InternalParent returns the concrete parent for resolver use.
+// InternalParent returns the concrete parent type.
 func (t *Type) InternalParent() *Type {
 	return t.parent
 }
 
-// InternalModule returns the concrete module for resolver use.
+// InternalModule returns the concrete module.
 func (t *Type) InternalModule() *Module {
 	return t.module
 }

@@ -1,7 +1,5 @@
 package gomib
 
-// resolve_behavior_test.go tests resolver behavior: type chains, semantic analysis, and import shadowing.
-
 import (
 	"testing"
 
@@ -9,16 +7,11 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// === Type chain resolution ===
-
 func loadTypeChainsMIB(t testing.TB) mib.Mib {
 	t.Helper()
 	return loadProblemMIB(t, "PROBLEM-TYPECHAINS-MIB")
 }
 
-// TestTypeChainBaseTypeInheritance verifies that base types propagate through
-// TC chains. Each object's effective base type should be the primitive at the
-// root of its type chain.
 func TestTypeChainBaseTypeInheritance(t *testing.T) {
 	m := loadTypeChainsMIB(t)
 
@@ -56,9 +49,6 @@ func TestTypeChainBaseTypeInheritance(t *testing.T) {
 	}
 }
 
-// TestTypeChainDisplayHintInheritance verifies that display hints are inherited
-// through the type chain. Objects using a TC with a display hint should get
-// that hint via computeEffectiveValues.
 func TestTypeChainDisplayHintInheritance(t *testing.T) {
 	m := loadTypeChainsMIB(t)
 
@@ -88,8 +78,6 @@ func TestTypeChainDisplayHintInheritance(t *testing.T) {
 	})
 }
 
-// TestTypeChainSizeInheritance verifies that size constraints propagate
-// through the type chain via computeEffectiveValues.
 func TestTypeChainSizeInheritance(t *testing.T) {
 	m := loadTypeChainsMIB(t)
 
@@ -116,8 +104,6 @@ func TestTypeChainSizeInheritance(t *testing.T) {
 	})
 }
 
-// TestTypeChainEnumInheritance verifies that enum values propagate through
-// the type chain via computeEffectiveValues.
 func TestTypeChainEnumInheritance(t *testing.T) {
 	m := loadTypeChainsMIB(t)
 
@@ -144,9 +130,6 @@ func TestTypeChainEnumInheritance(t *testing.T) {
 	})
 }
 
-// TestTypeChainApplicationTypePreservation verifies that application types
-// (Counter32, Gauge32, etc.) are preserved through the type chain and not
-// overwritten by base type inheritance.
 func TestTypeChainApplicationTypePreservation(t *testing.T) {
 	m := loadTypeChainsMIB(t)
 
@@ -172,8 +155,6 @@ func TestTypeChainApplicationTypePreservation(t *testing.T) {
 	})
 }
 
-// TestTypeChainTCFlagPropagation verifies that IsTextualConvention is set
-// on TC types but not on objects using inline syntax.
 func TestTypeChainTCFlagPropagation(t *testing.T) {
 	m := loadTypeChainsMIB(t)
 
@@ -196,15 +177,11 @@ func TestTypeChainTCFlagPropagation(t *testing.T) {
 	})
 }
 
-// === Semantic analysis ===
-
 func loadSemanticsMIB(t testing.TB) mib.Mib {
 	t.Helper()
 	return loadProblemMIB(t, "PROBLEM-SEMANTICS-MIB")
 }
 
-// TestKindInferenceTableStructure verifies that the semantic phase correctly
-// classifies table, row, column, and scalar objects.
 func TestKindInferenceTableStructure(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
@@ -232,7 +209,6 @@ func TestKindInferenceTableStructure(t *testing.T) {
 	}
 }
 
-// TestKindInferenceAugmentsTable verifies kind inference for AUGMENTS tables.
 func TestKindInferenceAugmentsTable(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
@@ -256,8 +232,6 @@ func TestKindInferenceAugmentsTable(t *testing.T) {
 	}
 }
 
-// TestAugmentsResolution verifies that AUGMENTS clauses are resolved to
-// the correct target row object.
 func TestAugmentsResolution(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
@@ -271,8 +245,6 @@ func TestAugmentsResolution(t *testing.T) {
 		"AUGMENTS should reference problemSemEntry")
 }
 
-// TestIndexResolution verifies that INDEX clauses are resolved to the
-// correct index objects.
 func TestIndexResolution(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
@@ -287,8 +259,6 @@ func TestIndexResolution(t *testing.T) {
 	testutil.False(t, indexes[0].Implied, "index should not be IMPLIED")
 }
 
-// TestNotificationObjectsResolution verifies that NOTIFICATION-TYPE OBJECTS
-// clauses are resolved to the correct object references.
 func TestNotificationObjectsResolution(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
@@ -340,7 +310,6 @@ func TestNotificationObjectsResolution(t *testing.T) {
 	})
 }
 
-// TestNotificationMetadata verifies notification status and OID resolution.
 func TestNotificationMetadata(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
@@ -365,10 +334,6 @@ func TestNotificationMetadata(t *testing.T) {
 	}
 }
 
-// TestModulePreferenceSMIv2OverSMIv1 verifies that when both SMIv1 and SMIv2
-// modules define the same OID, the SMIv2 module is preferred.
-// This is tested via IF-MIB (SMIv2) and RFC1213-MIB (SMIv1) which both
-// define objects like ifIndex.
 func TestModulePreferenceSMIv2OverSMIv1(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -380,13 +345,10 @@ func TestModulePreferenceSMIv2OverSMIv1(t *testing.T) {
 	mod := obj.Module()
 	testutil.NotNil(t, mod, "Module() for ifIndex")
 
-	// IF-MIB (SMIv2) should be preferred over RFC1213-MIB (SMIv1)
 	testutil.Equal(t, "IF-MIB", mod.Name(),
 		"ifIndex should be attributed to IF-MIB (SMIv2), not RFC1213-MIB (SMIv1)")
 }
 
-// TestDiagnosticEmissionUnresolvedType verifies that referencing a non-existent
-// type emits a "type-unknown" diagnostic.
 func TestDiagnosticEmissionUnresolvedType(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DIAGNOSTICS-MIB")
 
@@ -401,14 +363,11 @@ func TestDiagnosticEmissionUnresolvedType(t *testing.T) {
 	}
 	testutil.True(t, found, "should emit type-unknown diagnostic for NonExistentType")
 
-	// Verify it appears in Unresolved() too
 	unresolved := unresolvedSymbols(m, "PROBLEM-DIAGNOSTICS-MIB", "type")
 	testutil.True(t, unresolved["NonExistentType"],
 		"NonExistentType should be in unresolved list")
 }
 
-// TestDiagnosticEmissionUnresolvedIndex verifies that referencing a
-// non-existent index object emits an "index-unresolved" diagnostic.
 func TestDiagnosticEmissionUnresolvedIndex(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DIAGNOSTICS-MIB")
 
@@ -424,8 +383,6 @@ func TestDiagnosticEmissionUnresolvedIndex(t *testing.T) {
 	testutil.True(t, found, "should emit index-unresolved diagnostic for nonExistentIndex")
 }
 
-// TestDiagnosticEmissionUnresolvedNotificationObject verifies that referencing
-// a non-existent object in OBJECTS emits an "objects-unresolved" diagnostic.
 func TestDiagnosticEmissionUnresolvedNotificationObject(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DIAGNOSTICS-MIB")
 
@@ -441,12 +398,9 @@ func TestDiagnosticEmissionUnresolvedNotificationObject(t *testing.T) {
 	testutil.True(t, found, "should emit objects-unresolved diagnostic for totallyBogusObject")
 }
 
-// TestDiagnosticValidObjectNoFalsePositives verifies that valid objects in the
-// same module do not trigger unresolved diagnostics.
 func TestDiagnosticValidObjectNoFalsePositives(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DIAGNOSTICS-MIB")
 
-	// problemValidType uses Integer32 which is always available
 	obj := m.FindObject("problemValidType")
 	testutil.NotNil(t, obj, "valid object should resolve")
 	if obj == nil {
@@ -459,9 +413,6 @@ func TestDiagnosticValidObjectNoFalsePositives(t *testing.T) {
 	}
 }
 
-// TestDiagnosticNotifPartialResolution verifies that a notification with
-// mixed valid/invalid OBJECTS resolves the valid ones and emits diagnostics
-// for the invalid ones.
 func TestDiagnosticNotifPartialResolution(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DIAGNOSTICS-MIB")
 
@@ -470,13 +421,11 @@ func TestDiagnosticNotifPartialResolution(t *testing.T) {
 
 	varbinds := testutil.NormalizeVarbinds(notif.Objects())
 
-	// problemDiagCol should resolve
 	hasDiagCol := false
 	for _, v := range varbinds {
 		if v == "problemDiagCol" {
 			hasDiagCol = true
 		}
-		// totallyBogusObject should NOT be present
 		if v == "totallyBogusObject" {
 			t.Error("totallyBogusObject should not appear in resolved varbinds")
 		}
@@ -485,16 +434,11 @@ func TestDiagnosticNotifPartialResolution(t *testing.T) {
 		"problemDiagCol should be in resolved varbinds")
 }
 
-// === Import shadowing ===
-
 func loadShadowingMIB(t testing.TB) mib.Mib {
 	t.Helper()
 	return loadProblemMIB(t, "PROBLEM-SHADOWING-MIB")
 }
 
-// TestShadowedTypeLocalDefinitionWins verifies that when a module both
-// imports ShadowableType and defines it locally, the local definition is
-// used. The local version has display hint "1024a" while the base has "255a".
 func TestShadowedTypeLocalDefinitionWins(t *testing.T) {
 	m := loadShadowingMIB(t)
 
@@ -512,8 +456,6 @@ func TestShadowedTypeLocalDefinitionWins(t *testing.T) {
 		"should use local ShadowableType (1024a), not imported base (255a)")
 }
 
-// TestShadowedTypeSizeConstraint verifies that the local ShadowableType's
-// size constraint (0..128) is used, not the base's (0..64).
 func TestShadowedTypeSizeConstraint(t *testing.T) {
 	m := loadShadowingMIB(t)
 
@@ -532,8 +474,6 @@ func TestShadowedTypeSizeConstraint(t *testing.T) {
 	testutil.Equal(t, int64(128), sizes[0].Max, "size max should be 128 (local), not 64 (base)")
 }
 
-// TestShadowedTypeBaseType verifies that both the local and base
-// ShadowableType resolve to OCTET STRING base type.
 func TestShadowedTypeBaseType(t *testing.T) {
 	m := loadShadowingMIB(t)
 
@@ -547,8 +487,6 @@ func TestShadowedTypeBaseType(t *testing.T) {
 		"ShadowableType should resolve to OCTET STRING regardless of shadowing")
 }
 
-// TestNonShadowedImportStillWorks verifies that non-shadowed imports
-// (DisplayString) still resolve correctly in the same module.
 func TestNonShadowedImportStillWorks(t *testing.T) {
 	m := loadShadowingMIB(t)
 
@@ -567,8 +505,6 @@ func TestNonShadowedImportStillWorks(t *testing.T) {
 		"DisplayString should have display hint 255a (imported, not shadowed)")
 }
 
-// TestBaseModuleTypeNotAffected verifies that the base module's own
-// ShadowableType is unaffected by the shadowing module's redefinition.
 func TestBaseModuleTypeNotAffected(t *testing.T) {
 	m := loadShadowingMIB(t)
 
@@ -584,8 +520,6 @@ func TestBaseModuleTypeNotAffected(t *testing.T) {
 		"base module object should use base ShadowableType (255a), not the shadowing module's version")
 }
 
-// TestShadowingModuleScalarResolves verifies that basic type resolution
-// still works in a module with a shadowed import.
 func TestShadowingModuleScalarResolves(t *testing.T) {
 	m := loadShadowingMIB(t)
 

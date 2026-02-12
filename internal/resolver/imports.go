@@ -15,7 +15,7 @@ type importSymbol struct {
 	span types.Span
 }
 
-// resolveImports resolves all imports across all modules.
+// resolveImports is the import resolution phase entry point.
 func resolveImports(ctx *ResolverContext) {
 	for _, mod := range ctx.Modules {
 		importsBySource := make(map[string][]importSymbol)
@@ -63,7 +63,7 @@ func resolveImportsFromModule(ctx *ResolverContext, importingModule *module.Modu
 		return
 	}
 
-	// Safe fallback: module import aliases (normal and above)
+	// Module import aliases handle renamed modules (e.g., SNMPv2-SMI-v1 -> SNMPv2-SMI)
 	if ctx.DiagnosticConfig().AllowSafeFallbacks() {
 		if aliased := baseModuleImportAlias(fromModuleName); aliased != "" {
 			aliasCandidates := ctx.ModuleIndex[aliased]
@@ -82,7 +82,7 @@ func resolveImportsFromModule(ctx *ResolverContext, importingModule *module.Modu
 		}
 	}
 
-	// Safe fallback: import forwarding (normal and above)
+	// Import forwarding: symbols re-exported through intermediate modules
 	if ctx.DiagnosticConfig().AllowSafeFallbacks() && len(candidates) > 0 {
 		if forwarded := tryImportForwarding(ctx, candidates, userSymbols); len(forwarded) > 0 {
 			if ctx.TraceEnabled() {
@@ -97,9 +97,8 @@ func resolveImportsFromModule(ctx *ResolverContext, importingModule *module.Modu
 		}
 	}
 
-	// Safe fallback: partial resolution (normal and above)
-	// Resolve symbols that are found, record unresolved for others.
-	// This handles real-world MIBs that import from the "wrong" module.
+	// Partial resolution: resolve symbols that are found and record
+	// unresolved for the rest. Handles MIBs that import from the wrong module.
 	if ctx.DiagnosticConfig().AllowSafeFallbacks() && len(candidates) > 0 {
 		resolved, unresolved := tryPartialResolution(ctx, candidates, userSymbols)
 		for _, res := range resolved {
@@ -117,7 +116,6 @@ func resolveImportsFromModule(ctx *ResolverContext, importingModule *module.Modu
 		return
 	}
 
-	// Module not found at all
 	if ctx.TraceEnabled() {
 		ctx.Trace("imports unresolved",
 			slog.String("from", fromModuleName),
@@ -135,8 +133,8 @@ type forwardedSymbol struct {
 	source *module.Module
 }
 
-// tryPartialResolution tries to resolve as many symbols as possible from the candidates.
-// Returns resolved symbols and unresolved symbols separately.
+// tryPartialResolution resolves as many symbols as possible from the
+// candidates, returning resolved and unresolved symbols separately.
 func tryPartialResolution(ctx *ResolverContext, candidates []*module.Module, symbols []importSymbol) ([]forwardedSymbol, []importSymbol) {
 	var resolved []forwardedSymbol
 	var unresolved []importSymbol
@@ -175,7 +173,6 @@ func tryImportForwarding(ctx *ResolverContext, candidates []*module.Module, symb
 		forwarded := make([]forwardedSymbol, 0, len(symbols))
 		allFound := true
 		for _, sym := range symbols {
-			// First check if directly defined in candidate
 			if defNames != nil {
 				if _, isDirect := defNames[sym.name]; isDirect {
 					forwarded = append(forwarded, forwardedSymbol{
@@ -185,7 +182,7 @@ func tryImportForwarding(ctx *ResolverContext, candidates []*module.Module, symb
 					continue
 				}
 			}
-			// Otherwise check if imported (re-exported)
+			// Not directly defined, check if re-exported via imports
 			sourceModuleName, ok := importMap[sym.name]
 			if !ok {
 				allFound = false
@@ -243,7 +240,7 @@ func findCandidateWithAllSymbols(ctx *ResolverContext, candidates []*module.Modu
 	}
 
 	slices.SortFunc(scoredCandidates, func(a, b scored) int {
-		// Sort by symbol count descending, then by lastUpdated descending
+		// Prefer more matching symbols, then newer LAST-UPDATED
 		if c := cmp.Compare(b.symbolCount, a.symbolCount); c != 0 {
 			return c
 		}

@@ -9,7 +9,6 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// lexerState represents the lexer's current mode.
 type lexerState int
 
 const (
@@ -28,7 +27,7 @@ type Lexer struct {
 	types.Logger
 }
 
-// New creates a new lexer for the given source bytes.
+// New returns a Lexer that tokenizes the given source bytes.
 func New(source []byte, logger *slog.Logger) *Lexer {
 	l := &Lexer{
 		source: source,
@@ -45,7 +44,6 @@ func (l *Lexer) Diagnostics() []types.Diagnostic {
 	return slices.Clone(l.diagnostics)
 }
 
-// traceToken logs a token at trace level.
 func (l *Lexer) traceToken(tok Token) {
 	if l.TraceEnabled() {
 		l.Trace("token",
@@ -55,7 +53,8 @@ func (l *Lexer) traceToken(tok Token) {
 	}
 }
 
-// Tokenize tokenizes the entire source and returns all tokens and diagnostics.
+// Tokenize consumes all source text and returns the token stream
+// along with any diagnostics generated during lexing.
 func (l *Lexer) Tokenize() ([]Token, []types.Diagnostic) {
 	estimatedTokens := len(l.source) / 6
 	if estimatedTokens < 64 {
@@ -75,7 +74,8 @@ func (l *Lexer) Tokenize() ([]Token, []types.Diagnostic) {
 	return tokens, l.diagnostics
 }
 
-// NextToken returns the next token.
+// NextToken advances the lexer and returns the next token.
+// Returns TokEOF when all input is consumed.
 func (l *Lexer) NextToken() Token {
 	switch l.state {
 	case stateNormal:
@@ -193,7 +193,6 @@ func (l *Lexer) nextNormalToken() Token {
 		return l.token(TokEOF, start)
 	}
 
-	// Check for comment start
 	if b == '-' {
 		if next, ok := l.peekAt(1); ok && next == '-' {
 			l.advance()
@@ -204,7 +203,6 @@ func (l *Lexer) nextNormalToken() Token {
 		}
 	}
 
-	// Single-character tokens
 	switch b {
 	case '[':
 		l.advance()
@@ -235,7 +233,6 @@ func (l *Lexer) nextNormalToken() Token {
 		return l.token(TokPipe, start)
 	}
 
-	// Dot or DotDot
 	if b == '.' {
 		l.advance()
 		if next, ok := l.peek(); ok && next == '.' {
@@ -245,7 +242,6 @@ func (l *Lexer) nextNormalToken() Token {
 		return l.token(TokDot, start)
 	}
 
-	// ColonColonEqual or colon
 	if b == ':' {
 		l.advance()
 		if next, ok := l.peek(); ok && next == ':' {
@@ -258,7 +254,6 @@ func (l *Lexer) nextNormalToken() Token {
 		return l.token(TokColon, start)
 	}
 
-	// Minus (could be negative number or standalone)
 	if b == '-' {
 		if next, ok := l.peekAt(1); ok && isDigit(next) {
 			return l.scanNegativeNumber()
@@ -267,27 +262,22 @@ func (l *Lexer) nextNormalToken() Token {
 		return l.token(TokMinus, start)
 	}
 
-	// Numbers
 	if isDigit(b) {
 		return l.scanNumber()
 	}
 
-	// Quoted string
 	if b == '"' {
 		return l.scanQuotedString()
 	}
 
-	// Hex or binary string
 	if b == '\'' {
 		return l.scanHexOrBinString()
 	}
 
-	// Identifiers and keywords
 	if isAlpha(b) {
 		return l.scanIdentifierOrKeyword()
 	}
 
-	// Unknown character
 	l.advance()
 	span := l.spanFrom(start)
 	l.error(span, fmt.Sprintf("unexpected character: 0x%02x", b))

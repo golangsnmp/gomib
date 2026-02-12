@@ -2,7 +2,8 @@ package mibimpl
 
 import "github.com/golangsnmp/gomib/mib"
 
-// Notification is the concrete implementation of mib.Notification.
+// Notification implements mib.Notification for NOTIFICATION-TYPE and
+// TRAP-TYPE definitions.
 type Notification struct {
 	name    string
 	node    *Node
@@ -12,8 +13,6 @@ type Notification struct {
 	desc    string
 	ref     string
 }
-
-// Interface methods (mib.Notification)
 
 func (n *Notification) Name() string {
 	return n.name
@@ -68,8 +67,6 @@ func (n *Notification) String() string {
 	return n.name + " (" + n.OID().String() + ")"
 }
 
-// Mutation methods (for resolver use)
-
 func (n *Notification) SetName(name string) {
 	n.name = name
 }
@@ -102,12 +99,12 @@ func (n *Notification) SetReference(r string) {
 	n.ref = r
 }
 
-// InternalNode returns the concrete node for resolver use.
+// InternalNode returns the concrete node.
 func (n *Notification) InternalNode() *Node {
 	return n.node
 }
 
-// InternalObjects returns the concrete objects for resolver use.
+// InternalObjects returns the concrete OBJECTS list.
 func (n *Notification) InternalObjects() []*Object {
 	return n.objects
 }

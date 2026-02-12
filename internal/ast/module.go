@@ -4,7 +4,7 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// Module is a parsed MIB module.
+// Module is the top-level AST node for a parsed MIB module.
 type Module struct {
 	Name            Ident
 	DefinitionsKind DefinitionsKind
@@ -15,7 +15,7 @@ type Module struct {
 	Diagnostics     []types.Diagnostic
 }
 
-// NewModule creates a new module.
+// NewModule creates a Module with nil imports, body, and diagnostics.
 func NewModule(name Ident, definitionsKind DefinitionsKind, span types.Span) *Module {
 	return &Module{
 		Name:            name,
@@ -28,7 +28,7 @@ func NewModule(name Ident, definitionsKind DefinitionsKind, span types.Span) *Mo
 	}
 }
 
-// HasErrors returns true if this module has parse errors.
+// HasErrors reports whether any diagnostic has error severity or worse.
 func (m *Module) HasErrors() bool {
 	for _, d := range m.Diagnostics {
 		if d.Severity <= types.SeverityError {
@@ -38,7 +38,7 @@ func (m *Module) HasErrors() bool {
 	return false
 }
 
-// DefinitionsKind is the kind of module definition.
+// DefinitionsKind distinguishes DEFINITIONS from PIB-DEFINITIONS.
 type DefinitionsKind int
 
 const (
@@ -46,14 +46,14 @@ const (
 	DefinitionsKindPibDefinitions
 )
 
-// ImportClause is an import clause.
+// ImportClause groups symbols imported from a single source module.
 type ImportClause struct {
 	Symbols    []Ident
 	FromModule Ident
 	Span       types.Span
 }
 
-// NewImportClause creates a new import clause.
+// NewImportClause creates an ImportClause from its components.
 func NewImportClause(symbols []Ident, fromModule Ident, span types.Span) ImportClause {
 	return ImportClause{
 		Symbols:    symbols,
@@ -62,7 +62,8 @@ func NewImportClause(symbols []Ident, fromModule Ident, span types.Span) ImportC
 	}
 }
 
-// ExportsClause is an exports clause (SMIv1 only).
+// ExportsClause records the presence of an EXPORTS clause (SMIv1 only).
+// The exported symbols are not tracked since EXPORTS is skipped.
 type ExportsClause struct {
 	Span types.Span
 }

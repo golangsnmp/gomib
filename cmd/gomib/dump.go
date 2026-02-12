@@ -83,7 +83,7 @@ func cmdDump(args []string) int {
 	return 0
 }
 
-// JSONOptions controls what gets included in JSON output.
+// JSONOptions controls which fields are included in dump output.
 type JSONOptions struct {
 	Compact       bool
 	IncludeTree   bool
@@ -93,11 +93,9 @@ type JSONOptions struct {
 	OidFilter     string
 }
 
-// buildDumpOutput creates the JSON output structure.
 func buildDumpOutput(m gomib.Mib, opts JSONOptions) *DumpOutput {
 	output := &DumpOutput{}
 
-	// Modules
 	for _, mod := range m.Modules() {
 		if !shouldIncludeModule(mod.Name(), opts.RequestedMods) {
 			continue
@@ -105,7 +103,6 @@ func buildDumpOutput(m gomib.Mib, opts JSONOptions) *DumpOutput {
 		output.Modules = append(output.Modules, buildModuleJSON(mod, opts))
 	}
 
-	// Types
 	for _, typ := range m.Types() {
 		if typ.Module() != nil && !shouldIncludeModule(typ.Module().Name(), opts.RequestedMods) {
 			continue
@@ -113,7 +110,6 @@ func buildDumpOutput(m gomib.Mib, opts JSONOptions) *DumpOutput {
 		output.Types = append(output.Types, buildTypeJSON(typ, opts))
 	}
 
-	// Objects
 	for _, obj := range m.Objects() {
 		if obj.Module() != nil && !shouldIncludeModule(obj.Module().Name(), opts.RequestedMods) {
 			continue
@@ -121,7 +117,6 @@ func buildDumpOutput(m gomib.Mib, opts JSONOptions) *DumpOutput {
 		output.Objects = append(output.Objects, buildObjectJSON(obj, opts))
 	}
 
-	// Notifications
 	for _, notif := range m.Notifications() {
 		if notif.Module() != nil && !shouldIncludeModule(notif.Module().Name(), opts.RequestedMods) {
 			continue
@@ -129,7 +124,6 @@ func buildDumpOutput(m gomib.Mib, opts JSONOptions) *DumpOutput {
 		output.Notifications = append(output.Notifications, buildNotificationJSON(notif, opts))
 	}
 
-	// Tree
 	if opts.IncludeTree {
 		if opts.OidFilter != "" {
 			node := m.FindNode(opts.OidFilter)
@@ -137,14 +131,12 @@ func buildDumpOutput(m gomib.Mib, opts JSONOptions) *DumpOutput {
 				output.Tree = buildTreeJSON(node, opts)
 			}
 		} else {
-			// Build tree from root's children
 			root := m.Root()
 			if root != nil {
 				children := root.Children()
 				if len(children) == 1 {
 					output.Tree = buildTreeJSON(children[0], opts)
 				} else if len(children) > 1 {
-					// Wrap multiple roots
 					var trees []*TreeNodeJSON
 					for _, child := range children {
 						trees = append(trees, buildTreeJSON(child, opts))
@@ -158,7 +150,6 @@ func buildDumpOutput(m gomib.Mib, opts JSONOptions) *DumpOutput {
 		}
 	}
 
-	// Diagnostics
 	if opts.IncludeDiags {
 		for _, d := range m.Diagnostics() {
 			output.Diagnostics = append(output.Diagnostics, buildDiagnosticJSON(d))
@@ -219,7 +210,6 @@ func buildTypeJSON(typ gomib.Type, opts JSONOptions) TypeJSON {
 		t.Description = typ.Description()
 	}
 
-	// Constraints
 	for _, sr := range typ.Sizes() {
 		t.Size = append(t.Size, RangeJSON{Min: sr.Min, Max: sr.Max})
 	}
@@ -227,7 +217,6 @@ func buildTypeJSON(typ gomib.Type, opts JSONOptions) TypeJSON {
 		t.Range = append(t.Range, RangeJSON{Min: vr.Min, Max: vr.Max})
 	}
 
-	// Named values (enums/bits)
 	for _, nv := range typ.Enums() {
 		t.Enums = append(t.Enums, EnumJSON{Label: nv.Label, Value: nv.Value})
 	}
@@ -264,7 +253,6 @@ func buildObjectJSON(obj gomib.Object, opts JSONOptions) ObjectJSON {
 		o.Description = obj.Description()
 	}
 
-	// Index
 	for _, idx := range obj.Index() {
 		idxJSON := IndexJSON{Implied: idx.Implied}
 		if idx.Object != nil {
@@ -273,12 +261,10 @@ func buildObjectJSON(obj gomib.Object, opts JSONOptions) ObjectJSON {
 		o.Index = append(o.Index, idxJSON)
 	}
 
-	// Augments
 	if obj.Augments() != nil {
 		o.Augments = obj.Augments().Name()
 	}
 
-	// Named values
 	for _, nv := range obj.EffectiveEnums() {
 		o.Enums = append(o.Enums, EnumJSON{Label: nv.Label, Value: nv.Value})
 	}

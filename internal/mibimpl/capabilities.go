@@ -2,7 +2,8 @@ package mibimpl
 
 import "github.com/golangsnmp/gomib/mib"
 
-// Capabilities is the concrete implementation of mib.Capabilities.
+// Capabilities implements mib.Capabilities for AGENT-CAPABILITIES
+// definitions.
 type Capabilities struct {
 	name           string
 	node           *Node
@@ -13,8 +14,6 @@ type Capabilities struct {
 	productRelease string
 	supports       []mib.CapabilitiesModule
 }
-
-// Interface methods (mib.Capabilities)
 
 func (c *Capabilities) Name() string {
 	return c.name
@@ -69,8 +68,6 @@ func (c *Capabilities) String() string {
 	return c.name + " (" + c.OID().String() + ")"
 }
 
-// Mutation methods (for resolver use)
-
 func (c *Capabilities) SetNode(nd *Node) {
 	c.node = nd
 }
@@ -99,12 +96,12 @@ func (c *Capabilities) SetSupports(supports []mib.CapabilitiesModule) {
 	c.supports = supports
 }
 
-// InternalNode returns the concrete node for resolver use.
+// InternalNode returns the concrete node.
 func (c *Capabilities) InternalNode() *Node {
 	return c.node
 }
 
-// InternalModule returns the concrete module for resolver use.
+// InternalModule returns the concrete module.
 func (c *Capabilities) InternalModule() *Module {
 	return c.module
 }

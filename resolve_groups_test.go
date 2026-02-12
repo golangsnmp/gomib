@@ -7,8 +7,6 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// === Group collection access ===
-
 func TestGroupCount(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -63,12 +61,9 @@ func TestModuleGroupLookup(t *testing.T) {
 		testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 	}
 
-	// Non-existent group
 	testutil.Nil(t, snmpMIB.Group("noSuchGroup"),
 		"non-existent group should return nil")
 }
-
-// === FindGroup lookups ===
 
 func TestFindGroupByName(t *testing.T) {
 	m := loadTestMIB(t)
@@ -89,7 +84,6 @@ func TestFindGroupByQualifiedName(t *testing.T) {
 		testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 	}
 
-	// Wrong module
 	testutil.Nil(t, m.FindGroup("IF-MIB::snmpGroup"),
 		"snmpGroup should not be in IF-MIB")
 }
@@ -102,14 +96,12 @@ func TestFindGroupByOID(t *testing.T) {
 
 	oid := g.OID().String()
 
-	// Numeric OID lookup
 	g2 := m.FindGroup(oid)
 	testutil.NotNil(t, g2, "FindGroup by numeric OID %s should work", oid)
 	if g2 != nil {
 		testutil.Equal(t, "snmpGroup", g2.Name(), "group found by OID")
 	}
 
-	// Dotted OID lookup
 	g3 := m.FindGroup("." + oid)
 	testutil.NotNil(t, g3, "FindGroup by dotted OID .%s should work", oid)
 }
@@ -125,8 +117,6 @@ func TestFindGroupNotFound(t *testing.T) {
 		"non-existent module should return nil")
 }
 
-// === Group metadata ===
-
 func TestGroupMetadata(t *testing.T) {
 	m := loadTestMIB(t)
 
@@ -135,10 +125,8 @@ func TestGroupMetadata(t *testing.T) {
 		t.Fatal("snmpGroup not found")
 	}
 
-	// Name
 	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 
-	// Node
 	node := g.Node()
 	testutil.NotNil(t, node, "Group.Node() should not be nil")
 	if node != nil {
@@ -146,30 +134,23 @@ func TestGroupMetadata(t *testing.T) {
 		testutil.Equal(t, mib.KindGroup, node.Kind(), "node kind should be KindGroup")
 	}
 
-	// Module
 	mod := g.Module()
 	testutil.NotNil(t, mod, "Group.Module() should not be nil")
 	if mod != nil {
 		testutil.Equal(t, "SNMPv2-MIB", mod.Name(), "group module")
 	}
 
-	// OID
 	oid := g.OID()
 	testutil.Greater(t, len(oid), 0, "group OID should not be empty")
 
-	// Status
 	testutil.Equal(t, mib.StatusCurrent, g.Status(), "snmpGroup should be current")
 
-	// Description
 	desc := g.Description()
 	testutil.Greater(t, len(desc), 0, "snmpGroup should have a description")
 
-	// Not a notification group
 	testutil.False(t, g.IsNotificationGroup(),
 		"snmpGroup is an OBJECT-GROUP, not NOTIFICATION-GROUP")
 }
-
-// === Group members ===
 
 func TestObjectGroupMembers(t *testing.T) {
 	m := loadTestMIB(t)
@@ -219,12 +200,9 @@ func TestNotificationGroupMembers(t *testing.T) {
 		"authenticationFailure should be a member")
 }
 
-// === Node.Group() ===
-
 func TestNodeGroup(t *testing.T) {
 	m := loadTestMIB(t)
 
-	// Group node should have associated group
 	node := m.FindNode("snmpGroup")
 	if node == nil {
 		t.Fatal("snmpGroup node not found")
@@ -236,15 +214,12 @@ func TestNodeGroup(t *testing.T) {
 		testutil.Equal(t, "snmpGroup", g.Name(), "node Group() name")
 	}
 
-	// Non-group node should return nil
 	ifIndex := m.FindNode("ifIndex")
 	if ifIndex == nil {
 		t.Fatal("ifIndex not found")
 	}
 	testutil.Nil(t, ifIndex.Group(), "ifIndex should not have a Group()")
 }
-
-// === Node.Module() for group nodes ===
 
 func TestGroupNodeModule(t *testing.T) {
 	m := loadTestMIB(t)
@@ -261,8 +236,6 @@ func TestGroupNodeModule(t *testing.T) {
 			"snmpGroup node module should be SNMPv2-MIB")
 	}
 }
-
-// === Smaller groups ===
 
 func TestSmallObjectGroup(t *testing.T) {
 	m := loadTestMIB(t)

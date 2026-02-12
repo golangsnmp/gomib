@@ -6,7 +6,7 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// BaseModule represents SMI base modules (types and MACROs, not regular MIBs).
+// BaseModule identifies a well-known SMI base module (types and MACROs).
 type BaseModule int
 
 const (
@@ -26,7 +26,6 @@ const (
 	BaseModuleRFC1215
 )
 
-// baseModuleNames is the single source of truth for base module names.
 // Order matches the BaseModule iota constants.
 var baseModuleNames = [...]string{
 	"SNMPv2-SMI",
@@ -46,7 +45,7 @@ func (m BaseModule) Name() string {
 	return ""
 }
 
-// IsSMIv2 returns true if this is an SMIv2 module.
+// IsSMIv2 reports whether this is an SMIv2 base module.
 func (m BaseModule) IsSMIv2() bool {
 	switch m {
 	case BaseModuleSNMPv2SMI, BaseModuleSNMPv2TC, BaseModuleSNMPv2CONF:
@@ -56,7 +55,7 @@ func (m BaseModule) IsSMIv2() bool {
 	}
 }
 
-// IsSMIv1 returns true if this is an SMIv1 module.
+// IsSMIv1 reports whether this is an SMIv1 base module.
 func (m BaseModule) IsSMIv1() bool {
 	switch m {
 	case BaseModuleRFC1155SMI, BaseModuleRFC1065SMI, BaseModuleRFC1212, BaseModuleRFC1215:
@@ -66,7 +65,6 @@ func (m BaseModule) IsSMIv1() bool {
 	}
 }
 
-// baseModuleByName maps module names to BaseModule values.
 var baseModuleByName = func() map[string]BaseModule {
 	m := make(map[string]BaseModule, len(baseModuleNames))
 	for i, name := range baseModuleNames {
@@ -75,32 +73,31 @@ var baseModuleByName = func() map[string]BaseModule {
 	return m
 }()
 
-// BaseModuleFromName looks up a base module by name.
+// BaseModuleFromName returns the BaseModule for the given name, if any.
 func BaseModuleFromName(name string) (BaseModule, bool) {
 	m, ok := baseModuleByName[name]
 	return m, ok
 }
 
-// IsBaseModule returns true if the module name is a recognized base module.
+// IsBaseModule reports whether name is a recognized base module.
 func IsBaseModule(name string) bool {
 	_, ok := BaseModuleFromName(name)
 	return ok
 }
 
-// baseModuleCache holds lazily-created base modules.
 var (
 	baseModuleMu    sync.RWMutex
 	baseModuleCache = make(map[string]*Module)
 )
 
-// GetBaseModule returns the base module with the given name, or nil if not a base module.
-// Base modules are created on first access and cached.
+// GetBaseModule returns the Module for the named base module, or nil.
+// Modules are created on first access and cached.
 func GetBaseModule(name string) *Module {
 	if !IsBaseModule(name) {
 		return nil
 	}
 
-	// Fast path: check if already cached
+	// Fast path: read lock
 	baseModuleMu.RLock()
 	if mod, ok := baseModuleCache[name]; ok {
 		baseModuleMu.RUnlock()
@@ -108,11 +105,10 @@ func GetBaseModule(name string) *Module {
 	}
 	baseModuleMu.RUnlock()
 
-	// Slow path: create all base modules and cache them
+	// Slow path: write lock, create and cache all base modules
 	baseModuleMu.Lock()
 	defer baseModuleMu.Unlock()
 
-	// Double-check after acquiring write lock
 	if mod, ok := baseModuleCache[name]; ok {
 		return mod
 	}
@@ -124,7 +120,7 @@ func GetBaseModule(name string) *Module {
 	return baseModuleCache[name]
 }
 
-// AllBaseModules returns all base modules.
+// AllBaseModules returns every BaseModule constant.
 func AllBaseModules() []BaseModule {
 	result := make([]BaseModule, len(baseModuleNames))
 	for i := range baseModuleNames {
@@ -133,15 +129,12 @@ func AllBaseModules() []BaseModule {
 	return result
 }
 
-// BaseModuleNames returns the names of all base modules.
+// BaseModuleNames returns the canonical names of all base modules.
 func BaseModuleNames() []string {
 	return baseModuleNames[:]
 }
 
-// CreateBaseModules creates synthetic modules for all base modules.
-//
-// Returns modules in order: SNMPv2-SMI, SNMPv2-TC, SNMPv2-CONF,
-// RFC1155-SMI, RFC1065-SMI, RFC-1212, RFC-1215.
+// CreateBaseModules returns synthetic Module values for all base modules.
 // These should be prepended to the user module list before resolution.
 func CreateBaseModules() []*Module {
 	return []*Module{
@@ -155,37 +148,29 @@ func CreateBaseModules() []*Module {
 	}
 }
 
-// createSNMPv2SMI creates the synthetic SNMPv2-SMI module.
 func createSNMPv2SMI() *Module {
 	module := NewModule("SNMPv2-SMI", types.Synthetic)
 	module.Language = LanguageSMIv2
 
-	// Add OID root definitions
 	module.Definitions = append(module.Definitions, createOidDefinitions()...)
-
-	// Add base type definitions
 	module.Definitions = append(module.Definitions, createBaseTypeDefinitions()...)
 
 	return module
 }
 
-// createSNMPv2TC creates the synthetic SNMPv2-TC module.
 func createSNMPv2TC() *Module {
 	module := NewModule("SNMPv2-TC", types.Synthetic)
 	module.Language = LanguageSMIv2
 
-	// Add imports from SNMPv2-SMI (for base types used by TCs)
 	module.Imports = []Import{
 		NewImport("SNMPv2-SMI", "TimeTicks", types.Synthetic),
 	}
 
-	// Add textual convention definitions
 	module.Definitions = append(module.Definitions, createTCDefinitions()...)
 
 	return module
 }
 
-// createSNMPv2CONF creates the synthetic SNMPv2-CONF module.
 func createSNMPv2CONF() *Module {
 	module := NewModule("SNMPv2-CONF", types.Synthetic)
 	module.Language = LanguageSMIv2
@@ -193,33 +178,26 @@ func createSNMPv2CONF() *Module {
 	return module
 }
 
-// createRFC1155SMI creates the synthetic RFC1155-SMI module.
 func createRFC1155SMI() *Module {
 	module := NewModule("RFC1155-SMI", types.Synthetic)
 	module.Language = LanguageSMIv1
 
-	// Add SMIv1 type definitions
 	module.Definitions = append(module.Definitions, createSMIv1TypeDefinitions()...)
-
-	// Add OID root definitions (subset relevant to SMIv1)
 	module.Definitions = append(module.Definitions, createSMIv1OidDefinitions()...)
 
 	return module
 }
 
-// createRFC1065SMI creates the synthetic RFC1065-SMI module.
 func createRFC1065SMI() *Module {
 	module := NewModule("RFC1065-SMI", types.Synthetic)
 	module.Language = LanguageSMIv1
 
-	// Same content as RFC1155-SMI
 	module.Definitions = append(module.Definitions, createSMIv1TypeDefinitions()...)
 	module.Definitions = append(module.Definitions, createSMIv1OidDefinitions()...)
 
 	return module
 }
 
-// createRFC1212 creates the synthetic RFC-1212 module.
 func createRFC1212() *Module {
 	module := NewModule("RFC-1212", types.Synthetic)
 	module.Language = LanguageSMIv1
@@ -227,7 +205,6 @@ func createRFC1212() *Module {
 	return module
 }
 
-// createRFC1215 creates the synthetic RFC-1215 module.
 func createRFC1215() *Module {
 	module := NewModule("RFC-1215", types.Synthetic)
 	module.Language = LanguageSMIv1
@@ -235,9 +212,6 @@ func createRFC1215() *Module {
 	return module
 }
 
-// === Helper functions for creating types ===
-
-// constrainedIntRange creates a constrained INTEGER type with a value range.
 func constrainedIntRange(min, max RangeValue) TypeSyntax {
 	return &TypeSyntaxConstrained{
 		Base:       &TypeSyntaxTypeRef{Name: "INTEGER"},
@@ -245,7 +219,6 @@ func constrainedIntRange(min, max RangeValue) TypeSyntax {
 	}
 }
 
-// constrainedOctetSize creates a constrained OCTET STRING type with size constraints.
 func constrainedOctetSize(ranges []Range) TypeSyntax {
 	return &TypeSyntaxConstrained{
 		Base:       &TypeSyntaxOctetString{},
@@ -253,21 +226,18 @@ func constrainedOctetSize(ranges []Range) TypeSyntax {
 	}
 }
 
-// constrainedOctetFixed creates a constrained OCTET STRING with a single fixed size.
 func constrainedOctetFixed(size uint64) TypeSyntax {
 	return constrainedOctetSize([]Range{
 		{Min: &RangeValueUnsigned{Value: size}, Max: nil},
 	})
 }
 
-// constrainedOctetRange creates a constrained OCTET STRING with a size range.
 func constrainedOctetRange(min, max uint64) TypeSyntax {
 	return constrainedOctetSize([]Range{
 		NewRangeUnsigned(min, max),
 	})
 }
 
-// constrainedUintRange creates a constrained INTEGER with unsigned range (0..max).
 func constrainedUintRange(max uint64) TypeSyntax {
 	return constrainedIntRange(
 		&RangeValueUnsigned{Value: 0},
@@ -275,7 +245,6 @@ func constrainedUintRange(max uint64) TypeSyntax {
 	)
 }
 
-// makeOidValue creates a ValueAssignment for an OID definition.
 func makeOidValue(name string, components []OidComponent) Definition {
 	return &ValueAssignment{
 		Name: name,
@@ -284,7 +253,6 @@ func makeOidValue(name string, components []OidComponent) Definition {
 	}
 }
 
-// makeTypeDef creates a TypeDef for a type definition without explicit base type.
 func makeTypeDef(name string, syntax TypeSyntax) Definition {
 	return &TypeDef{
 		Name:                name,
@@ -299,7 +267,6 @@ func makeTypeDef(name string, syntax TypeSyntax) Definition {
 	}
 }
 
-// makeTypeDefWithBase creates a TypeDef for a base type definition with explicit base type.
 func makeTypeDefWithBase(name string, syntax TypeSyntax, base BaseType) Definition {
 	return &TypeDef{
 		Name:                name,
@@ -314,7 +281,6 @@ func makeTypeDefWithBase(name string, syntax TypeSyntax, base BaseType) Definiti
 	}
 }
 
-// makeTypeDefObsolete creates a TypeDef for an obsolete type definition.
 func makeTypeDefObsolete(name string, syntax TypeSyntax) Definition {
 	return &TypeDef{
 		Name:                name,
@@ -329,7 +295,6 @@ func makeTypeDefObsolete(name string, syntax TypeSyntax) Definition {
 	}
 }
 
-// makeTC creates a TypeDef for a textual convention.
 func makeTC(name, displayHint string, syntax TypeSyntax) Definition {
 	return &TypeDef{
 		Name:                name,
@@ -344,7 +309,6 @@ func makeTC(name, displayHint string, syntax TypeSyntax) Definition {
 	}
 }
 
-// makeTCObsolete creates a TypeDef for an obsolete textual convention.
 func makeTCObsolete(name, displayHint string, syntax TypeSyntax) Definition {
 	return &TypeDef{
 		Name:                name,
@@ -359,7 +323,6 @@ func makeTCObsolete(name, displayHint string, syntax TypeSyntax) Definition {
 	}
 }
 
-// makeTCWithEnum creates a TypeDef for a textual convention with enumerated values.
 func makeTCWithEnum(name string, values []NamedNumber) Definition {
 	return &TypeDef{
 		Name:                name,
@@ -373,8 +336,6 @@ func makeTCWithEnum(name string, values []NamedNumber) Definition {
 		Span:                types.Synthetic,
 	}
 }
-
-// === OID definitions ===
 
 func createOidDefinitions() []Definition {
 	return []Definition{
@@ -472,8 +433,6 @@ func createOidDefinitions() []Definition {
 	}
 }
 
-// === SMIv2 base type definitions ===
-
 func createBaseTypeDefinitions() []Definition {
 	int32Min := int64(-2147483648)
 	int32Max := int64(2147483647)
@@ -542,8 +501,6 @@ func createBaseTypeDefinitions() []Definition {
 	}
 }
 
-// === SMIv1 type definitions ===
-
 func createSMIv1TypeDefinitions() []Definition {
 	uint32Max := uint64(4294967295)
 
@@ -564,8 +521,6 @@ func createSMIv1TypeDefinitions() []Definition {
 		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}),
 	}
 }
-
-// === SMIv1 OID definitions ===
 
 func createSMIv1OidDefinitions() []Definition {
 	return []Definition{
@@ -613,8 +568,6 @@ func createSMIv1OidDefinitions() []Definition {
 		}),
 	}
 }
-
-// === Textual convention definitions ===
 
 func createTCDefinitions() []Definition {
 	int32Max := int64(2147483647)

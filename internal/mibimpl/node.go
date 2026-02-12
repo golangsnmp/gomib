@@ -8,12 +8,12 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// Node is the concrete implementation of mib.Node.
+// Node implements mib.Node, representing a single arc in the OID tree.
 type Node struct {
 	arc          uint32
 	name         string
 	kind         mib.Kind
-	module       *Module // defining module (for OID assignments)
+	module       *Module
 	obj          *Object
 	notif        *Notification
 	group        *Group
@@ -22,8 +22,6 @@ type Node struct {
 	parent       *Node
 	children     map[uint32]*Node
 }
-
-// Interface methods (mib.Node)
 
 func (n *Node) Arc() uint32 {
 	return n.arc
@@ -42,7 +40,6 @@ func (n *Node) IsRoot() bool {
 }
 
 func (n *Node) Module() mib.Module {
-	// Check associated object/notification/group first, then direct module
 	if n.obj != nil {
 		return n.obj.module
 	}
@@ -68,12 +65,10 @@ func (n *Node) OID() mib.Oid {
 	if n.parent == nil {
 		return nil
 	}
-	// Count depth
 	depth := 0
 	for nd := n; nd.parent != nil; nd = nd.parent {
 		depth++
 	}
-	// Build OID from root down
 	oid := make(mib.Oid, depth)
 	i := depth - 1
 	for nd := n; nd.parent != nil; nd = nd.parent {
@@ -199,7 +194,8 @@ func (n *Node) LongestPrefix(oid mib.Oid) mib.Node {
 	return deepest
 }
 
-// String returns a brief summary: "name (oid)" or just "(oid)" for unnamed nodes.
+// String returns a brief summary: "name (oid)" or just "(oid)" for
+// unnamed nodes.
 func (n *Node) String() string {
 	if n == nil {
 		return "<nil>"
@@ -213,8 +209,7 @@ func (n *Node) String() string {
 	return n.name + " (" + n.OID().String() + ")"
 }
 
-// Mutation methods (not in interface, for resolver use)
-
+// GetOrCreateChild returns the child at arc, creating it if absent.
 func (n *Node) GetOrCreateChild(arc uint32) *Node {
 	if n.children == nil {
 		n.children = make(map[uint32]*Node)
@@ -263,37 +258,37 @@ func (n *Node) SetCapabilities(c *Capabilities) {
 	n.capabilities = c
 }
 
-// InternalObject returns the concrete object for resolver use.
+// InternalObject returns the concrete object.
 func (n *Node) InternalObject() *Object {
 	return n.obj
 }
 
-// InternalNotification returns the concrete notification for resolver use.
+// InternalNotification returns the concrete notification.
 func (n *Node) InternalNotification() *Notification {
 	return n.notif
 }
 
-// InternalGroup returns the concrete group for resolver use.
+// InternalGroup returns the concrete group.
 func (n *Node) InternalGroup() *Group {
 	return n.group
 }
 
-// InternalCompliance returns the concrete compliance for resolver use.
+// InternalCompliance returns the concrete compliance.
 func (n *Node) InternalCompliance() *Compliance {
 	return n.compliance
 }
 
-// InternalCapabilities returns the concrete capabilities for resolver use.
+// InternalCapabilities returns the concrete capabilities.
 func (n *Node) InternalCapabilities() *Capabilities {
 	return n.capabilities
 }
 
-// InternalParent returns the concrete parent for resolver use.
+// InternalParent returns the concrete parent node.
 func (n *Node) InternalParent() *Node {
 	return n.parent
 }
 
-// InternalModule returns the concrete module for resolver use.
+// InternalModule returns the concrete module.
 func (n *Node) InternalModule() *Module {
 	return n.module
 }

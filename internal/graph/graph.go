@@ -17,13 +17,10 @@ const (
 	NodeKindNotification
 )
 
-// Graph is a dependency graph of symbols.
+// Graph is a dependency graph of symbols with forward and reverse edges.
 type Graph struct {
-	// nodes maps symbols to their metadata
-	nodes map[Symbol]*Node
-	// edges maps each symbol to symbols it depends on
-	edges map[Symbol][]Symbol
-	// reverse maps each symbol to symbols that depend on it
+	nodes   map[Symbol]*Node
+	edges   map[Symbol][]Symbol
 	reverse map[Symbol][]Symbol
 }
 
@@ -43,7 +40,7 @@ func New() *Graph {
 	}
 }
 
-// AddNode adds a node to the graph.
+// AddNode registers a symbol with its kind, if not already present.
 func (g *Graph) AddNode(sym Symbol, kind NodeKind) {
 	if _, exists := g.nodes[sym]; !exists {
 		g.nodes[sym] = &Node{
@@ -54,10 +51,9 @@ func (g *Graph) AddNode(sym Symbol, kind NodeKind) {
 	}
 }
 
-// AddEdge adds a dependency edge from -> to.
-// This means 'from' depends on 'to' (to must be resolved before from).
+// AddEdge records that "from" depends on "to", meaning "to" must be
+// resolved before "from". Missing nodes are created implicitly.
 func (g *Graph) AddEdge(from, to Symbol) {
-	// Ensure nodes exist
 	if _, ok := g.nodes[from]; !ok {
 		g.nodes[from] = &Node{Symbol: from}
 	}
@@ -65,28 +61,26 @@ func (g *Graph) AddEdge(from, to Symbol) {
 		g.nodes[to] = &Node{Symbol: to}
 	}
 
-	// Add forward edge
 	g.edges[from] = append(g.edges[from], to)
-	// Add reverse edge
 	g.reverse[to] = append(g.reverse[to], from)
 }
 
-// Node returns the node for a symbol, or nil if not found.
+// Node returns the metadata for a symbol, or nil if not present.
 func (g *Graph) Node(sym Symbol) *Node {
 	return g.nodes[sym]
 }
 
-// Dependencies returns the symbols that sym depends on.
+// Dependencies returns the symbols that sym depends on (forward edges).
 func (g *Graph) Dependencies(sym Symbol) []Symbol {
 	return g.edges[sym]
 }
 
-// Dependents returns the symbols that depend on sym.
+// Dependents returns the symbols that depend on sym (reverse edges).
 func (g *Graph) Dependents(sym Symbol) []Symbol {
 	return g.reverse[sym]
 }
 
-// Nodes returns all nodes in the graph.
+// Nodes returns all registered nodes.
 func (g *Graph) Nodes() []*Node {
 	result := make([]*Node, 0, len(g.nodes))
 	for _, n := range g.nodes {
@@ -95,14 +89,14 @@ func (g *Graph) Nodes() []*Node {
 	return result
 }
 
-// MarkResolved marks a symbol as resolved.
+// MarkResolved flags a symbol as fully resolved.
 func (g *Graph) MarkResolved(sym Symbol) {
 	if n := g.nodes[sym]; n != nil {
 		n.Resolved = true
 	}
 }
 
-// IsResolved returns true if the symbol is marked as resolved.
+// IsResolved reports whether the symbol has been resolved.
 func (g *Graph) IsResolved(sym Symbol) bool {
 	if n := g.nodes[sym]; n != nil {
 		return n.Resolved

@@ -263,7 +263,6 @@ func TestProblemNotifications(t *testing.T) {
 		}
 		testutil.True(t, hasStatus,
 			"problemNotifStatus should be in varbinds (resolved object)")
-		// The undefined varbind should NOT be present
 		for _, v := range varbinds {
 			if v == "problemUndefinedVarbind" {
 				t.Errorf("problemUndefinedVarbind should not appear in resolved varbinds")
@@ -456,7 +455,6 @@ func TestProblemAccess(t *testing.T) {
 func TestProblemImports(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-IMPORTS-MIB")
 
-	// SMI base types (from SNMPv2-SMI) should resolve via fallback
 	smiTests := []struct {
 		name     string
 		wantType string // normalized base type per net-snmp
@@ -510,8 +508,6 @@ func TestProblemImports(t *testing.T) {
 func containsYear(date, year string) bool {
 	return strings.Contains(date, year)
 }
-
-// === PROBLEM-SMIv1v2-MIX-MIB ===
 
 // TestProblemSMIv1v2AccessKeyword verifies that the parser accepts the SMIv1
 // ACCESS keyword in an SMIv2 module and resolves the access value correctly.
@@ -572,7 +568,6 @@ func TestProblemSMIv1v2TrapType(t *testing.T) {
 	testutil.Equal(t, "1.3.6.1.4.1.99998.1.1.4", normalObj.OID().String(),
 		"normal SMIv2 object OID should resolve correctly alongside TRAP-TYPE")
 
-	// Check if the v2 notification also resolved
 	notif := m.FindNotification("problemV2Notification")
 	testutil.NotNil(t, notif, "FindNotification(problemV2Notification)")
 	testutil.Equal(t, "1.3.6.1.4.1.99998.1.2.1", notif.OID().String(),
@@ -613,8 +608,6 @@ func TestProblemSMIv1v2CounterGauge(t *testing.T) {
 	})
 }
 
-// === PROBLEM-INDEX-MIB ===
-
 // TestProblemIndexBareType verifies that tables with bare type names in INDEX
 // clauses (e.g., INDEX { INTEGER }) load without crashing.
 // Ground truth: net-snmp silently accepts; smilint rejects with syntax error.
@@ -622,14 +615,12 @@ func TestProblemSMIv1v2CounterGauge(t *testing.T) {
 func TestProblemIndexBareType(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-INDEX-MIB")
 
-	// The table should parse and resolve
 	entry := m.FindObject("problemBareTypeEntry")
 	testutil.NotNil(t, entry, "FindObject(problemBareTypeEntry)")
 
 	kind := testutil.NormalizeKind(entry.Kind())
 	testutil.Equal(t, "row", kind, "entry should be a row")
 
-	// The value column should still resolve
 	val := m.FindObject("problemBareTypeValue")
 	testutil.NotNil(t, val, "problemBareTypeValue should resolve even with bare type index")
 }
@@ -652,7 +643,6 @@ func TestProblemIndexMacAddress(t *testing.T) {
 	testutil.Equal(t, "problemMacIndexAddress", indexes[0].Name,
 		"MacAddress index should resolve")
 
-	// Verify the column resolved
 	port := m.FindObject("problemMacIndexPort")
 	testutil.NotNil(t, port, "problemMacIndexPort column should resolve")
 }
@@ -729,8 +719,6 @@ func TestProblemIndexTableKinds(t *testing.T) {
 		})
 	}
 }
-
-// === PROBLEM-DEFVAL-MIB ===
 
 // TestProblemDefvalOidRef verifies that OID-valued DEFVALs (e.g., zeroDotZero)
 // are parsed and stored. gomib normalizes to numeric OID form.
@@ -871,7 +859,6 @@ func TestProblemDefvalEmptyBits(t *testing.T) {
 	dv := obj.DefaultValue()
 	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalEmptyBits")
 
-	// Empty BITS should produce an empty bit label list
 	if dv.Kind() == mib.DefValKindBits {
 		labels, ok := mib.DefValAs[[]string](dv)
 		if !ok {
@@ -903,7 +890,6 @@ func TestProblemDefvalMultiBits(t *testing.T) {
 			return
 		}
 		testutil.Equal(t, 2, len(labels), "multi BITS should have 2 labels")
-		// Verify the labels are present (order may vary)
 		hasRead, hasWrite := false, false
 		for _, l := range labels {
 			if l == "read" {
@@ -954,8 +940,6 @@ func TestProblemDefvalSpecialString(t *testing.T) {
 	}
 }
 
-// === PROBLEM-IMPORTS-ALIAS-MIB ===
-
 // TestProblemImportsAliasNormal verifies that module alias resolution works
 // at normal strictness (safe fallback).
 // Ground truth: net-snmp fails on SNMPv2-SMI-v1 (unlike gomib which has alias table).
@@ -963,16 +947,13 @@ func TestProblemDefvalSpecialString(t *testing.T) {
 func TestProblemImportsAliasNormal(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-IMPORTS-ALIAS-MIB", mib.StrictnessNormal)
 
-	// At normal level, module aliases (safe fallback) should be active
 	str := m.FindObject("problemAliasString")
 	testutil.NotNil(t, str, "FindObject(problemAliasString)")
 
-	// Verify the type resolved through the alias chain
 	testutil.NotNil(t, str.Type(), "type for problemAliasString")
 	testutil.Equal(t, mib.BaseOctetString, str.Type().EffectiveBase(),
 		"DisplayString from SNMPv2-TC-v1 should resolve to OCTET STRING")
 
-	// OID should resolve through aliased enterprises
 	testutil.Equal(t, "1.3.6.1.4.1.99998.3.1.1", str.OID().String(),
 		"OID should resolve through aliased module imports")
 }
@@ -983,18 +964,14 @@ func TestProblemImportsAliasNormal(t *testing.T) {
 func TestProblemImportsAliasStrict(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-IMPORTS-ALIAS-MIB", mib.StrictnessStrict)
 
-	// At strict level, module aliases are disabled
 	unresolved := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", "import")
 	if len(unresolved) == 0 {
 		t.Error("strict mode should have unresolved imports from aliased module names")
 	}
 
-	// Objects should not resolve since imports failed
 	str := m.FindObject("problemAliasString")
 	testutil.Nil(t, str, "objects should not resolve in strict mode with aliased imports")
 }
-
-// === PROBLEM-NAMING-MIB ===
 
 // TestProblemNamingUppercase verifies that uppercase-starting identifiers
 // (common in Huawei MIBs) are handled by the parser in permissive mode.
@@ -1003,11 +980,9 @@ func TestProblemImportsAliasStrict(t *testing.T) {
 func TestProblemNamingUppercase(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-NAMING-MIB")
 
-	// Normal lowercase object should always resolve
 	normalObj := m.FindObject("problemNormalObject")
 	testutil.NotNil(t, normalObj, "normal lowercase object should resolve")
 
-	// Uppercase identifiers should resolve in permissive mode
 	uppercaseNames := []string{
 		"NetEngine8000SysOid",
 		"S6730-H28Y4C",
@@ -1030,7 +1005,6 @@ func TestProblemNamingUppercase(t *testing.T) {
 func TestProblemNamingHyphens(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-NAMING-MIB")
 
-	// Collect all hyphen diagnostics for this module
 	hyphenDiags := make(map[string]bool)
 	for _, d := range m.Diagnostics() {
 		if d.Code == "identifier-hyphen-smiv2" && d.Module == "PROBLEM-NAMING-MIB" {
@@ -1038,7 +1012,6 @@ func TestProblemNamingHyphens(t *testing.T) {
 		}
 	}
 
-	// These three identifiers contain hyphens and should be flagged
 	wantFlagged := []string{"S6730-H28Y4C", "S5735-L8T4X-A1", "NetEngine-A800"}
 	for _, name := range wantFlagged {
 		found := false
@@ -1052,7 +1025,6 @@ func TestProblemNamingHyphens(t *testing.T) {
 			"should emit identifier-hyphen-smiv2 diagnostic for %s", name)
 	}
 
-	// NetEngine8000SysOid has no hyphens and should NOT be flagged
 	for msg := range hyphenDiags {
 		if strings.Contains(msg, "NetEngine8000SysOid") {
 			t.Errorf("NetEngine8000SysOid should not be flagged (no hyphens), got: %s", msg)

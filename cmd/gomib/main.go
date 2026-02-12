@@ -50,7 +50,6 @@ func main() {
 func run() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
-	// Parse global flags manually to support -vv and subcommands
 	args := os.Args[1:]
 	var cmdArgs []string
 	var cmd string
@@ -67,7 +66,7 @@ func run() int {
 		case arg == "-vv":
 			verbose = 2
 		case arg == "--no-color":
-			// noColor is reserved for future use
+			// reserved for future use
 		case arg == "-p" || arg == "--path":
 			if i+1 < len(args) {
 				i++
@@ -78,7 +77,6 @@ func run() int {
 		case strings.HasPrefix(arg, "--path="):
 			paths = append(paths, arg[7:])
 		case len(arg) > 0 && arg[0] == '-':
-			// Unknown flag, pass to subcommand
 			cmdArgs = append(cmdArgs, arg)
 		default:
 			if cmd == "" {
@@ -120,8 +118,6 @@ func run() int {
 	}
 }
 
-// setupLogger creates a logger based on verbosity level.
-// Returns nil if verbosity is 0 (no logging).
 func setupLogger() *slog.Logger {
 	if verbose == 0 {
 		return nil
@@ -135,7 +131,6 @@ func setupLogger() *slog.Logger {
 	}))
 }
 
-// getSources returns MIB sources from -p flags or default paths.
 func getSources() []gomib.Source {
 	if len(paths) > 0 {
 		var sources []gomib.Source
@@ -151,7 +146,6 @@ func getSources() []gomib.Source {
 	return defaultSources()
 }
 
-// defaultSources returns net-snmp compatible search paths.
 func defaultSources() []gomib.Source {
 	var sources []gomib.Source
 	searchPaths := getDefaultSearchPaths()
@@ -163,21 +157,17 @@ func defaultSources() []gomib.Source {
 	return sources
 }
 
-// getDefaultSearchPaths returns net-snmp compatible MIB paths.
 func getDefaultSearchPaths() []string {
 	var paths []string
 
-	// MIBDIRS environment variable
 	if mibdirs := os.Getenv("MIBDIRS"); mibdirs != "" {
 		paths = append(paths, strings.Split(mibdirs, ":")...)
 	}
 
-	// User directory
 	if home, err := os.UserHomeDir(); err == nil {
 		paths = append(paths, home+"/.snmp/mibs")
 	}
 
-	// System directories
 	paths = append(paths,
 		"/usr/share/snmp/mibs",
 		"/usr/local/share/snmp/mibs",
@@ -186,12 +176,10 @@ func getDefaultSearchPaths() []string {
 	return paths
 }
 
-// loadMib loads and resolves MIB modules.
 func loadMib(modules []string) (gomib.Mib, error) {
 	return loadMibWithOpts(modules)
 }
 
-// loadMibWithOpts loads and resolves MIB modules with additional options.
 func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (gomib.Mib, error) {
 	sources := getSources()
 	if len(sources) == 0 {
@@ -217,7 +205,6 @@ func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (gomib.Mib
 	return gomib.Load(context.Background(), source, opts...)
 }
 
-// printError prints an error message to stderr.
 func printError(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "error: "+format+"\n", args...)
 }

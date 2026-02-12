@@ -2,7 +2,8 @@ package mibimpl
 
 import "github.com/golangsnmp/gomib/mib"
 
-// Module is the concrete implementation of mib.Module.
+// Module implements mib.Module, holding all definitions from a single
+// MIB module.
 type Module struct {
 	name         string
 	language     mib.Language
@@ -12,17 +13,14 @@ type Module struct {
 	description  string
 	revisions    []mib.Revision
 
-	// Internal collections
 	objects       []*Object
 	types         []*Type
 	notifications []*Notification
 	groups        []*Group
 	compliances   []*Compliance
 	capabilities  []*Capabilities
-	nodes         []*Node // for OBJECT IDENTIFIER assignments
+	nodes         []*Node
 }
-
-// Interface methods (mib.Module)
 
 func (m *Module) Name() string {
 	return m.name
@@ -203,8 +201,6 @@ func (m *Module) CapabilitiesByName(name string) mib.Capabilities {
 	return nil
 }
 
-// Mutation methods (for resolver use)
-
 func (m *Module) SetLanguage(l mib.Language) {
 	m.language = l
 }
@@ -257,7 +253,7 @@ func (m *Module) AddNode(n *Node) {
 	m.nodes = append(m.nodes, n)
 }
 
-// InternalObject returns the concrete object for resolver use.
+// InternalObject looks up a concrete object by name.
 func (m *Module) InternalObject(name string) *Object {
 	for _, obj := range m.objects {
 		if obj.name == name {
@@ -267,7 +263,7 @@ func (m *Module) InternalObject(name string) *Object {
 	return nil
 }
 
-// InternalType returns the concrete type for resolver use.
+// InternalType looks up a concrete type by name.
 func (m *Module) InternalType(name string) *Type {
 	for _, t := range m.types {
 		if t.name == name {
@@ -277,32 +273,32 @@ func (m *Module) InternalType(name string) *Type {
 	return nil
 }
 
-// InternalObjects returns the concrete objects slice for resolver use.
+// InternalObjects returns the concrete objects slice.
 func (m *Module) InternalObjects() []*Object {
 	return m.objects
 }
 
-// InternalTypes returns the concrete types slice for resolver use.
+// InternalTypes returns the concrete types slice.
 func (m *Module) InternalTypes() []*Type {
 	return m.types
 }
 
-// InternalNotifications returns the concrete notifications slice for resolver use.
+// InternalNotifications returns the concrete notifications slice.
 func (m *Module) InternalNotifications() []*Notification {
 	return m.notifications
 }
 
-// InternalGroups returns the concrete groups slice for resolver use.
+// InternalGroups returns the concrete groups slice.
 func (m *Module) InternalGroups() []*Group {
 	return m.groups
 }
 
-// InternalCompliances returns the concrete compliances slice for resolver use.
+// InternalCompliances returns the concrete compliances slice.
 func (m *Module) InternalCompliances() []*Compliance {
 	return m.compliances
 }
 
-// InternalCapabilities returns the concrete capabilities slice for resolver use.
+// InternalCapabilities returns the concrete capabilities slice.
 func (m *Module) InternalCapabilities() []*Capabilities {
 	return m.capabilities
 }

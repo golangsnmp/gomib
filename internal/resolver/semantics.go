@@ -12,8 +12,8 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
+// analyzeSemantics is the semantic analysis phase entry point.
 func analyzeSemantics(ctx *ResolverContext) {
-	// Collect object type refs once and pass to all functions
 	objRefs := collectObjectTypeRefs(ctx)
 	inferNodeKinds(ctx, objRefs)
 	resolveTableSemantics(ctx, objRefs)
@@ -48,11 +48,10 @@ func inferNodeKinds(ctx *ResolverContext, objRefs []objectTypeRef) {
 		}
 	}
 
-	// Collect row children inline instead of separate tree walk
+	// Reclassify scalar children of row nodes as columns
 	columns := 0
 	for _, row := range rowNodes {
 		for _, child := range row.Children() {
-			// Type assert to get concrete node
 			if childNode, ok := child.(*mibimpl.Node); ok {
 				if childNode.Kind() == mib.KindScalar {
 					childNode.SetKind(mib.KindColumn)
@@ -81,9 +80,7 @@ type notificationRef struct {
 	notif *module.Notification
 }
 
-// collectDefinitionRefs iterates all definitions across modules, applying
-// matchFn to each. If matchFn returns a non-nil result, it's appended to the
-// returned slice.
+// collectDefinitionRefs collects definitions matching matchFn across all modules.
 func collectDefinitionRefs[T any](ctx *ResolverContext, matchFn func(*module.Module, module.Definition) (T, bool)) []T {
 	var refs []T
 	for _, mod := range ctx.Modules {
@@ -159,39 +156,32 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 		resolved.SetUnits(obj.Units)
 		resolved.SetReference(obj.Reference)
 
-		// Resolve type and extract inline constraints
 		if t, ok := resolveTypeSyntax(ctx, obj.Syntax, ref.mod, obj.Name, obj.Span); ok {
 			resolved.SetType(t)
 		}
 
-		// Extract inline constraints and named values
 		sizes, ranges := extractConstraints(obj.Syntax)
 		resolved.SetEffectiveSizes(sizes)
 		resolved.SetEffectiveRanges(ranges)
-		// Route to bits or enums based on syntax type
 		if _, isBits := obj.Syntax.(*module.TypeSyntaxBits); isBits {
 			resolved.SetEffectiveBits(extractNamedValues(obj.Syntax))
 		} else {
 			resolved.SetEffectiveEnums(extractNamedValues(obj.Syntax))
 		}
 
-		// INDEX and AUGMENTS are resolved in a second pass after all objects exist
-		// This ensures index objects exist when we try to link them
+		// INDEX and AUGMENTS are resolved in a second pass after all
+		// objects exist so that cross-references can be linked.
 
-		// Convert DEFVAL
 		if obj.DefVal != nil {
 			resolved.SetDefaultValue(convertDefVal(ctx, obj.DefVal, ref.mod, obj.Syntax))
 		}
 
-		// Pre-compute effective values from type chain
 		computeEffectiveValues(resolved)
 
 		ctx.Builder.AddObject(resolved)
 
-		// Only set this Object on the node if this module is preferred over
-		// any existing module. This handles cases where multiple modules define
-		// the same OID (e.g., IF-MIB and RFC1213-MIB both define ifEntry).
-		// We prefer SMIv2 modules over SMIv1.
+		// Prefer SMIv2 modules when multiple modules define the same OID
+		// (e.g., IF-MIB and RFC1213-MIB both define ifEntry).
 		currentObj := node.InternalObject()
 		var currentMod *mibimpl.Module
 		if currentObj != nil {
@@ -208,13 +198,12 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 		}
 	}
 
-	// Second pass: resolve INDEX and AUGMENTS references now that all objects exist
+	// Second pass: link INDEX and AUGMENTS now that all objects exist.
+	// Use the module's own Object instance, not the shared node's, because
+	// multiple modules can define objects at the same OID.
 	for _, ref := range objRefs {
 		obj := ref.obj
 
-		// Get the Object from the module's collection, not from the shared node.
-		// Multiple modules can define objects at the same OID (e.g., IF-MIB and
-		// RFC1213-MIB both define ifEntry). Each module has its own Object instance.
 		resolvedMod := ctx.ModuleToResolved[ref.mod]
 		if resolvedMod == nil {
 			continue
@@ -224,7 +213,6 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 			continue
 		}
 
-		// Resolve INDEX
 		if len(obj.Index) > 0 {
 			var indexEntries []mib.IndexEntry
 			for _, item := range obj.Index {
@@ -240,7 +228,6 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 			resolvedObj.SetIndex(indexEntries)
 		}
 
-		// Resolve AUGMENTS
 		if obj.Augments != "" {
 			if augNode, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); ok {
 				if augNode.InternalObject() != nil {
@@ -261,7 +248,7 @@ func computeEffectiveValues(obj *mibimpl.Object) {
 		return
 	}
 
-	// Walk the type chain to find effective values
+	// Inherit display hint, constraints, and enums from ancestor types
 	for t != nil {
 		if obj.EffectiveDisplayHint() == "" && t.DisplayHint() != "" {
 			obj.SetEffectiveHint(t.DisplayHint())
@@ -303,7 +290,6 @@ func createResolvedNotifications(ctx *ResolverContext) {
 			var objNode *mibimpl.Node
 			var ok bool
 
-			// Try module-scoped lookup first
 			objNode, ok = ctx.LookupNodeForModule(ref.mod, objName)
 
 			// Permissive only: global lookup for objects not explicitly imported
@@ -605,7 +591,7 @@ func resolveTypeSyntax(ctx *ResolverContext, syntax module.TypeSyntax, mod *modu
 	case *module.TypeSyntaxConstrained:
 		return resolveTypeSyntax(ctx, s.Base, mod, objectName, span)
 	case *module.TypeSyntaxIntegerEnum:
-		// If there's a base type name (e.g., TPSPRateType { kbps(1) }), use it
+		// Named base type (e.g., TPSPRateType { kbps(1) })
 		if s.Base != "" {
 			if t, ok := ctx.LookupTypeForModule(mod, s.Base); ok {
 				return t, true
@@ -613,7 +599,7 @@ func resolveTypeSyntax(ctx *ResolverContext, syntax module.TypeSyntax, mod *modu
 			ctx.RecordUnresolvedType(mod, objectName, s.Base, span)
 			return nil, false
 		}
-		// Otherwise fall back to INTEGER (the ASN.1 primitive, always seeded)
+		// Bare INTEGER { ... } enum with no named base
 		if t, ok := ctx.LookupType("INTEGER"); ok {
 			return t, true
 		}
@@ -665,7 +651,8 @@ func convertDefVal(ctx *ResolverContext, defval module.DefVal, mod *module.Modul
 		dv := mib.NewDefValBytes(bytes, raw)
 		return &dv
 	case *module.DefValEnum:
-		// Check if this is actually an OID reference based on object's type
+		// Parser emits bare names as DefValEnum, but for OID-typed objects
+		// the name is actually an OID reference.
 		if isOIDType(syntax) {
 			if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
 				oid := mib.Oid(node.OID())
@@ -804,7 +791,6 @@ func isOIDType(syntax module.TypeSyntax) bool {
 	case *module.TypeSyntaxObjectIdentifier:
 		return true
 	case *module.TypeSyntaxTypeRef:
-		// Check for common OID type names
 		return s.Name == "OBJECT IDENTIFIER" || s.Name == "AutonomousType"
 	case *module.TypeSyntaxConstrained:
 		return isOIDType(s.Base)
