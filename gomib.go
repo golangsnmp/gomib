@@ -23,6 +23,7 @@ type loadConfig struct {
 	logger      *slog.Logger
 	extensions  []string
 	noHeuristic bool
+	systemPaths bool
 	diagConfig  mib.DiagnosticConfig
 }
 
@@ -116,6 +117,9 @@ func LoadModules(ctx context.Context, names []string, source Source, opts ...Loa
 // loadFromSources loads all modules if names is nil, or only named
 // modules (plus dependencies) if names is non-nil.
 func loadFromSources(ctx context.Context, sources []Source, names []string, cfg loadConfig) (Mib, error) {
+	if cfg.systemPaths {
+		sources = append(sources, discoverSystemSources()...)
+	}
 	if len(sources) == 0 {
 		return nil, ErrNoSources
 	}
