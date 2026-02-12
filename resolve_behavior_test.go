@@ -47,15 +47,9 @@ func TestTypeChainBaseTypeInheritance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obj := m.FindObject(tt.name)
-			if obj == nil {
-				t.Skipf("%s not found", tt.name)
-				return
-			}
+			testutil.NotNil(t, obj, "FindObject(%s)", tt.name)
 			typ := obj.Type()
-			if typ == nil {
-				t.Skipf("%s type not resolved", tt.name)
-				return
-			}
+			testutil.NotNil(t, typ, "Type() for %s", tt.name)
 			testutil.Equal(t, tt.wantBase, typ.EffectiveBase(),
 				"base type for %s", tt.name)
 		})
@@ -71,15 +65,8 @@ func TestTypeChainDisplayHintInheritance(t *testing.T) {
 	t.Run("direct hint", func(t *testing.T) {
 		// MyString has DISPLAY-HINT "255a"
 		obj := m.FindObject("problemTwoLevelChain")
-		if obj == nil {
-			t.Skip("problemTwoLevelChain not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemTwoLevelChain)")
 		hint := obj.EffectiveDisplayHint()
-		if hint == "" {
-			t.Skip("no effective display hint - hint inheritance may not be implemented")
-			return
-		}
 		testutil.Equal(t, "255a", hint,
 			"two-level chain should inherit display hint from MyString")
 	})
@@ -87,25 +74,15 @@ func TestTypeChainDisplayHintInheritance(t *testing.T) {
 	t.Run("inherited through chain", func(t *testing.T) {
 		// MySpecialGauge -> MyFormattedGauge (has "d-2") -> Gauge32
 		obj := m.FindObject("problemInheritedHint")
-		if obj == nil {
-			t.Skip("problemInheritedHint not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemInheritedHint)")
 		hint := obj.EffectiveDisplayHint()
-		if hint == "" {
-			t.Skip("no effective display hint - chain inheritance may not reach through 2 levels")
-			return
-		}
 		testutil.Equal(t, "d-2", hint,
 			"should inherit display hint from MyFormattedGauge")
 	})
 
 	t.Run("no hint on primitive", func(t *testing.T) {
 		obj := m.FindObject("problemDirectInteger")
-		if obj == nil {
-			t.Skip("problemDirectInteger not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemDirectInteger)")
 		testutil.Equal(t, "", obj.EffectiveDisplayHint(),
 			"direct Integer32 should have no display hint")
 	})
@@ -119,15 +96,9 @@ func TestTypeChainSizeInheritance(t *testing.T) {
 	t.Run("direct size", func(t *testing.T) {
 		// MyString has SIZE (0..64), object uses MyString
 		obj := m.FindObject("problemTwoLevelChain")
-		if obj == nil {
-			t.Skip("problemTwoLevelChain not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemTwoLevelChain)")
 		sizes := obj.EffectiveSizes()
-		if len(sizes) == 0 {
-			t.Skip("no effective sizes - size inheritance may not propagate from TC")
-			return
-		}
+		testutil.NotEmpty(t, sizes, "EffectiveSizes()")
 		testutil.Equal(t, 1, len(sizes), "should have 1 size range")
 		testutil.Equal(t, int64(0), sizes[0].Min, "size min")
 		testutil.Equal(t, int64(64), sizes[0].Max, "size max")
@@ -136,15 +107,9 @@ func TestTypeChainSizeInheritance(t *testing.T) {
 	t.Run("inherited through chain", func(t *testing.T) {
 		// MySizedLabel -> MySizedString (SIZE 1..100) -> DisplayString
 		obj := m.FindObject("problemInheritedSize")
-		if obj == nil {
-			t.Skip("problemInheritedSize not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemInheritedSize)")
 		sizes := obj.EffectiveSizes()
-		if len(sizes) == 0 {
-			t.Skip("no effective sizes - chain size inheritance may not work")
-			return
-		}
+		testutil.NotEmpty(t, sizes, "EffectiveSizes()")
 		testutil.Equal(t, 1, len(sizes), "should have 1 size range")
 		testutil.Equal(t, int64(1), sizes[0].Min, "size min from MySizedString")
 		testutil.Equal(t, int64(100), sizes[0].Max, "size max from MySizedString")
@@ -159,15 +124,9 @@ func TestTypeChainEnumInheritance(t *testing.T) {
 	t.Run("TC enum chain", func(t *testing.T) {
 		// MyFilteredStatus -> MyStatus -> INTEGER { active(1), inactive(2), unknown(3) }
 		obj := m.FindObject("problemEnumChain")
-		if obj == nil {
-			t.Skip("problemEnumChain not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemEnumChain)")
 		enums := obj.EffectiveEnums()
-		if len(enums) == 0 {
-			t.Skip("no effective enums - enum chain inheritance may not work")
-			return
-		}
+		testutil.NotEmpty(t, enums, "EffectiveEnums()")
 		enumMap := testutil.NormalizeEnums(enums)
 		testutil.Equal(t, "active", enumMap[1], "enum value 1")
 		testutil.Equal(t, "inactive", enumMap[2], "enum value 2")
@@ -176,15 +135,9 @@ func TestTypeChainEnumInheritance(t *testing.T) {
 
 	t.Run("inline enum", func(t *testing.T) {
 		obj := m.FindObject("problemInlineEnum")
-		if obj == nil {
-			t.Skip("problemInlineEnum not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemInlineEnum)")
 		enums := obj.EffectiveEnums()
-		if len(enums) == 0 {
-			t.Skip("no effective enums for inline enum")
-			return
-		}
+		testutil.NotEmpty(t, enums, "EffectiveEnums()")
 		enumMap := testutil.NormalizeEnums(enums)
 		testutil.Equal(t, "up", enumMap[1], "inline enum value 1")
 		testutil.Equal(t, "down", enumMap[2], "inline enum value 2")
@@ -200,15 +153,9 @@ func TestTypeChainApplicationTypePreservation(t *testing.T) {
 	t.Run("Counter32 via TC", func(t *testing.T) {
 		// MyCounter -> Counter32
 		obj := m.FindObject("problemAppTypeChain")
-		if obj == nil {
-			t.Skip("problemAppTypeChain not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemAppTypeChain)")
 		typ := obj.Type()
-		if typ == nil {
-			t.Skip("type not resolved")
-			return
-		}
+		testutil.NotNil(t, typ, "Type()")
 		// Counter32 is an application type - base should be Counter32, not Integer32
 		testutil.Equal(t, mib.BaseCounter32, typ.EffectiveBase(),
 			"Counter32 application type should be preserved through TC chain")
@@ -217,15 +164,9 @@ func TestTypeChainApplicationTypePreservation(t *testing.T) {
 	t.Run("Gauge32 via TC chain", func(t *testing.T) {
 		// MySpecialGauge -> MyFormattedGauge -> Gauge32
 		obj := m.FindObject("problemInheritedHint")
-		if obj == nil {
-			t.Skip("problemInheritedHint not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemInheritedHint)")
 		typ := obj.Type()
-		if typ == nil {
-			t.Skip("type not resolved")
-			return
-		}
+		testutil.NotNil(t, typ, "Type()")
 		testutil.Equal(t, mib.BaseGauge32, typ.EffectiveBase(),
 			"Gauge32 application type should be preserved through two-level TC chain")
 	})
@@ -238,20 +179,16 @@ func TestTypeChainTCFlagPropagation(t *testing.T) {
 
 	t.Run("TC type has flag", func(t *testing.T) {
 		obj := m.FindObject("problemTwoLevelChain")
-		if obj == nil || obj.Type() == nil {
-			t.Skip("object or type not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemTwoLevelChain)")
+		testutil.NotNil(t, obj.Type(), "Type()")
 		testutil.True(t, obj.Type().IsTextualConvention(),
 			"MyString should be a TC")
 	})
 
 	t.Run("inline enum does not have TC flag", func(t *testing.T) {
 		obj := m.FindObject("problemInlineEnum")
-		if obj == nil || obj.Type() == nil {
-			t.Skip("object or type not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemInlineEnum)")
+		testutil.NotNil(t, obj.Type(), "Type()")
 		// Inline INTEGER { ... } resolves to the primitive INTEGER type,
 		// which is not a TC
 		testutil.False(t, obj.Type().IsTextualConvention(),
@@ -287,10 +224,7 @@ func TestKindInferenceTableStructure(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obj := m.FindObject(tt.name)
-			if obj == nil {
-				t.Skipf("%s not found", tt.name)
-				return
-			}
+			testutil.NotNil(t, obj, "FindObject(%s)", tt.name)
 			kind := testutil.NormalizeKind(obj.Kind())
 			testutil.Equal(t, tt.wantKind, kind,
 				"kind for %s", tt.name)
@@ -314,10 +248,7 @@ func TestKindInferenceAugmentsTable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obj := m.FindObject(tt.name)
-			if obj == nil {
-				t.Skipf("%s not found", tt.name)
-				return
-			}
+			testutil.NotNil(t, obj, "FindObject(%s)", tt.name)
 			kind := testutil.NormalizeKind(obj.Kind())
 			testutil.Equal(t, tt.wantKind, kind,
 				"kind for %s", tt.name)
@@ -331,16 +262,10 @@ func TestAugmentsResolution(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
 	entry := m.FindObject("problemAugEntry")
-	if entry == nil {
-		t.Skip("problemAugEntry not found")
-		return
-	}
+	testutil.NotNil(t, entry, "FindObject(problemAugEntry)")
 
 	aug := entry.Augments()
-	if aug == nil {
-		t.Skip("AUGMENTS not resolved for problemAugEntry")
-		return
-	}
+	testutil.NotNil(t, aug, "Augments() for problemAugEntry")
 
 	testutil.Equal(t, "problemSemEntry", aug.Name(),
 		"AUGMENTS should reference problemSemEntry")
@@ -352,16 +277,10 @@ func TestIndexResolution(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
 	entry := m.FindObject("problemSemEntry")
-	if entry == nil {
-		t.Skip("problemSemEntry not found")
-		return
-	}
+	testutil.NotNil(t, entry, "FindObject(problemSemEntry)")
 
 	indexes := testutil.NormalizeIndexes(entry.Index())
-	if len(indexes) == 0 {
-		t.Skip("no indexes resolved")
-		return
-	}
+	testutil.NotEmpty(t, indexes, "NormalizeIndexes()")
 
 	testutil.Equal(t, 1, len(indexes), "should have 1 index")
 	testutil.Equal(t, "problemSemIndex", indexes[0].Name, "index object name")
@@ -375,10 +294,7 @@ func TestNotificationObjectsResolution(t *testing.T) {
 
 	t.Run("normal objects", func(t *testing.T) {
 		notif := m.FindNotification("problemSemNotifNormal")
-		if notif == nil {
-			t.Skip("problemSemNotifNormal not found")
-			return
-		}
+		testutil.NotNil(t, notif, "FindNotification(problemSemNotifNormal)")
 		varbinds := testutil.NormalizeVarbinds(notif.Objects())
 		testutil.SliceEqual(t,
 			[]string{"problemSemName", "problemSemValue"},
@@ -387,10 +303,7 @@ func TestNotificationObjectsResolution(t *testing.T) {
 
 	t.Run("empty objects", func(t *testing.T) {
 		notif := m.FindNotification("problemSemNotifEmpty")
-		if notif == nil {
-			t.Skip("problemSemNotifEmpty not found")
-			return
-		}
+		testutil.NotNil(t, notif, "FindNotification(problemSemNotifEmpty)")
 		varbinds := testutil.NormalizeVarbinds(notif.Objects())
 		testutil.Equal(t, 0, len(varbinds),
 			"empty notification should have no varbinds")
@@ -398,10 +311,7 @@ func TestNotificationObjectsResolution(t *testing.T) {
 
 	t.Run("not-accessible index in objects", func(t *testing.T) {
 		notif := m.FindNotification("problemSemNotifWithIndex")
-		if notif == nil {
-			t.Skip("problemSemNotifWithIndex not found")
-			return
-		}
+		testutil.NotNil(t, notif, "FindNotification(problemSemNotifWithIndex)")
 		varbinds := testutil.NormalizeVarbinds(notif.Objects())
 		// Both objects should resolve, including the not-accessible index
 		testutil.Len(t, varbinds, 2, "should include not-accessible index")
@@ -412,10 +322,7 @@ func TestNotificationObjectsResolution(t *testing.T) {
 
 	t.Run("augment column in objects", func(t *testing.T) {
 		notif := m.FindNotification("problemSemNotifAugObj")
-		if notif == nil {
-			t.Skip("problemSemNotifAugObj not found")
-			return
-		}
+		testutil.NotNil(t, notif, "FindNotification(problemSemNotifAugObj)")
 		varbinds := testutil.NormalizeVarbinds(notif.Objects())
 		testutil.Len(t, varbinds, 2, "should include augment column")
 		testutil.SliceEqual(t,
@@ -425,10 +332,7 @@ func TestNotificationObjectsResolution(t *testing.T) {
 
 	t.Run("scalar in objects", func(t *testing.T) {
 		notif := m.FindNotification("problemSemNotifScalar")
-		if notif == nil {
-			t.Skip("problemSemNotifScalar not found")
-			return
-		}
+		testutil.NotNil(t, notif, "FindNotification(problemSemNotifScalar)")
 		varbinds := testutil.NormalizeVarbinds(notif.Objects())
 		testutil.Len(t, varbinds, 1, "should have 1 varbind")
 		testutil.SliceEqual(t, []string{"problemScalar1"}, varbinds,
@@ -454,10 +358,7 @@ func TestNotificationMetadata(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			notif := m.FindNotification(tt.name)
-			if notif == nil {
-				t.Skipf("%s not found", tt.name)
-				return
-			}
+			testutil.NotNil(t, notif, "FindNotification(%s)", tt.name)
 			testutil.Equal(t, tt.wantOID, notif.OID().String(),
 				"OID for %s", tt.name)
 		})
@@ -477,10 +378,7 @@ func TestModulePreferenceSMIv2OverSMIv1(t *testing.T) {
 	}
 
 	mod := obj.Module()
-	if mod == nil {
-		t.Skip("module attribution not set for ifIndex")
-		return
-	}
+	testutil.NotNil(t, mod, "Module() for ifIndex")
 
 	// IF-MIB (SMIv2) should be preferred over RFC1213-MIB (SMIv1)
 	testutil.Equal(t, "IF-MIB", mod.Name(),
@@ -568,10 +466,7 @@ func TestDiagnosticNotifPartialResolution(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DIAGNOSTICS-MIB")
 
 	notif := m.FindNotification("problemDiagNotifBadObj")
-	if notif == nil {
-		t.Skip("problemDiagNotifBadObj not found")
-		return
-	}
+	testutil.NotNil(t, notif, "FindNotification(problemDiagNotifBadObj)")
 
 	varbinds := testutil.NormalizeVarbinds(notif.Objects())
 
@@ -604,30 +499,15 @@ func TestShadowedTypeLocalDefinitionWins(t *testing.T) {
 	m := loadShadowingMIB(t)
 
 	obj := m.FindObject("problemShadowedTypeObject")
-	if obj == nil {
-		t.Skip("problemShadowedTypeObject not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemShadowedTypeObject)")
 
 	typ := obj.Type()
-	if typ == nil {
-		t.Skip("type not resolved for problemShadowedTypeObject")
-		return
-	}
+	testutil.NotNil(t, typ, "Type() for problemShadowedTypeObject")
 
 	// The local ShadowableType has display hint "1024a"
 	// The base ShadowableType has display hint "255a"
 	// If shadowing works, we should get "1024a"
 	hint := obj.EffectiveDisplayHint()
-	if hint == "" {
-		t.Skip("no effective display hint - type chain may not propagate hints")
-		return
-	}
-
-	// The key assertion: local definition should shadow the imported one
-	if hint == "255a" {
-		t.Error("got base module display hint '255a' - import is NOT being shadowed by local definition")
-	}
 	testutil.Equal(t, "1024a", hint,
 		"should use local ShadowableType (1024a), not imported base (255a)")
 }
@@ -638,16 +518,10 @@ func TestShadowedTypeSizeConstraint(t *testing.T) {
 	m := loadShadowingMIB(t)
 
 	obj := m.FindObject("problemShadowedTypeObject")
-	if obj == nil {
-		t.Skip("problemShadowedTypeObject not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemShadowedTypeObject)")
 
 	sizes := obj.EffectiveSizes()
-	if len(sizes) == 0 {
-		t.Skip("no effective sizes - size inheritance may not propagate from TC")
-		return
-	}
+	testutil.NotEmpty(t, sizes, "EffectiveSizes()")
 
 	testutil.Equal(t, 1, len(sizes), "should have 1 size range")
 	// Local: SIZE (0..128), Base: SIZE (0..64)
@@ -664,16 +538,10 @@ func TestShadowedTypeBaseType(t *testing.T) {
 	m := loadShadowingMIB(t)
 
 	obj := m.FindObject("problemShadowedTypeObject")
-	if obj == nil {
-		t.Skip("problemShadowedTypeObject not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemShadowedTypeObject)")
 
 	typ := obj.Type()
-	if typ == nil {
-		t.Skip("type not resolved")
-		return
-	}
+	testutil.NotNil(t, typ, "Type()")
 
 	testutil.Equal(t, mib.BaseOctetString, typ.EffectiveBase(),
 		"ShadowableType should resolve to OCTET STRING regardless of shadowing")
@@ -685,26 +553,16 @@ func TestNonShadowedImportStillWorks(t *testing.T) {
 	m := loadShadowingMIB(t)
 
 	obj := m.FindObject("problemNonShadowedObject")
-	if obj == nil {
-		t.Skip("problemNonShadowedObject not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemNonShadowedObject)")
 
 	typ := obj.Type()
-	if typ == nil {
-		t.Skip("type not resolved for non-shadowed import")
-		return
-	}
+	testutil.NotNil(t, typ, "Type() for problemNonShadowedObject")
 
 	testutil.Equal(t, mib.BaseOctetString, typ.EffectiveBase(),
 		"DisplayString should still resolve to OCTET STRING")
 
 	// DisplayString has display hint "255a"
 	hint := obj.EffectiveDisplayHint()
-	if hint == "" {
-		t.Skip("no display hint for DisplayString")
-		return
-	}
 	testutil.Equal(t, "255a", hint,
 		"DisplayString should have display hint 255a (imported, not shadowed)")
 }
@@ -715,23 +573,13 @@ func TestBaseModuleTypeNotAffected(t *testing.T) {
 	m := loadShadowingMIB(t)
 
 	obj := m.FindObject("problemBaseTypedObject")
-	if obj == nil {
-		t.Skip("problemBaseTypedObject not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemBaseTypedObject)")
 
 	typ := obj.Type()
-	if typ == nil {
-		t.Skip("type not resolved for base module object")
-		return
-	}
+	testutil.NotNil(t, typ, "Type() for problemBaseTypedObject")
 
 	// The base module's object should use its own ShadowableType (hint "255a")
 	hint := obj.EffectiveDisplayHint()
-	if hint == "" {
-		t.Skip("no display hint for base module's ShadowableType")
-		return
-	}
 	testutil.Equal(t, "255a", hint,
 		"base module object should use base ShadowableType (255a), not the shadowing module's version")
 }
@@ -742,16 +590,10 @@ func TestShadowingModuleScalarResolves(t *testing.T) {
 	m := loadShadowingMIB(t)
 
 	obj := m.FindObject("problemShadowScalar")
-	if obj == nil {
-		t.Skip("problemShadowScalar not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemShadowScalar)")
 
 	typ := obj.Type()
-	if typ == nil {
-		t.Skip("type not resolved for scalar")
-		return
-	}
+	testutil.NotNil(t, typ, "Type()")
 	testutil.Equal(t, mib.BaseInteger32, typ.EffectiveBase(),
 		"Integer32 scalar should resolve normally")
 }

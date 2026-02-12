@@ -144,10 +144,7 @@ func TestFindNodeByNumericOID(t *testing.T) {
 
 	// ifIndex OID is 1.3.6.1.2.1.2.2.1.1
 	node := m.FindNode("1.3.6.1.2.1.2.2.1.1")
-	if node == nil {
-		t.Skip("numeric OID lookup not supported or OID not in tree")
-		return
-	}
+	testutil.NotNil(t, node, "FindNode(1.3.6.1.2.1.2.2.1.1)")
 	testutil.Equal(t, "ifIndex", node.Name(), "node found by OID should be ifIndex")
 }
 
@@ -156,10 +153,7 @@ func TestFindNodeByDottedOID(t *testing.T) {
 
 	// Leading dot format
 	node := m.FindNode(".1.3.6.1.2.1.2.2.1.1")
-	if node == nil {
-		t.Skip("dotted OID lookup not supported or OID not in tree")
-		return
-	}
+	testutil.NotNil(t, node, "FindNode(.1.3.6.1.2.1.2.2.1.1)")
 	testutil.Equal(t, "ifIndex", node.Name(), "node found by dotted OID should be ifIndex")
 }
 
@@ -167,10 +161,7 @@ func TestFindNodeByQualifiedName(t *testing.T) {
 	m := loadTestMIB(t)
 
 	node := m.FindNode("IF-MIB::ifIndex")
-	if node == nil {
-		t.Skip("qualified name lookup not supported")
-		return
-	}
+	testutil.NotNil(t, node, "FindNode(IF-MIB::ifIndex)")
 	testutil.Equal(t, "ifIndex", node.Name(), "node found by qualified name should be ifIndex")
 }
 
@@ -195,10 +186,7 @@ func TestFindObjectByQualifiedName(t *testing.T) {
 	m := loadTestMIB(t)
 
 	obj := m.FindObject("SNMPv2-MIB::sysDescr")
-	if obj == nil {
-		t.Skip("qualified object lookup not supported")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(SNMPv2-MIB::sysDescr)")
 	testutil.Equal(t, "sysDescr", obj.Name(), "qualified object name")
 }
 
@@ -206,10 +194,7 @@ func TestFindType(t *testing.T) {
 	m := loadTestMIB(t)
 
 	typ := m.FindType("DisplayString")
-	if typ == nil {
-		t.Skip("FindType not supported or DisplayString not registered")
-		return
-	}
+	testutil.NotNil(t, typ, "FindType(DisplayString)")
 	testutil.Equal(t, "DisplayString", typ.Name(), "type name")
 	testutil.True(t, typ.IsTextualConvention(), "DisplayString should be a TC")
 }
@@ -218,10 +203,7 @@ func TestFindNotification(t *testing.T) {
 	m := loadTestMIB(t)
 
 	notif := m.FindNotification("linkDown")
-	if notif == nil {
-		t.Skip("linkDown notification not found")
-		return
-	}
+	testutil.NotNil(t, notif, "FindNotification(linkDown)")
 	testutil.Equal(t, "linkDown", notif.Name(), "notification name")
 }
 

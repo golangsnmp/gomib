@@ -261,14 +261,12 @@ func TestParseTrapType(t *testing.T) {
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
-		t.Skip("TRAP-TYPE parsing not supported or produced no definitions")
-		return
+		t.Fatal("expected definitions in module body")
 	}
 
 	def, ok := module.Body[0].(*ast.TrapTypeDef)
 	if !ok {
-		t.Skipf("expected TrapTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected TrapTypeDef, got %T", module.Body[0])
 	}
 	testutil.Equal(t, "testTrap", def.Name.Name, "trap name")
 	testutil.Equal(t, "testEnterprise", def.Enterprise.Name, "enterprise")
@@ -289,14 +287,12 @@ func TestParseTrapTypeMinimal(t *testing.T) {
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
-		t.Skip("minimal TRAP-TYPE parsing not supported")
-		return
+		t.Fatal("expected definitions in module body")
 	}
 
 	def, ok := module.Body[0].(*ast.TrapTypeDef)
 	if !ok {
-		t.Skipf("expected TrapTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected TrapTypeDef, got %T", module.Body[0])
 	}
 	testutil.Equal(t, "minTrap", def.Name.Name, "trap name")
 	testutil.Equal(t, uint32(1), def.TrapNumber, "trap number")
@@ -317,14 +313,12 @@ func TestParseNotificationType(t *testing.T) {
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
-		t.Skip("NOTIFICATION-TYPE parsing produced no definitions")
-		return
+		t.Fatal("expected definitions in module body")
 	}
 
 	def, ok := module.Body[0].(*ast.NotificationTypeDef)
 	if !ok {
-		t.Skipf("expected NotificationTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected NotificationTypeDef, got %T", module.Body[0])
 	}
 	testutil.Equal(t, "testNotification", def.Name.Name, "notification name")
 	testutil.Len(t, def.Objects, 2, "objects count")
@@ -342,14 +336,12 @@ func TestParseNotificationTypeNoObjects(t *testing.T) {
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
-		t.Skip("NOTIFICATION-TYPE without OBJECTS not supported")
-		return
+		t.Fatal("expected definitions in module body")
 	}
 
 	def, ok := module.Body[0].(*ast.NotificationTypeDef)
 	if !ok {
-		t.Skipf("expected NotificationTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected NotificationTypeDef, got %T", module.Body[0])
 	}
 	testutil.Equal(t, "testNotification", def.Name.Name, "notification name")
 	testutil.Len(t, def.Objects, 0, "no objects")
@@ -368,14 +360,12 @@ func TestParseModuleCompliance(t *testing.T) {
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
-		t.Skip("MODULE-COMPLIANCE parsing produced no definitions")
-		return
+		t.Fatal("expected definitions in module body")
 	}
 
 	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
 	if !ok {
-		t.Skipf("expected ModuleComplianceDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected ModuleComplianceDef, got %T", module.Body[0])
 	}
 	testutil.Equal(t, "testCompliance", def.Name.Name, "compliance name")
 	testutil.Greater(t, len(def.Modules), 0, "should have at least one MODULE clause")
@@ -398,14 +388,12 @@ func TestParseAgentCapabilities(t *testing.T) {
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
-		t.Skip("AGENT-CAPABILITIES parsing produced no definitions")
-		return
+		t.Fatal("expected definitions in module body")
 	}
 
 	def, ok := module.Body[0].(*ast.AgentCapabilitiesDef)
 	if !ok {
-		t.Skipf("expected AgentCapabilitiesDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected AgentCapabilitiesDef, got %T", module.Body[0])
 	}
 	testutil.Equal(t, "testAgent", def.Name.Name, "agent capabilities name")
 	testutil.Equal(t, "Test Agent 1.0", def.ProductRelease.Value, "product release")
@@ -424,14 +412,12 @@ func TestParseNotificationGroup(t *testing.T) {
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
-		t.Skip("NOTIFICATION-GROUP parsing produced no definitions")
-		return
+		t.Fatal("expected definitions in module body")
 	}
 
 	def, ok := module.Body[0].(*ast.NotificationGroupDef)
 	if !ok {
-		t.Skipf("expected NotificationGroupDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected NotificationGroupDef, got %T", module.Body[0])
 	}
 	testutil.Equal(t, "testNotifGroup", def.Name.Name, "notification group name")
 	testutil.Len(t, def.Notifications, 2, "notifications count")
@@ -448,14 +434,12 @@ func TestParseObjectIdentity(t *testing.T) {
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
-		t.Skip("OBJECT-IDENTITY parsing produced no definitions")
-		return
+		t.Fatal("expected definitions in module body")
 	}
 
 	def, ok := module.Body[0].(*ast.ObjectIdentityDef)
 	if !ok {
-		t.Skipf("expected ObjectIdentityDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected ObjectIdentityDef, got %T", module.Body[0])
 	}
 	testutil.Equal(t, "testIdentity", def.Name.Name, "identity name")
 }
@@ -512,18 +496,15 @@ func TestParseSyntaxWithRange(t *testing.T) {
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
 	if !ok {
-		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	constrained, ok := def.Syntax.Syntax.(*ast.TypeSyntaxConstrained)
 	if !ok {
-		t.Skipf("expected constrained syntax, got %T", def.Syntax.Syntax)
-		return
+		t.Fatalf("expected constrained syntax, got %T", def.Syntax.Syntax)
 	}
 	rangeConstraint, ok := constrained.Constraint.(*ast.ConstraintRange)
 	if !ok {
-		t.Skipf("expected range constraint, got %T", constrained.Constraint)
-		return
+		t.Fatalf("expected range constraint, got %T", constrained.Constraint)
 	}
 	testutil.Len(t, rangeConstraint.Ranges, 1, "should have 1 range")
 }
@@ -544,12 +525,10 @@ func TestParseAugments(t *testing.T) {
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
 	if !ok {
-		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	if def.Augments == nil {
-		t.Skip("AUGMENTS clause not parsed")
-		return
+		t.Fatal("AUGMENTS clause not parsed")
 	}
 	testutil.Equal(t, "testEntry", def.Augments.Target.Name, "augments target")
 }
@@ -569,13 +548,11 @@ func TestParseBitsSyntax(t *testing.T) {
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
 	if !ok {
-		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	bits, ok := def.Syntax.Syntax.(*ast.TypeSyntaxBits)
 	if !ok {
-		t.Skipf("expected TypeSyntaxBits, got %T", def.Syntax.Syntax)
-		return
+		t.Fatalf("expected TypeSyntaxBits, got %T", def.Syntax.Syntax)
 	}
 	testutil.Len(t, bits.NamedBits, 3, "named bits count")
 }
@@ -596,14 +573,12 @@ func TestParseDefValString(t *testing.T) {
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
 	if !ok {
-		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 	strVal, ok := def.DefVal.Value.(*ast.DefValContentString)
 	if !ok {
-		t.Skipf("expected string DEFVAL, got %T", def.DefVal.Value)
-		return
+		t.Fatalf("expected string DEFVAL, got %T", def.DefVal.Value)
 	}
 	testutil.Equal(t, "default value", strVal.Value.Value, "DEFVAL string value")
 }
@@ -624,8 +599,7 @@ func TestParseDefValHex(t *testing.T) {
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
 	if !ok {
-		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 }
@@ -646,8 +620,7 @@ func TestParseDefValBits(t *testing.T) {
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
 	if !ok {
-		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 }
@@ -667,12 +640,11 @@ func TestParseSequenceOf(t *testing.T) {
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
 	if !ok {
-		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	_, ok = def.Syntax.Syntax.(*ast.TypeSyntaxSequenceOf)
 	if !ok {
-		t.Skipf("expected TypeSyntaxSequenceOf, got %T", def.Syntax.Syntax)
+		t.Fatalf("expected TypeSyntaxSequenceOf, got %T", def.Syntax.Syntax)
 	}
 }
 
@@ -690,14 +662,12 @@ func TestParseSMIv1ObjectType(t *testing.T) {
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
-		t.Skip("SMIv1 OBJECT-TYPE not parsed")
-		return
+		t.Fatal("expected definitions in module body")
 	}
 
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
 	if !ok {
-		t.Skipf("expected ObjectTypeDef, got %T", module.Body[0])
-		return
+		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	testutil.Equal(t, "testSMIv1", def.Name.Name, "SMIv1 object name")
 	testutil.Equal(t, ast.AccessValueReadOnly, def.Access.Value, "SMIv1 access")

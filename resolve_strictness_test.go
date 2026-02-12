@@ -427,16 +427,10 @@ func TestImportForwardingTypeResolution(t *testing.T) {
 
 	// The forwarded type object should resolve
 	obj := m.FindObject("problemForwardedTypeObject")
-	if obj == nil {
-		t.Skip("problemForwardedTypeObject not found - import forwarding may not resolve the type")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemForwardedTypeObject)")
 
 	typ := obj.Type()
-	if typ == nil {
-		t.Skip("type not resolved for problemForwardedTypeObject - forwarding may not cover types")
-		return
-	}
+	testutil.NotNil(t, typ, "Type()")
 
 	// ForwardedType is a TC based on DisplayString -> OCTET STRING
 	testutil.Equal(t, mib.BaseOctetString, typ.EffectiveBase(),
@@ -452,10 +446,7 @@ func TestImportForwardingOidResolution(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-FORWARDING-MIB", mib.StrictnessNormal)
 
 	obj := m.FindObject("problemForwardedOidObject")
-	if obj == nil {
-		t.Skip("problemForwardedOidObject not found - OID chain may not resolve via forwarding")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemForwardedOidObject)")
 
 	// forwardedSourceRoot = enterprises.99998.20.1
 	// problemForwardedOidObject = forwardedSourceRoot.10
@@ -504,15 +495,9 @@ func TestImportForwardingSourceModuleCorrectness(t *testing.T) {
 
 	// The source object (defined in source MIB) should have source module attribution
 	srcObj := m.FindObject("forwardedSourceObject")
-	if srcObj == nil {
-		t.Skip("forwardedSourceObject not found")
-		return
-	}
+	testutil.NotNil(t, srcObj, "FindObject(forwardedSourceObject)")
 
-	if srcObj.Module() == nil {
-		t.Skip("module attribution not set for forwardedSourceObject")
-		return
-	}
+	testutil.NotNil(t, srcObj.Module(), "Module()")
 
 	testutil.Equal(t, "PROBLEM-FORWARDING-SOURCE-MIB", srcObj.Module().Name(),
 		"source object should be attributed to the source module")

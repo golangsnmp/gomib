@@ -143,8 +143,7 @@ func TestProblemHexStringBytes(t *testing.T) {
 			}
 
 			if dv.Kind() != mib.DefValKindBytes {
-				t.Skipf("object %s DEFVAL kind=%v, expected Bytes", tt.name, dv.Kind())
-				return
+				t.Fatalf("object %s DEFVAL kind=%v, expected Bytes", tt.name, dv.Kind())
 			}
 
 			got, ok := mib.DefValAs[[]byte](dv)
@@ -522,10 +521,7 @@ func TestProblemSMIv1v2AccessKeyword(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-SMIv1v2-MIX-MIB")
 
 	obj := m.FindObject("problemV1AccessObject")
-	if obj == nil {
-		t.Skip("problemV1AccessObject not found - parser may reject ACCESS keyword in SMIv2 module")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemV1AccessObject)")
 	access := testutil.NormalizeAccess(obj.Access())
 	testutil.Equal(t, "read-only", access,
 		"ACCESS read-only in SMIv2 module should resolve (matches net-snmp)")
@@ -540,10 +536,7 @@ func TestProblemSMIv1v2MandatoryStatus(t *testing.T) {
 
 	t.Run("mandatory", func(t *testing.T) {
 		obj := m.FindObject("problemMandatoryStatus")
-		if obj == nil {
-			t.Skip("problemMandatoryStatus not found - parser may reject mandatory status in SMIv2")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemMandatoryStatus)")
 		status := testutil.NormalizeStatus(obj.Status())
 		// gomib preserves mandatory as StatusMandatory; net-snmp maps to current
 		if status != "mandatory" && status != "current" {
@@ -553,10 +546,7 @@ func TestProblemSMIv1v2MandatoryStatus(t *testing.T) {
 
 	t.Run("optional", func(t *testing.T) {
 		obj := m.FindObject("problemOptionalStatus")
-		if obj == nil {
-			t.Skip("problemOptionalStatus not found - parser may reject optional status in SMIv2")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemOptionalStatus)")
 		status := testutil.NormalizeStatus(obj.Status())
 		if status != "optional" && status != "obsolete" {
 			t.Errorf("status: got %q, want optional or obsolete", status)
@@ -584,10 +574,7 @@ func TestProblemSMIv1v2TrapType(t *testing.T) {
 
 	// Check if the v2 notification also resolved
 	notif := m.FindNotification("problemV2Notification")
-	if notif == nil {
-		t.Skip("problemV2Notification not found - notification may not resolve alongside TRAP-TYPE")
-		return
-	}
+	testutil.NotNil(t, notif, "FindNotification(problemV2Notification)")
 	testutil.Equal(t, "1.3.6.1.4.1.99998.1.2.1", notif.OID().String(),
 		"SMIv2 notification OID")
 }
@@ -637,10 +624,7 @@ func TestProblemIndexBareType(t *testing.T) {
 
 	// The table should parse and resolve
 	entry := m.FindObject("problemBareTypeEntry")
-	if entry == nil {
-		t.Skip("problemBareTypeEntry not found - bare type INDEX may not be supported")
-		return
-	}
+	testutil.NotNil(t, entry, "FindObject(problemBareTypeEntry)")
 
 	kind := testutil.NormalizeKind(entry.Kind())
 	testutil.Equal(t, "row", kind, "entry should be a row")
@@ -658,19 +642,13 @@ func TestProblemIndexMacAddress(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-INDEX-MIB")
 
 	entry := m.FindObject("problemMacIndexEntry")
-	if entry == nil {
-		t.Skip("problemMacIndexEntry not found")
-		return
-	}
+	testutil.NotNil(t, entry, "FindObject(problemMacIndexEntry)")
 
 	kind := testutil.NormalizeKind(entry.Kind())
 	testutil.Equal(t, "row", kind, "entry should be a row")
 
 	indexes := testutil.NormalizeIndexes(entry.Index())
-	if len(indexes) == 0 {
-		t.Skip("no indexes resolved for MacAddress index table")
-		return
-	}
+	testutil.NotEmpty(t, indexes, "indexes for MacAddress index table")
 	testutil.Equal(t, "problemMacIndexAddress", indexes[0].Name,
 		"MacAddress index should resolve")
 
@@ -687,19 +665,13 @@ func TestProblemIndexNoRange(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-INDEX-MIB")
 
 	entry := m.FindObject("problemNoRangeEntry")
-	if entry == nil {
-		t.Skip("problemNoRangeEntry not found")
-		return
-	}
+	testutil.NotNil(t, entry, "FindObject(problemNoRangeEntry)")
 
 	kind := testutil.NormalizeKind(entry.Kind())
 	testutil.Equal(t, "row", kind, "entry should be a row")
 
 	indexes := testutil.NormalizeIndexes(entry.Index())
-	if len(indexes) != 2 {
-		t.Skipf("expected 2 indexes, got %d", len(indexes))
-		return
-	}
+	testutil.Len(t, indexes, 2, "indexes count")
 	testutil.Equal(t, "problemNoRangeIndex1", indexes[0].Name, "first index")
 	testutil.Equal(t, "problemNoRangeIndex2", indexes[1].Name, "second index")
 }
@@ -712,19 +684,13 @@ func TestProblemIndexDisplayString(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-INDEX-MIB")
 
 	entry := m.FindObject("problemStringIndexEntry")
-	if entry == nil {
-		t.Skip("problemStringIndexEntry not found")
-		return
-	}
+	testutil.NotNil(t, entry, "FindObject(problemStringIndexEntry)")
 
 	kind := testutil.NormalizeKind(entry.Kind())
 	testutil.Equal(t, "row", kind, "entry should be a row")
 
 	indexes := testutil.NormalizeIndexes(entry.Index())
-	if len(indexes) == 0 {
-		t.Skip("no indexes resolved for DisplayString index table")
-		return
-	}
+	testutil.NotEmpty(t, indexes, "indexes for DisplayString index table")
 	testutil.Equal(t, "problemStringIndexName", indexes[0].Name,
 		"DisplayString index should resolve")
 }
@@ -750,24 +716,15 @@ func TestProblemIndexTableKinds(t *testing.T) {
 	for _, tt := range tables {
 		t.Run(tt.table, func(t *testing.T) {
 			tbl := m.FindObject(tt.table)
-			if tbl == nil {
-				t.Skipf("%s not found", tt.table)
-				return
-			}
+			testutil.NotNil(t, tbl, "FindObject(%s)", tt.table)
 			testutil.Equal(t, "table", testutil.NormalizeKind(tbl.Kind()), "table kind")
 
 			ent := m.FindObject(tt.entry)
-			if ent == nil {
-				t.Skipf("%s not found", tt.entry)
-				return
-			}
+			testutil.NotNil(t, ent, "FindObject(%s)", tt.entry)
 			testutil.Equal(t, "row", testutil.NormalizeKind(ent.Kind()), "entry kind")
 
 			col := m.FindObject(tt.column)
-			if col == nil {
-				t.Skipf("%s not found", tt.column)
-				return
-			}
+			testutil.NotNil(t, col, "FindObject(%s)", tt.column)
 			testutil.Equal(t, "column", testutil.NormalizeKind(col.Kind()), "column kind")
 		})
 	}
@@ -783,16 +740,10 @@ func TestProblemDefvalOidRef(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := m.FindObject("problemDefvalOidRef")
-	if obj == nil {
-		t.Skip("problemDefvalOidRef not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalOidRef)")
 
 	dv := obj.DefaultValue()
-	if dv.IsZero() {
-		t.Skip("no DEFVAL parsed for problemDefvalOidRef")
-		return
-	}
+	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalOidRef")
 
 	got := dv.String()
 	// gomib normalizes OID defvals to numeric. net-snmp keeps symbolic.
@@ -810,16 +761,10 @@ func TestProblemDefvalTypeMismatch(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := m.FindObject("problemDefvalTypeMismatch")
-	if obj == nil {
-		t.Skip("problemDefvalTypeMismatch not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalTypeMismatch)")
 
 	dv := obj.DefaultValue()
-	if dv.IsZero() {
-		t.Skip("no DEFVAL parsed for problemDefvalTypeMismatch")
-		return
-	}
+	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalTypeMismatch")
 
 	got := dv.String()
 	// The DEFVAL { 5 } could be stored as integer "5" or as enum label "warning"
@@ -837,10 +782,7 @@ func TestProblemDefvalBadEnum(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := m.FindObject("problemDefvalBadEnum")
-	if obj == nil {
-		t.Skip("problemDefvalBadEnum not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalBadEnum)")
 
 	dv := obj.DefaultValue()
 	if dv.IsZero() {
@@ -862,16 +804,10 @@ func TestProblemDefvalLargeHex(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := m.FindObject("problemDefvalLargeHex")
-	if obj == nil {
-		t.Skip("problemDefvalLargeHex not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalLargeHex)")
 
 	dv := obj.DefaultValue()
-	if dv.IsZero() {
-		t.Skip("no DEFVAL parsed for problemDefvalLargeHex")
-		return
-	}
+	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalLargeHex")
 
 	got := dv.String()
 	// gomib: "0x00000000000000000000000000000000" (16 bytes > 8, uses hex format)
@@ -892,16 +828,10 @@ func TestProblemDefvalBinary(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := m.FindObject("problemDefvalBinary")
-	if obj == nil {
-		t.Skip("problemDefvalBinary not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalBinary)")
 
 	dv := obj.DefaultValue()
-	if dv.IsZero() {
-		t.Skip("no DEFVAL parsed for problemDefvalBinary")
-		return
-	}
+	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalBinary")
 
 	got := dv.String()
 	// '10101010'B = 0xAA = 170
@@ -917,16 +847,10 @@ func TestProblemDefvalBinaryOdd(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := m.FindObject("problemDefvalBinaryOdd")
-	if obj == nil {
-		t.Skip("problemDefvalBinaryOdd not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalBinaryOdd)")
 
 	dv := obj.DefaultValue()
-	if dv.IsZero() {
-		t.Skip("no DEFVAL parsed for problemDefvalBinaryOdd")
-		return
-	}
+	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalBinaryOdd")
 
 	got := dv.String()
 	// '101'B padded to '00000101'B = 0x05 = 5
@@ -942,16 +866,10 @@ func TestProblemDefvalEmptyBits(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := m.FindObject("problemDefvalEmptyBits")
-	if obj == nil {
-		t.Skip("problemDefvalEmptyBits not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalEmptyBits)")
 
 	dv := obj.DefaultValue()
-	if dv.IsZero() {
-		t.Skip("no DEFVAL parsed for problemDefvalEmptyBits")
-		return
-	}
+	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalEmptyBits")
 
 	// Empty BITS should produce an empty bit label list
 	if dv.Kind() == mib.DefValKindBits {
@@ -973,16 +891,10 @@ func TestProblemDefvalMultiBits(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := m.FindObject("problemDefvalMultiBits")
-	if obj == nil {
-		t.Skip("problemDefvalMultiBits not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalMultiBits)")
 
 	dv := obj.DefaultValue()
-	if dv.IsZero() {
-		t.Skip("no DEFVAL parsed for problemDefvalMultiBits")
-		return
-	}
+	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalMultiBits")
 
 	if dv.Kind() == mib.DefValKindBits {
 		labels, ok := mib.DefValAs[[]string](dv)
@@ -1015,16 +927,10 @@ func TestProblemDefvalNegative(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := m.FindObject("problemDefvalNegative")
-	if obj == nil {
-		t.Skip("problemDefvalNegative not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalNegative)")
 
 	dv := obj.DefaultValue()
-	if dv.IsZero() {
-		t.Skip("no DEFVAL parsed for problemDefvalNegative")
-		return
-	}
+	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalNegative")
 
 	got := dv.String()
 	testutil.Equal(t, "-1", got, "negative DEFVAL should be -1")
@@ -1036,16 +942,10 @@ func TestProblemDefvalSpecialString(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := m.FindObject("problemDefvalSpecialString")
-	if obj == nil {
-		t.Skip("problemDefvalSpecialString not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalSpecialString)")
 
 	dv := obj.DefaultValue()
-	if dv.IsZero() {
-		t.Skip("no DEFVAL parsed for problemDefvalSpecialString")
-		return
-	}
+	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalSpecialString")
 
 	// The raw MIB has DEFVAL { "default-value" }
 	got := dv.String()
@@ -1065,16 +965,10 @@ func TestProblemImportsAliasNormal(t *testing.T) {
 
 	// At normal level, module aliases (safe fallback) should be active
 	str := m.FindObject("problemAliasString")
-	if str == nil {
-		t.Skip("problemAliasString not found - module alias resolution may not be working")
-		return
-	}
+	testutil.NotNil(t, str, "FindObject(problemAliasString)")
 
 	// Verify the type resolved through the alias chain
-	if str.Type() == nil {
-		t.Skip("type not resolved for problemAliasString")
-		return
-	}
+	testutil.NotNil(t, str.Type(), "type for problemAliasString")
 	testutil.Equal(t, mib.BaseOctetString, str.Type().EffectiveBase(),
 		"DisplayString from SNMPv2-TC-v1 should resolve to OCTET STRING")
 

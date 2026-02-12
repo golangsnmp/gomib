@@ -98,10 +98,7 @@ func TestFindGroupByOID(t *testing.T) {
 	m := loadTestMIB(t)
 
 	g := m.FindGroup("snmpGroup")
-	if g == nil {
-		t.Skip("snmpGroup not found by name")
-		return
-	}
+	testutil.NotNil(t, g, "FindGroup(snmpGroup)")
 
 	oid := g.OID().String()
 
@@ -273,10 +270,7 @@ func TestSmallObjectGroup(t *testing.T) {
 	// snmpCommunityGroup has 2 members:
 	// OBJECTS { snmpInBadCommunityNames, snmpInBadCommunityUses }
 	g := m.FindGroup("snmpCommunityGroup")
-	if g == nil {
-		t.Skip("snmpCommunityGroup not found")
-		return
-	}
+	testutil.NotNil(t, g, "FindGroup(snmpCommunityGroup)")
 
 	testutil.False(t, g.IsNotificationGroup(),
 		"snmpCommunityGroup is an OBJECT-GROUP")
@@ -290,10 +284,7 @@ func TestWarmStartNotificationGroup(t *testing.T) {
 	// snmpWarmStartNotificationGroup NOTIFICATION-GROUP
 	// NOTIFICATIONS { warmStart }
 	g := m.FindGroup("snmpWarmStartNotificationGroup")
-	if g == nil {
-		t.Skip("snmpWarmStartNotificationGroup not found")
-		return
-	}
+	testutil.NotNil(t, g, "FindGroup(snmpWarmStartNotificationGroup)")
 
 	testutil.True(t, g.IsNotificationGroup(),
 		"snmpWarmStartNotificationGroup should be a NOTIFICATION-GROUP")

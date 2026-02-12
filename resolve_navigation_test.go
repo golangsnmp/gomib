@@ -48,10 +48,7 @@ func TestNodeChildren(t *testing.T) {
 
 	// ifEntry has multiple children (columns)
 	entry := m.FindNode("ifEntry")
-	if entry == nil {
-		t.Skip("ifEntry not found")
-		return
-	}
+	testutil.NotNil(t, entry, "FindNode(ifEntry)")
 
 	children := entry.Children()
 	testutil.Greater(t, len(children), 0,
@@ -72,17 +69,11 @@ func TestNodeChild(t *testing.T) {
 	m := loadTestMIB(t)
 
 	entry := m.FindNode("ifEntry")
-	if entry == nil {
-		t.Skip("ifEntry not found")
-		return
-	}
+	testutil.NotNil(t, entry, "FindNode(ifEntry)")
 
 	// ifIndex is arc 1 under ifEntry
 	child := entry.Child(1)
-	if child == nil {
-		t.Skip("Child(1) returned nil - arc lookup may work differently")
-		return
-	}
+	testutil.NotNil(t, child, "Child(1) of ifEntry")
 	testutil.Equal(t, "ifIndex", child.Name(), "Child(1) of ifEntry should be ifIndex")
 
 	// Non-existent arc
@@ -95,10 +86,7 @@ func TestNodeDescendants(t *testing.T) {
 
 	// ifTable has descendants (ifEntry + columns)
 	table := m.FindNode("ifTable")
-	if table == nil {
-		t.Skip("ifTable not found")
-		return
-	}
+	testutil.NotNil(t, table, "FindNode(ifTable)")
 
 	count := 0
 	for range table.Descendants() {
@@ -139,15 +127,9 @@ func TestNodeObjectAndNotification(t *testing.T) {
 
 	// linkDown should have a notification
 	linkDown := m.FindNode("linkDown")
-	if linkDown == nil {
-		t.Skip("linkDown not found")
-		return
-	}
+	testutil.NotNil(t, linkDown, "FindNode(linkDown)")
 	notif := linkDown.Notification()
-	if notif == nil {
-		t.Skip("linkDown node has no associated notification")
-		return
-	}
+	testutil.NotNil(t, notif, "linkDown node should have an associated notification")
 	testutil.Equal(t, "linkDown", notif.Name(), "linkDown notification name")
 }
 
@@ -167,10 +149,7 @@ func TestObjectTableNavigation(t *testing.T) {
 		testutil.False(t, col.IsScalar(), "ifIndex should not be a scalar")
 
 		tbl := col.Table()
-		if tbl == nil {
-			t.Skip("Table() returned nil for ifIndex")
-			return
-		}
+		testutil.NotNil(t, tbl, "Table() for ifIndex")
 		testutil.Equal(t, "ifTable", tbl.Name(), "ifIndex's table should be ifTable")
 		testutil.True(t, tbl.IsTable(), "ifTable should be a table")
 	})
@@ -182,36 +161,24 @@ func TestObjectTableNavigation(t *testing.T) {
 		}
 
 		row := col.Row()
-		if row == nil {
-			t.Skip("Row() returned nil for ifIndex")
-			return
-		}
+		testutil.NotNil(t, row, "Row() for ifIndex")
 		testutil.Equal(t, "ifEntry", row.Name(), "ifIndex's row should be ifEntry")
 		testutil.True(t, row.IsRow(), "ifEntry should be a row")
 	})
 
 	t.Run("table to entry", func(t *testing.T) {
 		tbl := m.FindObject("ifTable")
-		if tbl == nil {
-			t.Skip("ifTable not found")
-			return
-		}
+		testutil.NotNil(t, tbl, "FindObject(ifTable)")
 		testutil.True(t, tbl.IsTable(), "ifTable should be a table")
 
 		entry := tbl.Entry()
-		if entry == nil {
-			t.Skip("Entry() returned nil for ifTable")
-			return
-		}
+		testutil.NotNil(t, entry, "Entry() for ifTable")
 		testutil.Equal(t, "ifEntry", entry.Name(), "ifTable entry should be ifEntry")
 	})
 
 	t.Run("row columns", func(t *testing.T) {
 		row := m.FindObject("ifEntry")
-		if row == nil {
-			t.Skip("ifEntry not found")
-			return
-		}
+		testutil.NotNil(t, row, "FindObject(ifEntry)")
 
 		cols := row.Columns()
 		testutil.Greater(t, len(cols), 5, "ifEntry should have many columns")
@@ -229,10 +196,7 @@ func TestObjectTableNavigation(t *testing.T) {
 
 	t.Run("scalar predicates", func(t *testing.T) {
 		scalar := m.FindObject("sysDescr")
-		if scalar == nil {
-			t.Skip("sysDescr not found")
-			return
-		}
+		testutil.NotNil(t, scalar, "FindObject(sysDescr)")
 		testutil.True(t, scalar.IsScalar(), "sysDescr should be a scalar")
 		testutil.False(t, scalar.IsTable(), "sysDescr should not be a table")
 		testutil.False(t, scalar.IsRow(), "sysDescr should not be a row")
@@ -244,16 +208,10 @@ func TestObjectEffectiveIndexes(t *testing.T) {
 	m := loadTestMIB(t)
 
 	entry := m.FindObject("ifEntry")
-	if entry == nil {
-		t.Skip("ifEntry not found")
-		return
-	}
+	testutil.NotNil(t, entry, "FindObject(ifEntry)")
 
 	indexes := entry.EffectiveIndexes()
-	if len(indexes) == 0 {
-		t.Skip("EffectiveIndexes() returned empty")
-		return
-	}
+	testutil.NotEmpty(t, indexes, "EffectiveIndexes() for ifEntry")
 
 	testutil.Equal(t, 1, len(indexes), "ifEntry should have 1 index")
 	testutil.Equal(t, "ifIndex", indexes[0].Object.Name(), "index should be ifIndex")
@@ -266,23 +224,14 @@ func TestObjectEnumLookup(t *testing.T) {
 
 	// ifType has enum values
 	obj := m.FindObject("ifType")
-	if obj == nil {
-		t.Skip("ifType not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(ifType)")
 
 	enums := obj.EffectiveEnums()
-	if len(enums) == 0 {
-		t.Skip("ifType has no effective enums")
-		return
-	}
+	testutil.NotEmpty(t, enums, "EffectiveEnums() for ifType")
 
 	// Look up "ethernetCsmacd" which should be value 6
 	nv, ok := obj.Enum("ethernetCsmacd")
-	if !ok {
-		t.Skip("Enum(ethernetCsmacd) not found - lookup may not be implemented")
-		return
-	}
+	testutil.True(t, ok, "Enum(ethernetCsmacd) should be found")
 	testutil.Equal(t, int64(6), nv.Value, "ethernetCsmacd should be 6")
 
 	// Non-existent label
@@ -295,31 +244,19 @@ func TestObjectBitLookup(t *testing.T) {
 	pm := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
 	obj := pm.FindObject("problemDefvalMultiBits")
-	if obj == nil {
-		t.Skip("problemDefvalMultiBits not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemDefvalMultiBits)")
 
 	bits := obj.EffectiveBits()
-	if len(bits) == 0 {
-		t.Skip("no effective bits on problemDefvalMultiBits")
-		return
-	}
+	testutil.NotEmpty(t, bits, "EffectiveBits() for problemDefvalMultiBits")
 
 	// Look up "read" which should be bit 0
 	nv, ok := obj.Bit("read")
-	if !ok {
-		t.Skip("Bit(read) not found - lookup may not be implemented")
-		return
-	}
+	testutil.True(t, ok, "Bit(read) should be found")
 	testutil.Equal(t, int64(0), nv.Value, "read bit should be 0")
 
 	// Look up "write" which should be bit 1
 	nv, ok = obj.Bit("write")
-	if !ok {
-		t.Skip("Bit(write) not found")
-		return
-	}
+	testutil.True(t, ok, "Bit(write) should be found")
 	testutil.Equal(t, int64(1), nv.Value, "write bit should be 1")
 
 	// Non-existent bit
@@ -334,10 +271,7 @@ func TestTypePredicates(t *testing.T) {
 
 	t.Run("IsString", func(t *testing.T) {
 		typ := m.FindType("DisplayString")
-		if typ == nil {
-			t.Skip("DisplayString type not found")
-			return
-		}
+		testutil.NotNil(t, typ, "FindType(DisplayString)")
 		testutil.True(t, typ.IsString(), "DisplayString should be IsString()")
 		testutil.False(t, typ.IsCounter(), "DisplayString should not be IsCounter()")
 		testutil.False(t, typ.IsGauge(), "DisplayString should not be IsGauge()")
@@ -346,28 +280,19 @@ func TestTypePredicates(t *testing.T) {
 	t.Run("IsEnumeration", func(t *testing.T) {
 		// ifType uses IANAifType which is an enumeration
 		obj := m.FindObject("ifType")
-		if obj == nil || obj.Type() == nil {
-			t.Skip("ifType or its type not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(ifType)")
+		testutil.NotNil(t, obj.Type(), "ifType type")
 		// The effective type might be an enumeration
 		enums := obj.EffectiveEnums()
-		if len(enums) == 0 {
-			t.Skip("ifType has no enums")
-			return
-		}
-		if !obj.Type().IsEnumeration() {
-			t.Skip("ifType type does not report IsEnumeration() - may check direct enums only")
-		}
+		testutil.NotEmpty(t, enums, "EffectiveEnums() for ifType")
+		testutil.True(t, obj.Type().IsEnumeration(), "ifType type should report IsEnumeration()")
 	})
 
 	t.Run("counter type from problem MIBs", func(t *testing.T) {
 		pm := loadTypeChainsMIB(t)
 		obj := pm.FindObject("problemAppTypeChain")
-		if obj == nil || obj.Type() == nil {
-			t.Skip("problemAppTypeChain not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemAppTypeChain)")
+		testutil.NotNil(t, obj.Type(), "problemAppTypeChain type")
 		testutil.True(t, obj.Type().IsCounter(),
 			"MyCounter (based on Counter32) should report IsCounter()")
 	})
@@ -375,10 +300,8 @@ func TestTypePredicates(t *testing.T) {
 	t.Run("gauge type from problem MIBs", func(t *testing.T) {
 		pm := loadTypeChainsMIB(t)
 		obj := pm.FindObject("problemInheritedHint")
-		if obj == nil || obj.Type() == nil {
-			t.Skip("problemInheritedHint not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemInheritedHint)")
+		testutil.NotNil(t, obj.Type(), "problemInheritedHint type")
 		testutil.True(t, obj.Type().IsGauge(),
 			"MySpecialGauge (based on Gauge32) should report IsGauge()")
 	})
@@ -386,10 +309,8 @@ func TestTypePredicates(t *testing.T) {
 	t.Run("IsBits", func(t *testing.T) {
 		pm := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 		obj := pm.FindObject("problemDefvalMultiBits")
-		if obj == nil || obj.Type() == nil {
-			t.Skip("problemDefvalMultiBits not found")
-			return
-		}
+		testutil.NotNil(t, obj, "FindObject(problemDefvalMultiBits)")
+		testutil.NotNil(t, obj.Type(), "problemDefvalMultiBits type")
 		// BITS is the effective base type
 		testutil.Equal(t, mib.BaseBits, obj.Type().EffectiveBase(),
 			"BITS object should have BaseBits effective base")
@@ -406,16 +327,10 @@ func TestTypeParent(t *testing.T) {
 	m := loadTestMIB(t)
 
 	typ := m.FindType("DisplayString")
-	if typ == nil {
-		t.Skip("DisplayString type not found")
-		return
-	}
+	testutil.NotNil(t, typ, "FindType(DisplayString)")
 
 	parent := typ.Parent()
-	if parent == nil {
-		t.Skip("DisplayString has no Parent() - may not be implemented")
-		return
-	}
+	testutil.NotNil(t, parent, "DisplayString Parent()")
 
 	// DisplayString is based on OCTET STRING
 	testutil.Equal(t, mib.BaseOctetString, parent.EffectiveBase(),
@@ -427,26 +342,21 @@ func TestTypeEnumLookup(t *testing.T) {
 	pm := loadTypeChainsMIB(t)
 
 	obj := pm.FindObject("problemEnumChain")
-	if obj == nil || obj.Type() == nil {
-		t.Skip("problemEnumChain not found")
-		return
-	}
+	testutil.NotNil(t, obj, "FindObject(problemEnumChain)")
+	testutil.NotNil(t, obj.Type(), "problemEnumChain type")
 
 	// Walk up the type chain to find the type with enums
 	typ := obj.Type()
 	for typ != nil {
 		if len(typ.Enums()) > 0 {
 			nv, ok := typ.Enum("active")
-			if !ok {
-				t.Skip("Enum(active) not found on type")
-				return
-			}
+			testutil.True(t, ok, "Enum(active) should be found on type")
 			testutil.Equal(t, int64(1), nv.Value, "active should be 1")
 			return
 		}
 		typ = typ.Parent()
 	}
-	t.Skip("no type in chain has direct enums")
+	t.Fatal("no type in chain has direct enums")
 }
 
 // === Module metadata ===
@@ -471,11 +381,7 @@ func TestModuleDescription(t *testing.T) {
 	}
 
 	desc := ifMIB.Description()
-	if desc == "" {
-		t.Skip("IF-MIB has no Description() - may not be populated")
-		return
-	}
-	testutil.True(t, len(desc) > 0, "IF-MIB should have a non-empty description")
+	testutil.True(t, desc != "", "IF-MIB should have a non-empty description")
 }
 
 func TestModuleOID(t *testing.T) {
@@ -487,10 +393,6 @@ func TestModuleOID(t *testing.T) {
 	}
 
 	oid := ifMIB.OID()
-	if oid.String() == "" {
-		t.Skip("IF-MIB has no OID - may not be set")
-		return
-	}
 	// IF-MIB identity = 1.3.6.1.2.1.31
 	testutil.Equal(t, "1.3.6.1.2.1.31", oid.String(),
 		"IF-MIB module OID")
@@ -506,10 +408,7 @@ func TestModuleScopedLookups(t *testing.T) {
 
 	t.Run("Object lookup", func(t *testing.T) {
 		obj := ifMIB.Object("ifIndex")
-		if obj == nil {
-			t.Skip("Module.Object(ifIndex) not found - may not scope correctly for imported objects")
-			return
-		}
+		testutil.NotNil(t, obj, "Module.Object(ifIndex)")
 		testutil.Equal(t, "ifIndex", obj.Name(), "module-scoped object name")
 	})
 
@@ -517,8 +416,7 @@ func TestModuleScopedLookups(t *testing.T) {
 		// ifMIBObjects is defined in IF-MIB as a node
 		node := ifMIB.Node("ifMIBObjects")
 		if node == nil {
-			t.Skip("Module.Node(ifMIBObjects) not found - may not expose non-object nodes")
-			return
+			t.Fatal("Module.Node(ifMIBObjects) returned nil")
 		}
 		testutil.Equal(t, "ifMIBObjects", node.Name(), "module-scoped node name")
 	})
@@ -526,10 +424,7 @@ func TestModuleScopedLookups(t *testing.T) {
 	t.Run("Type lookup", func(t *testing.T) {
 		// IF-MIB defines InterfaceIndex TC
 		typ := ifMIB.Type("InterfaceIndex")
-		if typ == nil {
-			t.Skip("Module.Type(InterfaceIndex) not found")
-			return
-		}
+		testutil.NotNil(t, typ, "Module.Type(InterfaceIndex)")
 		testutil.Equal(t, "InterfaceIndex", typ.Name(), "module-scoped type name")
 	})
 }
@@ -618,10 +513,7 @@ func TestNodeByOID(t *testing.T) {
 	}
 
 	node := m.NodeByOID(oid)
-	if node == nil {
-		t.Skip("NodeByOID not implemented or OID not in tree")
-		return
-	}
+	testutil.NotNil(t, node, "NodeByOID(1.3.6.1.2.1.2.2.1.1)")
 	testutil.Equal(t, "ifIndex", node.Name(), "NodeByOID should find ifIndex")
 }
 
@@ -637,10 +529,7 @@ func TestLongestPrefixByOID(t *testing.T) {
 	}
 
 	node := m.LongestPrefixByOID(oid)
-	if node == nil {
-		t.Skip("LongestPrefixByOID not implemented or no match")
-		return
-	}
+	testutil.NotNil(t, node, "LongestPrefixByOID(ifIndex.5)")
 	testutil.Equal(t, "ifIndex", node.Name(),
 		"LongestPrefixByOID for ifIndex.5 should find ifIndex")
 }
@@ -660,10 +549,7 @@ func TestNodeLongestPrefix(t *testing.T) {
 	}
 
 	node := root.LongestPrefix(oid)
-	if node == nil {
-		t.Skip("Node.LongestPrefix not implemented")
-		return
-	}
+	testutil.NotNil(t, node, "Node.LongestPrefix(ifIndex.5)")
 	testutil.Equal(t, "ifIndex", node.Name(),
 		"Node.LongestPrefix for ifIndex.5 should find ifIndex")
 }
@@ -679,10 +565,7 @@ func TestObjectDescription(t *testing.T) {
 	}
 
 	desc := obj.Description()
-	if desc == "" {
-		t.Skip("sysDescr has no Description() - may not be populated")
-		return
-	}
+	testutil.True(t, desc != "", "sysDescr should have a non-empty description")
 	// sysDescr DESCRIPTION contains text about system description
 	testutil.Greater(t, len(desc), 10,
 		"sysDescr description should be non-trivial")
@@ -709,10 +592,7 @@ func TestNotificationMetadataFields(t *testing.T) {
 	m := loadTestMIB(t)
 
 	notif := m.FindNotification("linkDown")
-	if notif == nil {
-		t.Skip("linkDown notification not found")
-		return
-	}
+	testutil.NotNil(t, notif, "FindNotification(linkDown)")
 
 	// Node
 	node := notif.Node()
@@ -763,17 +643,10 @@ func TestModuleNotifications(t *testing.T) {
 	m := loadTestMIB(t)
 
 	snmpMIB := m.Module("SNMPv2-MIB")
-	if snmpMIB == nil {
-		t.Skip("SNMPv2-MIB not found")
-		return
-	}
+	testutil.NotNil(t, snmpMIB, "Module(SNMPv2-MIB)")
 
 	notifs := snmpMIB.Notifications()
-	// SNMPv2-MIB defines coldStart, warmStart, authenticationFailure
-	if len(notifs) == 0 {
-		t.Skip("SNMPv2-MIB reports no notifications from Module.Notifications()")
-		return
-	}
+	testutil.NotEmpty(t, notifs, "SNMPv2-MIB Notifications()")
 
 	names := make(map[string]bool)
 	for _, n := range notifs {
@@ -781,10 +654,8 @@ func TestModuleNotifications(t *testing.T) {
 	}
 
 	// At minimum coldStart should be there
-	if !names["coldStart"] {
-		t.Logf("SNMPv2-MIB notifications: %v", names)
-		t.Skip("coldStart not in SNMPv2-MIB.Notifications() - may only include directly defined notifications")
-	}
+	testutil.True(t, names["coldStart"],
+		"coldStart should be in SNMPv2-MIB.Notifications()")
 }
 
 // === Notification objects (varbinds) ===
@@ -793,17 +664,10 @@ func TestNotificationObjects(t *testing.T) {
 	m := loadTestMIB(t)
 
 	notif := m.FindNotification("linkDown")
-	if notif == nil {
-		t.Skip("linkDown not found")
-		return
-	}
+	testutil.NotNil(t, notif, "FindNotification(linkDown)")
 
 	objects := notif.Objects()
-	// linkDown OBJECTS { ifIndex, ifAdminStatus, ifOperStatus }
-	if len(objects) == 0 {
-		t.Skip("linkDown has no Objects()")
-		return
-	}
+	testutil.NotEmpty(t, objects, "linkDown Objects()")
 
 	names := make([]string, len(objects))
 	for i, obj := range objects {
@@ -819,23 +683,14 @@ func TestAugmentsEffectiveIndexes(t *testing.T) {
 	pm := loadSemanticsMIB(t)
 
 	entry := pm.FindObject("problemAugEntry")
-	if entry == nil {
-		t.Skip("problemAugEntry not found")
-		return
-	}
+	testutil.NotNil(t, entry, "FindObject(problemAugEntry)")
 
 	// AUGMENTS { problemSemEntry } which has INDEX { problemSemIndex }
 	aug := entry.Augments()
-	if aug == nil {
-		t.Skip("AUGMENTS not resolved")
-		return
-	}
+	testutil.NotNil(t, aug, "Augments() for problemAugEntry")
 
 	indexes := entry.EffectiveIndexes()
-	if len(indexes) == 0 {
-		t.Skip("EffectiveIndexes() empty for augmenting entry")
-		return
-	}
+	testutil.NotEmpty(t, indexes, "EffectiveIndexes() for augmenting entry")
 
 	// Should inherit problemSemIndex from the augmented table
 	testutil.Equal(t, "problemSemIndex", indexes[0].Object.Name(),

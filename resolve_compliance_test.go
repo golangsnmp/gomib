@@ -92,10 +92,7 @@ func TestFindComplianceByOID(t *testing.T) {
 	m := loadTestMIB(t)
 
 	c := m.FindCompliance("snmpBasicComplianceRev2")
-	if c == nil {
-		t.Skip("snmpBasicComplianceRev2 not found by name")
-		return
-	}
+	testutil.NotNil(t, c, "FindCompliance(snmpBasicComplianceRev2)")
 
 	oid := c.OID().String()
 
@@ -166,10 +163,7 @@ func TestDeprecatedCompliance(t *testing.T) {
 	m := loadTestMIB(t)
 
 	c := m.FindCompliance("snmpBasicCompliance")
-	if c == nil {
-		t.Skip("snmpBasicCompliance not found")
-		return
-	}
+	testutil.NotNil(t, c, "FindCompliance(snmpBasicCompliance)")
 
 	testutil.Equal(t, mib.StatusDeprecated, c.Status(),
 		"snmpBasicCompliance should be deprecated")
