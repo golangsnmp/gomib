@@ -607,7 +607,7 @@ func TestResolveTypeSyntaxBaseTypes(t *testing.T) {
 	// global type lookup. Set up a context with an SNMPv2-SMI module
 	// that has the needed base types registered.
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	ctx := newResolverContext([]*module.Module{smiMod}, nil, mib.DefaultConfig())
+	ctx := newresolverContext([]*module.Module{smiMod}, nil, mib.DefaultConfig())
 	ctx.Snmpv2SMIModule = smiMod
 
 	integerType := mibimpl.NewType("INTEGER")
@@ -1117,4 +1117,51 @@ func TestConvertDefValOidValue(t *testing.T) {
 			t.Errorf("expected nil when first component is numeric, got %v", dv)
 		}
 	})
+}
+
+func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
+	// When a notification references an object whose node exists but has no
+	// InternalObject (e.g., an intermediate node), a diagnostic should be
+	// emitted rather than silently dropping the reference.
+	mod := &module.Module{
+		Name: "TEST-MIB",
+		Definitions: []module.Definition{
+			&module.Notification{
+				Name:    "testNotif",
+				Objects: []string{"intermediateNode"},
+			},
+		},
+	}
+
+	ctx := newresolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
+	ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+	resolvedMod := mibimpl.NewModule(mod.Name)
+	ctx.ModuleToResolved[mod] = resolvedMod
+	ctx.ResolvedToModule[resolvedMod] = mod
+
+	// Create a node for the notification itself
+	root := ctx.Builder.Root()
+	notifNode := root.GetOrCreateChild(1)
+	notifNode.SetName("testNotif")
+	ctx.RegisterModuleNodeSymbol(mod, "testNotif", notifNode)
+
+	// Create a node for the referenced object, but do NOT set an Object on it.
+	// This simulates an intermediate node or non-object definition.
+	objNode := root.GetOrCreateChild(2)
+	objNode.SetName("intermediateNode")
+	ctx.RegisterModuleNodeSymbol(mod, "intermediateNode", objNode)
+
+	createResolvedNotifications(ctx)
+
+	// Should have emitted a diagnostic for the nil-object case.
+	var found bool
+	for _, d := range ctx.Diagnostics() {
+		if d.Code == "notification-object-not-object" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic for notification object with nil InternalObject, got none")
+	}
 }

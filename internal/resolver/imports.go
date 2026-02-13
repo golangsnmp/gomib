@@ -16,7 +16,7 @@ type importSymbol struct {
 }
 
 // resolveImports is the import resolution phase entry point.
-func resolveImports(ctx *ResolverContext) {
+func resolveImports(ctx *resolverContext) {
 	for _, mod := range ctx.Modules {
 		importsBySource := make(map[string][]importSymbol)
 		for _, imp := range mod.Imports {
@@ -38,7 +38,7 @@ func resolveImports(ctx *ResolverContext) {
 	}
 }
 
-func resolveImportsFromModule(ctx *ResolverContext, importingModule *module.Module, fromModuleName string, symbols []importSymbol) {
+func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Module, fromModuleName string, symbols []importSymbol) {
 	var userSymbols []importSymbol
 	for _, sym := range symbols {
 		if isMacroSymbol(sym.name) {
@@ -111,7 +111,7 @@ func resolveImportsFromModule(ctx *ResolverContext, importingModule *module.Modu
 				slog.Int("unresolved", len(unresolved)))
 		}
 		for _, sym := range unresolved {
-			ctx.RecordUnresolvedImport(importingModule, fromModuleName, sym.name, "symbol_not_exported", sym.span)
+			ctx.RecordUnresolvedImport(importingModule, fromModuleName, sym.name, reasonSymbolNotExported, sym.span)
 		}
 		return
 	}
@@ -120,11 +120,11 @@ func resolveImportsFromModule(ctx *ResolverContext, importingModule *module.Modu
 		ctx.Trace("imports unresolved",
 			slog.String("from", fromModuleName),
 			slog.Int("symbols", len(userSymbols)),
-			slog.String("reason", "module_not_found"))
+			slog.String("reason", reasonModuleNotFound))
 	}
 
 	for _, sym := range userSymbols {
-		ctx.RecordUnresolvedImport(importingModule, fromModuleName, sym.name, "module_not_found", sym.span)
+		ctx.RecordUnresolvedImport(importingModule, fromModuleName, sym.name, reasonModuleNotFound, sym.span)
 	}
 }
 
@@ -135,7 +135,7 @@ type forwardedSymbol struct {
 
 // tryPartialResolution resolves as many symbols as possible from the
 // candidates, returning resolved and unresolved symbols separately.
-func tryPartialResolution(ctx *ResolverContext, candidates []*module.Module, symbols []importSymbol) ([]forwardedSymbol, []importSymbol) {
+func tryPartialResolution(ctx *resolverContext, candidates []*module.Module, symbols []importSymbol) ([]forwardedSymbol, []importSymbol) {
 	var resolved []forwardedSymbol
 	var unresolved []importSymbol
 
@@ -162,7 +162,7 @@ func tryPartialResolution(ctx *ResolverContext, candidates []*module.Module, sym
 	return resolved, unresolved
 }
 
-func tryImportForwarding(ctx *ResolverContext, candidates []*module.Module, symbols []importSymbol) []forwardedSymbol {
+func tryImportForwarding(ctx *resolverContext, candidates []*module.Module, symbols []importSymbol) []forwardedSymbol {
 	for _, candidate := range candidates {
 		defNames := ctx.ModuleDefNames[candidate]
 		importMap := make(map[string]string)
@@ -205,7 +205,7 @@ func tryImportForwarding(ctx *ResolverContext, candidates []*module.Module, symb
 	return nil
 }
 
-func findCandidateWithAllSymbols(ctx *ResolverContext, candidates []*module.Module, symbols []importSymbol) (*module.Module, bool) {
+func findCandidateWithAllSymbols(ctx *resolverContext, candidates []*module.Module, symbols []importSymbol) (*module.Module, bool) {
 	if len(candidates) == 0 {
 		return nil, false
 	}
@@ -267,9 +267,14 @@ func extractLastUpdated(mod *module.Module) string {
 	return ""
 }
 
+// normalizeTimestamp converts SMI LAST-UPDATED timestamps to a sortable form.
+// SMIv1 uses 10-digit format "YYMMDDHHmmZ" (2-digit year), SMIv2 uses
+// 12-digit "YYYYMMDDHHmmZ" (4-digit year). This expands 10-digit timestamps
+// to 12-digit by prepending "19" for years >= 70, "20" otherwise.
 func normalizeTimestamp(ts string) string {
+	const smiv1TimestampLen = 10
 	trimmed := strings.TrimSuffix(ts, "Z")
-	if len(trimmed) == 10 {
+	if len(trimmed) == smiv1TimestampLen {
 		yy := trimmed[:2]
 		century := "20"
 		if yy >= "70" {

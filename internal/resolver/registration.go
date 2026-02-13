@@ -11,7 +11,7 @@ import (
 // registerModules indexes all modules and seeds the resolver context.
 // Synthetic base modules are prepended to user modules so that later
 // phases can resolve primitives and well-known types.
-func registerModules(ctx *ResolverContext) {
+func registerModules(ctx *resolverContext) {
 	baseModules := module.CreateBaseModules()
 
 	if ctx.TraceEnabled() {

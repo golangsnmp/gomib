@@ -9,8 +9,8 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-func newTestContext() *ResolverContext {
-	return newResolverContext(nil, nil, mib.DefaultConfig())
+func newTestContext() *resolverContext {
+	return newresolverContext(nil, nil, mib.DefaultConfig())
 }
 
 func TestRecordUnresolvedSeverityConsistency(t *testing.T) {
@@ -24,47 +24,47 @@ func TestRecordUnresolvedSeverityConsistency(t *testing.T) {
 	tests := []struct {
 		name string
 		code string
-		emit func(c *ResolverContext)
+		emit func(c *resolverContext)
 	}{
 		{
 			name: "import",
 			code: "import-not-found",
-			emit: func(c *ResolverContext) {
+			emit: func(c *resolverContext) {
 				c.RecordUnresolvedImport(mod, "OTHER-MIB", "someSymbol", "not found", span)
 			},
 		},
 		{
 			name: "import module not found",
 			code: "import-module-not-found",
-			emit: func(c *ResolverContext) {
-				c.RecordUnresolvedImport(mod, "MISSING-MIB", "someSymbol", "module not found", span)
+			emit: func(c *resolverContext) {
+				c.RecordUnresolvedImport(mod, "MISSING-MIB", "someSymbol", "module_not_found", span)
 			},
 		},
 		{
 			name: "type",
 			code: "type-unknown",
-			emit: func(c *ResolverContext) {
+			emit: func(c *resolverContext) {
 				c.RecordUnresolvedType(mod, "myType", "UnknownType", span)
 			},
 		},
 		{
 			name: "oid",
 			code: "oid-orphan",
-			emit: func(c *ResolverContext) {
+			emit: func(c *resolverContext) {
 				c.RecordUnresolvedOid(mod, "myObject", "unknownParent", span)
 			},
 		},
 		{
 			name: "index",
 			code: "index-unresolved",
-			emit: func(c *ResolverContext) {
+			emit: func(c *resolverContext) {
 				c.RecordUnresolvedIndex(mod, "myRow", "missingIndex", span)
 			},
 		},
 		{
 			name: "notification object",
 			code: "objects-unresolved",
-			emit: func(c *ResolverContext) {
+			emit: func(c *resolverContext) {
 				c.RecordUnresolvedNotificationObject(mod, "myNotif", "missingObject", span)
 			},
 		},
@@ -380,7 +380,7 @@ func TestLookupNodeGlobal(t *testing.T) {
 	nodeY := &mibimpl.Node{}
 	nodeY.SetName("y")
 
-	ctx := newResolverContext([]*module.Module{modA, modB}, nil, mib.DefaultConfig())
+	ctx := newresolverContext([]*module.Module{modA, modB}, nil, mib.DefaultConfig())
 	ctx.ModuleSymbolToNode[modA] = map[string]*mibimpl.Node{"x": nodeX}
 	ctx.ModuleSymbolToNode[modB] = map[string]*mibimpl.Node{"y": nodeY}
 
@@ -409,7 +409,7 @@ func TestLookupNodeGlobal_DeterministicOrder(t *testing.T) {
 	nodeB := &mibimpl.Node{}
 	nodeB.SetName("x")
 
-	ctx := newResolverContext([]*module.Module{modA, modB}, nil, mib.DefaultConfig())
+	ctx := newresolverContext([]*module.Module{modA, modB}, nil, mib.DefaultConfig())
 	ctx.ModuleSymbolToNode[modA] = map[string]*mibimpl.Node{"x": nodeA}
 	ctx.ModuleSymbolToNode[modB] = map[string]*mibimpl.Node{"x": nodeB}
 
@@ -453,7 +453,7 @@ func TestLookupTypeForModule_ASN1Fallback(t *testing.T) {
 
 func TestLookupTypeForModule_PermissiveFallbacks(t *testing.T) {
 	// In permissive mode, SMI global types, SMIv1 types, and TC types resolve.
-	ctx := newResolverContext(nil, nil, mib.PermissiveConfig())
+	ctx := newresolverContext(nil, nil, mib.PermissiveConfig())
 	modA := &module.Module{Name: "A"}
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
@@ -489,7 +489,7 @@ func TestLookupTypeForModule_PermissiveFallbacks(t *testing.T) {
 
 func TestLookupTypeForModule_StrictNoFallback(t *testing.T) {
 	// In strict mode, SMI global types should not resolve without import.
-	ctx := newResolverContext(nil, nil, mib.StrictConfig())
+	ctx := newresolverContext(nil, nil, mib.StrictConfig())
 	modA := &module.Module{Name: "A"}
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
@@ -516,7 +516,7 @@ func TestLookupTypeForModule_StrictNoFallback(t *testing.T) {
 
 func TestLookupType_Permissive(t *testing.T) {
 	// LookupType with no module context, permissive mode.
-	ctx := newResolverContext(nil, nil, mib.PermissiveConfig())
+	ctx := newresolverContext(nil, nil, mib.PermissiveConfig())
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
 	rfc1155Mod := &module.Module{Name: "RFC1155-SMI"}
@@ -556,7 +556,7 @@ func TestLookupType_Permissive(t *testing.T) {
 
 func TestLookupType_StrictOnlyPrimitives(t *testing.T) {
 	// Strict mode: only ASN.1 primitives, no global search.
-	ctx := newResolverContext(nil, nil, mib.StrictConfig())
+	ctx := newresolverContext(nil, nil, mib.StrictConfig())
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
 	intType := mibimpl.NewType("INTEGER")
@@ -584,7 +584,7 @@ func TestLookupType_GlobalModuleScan(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 	vendorType := mibimpl.NewType("VendorSpecialType")
 
-	ctx := newResolverContext([]*module.Module{modA}, nil, mib.PermissiveConfig())
+	ctx := newresolverContext([]*module.Module{modA}, nil, mib.PermissiveConfig())
 	ctx.Snmpv2SMIModule = &module.Module{Name: "SNMPv2-SMI"}
 	ctx.ModuleSymbolToType[modA] = map[string]*mibimpl.Type{"VendorSpecialType": vendorType}
 
@@ -725,7 +725,7 @@ func TestEmitDiagnostic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := newResolverContext(nil, nil, tt.config)
+			ctx := newresolverContext(nil, nil, tt.config)
 			ctx.EmitDiagnostic("test-code", tt.severity, "MOD", 1, 1, "test message")
 			got := len(ctx.Diagnostics())
 			if got != tt.want {
@@ -740,7 +740,7 @@ func TestEmitDiagnostic_IgnoredCode(t *testing.T) {
 		Level:  mib.StrictnessStrict,
 		Ignore: []string{"test-*"},
 	}
-	ctx := newResolverContext(nil, nil, config)
+	ctx := newresolverContext(nil, nil, config)
 	ctx.EmitDiagnostic("test-foo", mib.SeverityError, "MOD", 1, 1, "ignored")
 	if len(ctx.Diagnostics()) != 0 {
 		t.Fatal("expected ignored code to produce no diagnostics")
@@ -848,7 +848,7 @@ func TestFinalizeUnresolved_NilModule(t *testing.T) {
 
 func TestDropModules(t *testing.T) {
 	mod := &module.Module{Name: "A"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
+	ctx := newresolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
 	ctx.ModuleIndex["A"] = []*module.Module{mod}
 	ctx.ModuleDefNames[mod] = map[string]struct{}{"foo": {}}
 
@@ -880,70 +880,19 @@ func TestDropModules(t *testing.T) {
 	}
 }
 
-func TestScanCapacityHints(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
-		h := scanCapacityHints(nil)
-		if h.modules != 0 || h.objects != 0 || h.types != 0 || h.notifications != 0 || h.nodes != 0 || h.imports != 0 {
-			t.Errorf("expected all zeros, got %+v", h)
-		}
-	})
-
-	t.Run("counts definitions", func(t *testing.T) {
-		oid := module.OidAssignment{Components: []module.OidComponent{&module.OidComponentName{NameValue: "iso"}}}
-		mod := &module.Module{
-			Name: "TEST",
-			Imports: []module.Import{
-				{Module: "A", Symbol: "x"},
-				{Module: "B", Symbol: "y"},
-			},
-			Definitions: []module.Definition{
-				&module.ObjectType{Name: "obj1", Oid: oid},
-				&module.ObjectType{Name: "obj2", Oid: oid},
-				&module.TypeDef{Name: "type1"},
-				&module.Notification{Name: "notif1", Oid: &oid},
-				&module.ValueAssignment{Name: "val1", Oid: oid},
-			},
-		}
-
-		h := scanCapacityHints([]*module.Module{mod})
-		if h.modules != 1 {
-			t.Errorf("modules = %d, want 1", h.modules)
-		}
-		if h.objects != 2 {
-			t.Errorf("objects = %d, want 2", h.objects)
-		}
-		if h.types != 1 {
-			t.Errorf("types = %d, want 1", h.types)
-		}
-		if h.notifications != 1 {
-			t.Errorf("notifications = %d, want 1", h.notifications)
-		}
-		// obj1, obj2, notif1, val1 all have OIDs = 4 nodes
-		if h.nodes != 4 {
-			t.Errorf("nodes = %d, want 4", h.nodes)
-		}
-		if h.imports != 2 {
-			t.Errorf("imports = %d, want 2", h.imports)
-		}
-	})
-
-	t.Run("TypeDef has no OID", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST",
-			Definitions: []module.Definition{
-				&module.TypeDef{Name: "type1"},
-			},
-		}
-		h := scanCapacityHints([]*module.Module{mod})
-		if h.nodes != 0 {
-			t.Errorf("nodes = %d, want 0 (TypeDef has no OID)", h.nodes)
-		}
-	})
+func TestModuleCount(t *testing.T) {
+	if moduleCount(nil) != 0 {
+		t.Error("expected 0 for nil")
+	}
+	mods := []*module.Module{{Name: "A"}, {Name: "B"}}
+	if moduleCount(mods) != 2 {
+		t.Errorf("expected 2, got %d", moduleCount(mods))
+	}
 }
 
 func TestDiagnosticConfig_Getter(t *testing.T) {
 	config := mib.PermissiveConfig()
-	ctx := newResolverContext(nil, nil, config)
+	ctx := newresolverContext(nil, nil, config)
 	got := ctx.DiagnosticConfig()
 	if got.Level != config.Level {
 		t.Errorf("DiagnosticConfig().Level = %v, want %v", got.Level, config.Level)

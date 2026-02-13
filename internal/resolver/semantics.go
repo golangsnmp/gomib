@@ -13,7 +13,7 @@ import (
 )
 
 // analyzeSemantics is the semantic analysis phase entry point.
-func analyzeSemantics(ctx *ResolverContext) {
+func analyzeSemantics(ctx *resolverContext) {
 	objRefs := collectObjectTypeRefs(ctx)
 	inferNodeKinds(ctx, objRefs)
 	resolveTableSemantics(ctx, objRefs)
@@ -24,7 +24,7 @@ func analyzeSemantics(ctx *ResolverContext) {
 	createResolvedCapabilities(ctx)
 }
 
-func inferNodeKinds(ctx *ResolverContext, objRefs []objectTypeRef) {
+func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 	tables, rows, scalars := 0, 0, 0
 	var rowNodes []*mibimpl.Node
 
@@ -81,7 +81,7 @@ type notificationRef struct {
 }
 
 // collectDefinitionRefs collects definitions matching matchFn across all modules.
-func collectDefinitionRefs[T any](ctx *ResolverContext, matchFn func(*module.Module, module.Definition) (T, bool)) []T {
+func collectDefinitionRefs[T any](ctx *resolverContext, matchFn func(*module.Module, module.Definition) (T, bool)) []T {
 	var refs []T
 	for _, mod := range ctx.Modules {
 		for _, def := range mod.Definitions {
@@ -93,7 +93,7 @@ func collectDefinitionRefs[T any](ctx *ResolverContext, matchFn func(*module.Mod
 	return refs
 }
 
-func collectObjectTypeRefs(ctx *ResolverContext) []objectTypeRef {
+func collectObjectTypeRefs(ctx *resolverContext) []objectTypeRef {
 	return collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (objectTypeRef, bool) {
 		if obj, ok := def.(*module.ObjectType); ok {
 			return objectTypeRef{mod: mod, obj: obj}, true
@@ -102,7 +102,7 @@ func collectObjectTypeRefs(ctx *ResolverContext) []objectTypeRef {
 	})
 }
 
-func collectNotificationRefs(ctx *ResolverContext) []notificationRef {
+func collectNotificationRefs(ctx *resolverContext) []notificationRef {
 	return collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (notificationRef, bool) {
 		if notif, ok := def.(*module.Notification); ok {
 			return notificationRef{mod: mod, notif: notif}, true
@@ -111,7 +111,7 @@ func collectNotificationRefs(ctx *ResolverContext) []notificationRef {
 	})
 }
 
-func resolveTableSemantics(ctx *ResolverContext, objRefs []objectTypeRef) {
+func resolveTableSemantics(ctx *resolverContext, objRefs []objectTypeRef) {
 	for _, ref := range objRefs {
 		obj := ref.obj
 		if len(obj.Index) == 0 && obj.Augments == "" {
@@ -137,7 +137,7 @@ func resolveTableSemantics(ctx *ResolverContext, objRefs []objectTypeRef) {
 	}
 }
 
-func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
+func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 	created := 0
 	for _, ref := range objRefs {
 		obj := ref.obj
@@ -169,9 +169,6 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 			resolved.SetEffectiveEnums(extractNamedValues(obj.Syntax))
 		}
 
-		// INDEX and AUGMENTS are resolved in a second pass after all
-		// objects exist so that cross-references can be linked.
-
 		if obj.DefVal != nil {
 			resolved.SetDefaultValue(convertDefVal(ctx, obj.DefVal, ref.mod, obj.Syntax))
 		}
@@ -198,9 +195,17 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 		}
 	}
 
-	// Second pass: link INDEX and AUGMENTS now that all objects exist.
-	// Use the module's own Object instance, not the shared node's, because
-	// multiple modules can define objects at the same OID.
+	linkObjectIndexes(ctx, objRefs)
+
+	if ctx.TraceEnabled() {
+		ctx.Trace("created resolved objects", slog.Int("count", created))
+	}
+}
+
+// linkObjectIndexes resolves INDEX and AUGMENTS references now that all
+// objects exist. Uses the module's own Object instance, not the shared
+// node's, because multiple modules can define objects at the same OID.
+func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 	for _, ref := range objRefs {
 		obj := ref.obj
 
@@ -236,19 +241,19 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 			}
 		}
 	}
-
-	if ctx.TraceEnabled() {
-		ctx.Trace("created resolved objects", slog.Int("count", created))
-	}
 }
 
+// computeEffectiveValues fills in display hints, size/range constraints,
+// enums, and bits on the object by walking the type chain from child to root.
+// Object-level values (set from the OBJECT-TYPE syntax) take precedence;
+// only missing values are inherited from ancestor types. The first non-empty
+// value found in the chain wins.
 func computeEffectiveValues(obj *mibimpl.Object) {
 	t := obj.InternalType()
 	if t == nil {
 		return
 	}
 
-	// Inherit display hint, constraints, and enums from ancestor types
 	for t != nil {
 		if obj.EffectiveDisplayHint() == "" && t.DisplayHint() != "" {
 			obj.SetEffectiveHint(t.DisplayHint())
@@ -269,7 +274,7 @@ func computeEffectiveValues(obj *mibimpl.Object) {
 	}
 }
 
-func createResolvedNotifications(ctx *ResolverContext) {
+func createResolvedNotifications(ctx *resolverContext) {
 	created := 0
 	for _, ref := range collectNotificationRefs(ctx) {
 		notif := ref.notif
@@ -301,6 +306,11 @@ func createResolvedNotifications(ctx *ResolverContext) {
 				resolved.AddObject(objNode.InternalObject())
 			} else if !ok {
 				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
+			} else if ok {
+				// Node exists but has no object definition (intermediate node
+				// or non-object definition).
+				ctx.emitUnresolvedDiagnostic(ref.mod, "notification-object-not-object", mib.SeverityMinor,
+					"notification "+notif.Name+" references "+objName+" which is not an object definition")
 			}
 		}
 
@@ -328,10 +338,17 @@ type notificationGroupRef struct {
 	grp *module.NotificationGroup
 }
 
-func createResolvedGroups(ctx *ResolverContext) {
-	created := 0
+func createResolvedGroups(ctx *resolverContext) {
+	objCount := createResolvedObjectGroups(ctx)
+	notifCount := createResolvedNotificationGroups(ctx)
 
-	// OBJECT-GROUP definitions
+	if ctx.TraceEnabled() {
+		ctx.Trace("created resolved groups", slog.Int("count", objCount+notifCount))
+	}
+}
+
+func createResolvedObjectGroups(ctx *resolverContext) int {
+	created := 0
 	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (objectGroupRef, bool) {
 		if grp, ok := def.(*module.ObjectGroup); ok {
 			return objectGroupRef{mod: mod, grp: grp}, true
@@ -362,16 +379,14 @@ func createResolvedGroups(ctx *ResolverContext) {
 			}
 		}
 
-		ctx.Builder.AddGroup(resolved)
-		node.SetGroup(resolved)
+		registerGroup(ctx, ref.mod, node, resolved)
 		created++
-
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
-			resolvedMod.AddGroup(resolved)
-		}
 	}
+	return created
+}
 
-	// NOTIFICATION-GROUP definitions
+func createResolvedNotificationGroups(ctx *resolverContext) int {
+	created := 0
 	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (notificationGroupRef, bool) {
 		if grp, ok := def.(*module.NotificationGroup); ok {
 			return notificationGroupRef{mod: mod, grp: grp}, true
@@ -398,17 +413,17 @@ func createResolvedGroups(ctx *ResolverContext) {
 			}
 		}
 
-		ctx.Builder.AddGroup(resolved)
-		node.SetGroup(resolved)
+		registerGroup(ctx, ref.mod, node, resolved)
 		created++
-
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
-			resolvedMod.AddGroup(resolved)
-		}
 	}
+	return created
+}
 
-	if ctx.TraceEnabled() {
-		ctx.Trace("created resolved groups", slog.Int("count", created))
+func registerGroup(ctx *resolverContext, mod *module.Module, node *mibimpl.Node, resolved *mibimpl.Group) {
+	ctx.Builder.AddGroup(resolved)
+	node.SetGroup(resolved)
+	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
+		resolvedMod.AddGroup(resolved)
 	}
 }
 
@@ -422,7 +437,7 @@ type capabilitiesRef struct {
 	cap *module.AgentCapabilities
 }
 
-func createResolvedCompliances(ctx *ResolverContext) {
+func createResolvedCompliances(ctx *resolverContext) {
 	created := 0
 	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (complianceRef, bool) {
 		if comp, ok := def.(*module.ModuleCompliance); ok {
@@ -493,7 +508,7 @@ func convertComplianceModules(modules []module.ComplianceModule) []mib.Complianc
 	return result
 }
 
-func createResolvedCapabilities(ctx *ResolverContext) {
+func createResolvedCapabilities(ctx *resolverContext) {
 	created := 0
 	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (capabilitiesRef, bool) {
 		if cap, ok := def.(*module.AgentCapabilities); ok {
@@ -569,7 +584,7 @@ func convertSupportsModules(modules []module.SupportsModule) []mib.CapabilitiesM
 	return result
 }
 
-func lookupMemberNode(ctx *ResolverContext, mod *module.Module, name string) (*mibimpl.Node, bool) {
+func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*mibimpl.Node, bool) {
 	node, ok := ctx.LookupNodeForModule(mod, name)
 	if ok {
 		return node, true
@@ -580,7 +595,7 @@ func lookupMemberNode(ctx *ResolverContext, mod *module.Module, name string) (*m
 	return nil, false
 }
 
-func resolveTypeSyntax(ctx *ResolverContext, syntax module.TypeSyntax, mod *module.Module, objectName string, span types.Span) (*mibimpl.Type, bool) {
+func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, objectName string, span types.Span) (*mibimpl.Type, bool) {
 	switch s := syntax.(type) {
 	case *module.TypeSyntaxTypeRef:
 		if t, ok := ctx.LookupTypeForModule(mod, s.Name); ok {
@@ -626,7 +641,7 @@ func resolveTypeSyntax(ctx *ResolverContext, syntax module.TypeSyntax, mod *modu
 	}
 }
 
-func convertDefVal(ctx *ResolverContext, defval module.DefVal, mod *module.Module, syntax module.TypeSyntax) *mib.DefVal {
+func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Module, syntax module.TypeSyntax) *mib.DefVal {
 	switch v := defval.(type) {
 	case *module.DefValInteger:
 		raw := strconv.FormatInt(v.Value, 10)
@@ -775,14 +790,13 @@ func convertAccess(a module.Access) mib.Access {
 	}
 }
 
+// isBareTypeIndex returns true for primitive/global type names that can appear
+// directly in INDEX clauses without being object definitions.
 func isBareTypeIndex(name string) bool {
-	switch name {
-	case "INTEGER", "Integer32", "Unsigned32", "Counter32", "Counter64", "Gauge32",
-		"IpAddress", "Opaque", "TimeTicks", "BITS", "OCTET STRING", "Counter", "Gauge", "NetworkAddress":
-		return true
-	default:
+	if name == "OBJECT IDENTIFIER" {
 		return false
 	}
+	return isASN1Primitive(name) || isSmiGlobalType(name) || isSmiV1GlobalType(name)
 }
 
 // isOIDType checks if the syntax resolves to OBJECT IDENTIFIER.

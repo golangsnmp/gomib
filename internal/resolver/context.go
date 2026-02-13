@@ -10,8 +10,14 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// ResolverContext holds indices and working state for all resolution phases.
-type ResolverContext struct {
+// Import failure reason strings, shared between imports.go and context.go.
+const (
+	reasonModuleNotFound    = "module_not_found"
+	reasonSymbolNotExported = "symbol_not_exported"
+)
+
+// resolverContext holds indices and working state for all resolution phases.
+type resolverContext struct {
 	Builder *mibimpl.Builder
 
 	Modules []*module.Module
@@ -96,60 +102,34 @@ type unresolvedNotifObject struct {
 	span         types.Span
 }
 
-type capacityHints struct {
-	modules       int
-	objects       int
-	types         int
-	notifications int
-	nodes         int
-	imports       int
+func moduleCount(mods []*module.Module) int {
+	return len(mods)
 }
 
-func scanCapacityHints(mods []*module.Module) capacityHints {
-	h := capacityHints{modules: len(mods)}
-	for _, mod := range mods {
-		h.imports += len(mod.Imports)
-		for _, def := range mod.Definitions {
-			if def.DefinitionOid() != nil {
-				h.nodes++
-			}
-			switch def.(type) {
-			case *module.ObjectType:
-				h.objects++
-			case *module.TypeDef:
-				h.types++
-			case *module.Notification:
-				h.notifications++
-			}
-		}
-	}
-	return h
-}
-
-func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *ResolverContext {
-	h := scanCapacityHints(mods)
-	return &ResolverContext{
+func newresolverContext(mods []*module.Module, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *resolverContext {
+	n := moduleCount(mods)
+	return &resolverContext{
 		Builder:            mibimpl.NewBuilder(),
 		Modules:            mods,
-		ModuleIndex:        make(map[string][]*module.Module, h.modules),
-		ModuleToResolved:   make(map[*module.Module]*mibimpl.Module, h.modules),
-		ResolvedToModule:   make(map[*mibimpl.Module]*module.Module, h.modules),
-		ModuleSymbolToNode: make(map[*module.Module]map[string]*mibimpl.Node, h.modules),
-		ModuleImports:      make(map[*module.Module]map[string]*module.Module, h.modules),
-		ModuleSymbolToType: make(map[*module.Module]map[string]*mibimpl.Type, h.modules),
-		ModuleDefNames:     make(map[*module.Module]map[string]struct{}, h.modules),
+		ModuleIndex:        make(map[string][]*module.Module, n),
+		ModuleToResolved:   make(map[*module.Module]*mibimpl.Module, n),
+		ResolvedToModule:   make(map[*mibimpl.Module]*module.Module, n),
+		ModuleSymbolToNode: make(map[*module.Module]map[string]*mibimpl.Node, n),
+		ModuleImports:      make(map[*module.Module]map[string]*module.Module, n),
+		ModuleSymbolToType: make(map[*module.Module]map[string]*mibimpl.Type, n),
+		ModuleDefNames:     make(map[*module.Module]map[string]struct{}, n),
 		diagConfig:         diagConfig,
 		Logger:             types.Logger{L: logger},
 	}
 }
 
 // LookupNodeForModule resolves a node by name, traversing imports from mod.
-func (c *ResolverContext) LookupNodeForModule(mod *module.Module, name string) (*mibimpl.Node, bool) {
+func (c *resolverContext) LookupNodeForModule(mod *module.Module, name string) (*mibimpl.Node, bool) {
 	return c.lookupNodeInModuleScope(mod, name)
 }
 
 // LookupNodeInModule resolves a node across all versions of a named module.
-func (c *ResolverContext) LookupNodeInModule(moduleName, name string) (*mibimpl.Node, bool) {
+func (c *resolverContext) LookupNodeInModule(moduleName, name string) (*mibimpl.Node, bool) {
 	candidates := c.ModuleIndex[moduleName]
 	for _, mod := range candidates {
 		if node, ok := c.LookupNodeForModule(mod, name); ok {
@@ -161,7 +141,7 @@ func (c *ResolverContext) LookupNodeInModule(moduleName, name string) (*mibimpl.
 
 // LookupNodeGlobal searches all modules for a node with the given name.
 // Iterates in module-list order for deterministic results.
-func (c *ResolverContext) LookupNodeGlobal(name string) (*mibimpl.Node, bool) {
+func (c *resolverContext) LookupNodeGlobal(name string) (*mibimpl.Node, bool) {
 	for _, mod := range c.Modules {
 		if symbols := c.ModuleSymbolToNode[mod]; symbols != nil {
 			if node, ok := symbols[name]; ok {
@@ -173,7 +153,7 @@ func (c *ResolverContext) LookupNodeGlobal(name string) (*mibimpl.Node, bool) {
 }
 
 // lookupTypeInModule looks up a type directly in a module's symbol table.
-func (c *ResolverContext) lookupTypeInModule(mod *module.Module, name string) (*mibimpl.Type, bool) {
+func (c *resolverContext) lookupTypeInModule(mod *module.Module, name string) (*mibimpl.Type, bool) {
 	if mod == nil {
 		return nil, false
 	}
@@ -185,43 +165,56 @@ func (c *ResolverContext) lookupTypeInModule(mod *module.Module, name string) (*
 	return nil, false
 }
 
-// LookupType searches for a type by name, trying well-known modules first.
-// Beyond ASN.1 primitives, global search is only enabled in permissive mode.
-func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
+// tryWellKnownTypeFallbacks searches ASN.1 primitives (always) and well-known
+// base modules (permissive only) for a type by name.
+func (c *resolverContext) tryWellKnownTypeFallbacks(name string) (*mibimpl.Type, bool) {
 	// RFC-compliant: ASN.1 primitives are always available
 	if isASN1Primitive(name) {
 		if t, ok := c.lookupTypeInModule(c.Snmpv2SMIModule, name); ok {
-			return t, ok
-		}
-	}
-
-	// Permissive only: global type search
-	if !c.diagConfig.AllowBestGuessFallbacks() {
-		return nil, false
-	}
-
-	// Try SNMPv2-SMI for SMI global types
-	if c.Snmpv2SMIModule != nil {
-		if t, ok := c.LookupTypeForModule(c.Snmpv2SMIModule, name); ok {
 			return t, true
 		}
 	}
 
-	// Try RFC1155-SMI for SMIv1 types (Counter, Gauge, NetworkAddress)
+	if !c.diagConfig.AllowBestGuessFallbacks() {
+		return nil, false
+	}
+
+	// Permissive only: SMI global types from SNMPv2-SMI
+	if isSmiGlobalType(name) {
+		if t, ok := c.lookupTypeInModule(c.Snmpv2SMIModule, name); ok {
+			return t, true
+		}
+	}
+
+	// Permissive only: SMIv1 types (Counter, Gauge, NetworkAddress) from RFC1155-SMI
 	if isSmiV1GlobalType(name) {
 		if t, ok := c.lookupTypeInModule(c.Rfc1155SMIModule, name); ok {
-			return t, ok
+			return t, true
 		}
 	}
 
-	// Try SNMPv2-TC for standard textual conventions (DisplayString, TruthValue, etc.)
+	// Permissive only: SNMPv2-TC textual conventions (DisplayString, TruthValue, etc.)
 	if isSNMPv2TCType(name) {
 		if t, ok := c.lookupTypeInModule(c.Snmpv2TCModule, name); ok {
-			return t, ok
+			return t, true
 		}
 	}
 
-	// Iterate in module-list order for deterministic results.
+	return nil, false
+}
+
+// LookupType searches for a type by name, trying well-known modules first.
+// Beyond ASN.1 primitives, global search is only enabled in permissive mode.
+func (c *resolverContext) LookupType(name string) (*mibimpl.Type, bool) {
+	if t, ok := c.tryWellKnownTypeFallbacks(name); ok {
+		return t, true
+	}
+
+	if !c.diagConfig.AllowBestGuessFallbacks() {
+		return nil, false
+	}
+
+	// Permissive only: scan all modules for unknown types.
 	for _, mod := range c.Modules {
 		if symbols := c.ModuleSymbolToType[mod]; symbols != nil {
 			if t, ok := symbols[name]; ok {
@@ -234,44 +227,11 @@ func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
 
 // LookupTypeForModule resolves a type by name, traversing imports from mod.
 // Falls back to well-known base modules when permissive mode is enabled.
-func (c *ResolverContext) LookupTypeForModule(mod *module.Module, name string) (*mibimpl.Type, bool) {
+func (c *resolverContext) LookupTypeForModule(mod *module.Module, name string) (*mibimpl.Type, bool) {
 	if t, ok := c.lookupTypeInModuleScope(mod, name); ok {
 		return t, true
 	}
-
-	// RFC-compliant: ASN.1 primitives are always available
-	if isASN1Primitive(name) {
-		if t, ok := c.lookupTypeInModule(c.Snmpv2SMIModule, name); ok {
-			return t, ok
-		}
-	}
-
-	if !c.diagConfig.AllowBestGuessFallbacks() {
-		return nil, false
-	}
-
-	// Permissive only: SMI global types without explicit import
-	if isSmiGlobalType(name) {
-		if t, ok := c.lookupTypeInModule(c.Snmpv2SMIModule, name); ok {
-			return t, ok
-		}
-	}
-
-	// Permissive only: SMIv1 types (Counter, Gauge, NetworkAddress) from RFC1155-SMI
-	if isSmiV1GlobalType(name) {
-		if t, ok := c.lookupTypeInModule(c.Rfc1155SMIModule, name); ok {
-			return t, ok
-		}
-	}
-
-	// Permissive only: SNMPv2-TC textual conventions (DisplayString, TruthValue, etc.)
-	if isSNMPv2TCType(name) {
-		if t, ok := c.lookupTypeInModule(c.Snmpv2TCModule, name); ok {
-			return t, ok
-		}
-	}
-
-	return nil, false
+	return c.tryWellKnownTypeFallbacks(name)
 }
 
 // maxImportChainDepth is the maximum depth of import chains to traverse.
@@ -321,14 +281,14 @@ func lookupInModuleScope[T any](
 	}
 }
 
-func (c *ResolverContext) lookupNodeInModuleScope(mod *module.Module, name string) (*mibimpl.Node, bool) {
+func (c *resolverContext) lookupNodeInModuleScope(mod *module.Module, name string) (*mibimpl.Node, bool) {
 	return lookupInModuleScope(mod, name,
 		func(m *module.Module) map[string]*mibimpl.Node { return c.ModuleSymbolToNode[m] },
 		func(m *module.Module) map[string]*module.Module { return c.ModuleImports[m] },
 	)
 }
 
-func (c *ResolverContext) lookupTypeInModuleScope(mod *module.Module, name string) (*mibimpl.Type, bool) {
+func (c *resolverContext) lookupTypeInModuleScope(mod *module.Module, name string) (*mibimpl.Type, bool) {
 	return lookupInModuleScope(mod, name,
 		func(m *module.Module) map[string]*mibimpl.Type { return c.ModuleSymbolToType[m] },
 		func(m *module.Module) map[string]*module.Module { return c.ModuleImports[m] },
@@ -336,7 +296,7 @@ func (c *ResolverContext) lookupTypeInModuleScope(mod *module.Module, name strin
 }
 
 // RegisterImport maps a symbol in importingModule to its source module.
-func (c *ResolverContext) RegisterImport(importingModule *module.Module, symbol string, sourceModule *module.Module) {
+func (c *resolverContext) RegisterImport(importingModule *module.Module, symbol string, sourceModule *module.Module) {
 	imports := c.ModuleImports[importingModule]
 	if imports == nil {
 		imports = make(map[string]*module.Module)
@@ -346,7 +306,7 @@ func (c *ResolverContext) RegisterImport(importingModule *module.Module, symbol 
 }
 
 // RegisterModuleNodeSymbol binds a symbol name to a node within a module scope.
-func (c *ResolverContext) RegisterModuleNodeSymbol(mod *module.Module, symbol string, node *mibimpl.Node) {
+func (c *resolverContext) RegisterModuleNodeSymbol(mod *module.Module, symbol string, node *mibimpl.Node) {
 	symbols := c.ModuleSymbolToNode[mod]
 	if symbols == nil {
 		symbols = make(map[string]*mibimpl.Node)
@@ -361,7 +321,7 @@ func (c *ResolverContext) RegisterModuleNodeSymbol(mod *module.Module, symbol st
 }
 
 // RegisterModuleTypeSymbol binds a symbol name to a type within a module scope.
-func (c *ResolverContext) RegisterModuleTypeSymbol(mod *module.Module, name string, t *mibimpl.Type) {
+func (c *resolverContext) RegisterModuleTypeSymbol(mod *module.Module, name string, t *mibimpl.Type) {
 	symbols := c.ModuleSymbolToType[mod]
 	if symbols == nil {
 		symbols = make(map[string]*mibimpl.Type)
@@ -371,7 +331,7 @@ func (c *ResolverContext) RegisterModuleTypeSymbol(mod *module.Module, name stri
 }
 
 // EmitDiagnostic records a diagnostic, filtered by the current config's severity and code rules.
-func (c *ResolverContext) EmitDiagnostic(code string, severity mib.Severity, moduleName string, line, col int, message string) {
+func (c *resolverContext) EmitDiagnostic(code string, severity mib.Severity, moduleName string, line, col int, message string) {
 	if !c.diagConfig.ShouldReport(code, severity) {
 		return
 	}
@@ -386,17 +346,17 @@ func (c *ResolverContext) EmitDiagnostic(code string, severity mib.Severity, mod
 }
 
 // Diagnostics returns all diagnostics collected during resolution.
-func (c *ResolverContext) Diagnostics() []mib.Diagnostic {
+func (c *resolverContext) Diagnostics() []mib.Diagnostic {
 	return c.diagnostics
 }
 
 // DiagnosticConfig returns the active strictness and filtering configuration.
-func (c *ResolverContext) DiagnosticConfig() mib.DiagnosticConfig {
+func (c *resolverContext) DiagnosticConfig() mib.DiagnosticConfig {
 	return c.diagConfig
 }
 
 // logCycles logs detected dependency cycles at trace level.
-func logCycles(ctx *ResolverContext, cycles [][]graph.Symbol, msg string) {
+func logCycles(ctx *resolverContext, cycles [][]graph.Symbol, msg string) {
 	if len(cycles) == 0 || !ctx.TraceEnabled() {
 		return
 	}
@@ -409,7 +369,7 @@ func logCycles(ctx *ResolverContext, cycles [][]graph.Symbol, msg string) {
 	}
 }
 
-func (c *ResolverContext) emitUnresolvedDiagnostic(mod *module.Module, code string, severity mib.Severity, msg string) {
+func (c *resolverContext) emitUnresolvedDiagnostic(mod *module.Module, code string, severity mib.Severity, msg string) {
 	modName := ""
 	if mod != nil {
 		modName = mod.Name
@@ -418,7 +378,7 @@ func (c *ResolverContext) emitUnresolvedDiagnostic(mod *module.Module, code stri
 }
 
 // RecordUnresolvedImport tracks a symbol that could not be resolved from its source module.
-func (c *ResolverContext) RecordUnresolvedImport(importingModule *module.Module, fromModule, symbol, reason string, span types.Span) {
+func (c *resolverContext) RecordUnresolvedImport(importingModule *module.Module, fromModule, symbol, reason string, span types.Span) {
 	c.unresolvedImports = append(c.unresolvedImports, unresolvedImport{
 		importingModule: importingModule,
 		fromModule:      fromModule,
@@ -427,7 +387,7 @@ func (c *ResolverContext) RecordUnresolvedImport(importingModule *module.Module,
 		span:            span,
 	})
 	code := "import-not-found"
-	if reason == "module not found" {
+	if reason == reasonModuleNotFound {
 		code = "import-module-not-found"
 	}
 	c.emitUnresolvedDiagnostic(importingModule, code, mib.SeverityError,
@@ -435,7 +395,7 @@ func (c *ResolverContext) RecordUnresolvedImport(importingModule *module.Module,
 }
 
 // RecordUnresolvedType tracks a type definition whose parent type could not be found.
-func (c *ResolverContext) RecordUnresolvedType(mod *module.Module, referrer, referenced string, span types.Span) {
+func (c *resolverContext) RecordUnresolvedType(mod *module.Module, referrer, referenced string, span types.Span) {
 	c.unresolvedTypes = append(c.unresolvedTypes, unresolvedType{
 		module:     mod,
 		referrer:   referrer,
@@ -447,7 +407,7 @@ func (c *ResolverContext) RecordUnresolvedType(mod *module.Module, referrer, ref
 }
 
 // RecordUnresolvedOid tracks an OID definition whose parent component could not be resolved.
-func (c *ResolverContext) RecordUnresolvedOid(mod *module.Module, defName, component string, span types.Span) {
+func (c *resolverContext) RecordUnresolvedOid(mod *module.Module, defName, component string, span types.Span) {
 	c.unresolvedOids = append(c.unresolvedOids, unresolvedOid{
 		module:     mod,
 		definition: defName,
@@ -459,7 +419,7 @@ func (c *ResolverContext) RecordUnresolvedOid(mod *module.Module, defName, compo
 }
 
 // RecordUnresolvedIndex tracks a row's INDEX entry that references a missing object.
-func (c *ResolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexObject string, span types.Span) {
+func (c *resolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexObject string, span types.Span) {
 	c.unresolvedIndexes = append(c.unresolvedIndexes, unresolvedIndex{
 		module:      mod,
 		row:         row,
@@ -471,7 +431,7 @@ func (c *ResolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexOb
 }
 
 // RecordUnresolvedNotificationObject tracks a notification's OBJECTS entry that references a missing object.
-func (c *ResolverContext) RecordUnresolvedNotificationObject(mod *module.Module, notification, object string, span types.Span) {
+func (c *resolverContext) RecordUnresolvedNotificationObject(mod *module.Module, notification, object string, span types.Span) {
 	c.unresolvedNotifObjects = append(c.unresolvedNotifObjects, unresolvedNotifObject{
 		module:       mod,
 		notification: notification,
@@ -483,68 +443,40 @@ func (c *ResolverContext) RecordUnresolvedNotificationObject(mod *module.Module,
 }
 
 // DropModules releases parsed module data to free memory after resolution completes.
-func (c *ResolverContext) DropModules() {
+func (c *resolverContext) DropModules() {
 	c.Modules = nil
 	c.ModuleIndex = nil
 	c.ModuleDefNames = nil
 }
 
+func addUnresolved(b *mibimpl.Builder, kind string, symbol string, mod *module.Module) {
+	modName := ""
+	if mod != nil {
+		modName = mod.Name
+	}
+	b.AddUnresolved(mib.UnresolvedRef{
+		Kind:   kind,
+		Symbol: symbol,
+		Module: modName,
+	})
+}
+
 // FinalizeUnresolved copies collected unresolved references and diagnostics into the Mib builder.
-func (c *ResolverContext) FinalizeUnresolved() {
+func (c *resolverContext) FinalizeUnresolved() {
 	for _, u := range c.unresolvedImports {
-		modName := ""
-		if u.importingModule != nil {
-			modName = u.importingModule.Name
-		}
-		c.Builder.AddUnresolved(mib.UnresolvedRef{
-			Kind:   "import",
-			Symbol: u.symbol,
-			Module: modName,
-		})
+		addUnresolved(c.Builder, mib.UnresolvedImport, u.symbol, u.importingModule)
 	}
 	for _, u := range c.unresolvedTypes {
-		modName := ""
-		if u.module != nil {
-			modName = u.module.Name
-		}
-		c.Builder.AddUnresolved(mib.UnresolvedRef{
-			Kind:   "type",
-			Symbol: u.referenced,
-			Module: modName,
-		})
+		addUnresolved(c.Builder, mib.UnresolvedType, u.referenced, u.module)
 	}
 	for _, u := range c.unresolvedOids {
-		modName := ""
-		if u.module != nil {
-			modName = u.module.Name
-		}
-		c.Builder.AddUnresolved(mib.UnresolvedRef{
-			Kind:   "oid",
-			Symbol: u.component,
-			Module: modName,
-		})
+		addUnresolved(c.Builder, mib.UnresolvedOID, u.component, u.module)
 	}
 	for _, u := range c.unresolvedIndexes {
-		modName := ""
-		if u.module != nil {
-			modName = u.module.Name
-		}
-		c.Builder.AddUnresolved(mib.UnresolvedRef{
-			Kind:   "index",
-			Symbol: u.indexObject,
-			Module: modName,
-		})
+		addUnresolved(c.Builder, mib.UnresolvedIndex, u.indexObject, u.module)
 	}
 	for _, u := range c.unresolvedNotifObjects {
-		modName := ""
-		if u.module != nil {
-			modName = u.module.Name
-		}
-		c.Builder.AddUnresolved(mib.UnresolvedRef{
-			Kind:   "notification-object",
-			Symbol: u.object,
-			Module: modName,
-		})
+		addUnresolved(c.Builder, mib.UnresolvedNotificationObject, u.object, u.module)
 	}
 
 	for _, d := range c.diagnostics {

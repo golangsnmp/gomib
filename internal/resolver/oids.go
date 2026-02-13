@@ -35,7 +35,7 @@ var smiGlobalOidRoots = map[string]struct{}{
 }
 
 // resolveOids is the OID resolution phase entry point.
-func resolveOids(ctx *ResolverContext) {
+func resolveOids(ctx *resolverContext) {
 	defs := collectOidDefinitions(ctx)
 	checkSmiv2IdentifierHyphens(ctx, defs.oidDefs)
 
@@ -96,7 +96,7 @@ func resolveOids(ctx *ResolverContext) {
 }
 
 // getOidParentSymbol returns the symbol that the first component of the OID references.
-func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, bool) {
+func getOidParentSymbol(ctx *resolverContext, def oidDefinition) (graph.Symbol, bool) {
 	oid := def.oid()
 	if oid == nil || len(oid.Components) == 0 {
 		return graph.Symbol{}, false
@@ -125,7 +125,7 @@ func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, 
 
 // lookupNamedParentSymbol resolves a named OID parent by checking well-known roots,
 // local/imported definitions, and (in permissive mode) SMI global roots.
-func lookupNamedParentSymbol(ctx *ResolverContext, def oidDefinition, name string) (graph.Symbol, bool) {
+func lookupNamedParentSymbol(ctx *resolverContext, def oidDefinition, name string) (graph.Symbol, bool) {
 	if wellKnownRootArc(name) >= 0 {
 		return graph.Symbol{}, false
 	}
@@ -142,7 +142,7 @@ func lookupNamedParentSymbol(ctx *ResolverContext, def oidDefinition, name strin
 
 // findOidDefiningModule finds the module that defines an OID symbol,
 // checking local definitions first, then imports.
-func findOidDefiningModule(ctx *ResolverContext, fromMod *module.Module, name string) string {
+func findOidDefiningModule(ctx *resolverContext, fromMod *module.Module, name string) string {
 	for _, def := range fromMod.Definitions {
 		if def.DefinitionName() == name && def.DefinitionOid() != nil {
 			return fromMod.Name
@@ -159,7 +159,7 @@ func findOidDefiningModule(ctx *ResolverContext, fromMod *module.Module, name st
 }
 
 // recordUnresolvedFirstComponent records an unresolved OID based on its first component.
-func recordUnresolvedFirstComponent(ctx *ResolverContext, def oidDefinition, oid *module.OidAssignment) {
+func recordUnresolvedFirstComponent(ctx *resolverContext, def oidDefinition, oid *module.OidAssignment) {
 	defName := def.defName()
 	span := oid.Span
 	first := oid.Components[0]
@@ -178,7 +178,7 @@ func recordUnresolvedFirstComponent(ctx *ResolverContext, def oidDefinition, oid
 
 // checkSmiv2IdentifierHyphens emits a diagnostic for OID definition names
 // containing hyphens in SMIv2 modules. smilint flags this at level 5.
-func checkSmiv2IdentifierHyphens(ctx *ResolverContext, defs []oidDefinition) {
+func checkSmiv2IdentifierHyphens(ctx *resolverContext, defs []oidDefinition) {
 	for _, def := range defs {
 		if def.mod.Language != module.LanguageSMIv2 || module.IsBaseModule(def.mod.Name) {
 			continue
@@ -241,7 +241,7 @@ type collectedOidDefinitions struct {
 	trapDefs []trapTypeRef
 }
 
-func collectOidDefinitions(ctx *ResolverContext) collectedOidDefinitions {
+func collectOidDefinitions(ctx *resolverContext) collectedOidDefinitions {
 	var defs collectedOidDefinitions
 
 	for _, mod := range ctx.Modules {
@@ -285,7 +285,7 @@ func collectOidDefinitions(ctx *ResolverContext) collectedOidDefinitions {
 	return defs
 }
 
-func resolveOidDefinition(ctx *ResolverContext, def oidDefinition) bool {
+func resolveOidDefinition(ctx *resolverContext, def oidDefinition) bool {
 	oid := def.oid()
 	if oid == nil {
 		return false
@@ -311,7 +311,7 @@ func resolveOidDefinition(ctx *ResolverContext, def oidDefinition) bool {
 	return true
 }
 
-func resolveOidComponent(ctx *ResolverContext, def oidDefinition, currentNode *mibimpl.Node, component module.OidComponent, isLast bool) (*mibimpl.Node, bool) {
+func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *mibimpl.Node, component module.OidComponent, isLast bool) (*mibimpl.Node, bool) {
 	switch c := component.(type) {
 	case *module.OidComponentName:
 		return resolveNameComponent(ctx, def, c.NameValue)
@@ -329,7 +329,7 @@ func resolveOidComponent(ctx *ResolverContext, def oidDefinition, currentNode *m
 	}
 }
 
-func resolveNameComponent(ctx *ResolverContext, def oidDefinition, name string) (*mibimpl.Node, bool) {
+func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) (*mibimpl.Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
 		return node, true
 	}
@@ -347,7 +347,7 @@ func resolveNameComponent(ctx *ResolverContext, def oidDefinition, name string) 
 	return nil, false
 }
 
-func resolveNamedNumberComponent(ctx *ResolverContext, def oidDefinition, currentNode *mibimpl.Node, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
+func resolveNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *mibimpl.Node, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
 		ctx.RegisterModuleNodeSymbol(def.mod, name, node)
 		return node, true
@@ -355,7 +355,7 @@ func resolveNamedNumberComponent(ctx *ResolverContext, def oidDefinition, curren
 	return createNamedChild(ctx, def, currentNode, name, number, isLast)
 }
 
-func resolveQualifiedNameComponent(ctx *ResolverContext, def oidDefinition, moduleName, name string) (*mibimpl.Node, bool) {
+func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, moduleName, name string) (*mibimpl.Node, bool) {
 	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
 		return node, true
 	}
@@ -363,7 +363,7 @@ func resolveQualifiedNameComponent(ctx *ResolverContext, def oidDefinition, modu
 	return nil, false
 }
 
-func resolveQualifiedNamedNumberComponent(ctx *ResolverContext, def oidDefinition, currentNode *mibimpl.Node, moduleName, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
+func resolveQualifiedNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *mibimpl.Node, moduleName, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
 	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
 		ctx.RegisterModuleNodeSymbol(def.mod, name, node)
 		return node, true
@@ -373,7 +373,7 @@ func resolveQualifiedNamedNumberComponent(ctx *ResolverContext, def oidDefinitio
 
 // createNamedChild resolves a numeric component and registers it with a name.
 // Shared by resolveNamedNumberComponent and resolveQualifiedNamedNumberComponent.
-func createNamedChild(ctx *ResolverContext, def oidDefinition, currentNode *mibimpl.Node, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
+func createNamedChild(ctx *resolverContext, def oidDefinition, currentNode *mibimpl.Node, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
 	child := resolveNumericComponent(ctx, currentNode, number)
 	if child == nil {
 		return nil, false
@@ -390,7 +390,7 @@ func createNamedChild(ctx *ResolverContext, def oidDefinition, currentNode *mibi
 	return child, true
 }
 
-func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mibimpl.Node, label string) {
+func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *mibimpl.Node, label string) {
 	switch def.kind {
 	case defObjectType:
 		node.SetKind(mib.KindScalar)
@@ -440,14 +440,14 @@ func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mibimp
 	}
 }
 
-func resolveNumericComponent(ctx *ResolverContext, parent *mibimpl.Node, arc uint32) *mibimpl.Node {
+func resolveNumericComponent(ctx *resolverContext, parent *mibimpl.Node, arc uint32) *mibimpl.Node {
 	if parent != nil {
 		return parent.GetOrCreateChild(arc)
 	}
 	return ctx.Builder.GetOrCreateRoot(arc)
 }
 
-func resolveTrapTypeDefinitions(ctx *ResolverContext, defs []trapTypeRef) {
+func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 	for _, def := range defs {
 		enterprise, trapNumber, span, ok := def.trapInfo()
 		if !ok {
@@ -487,7 +487,7 @@ func resolveTrapTypeDefinitions(ctx *ResolverContext, defs []trapTypeRef) {
 	}
 }
 
-func lookupOrCreateWellKnownRoot(ctx *ResolverContext, name string) (*mibimpl.Node, bool) {
+func lookupOrCreateWellKnownRoot(ctx *resolverContext, name string) (*mibimpl.Node, bool) {
 	arc := wellKnownRootArc(name)
 	if arc < 0 {
 		return nil, false
@@ -495,7 +495,7 @@ func lookupOrCreateWellKnownRoot(ctx *ResolverContext, name string) (*mibimpl.No
 	return ctx.Builder.GetOrCreateRoot(uint32(arc)), true
 }
 
-func lookupSmiGlobalOidRoot(ctx *ResolverContext, name string) (*mibimpl.Node, bool) {
+func lookupSmiGlobalOidRoot(ctx *resolverContext, name string) (*mibimpl.Node, bool) {
 	if _, ok := smiGlobalOidRoots[name]; !ok {
 		return nil, false
 	}
@@ -523,7 +523,7 @@ func wellKnownRootArc(name string) int {
 
 // shouldPreferModule determines if newMod should replace currentMod as the node's module.
 // Preference order: SMIv2 > SMIv1 > Unknown, with newer LAST-UPDATED as tiebreaker.
-func shouldPreferModule(ctx *ResolverContext, newMod, currentMod *mibimpl.Module, srcMod *module.Module) bool {
+func shouldPreferModule(ctx *resolverContext, newMod, currentMod *mibimpl.Module, srcMod *module.Module) bool {
 	if currentMod == nil {
 		return true
 	}

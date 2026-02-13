@@ -149,7 +149,7 @@ func TestExtractLastUpdated(t *testing.T) {
 
 // makeTestModule creates a module with the given definitions registered in
 // the context's ModuleDefNames index.
-func makeTestModule(ctx *ResolverContext, name string, defNames []string) *module.Module {
+func makeTestModule(ctx *resolverContext, name string, defNames []string) *module.Module {
 	mod := &module.Module{Name: name}
 	defs := make(map[string]struct{}, len(defNames))
 	for _, n := range defNames {
@@ -475,9 +475,9 @@ func TestTryImportForwarding(t *testing.T) {
 	})
 }
 
-// newTestContextWithConfig creates a ResolverContext with a specific DiagnosticConfig.
-func newTestContextWithConfig(config mib.DiagnosticConfig) *ResolverContext {
-	return newResolverContext(nil, nil, config)
+// newTestContextWithConfig creates a resolverContext with a specific DiagnosticConfig.
+func newTestContextWithConfig(config mib.DiagnosticConfig) *resolverContext {
+	return newresolverContext(nil, nil, config)
 }
 
 func TestResolveImportsFromModule(t *testing.T) {
@@ -638,8 +638,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 		if ctx.unresolvedImports[0].symbol != "missing1" {
 			t.Errorf("unresolved symbol = %q, want %q", ctx.unresolvedImports[0].symbol, "missing1")
 		}
-		if ctx.unresolvedImports[0].reason != "symbol_not_exported" {
-			t.Errorf("unresolved reason = %q, want %q", ctx.unresolvedImports[0].reason, "symbol_not_exported")
+		if ctx.unresolvedImports[0].reason != reasonSymbolNotExported {
+			t.Errorf("unresolved reason = %q, want %q", ctx.unresolvedImports[0].reason, reasonSymbolNotExported)
 		}
 	})
 
@@ -655,8 +655,31 @@ func TestResolveImportsFromModule(t *testing.T) {
 		if len(ctx.unresolvedImports) != 1 {
 			t.Fatalf("unresolved count = %d, want 1", len(ctx.unresolvedImports))
 		}
-		if ctx.unresolvedImports[0].reason != "module_not_found" {
-			t.Errorf("reason = %q, want %q", ctx.unresolvedImports[0].reason, "module_not_found")
+		if ctx.unresolvedImports[0].reason != reasonModuleNotFound {
+			t.Errorf("reason = %q, want %q", ctx.unresolvedImports[0].reason, reasonModuleNotFound)
+		}
+	})
+
+	t.Run("module not found emits correct diagnostic code", func(t *testing.T) {
+		ctx := newTestContext()
+		importing := &module.Module{Name: "IMPORTER"}
+		resolveImportsFromModule(ctx, importing, "NONEXISTENT-MIB",
+			syms("something"))
+
+		diags := ctx.Diagnostics()
+		found := false
+		for _, d := range diags {
+			if d.Code == "import-module-not-found" && d.Module == "IMPORTER" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			codes := make([]string, len(diags))
+			for i, d := range diags {
+				codes[i] = d.Code
+			}
+			t.Errorf("expected diagnostic code %q, got codes: %v", "import-module-not-found", codes)
 		}
 	})
 
@@ -677,8 +700,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 		if len(ctx.unresolvedImports) != 1 {
 			t.Fatalf("unresolved count = %d, want 1", len(ctx.unresolvedImports))
 		}
-		if ctx.unresolvedImports[0].reason != "module_not_found" {
-			t.Errorf("reason = %q, want %q", ctx.unresolvedImports[0].reason, "module_not_found")
+		if ctx.unresolvedImports[0].reason != reasonModuleNotFound {
+			t.Errorf("reason = %q, want %q", ctx.unresolvedImports[0].reason, reasonModuleNotFound)
 		}
 	})
 
@@ -718,7 +741,7 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{importing}, nil, mib.DefaultConfig())
+		ctx := newresolverContext([]*module.Module{importing}, nil, mib.DefaultConfig())
 		ctx.ModuleIndex["SOURCE-MIB"] = []*module.Module{source}
 		ctx.ModuleDefNames[source] = map[string]struct{}{
 			"sysDescr": {},
@@ -750,7 +773,7 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{importing}, nil, mib.DefaultConfig())
+		ctx := newresolverContext([]*module.Module{importing}, nil, mib.DefaultConfig())
 		ctx.ModuleIndex["MOD-A"] = []*module.Module{sourceA}
 		ctx.ModuleIndex["MOD-B"] = []*module.Module{sourceB}
 		ctx.ModuleDefNames[sourceA] = map[string]struct{}{"alpha": {}}

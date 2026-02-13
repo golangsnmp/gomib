@@ -206,7 +206,16 @@ type NotificationVariation struct {
 
 // UnresolvedRef describes a symbol that could not be resolved.
 type UnresolvedRef struct {
-	Kind   string // "type", "object", "import"
+	Kind   string
 	Symbol string
 	Module string
 }
+
+// UnresolvedRef Kind values.
+const (
+	UnresolvedImport             = "import"
+	UnresolvedType               = "type"
+	UnresolvedOID                = "oid"
+	UnresolvedIndex              = "index"
+	UnresolvedNotificationObject = "notification-object"
+)

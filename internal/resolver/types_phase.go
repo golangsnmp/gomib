@@ -10,13 +10,13 @@ import (
 )
 
 // resolveTypes is the type resolution phase entry point.
-func resolveTypes(ctx *ResolverContext) {
+func resolveTypes(ctx *resolverContext) {
 	seedPrimitiveTypes(ctx)
 	createUserTypes(ctx)
 	resolveTypeBases(ctx)
 }
 
-func seedPrimitiveTypes(ctx *ResolverContext) {
+func seedPrimitiveTypes(ctx *resolverContext) {
 	if ctx.Snmpv2SMIModule == nil {
 		return
 	}
@@ -46,7 +46,7 @@ func seedPrimitiveTypes(ctx *ResolverContext) {
 	seedType("BITS", mib.BaseBits)
 }
 
-func createUserTypes(ctx *ResolverContext) {
+func createUserTypes(ctx *resolverContext) {
 	for _, mod := range ctx.Modules {
 		resolved := ctx.ModuleToResolved[mod]
 
@@ -114,7 +114,7 @@ type typeResolutionEntry struct {
 	typ *mibimpl.Type
 }
 
-func resolveTypeBases(ctx *ResolverContext) {
+func resolveTypeBases(ctx *resolverContext) {
 	resolveTypeRefParentsGraph(ctx)
 	linkPrimitiveSyntaxParents(ctx)
 	linkRFC1213TypesToTCs(ctx)
@@ -123,7 +123,7 @@ func resolveTypeBases(ctx *ResolverContext) {
 
 // resolveTypeRefParentsGraph uses a dependency graph to resolve type parents
 // in topological order (single pass).
-func resolveTypeRefParentsGraph(ctx *ResolverContext) {
+func resolveTypeRefParentsGraph(ctx *resolverContext) {
 	entries := make(map[graph.Symbol]typeResolutionEntry)
 	g := graph.New()
 
@@ -193,7 +193,7 @@ func resolveTypeRefParentsGraph(ctx *ResolverContext) {
 }
 
 // findTypeDefiningModule finds the module that defines a type, following imports.
-func findTypeDefiningModule(ctx *ResolverContext, fromMod *module.Module, typeName string) string {
+func findTypeDefiningModule(ctx *resolverContext, fromMod *module.Module, typeName string) string {
 	for _, def := range fromMod.Definitions {
 		if td, ok := def.(*module.TypeDef); ok && td.Name == typeName {
 			return fromMod.Name
@@ -223,7 +223,7 @@ func findTypeDefiningModule(ctx *ResolverContext, fromMod *module.Module, typeNa
 	return ""
 }
 
-func resolveTypeParent(ctx *ResolverContext, entry typeResolutionEntry) bool {
+func resolveTypeParent(ctx *resolverContext, entry typeResolutionEntry) bool {
 	baseName := getTypeRefBaseName(entry.td.Syntax)
 	if baseName == "" {
 		return false
@@ -271,7 +271,7 @@ func getPrimitiveParentName(syntax module.TypeSyntax) string {
 	return ""
 }
 
-func linkPrimitiveSyntaxParents(ctx *ResolverContext) {
+func linkPrimitiveSyntaxParents(ctx *resolverContext) {
 	for _, mod := range ctx.Modules {
 		for _, def := range mod.Definitions {
 			td, ok := def.(*module.TypeDef)
@@ -298,7 +298,7 @@ func linkPrimitiveSyntaxParents(ctx *ResolverContext) {
 	}
 }
 
-func linkRFC1213TypesToTCs(ctx *ResolverContext) {
+func linkRFC1213TypesToTCs(ctx *resolverContext) {
 	pairs := []struct {
 		typeName     string
 		sourceModule string
@@ -329,7 +329,7 @@ func linkRFC1213TypesToTCs(ctx *ResolverContext) {
 	}
 }
 
-func inheritBaseTypes(ctx *ResolverContext) {
+func inheritBaseTypes(ctx *resolverContext) {
 	for _, t := range ctx.Builder.Types() {
 		if t.InternalParent() != nil && !isApplicationBaseType(t.Base()) {
 			if base, ok := resolveBaseFromChain(t); ok {

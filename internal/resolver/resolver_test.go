@@ -219,21 +219,17 @@ func TestResolveUnresolvedImportProducesDiagnostic(t *testing.T) {
 		t.Errorf("expected unresolved import for fakeObject, got: %v", unresolved)
 	}
 
-	// Diagnostics should contain the import failure.
-	// Note: the imports phase passes "module_not_found" as the reason string,
-	// and RecordUnresolvedImport maps "module not found" (spaces) to
-	// "import-module-not-found". With underscores, it falls through to
-	// "import-not-found".
+	// Diagnostics should contain the import failure with module-not-found code.
 	diags := m.Diagnostics()
 	foundDiag := false
 	for _, d := range diags {
-		if d.Code == "import-not-found" && d.Module == "BAD-IMPORT-MIB" {
+		if d.Code == "import-module-not-found" && d.Module == "BAD-IMPORT-MIB" {
 			foundDiag = true
 			break
 		}
 	}
 	if !foundDiag {
-		t.Error("expected diagnostic with code import-not-found for BAD-IMPORT-MIB")
+		t.Error("expected diagnostic with code import-module-not-found for BAD-IMPORT-MIB")
 	}
 }
 

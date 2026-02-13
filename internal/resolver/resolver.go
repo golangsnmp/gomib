@@ -45,7 +45,7 @@ func Resolve(mods []*module.Module, logger *slog.Logger, diagConfig *mib.Diagnos
 }
 
 func (r *resolver) resolve(mods []*module.Module) mib.Mib {
-	ctx := newResolverContext(mods, r.L, r.diagConfig)
+	ctx := newresolverContext(mods, r.L, r.diagConfig)
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "register"))
 	registerModules(ctx)
