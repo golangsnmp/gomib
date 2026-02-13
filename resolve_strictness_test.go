@@ -81,9 +81,6 @@ func TestTypeFallbackPermissiveOnly(t *testing.T) {
 			t.Run(tt.object, func(t *testing.T) {
 				obj := m.FindObject(tt.object)
 				testutil.NotNil(t, obj, "object should exist (OID resolves via imported enterprises)")
-				if obj == nil {
-					return
-				}
 				testutil.Nil(t, obj.Type(), "type should be nil in strict mode (no global type fallback)")
 				testutil.True(t, unresolved[tt.wantBase.String()],
 					"type %s should be in unresolved list", tt.wantBase)
@@ -99,9 +96,6 @@ func TestTypeFallbackPermissiveOnly(t *testing.T) {
 			t.Run(tt.object, func(t *testing.T) {
 				obj := m.FindObject(tt.object)
 				testutil.NotNil(t, obj, "object should exist (OID resolves via imported enterprises)")
-				if obj == nil {
-					return
-				}
 				// Normal mode (level 3) does NOT enable best-guess fallbacks (level >= 5),
 				// so global type lookup is disabled - same outcome as strict for types.
 				testutil.Nil(t, obj.Type(), "type should be nil in normal mode (no global type fallback)")
@@ -249,23 +243,15 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 
 		str := m.FindObject("problemAliasString")
 		testutil.NotNil(t, str, "problemAliasString should resolve in normal mode")
-		if str != nil {
-			testutil.NotNil(t, str.Type(), "type should resolve")
-			if str.Type() != nil {
-				testutil.Equal(t, mib.BaseOctetString, str.Type().EffectiveBase(),
-					"DisplayString base type should be OCTET STRING")
-			}
-		}
+		testutil.NotNil(t, str.Type(), "type should resolve")
+		testutil.Equal(t, mib.BaseOctetString, str.Type().EffectiveBase(),
+			"DisplayString base type should be OCTET STRING")
 
 		intObj := m.FindObject("problemAliasInteger")
 		testutil.NotNil(t, intObj, "problemAliasInteger should resolve in normal mode")
-		if intObj != nil {
-			testutil.NotNil(t, intObj.Type(), "type should resolve")
-			if intObj.Type() != nil {
-				testutil.Equal(t, mib.BaseInteger32, intObj.Type().EffectiveBase(),
-					"Integer32 base type should be Integer32")
-			}
-		}
+		testutil.NotNil(t, intObj.Type(), "type should resolve")
+		testutil.Equal(t, mib.BaseInteger32, intObj.Type().EffectiveBase(),
+			"Integer32 base type should be Integer32")
 	})
 
 	t.Run("permissive", func(t *testing.T) {
@@ -357,11 +343,9 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 
 		obj := m.FindObject("testObject")
 		testutil.NotNil(t, obj, "testObject should resolve in permissive mode")
-		if obj != nil {
-			// enterprises = 1.3.6.1.4.1, MIB = .99999, object = .1
-			testutil.Equal(t, "1.3.6.1.4.1.99999.1", obj.OID().String(),
-				"testObject OID should match net-snmp")
-		}
+		// enterprises = 1.3.6.1.4.1, MIB = .99999, object = .1
+		testutil.Equal(t, "1.3.6.1.4.1.99999.1", obj.OID().String(),
+			"testObject OID should match net-snmp")
 	})
 }
 

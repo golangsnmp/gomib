@@ -107,13 +107,11 @@ func TestLoadNonexistentModule(t *testing.T) {
 
 	ctx := context.Background()
 	m, err := LoadModules(ctx, []string{"TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST"}, src)
-	if err != nil {
-		return
-	}
-	if m != nil {
-		mod := m.Module("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST")
-		testutil.Nil(t, mod, "nonexistent module should not be in the result")
-	}
+	testutil.NoError(t, err, "LoadModules should not error for nonexistent module")
+	testutil.NotNil(t, m, "LoadModules should return a Mib even for nonexistent module")
+
+	mod := m.Module("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST")
+	testutil.Nil(t, mod, "nonexistent module should not be in the result")
 }
 
 func TestLoadNoSources(t *testing.T) {
@@ -165,9 +163,7 @@ func TestFindObjectByName(t *testing.T) {
 
 	obj := m.FindObject("sysDescr")
 	testutil.NotNil(t, obj, "should find sysDescr by name")
-	if obj != nil {
-		testutil.Equal(t, "sysDescr", obj.Name(), "object name")
-	}
+	testutil.Equal(t, "sysDescr", obj.Name(), "object name")
 }
 
 func TestFindObjectByQualifiedName(t *testing.T) {

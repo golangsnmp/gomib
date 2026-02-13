@@ -106,9 +106,7 @@ func TestNodeObjectAndNotification(t *testing.T) {
 	}
 	obj := node.Object()
 	testutil.NotNil(t, obj, "ifIndex node should have an associated Object")
-	if obj != nil {
-		testutil.Equal(t, "ifIndex", obj.Name(), "associated object name")
-	}
+	testutil.Equal(t, "ifIndex", obj.Name(), "associated object name")
 
 	testutil.Nil(t, node.Notification(), "ifIndex should not have a notification")
 
@@ -454,14 +452,12 @@ func TestMibNotificationCount(t *testing.T) {
 func TestMibHasErrors(t *testing.T) {
 	m := loadTestMIB(t)
 
-	// Standard MIBs loaded at default strictness should not have errors
-	// (they may have diagnostics, but not errors)
-	_ = m.HasErrors() // just verify it doesn't panic
+	// Standard MIBs loaded at default strictness should not have errors.
+	testutil.False(t, m.HasErrors(), "standard MIBs at default strictness should not have errors")
 
+	// PROBLEM-IMPORTS-MIB has missing imports that fail at strict level.
 	strict := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.StrictnessStrict)
-	// The strict load may or may not report HasErrors depending on what
-	// severity threshold is used. We just verify the method works.
-	_ = strict.HasErrors()
+	testutil.True(t, strict.HasErrors(), "PROBLEM-IMPORTS-MIB at strict should have errors")
 }
 
 func TestNodeByOID(t *testing.T) {
@@ -550,9 +546,7 @@ func TestNotificationMetadataFields(t *testing.T) {
 
 	node := notif.Node()
 	testutil.NotNil(t, node, "Notification.Node() should not be nil")
-	if node != nil {
-		testutil.Equal(t, "linkDown", node.Name(), "notification node name")
-	}
+	testutil.Equal(t, "linkDown", node.Name(), "notification node name")
 
 	mod := notif.Module()
 	testutil.NotNil(t, mod, "Notification.Module() should not be nil")

@@ -305,33 +305,24 @@ func TestProblemRevisions(t *testing.T) {
 		// Object declared before MODULE-IDENTITY - should still resolve
 		node := m.FindNode("problemRevPreIdentity")
 		testutil.NotNil(t, node, "problemRevPreIdentity should resolve despite being before MODULE-IDENTITY")
-		if node != nil {
-			oid := node.OID().String()
-			testutil.Equal(t, "1.3.6.1.4.1.99998.11", oid,
-				"problemRevPreIdentity OID")
-		}
+		testutil.Equal(t, "1.3.6.1.4.1.99998.11", node.OID().String(),
+			"problemRevPreIdentity OID")
 	})
 
 	t.Run("post-identity object resolves", func(t *testing.T) {
 		// net-snmp OID: enterprises.99998.11.1.1.1
 		obj := m.FindObject("problemRevTestObject")
 		testutil.NotNil(t, obj, "problemRevTestObject should resolve")
-		if obj != nil {
-			oid := obj.OID().String()
-			testutil.Equal(t, "1.3.6.1.4.1.99998.11.1.1.1", oid,
-				"problemRevTestObject OID")
-		}
+		testutil.Equal(t, "1.3.6.1.4.1.99998.11.1.1.1", obj.OID().String(),
+			"problemRevTestObject OID")
 	})
 
 	t.Run("module identity resolves", func(t *testing.T) {
 		// net-snmp OID: enterprises.99998.11.1
 		node := m.FindNode("problemRevisionsMIB")
 		testutil.NotNil(t, node, "problemRevisionsMIB MODULE-IDENTITY should resolve")
-		if node != nil {
-			oid := node.OID().String()
-			testutil.Equal(t, "1.3.6.1.4.1.99998.11.1", oid,
-				"problemRevisionsMIB OID")
-		}
+		testutil.Equal(t, "1.3.6.1.4.1.99998.11.1", node.OID().String(),
+			"problemRevisionsMIB OID")
 	})
 
 	t.Run("out-of-order revisions parsed with dates", func(t *testing.T) {
@@ -769,16 +760,11 @@ func TestProblemDefvalBadEnum(t *testing.T) {
 	testutil.NotNil(t, obj, "FindObject(problemDefvalBadEnum)")
 
 	dv := obj.DefaultValue()
-	if dv.IsZero() {
-		// It's acceptable for the parser to not store an unresolvable DEFVAL
-		t.Log("no DEFVAL parsed for problemDefvalBadEnum (undefined enum label)")
-		return
-	}
-
-	got := dv.String()
-	// "unknown" is not in the enum {up(1), down(2), testing(3)}, so this
-	// could be stored as the raw label "unknown" or dropped.
-	t.Logf("defval for undefined enum label: %q (kind=%v)", got, dv.Kind())
+	// "unknown" is not in the enum {up(1), down(2), testing(3)}.
+	// Parser stores the raw label as DefValKindEnum.
+	testutil.True(t, !dv.IsZero(), "DEFVAL should be parsed even with undefined enum label")
+	testutil.Equal(t, mib.DefValKindEnum, dv.Kind(), "bad enum DEFVAL kind")
+	testutil.Equal(t, "unknown", dv.String(), "bad enum DEFVAL preserved as raw label")
 }
 
 // TestProblemDefvalLargeHex verifies that a 16-byte hex DEFVAL is parsed.

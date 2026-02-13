@@ -57,9 +57,7 @@ func TestModuleGroupLookup(t *testing.T) {
 
 	g := snmpMIB.Group("snmpGroup")
 	testutil.NotNil(t, g, "Module.Group(snmpGroup) should not be nil")
-	if g != nil {
-		testutil.Equal(t, "snmpGroup", g.Name(), "group name")
-	}
+	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 
 	testutil.Nil(t, snmpMIB.Group("noSuchGroup"),
 		"non-existent group should return nil")
@@ -70,9 +68,7 @@ func TestFindGroupByName(t *testing.T) {
 
 	g := m.FindGroup("snmpGroup")
 	testutil.NotNil(t, g, "FindGroup(snmpGroup) should not be nil")
-	if g != nil {
-		testutil.Equal(t, "snmpGroup", g.Name(), "group name")
-	}
+	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 }
 
 func TestFindGroupByQualifiedName(t *testing.T) {
@@ -80,9 +76,7 @@ func TestFindGroupByQualifiedName(t *testing.T) {
 
 	g := m.FindGroup("SNMPv2-MIB::snmpGroup")
 	testutil.NotNil(t, g, "FindGroup(SNMPv2-MIB::snmpGroup) should not be nil")
-	if g != nil {
-		testutil.Equal(t, "snmpGroup", g.Name(), "group name")
-	}
+	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 
 	testutil.Nil(t, m.FindGroup("IF-MIB::snmpGroup"),
 		"snmpGroup should not be in IF-MIB")
@@ -98,9 +92,7 @@ func TestFindGroupByOID(t *testing.T) {
 
 	g2 := m.FindGroup(oid)
 	testutil.NotNil(t, g2, "FindGroup by numeric OID %s should work", oid)
-	if g2 != nil {
-		testutil.Equal(t, "snmpGroup", g2.Name(), "group found by OID")
-	}
+	testutil.Equal(t, "snmpGroup", g2.Name(), "group found by OID")
 
 	g3 := m.FindGroup("." + oid)
 	testutil.NotNil(t, g3, "FindGroup by dotted OID .%s should work", oid)
@@ -129,16 +121,12 @@ func TestGroupMetadata(t *testing.T) {
 
 	node := g.Node()
 	testutil.NotNil(t, node, "Group.Node() should not be nil")
-	if node != nil {
-		testutil.Equal(t, "snmpGroup", node.Name(), "node name matches group")
-		testutil.Equal(t, mib.KindGroup, node.Kind(), "node kind should be KindGroup")
-	}
+	testutil.Equal(t, "snmpGroup", node.Name(), "node name matches group")
+	testutil.Equal(t, mib.KindGroup, node.Kind(), "node kind should be KindGroup")
 
 	mod := g.Module()
 	testutil.NotNil(t, mod, "Group.Module() should not be nil")
-	if mod != nil {
-		testutil.Equal(t, "SNMPv2-MIB", mod.Name(), "group module")
-	}
+	testutil.Equal(t, "SNMPv2-MIB", mod.Name(), "group module")
 
 	oid := g.OID()
 	testutil.Greater(t, len(oid), 0, "group OID should not be empty")
@@ -210,9 +198,7 @@ func TestNodeGroup(t *testing.T) {
 
 	g := node.Group()
 	testutil.NotNil(t, g, "group node should have Group()")
-	if g != nil {
-		testutil.Equal(t, "snmpGroup", g.Name(), "node Group() name")
-	}
+	testutil.Equal(t, "snmpGroup", g.Name(), "node Group() name")
 
 	ifIndex := m.FindNode("ifIndex")
 	if ifIndex == nil {
@@ -231,10 +217,8 @@ func TestGroupNodeModule(t *testing.T) {
 
 	mod := node.Module()
 	testutil.NotNil(t, mod, "group node should have a Module()")
-	if mod != nil {
-		testutil.Equal(t, "SNMPv2-MIB", mod.Name(),
-			"snmpGroup node module should be SNMPv2-MIB")
-	}
+	testutil.Equal(t, "SNMPv2-MIB", mod.Name(),
+		"snmpGroup node module should be SNMPv2-MIB")
 }
 
 func TestSmallObjectGroup(t *testing.T) {

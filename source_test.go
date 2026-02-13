@@ -283,14 +283,9 @@ func TestLoadContextCancellation(t *testing.T) {
 	cancel() // cancel immediately
 
 	_, err = Load(ctx, src)
-	if err == nil {
-		// Load may succeed if it completes before checking context.
-		// This is acceptable - the test just verifies no panic.
-		t.Log("Load completed despite cancelled context (fast enough to beat cancellation)")
-	} else {
-		testutil.Equal(t, context.Canceled, err,
-			"expected context.Canceled error, got %v", err)
-	}
+	// Pre-cancelled context should produce context.Canceled.
+	testutil.Error(t, err, "Load with cancelled context should return error")
+	testutil.Equal(t, context.Canceled, err, "error should be context.Canceled")
 }
 
 func TestLoadModulesContextCancellation(t *testing.T) {
@@ -301,12 +296,9 @@ func TestLoadModulesContextCancellation(t *testing.T) {
 	cancel()
 
 	_, err = LoadModules(ctx, []string{"IF-MIB"}, src)
-	if err == nil {
-		t.Log("LoadModules completed despite cancelled context")
-	} else {
-		testutil.Equal(t, context.Canceled, err,
-			"expected context.Canceled error, got %v", err)
-	}
+	// Pre-cancelled context should produce context.Canceled.
+	testutil.Error(t, err, "LoadModules with cancelled context should return error")
+	testutil.Equal(t, context.Canceled, err, "error should be context.Canceled")
 }
 
 func TestHeuristicLooksLikeMIBContent(t *testing.T) {
