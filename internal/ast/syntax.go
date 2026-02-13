@@ -334,6 +334,14 @@ type DefValContentObjectIdentifier struct {
 
 func (*DefValContentObjectIdentifier) defValContent() {}
 
+// DefValContentUnparsed represents DEFVAL content that could not be parsed.
+// Used by error recovery when the parser skips over unrecognized content.
+type DefValContentUnparsed struct {
+	Span types.Span
+}
+
+func (*DefValContentUnparsed) defValContent() {}
+
 // RevisionClause represents a REVISION clause within MODULE-IDENTITY.
 type RevisionClause struct {
 	Date        QuotedString

@@ -118,7 +118,7 @@ func (p *Parser) ParseModule() *ast.Module {
 
 	name, definitionsKind, err := p.parseModuleHeader()
 	if err != nil {
-		p.diagnostics = append(p.diagnostics, *err)
+		p.recordParseError(*err)
 		p.Log(slog.LevelWarn, "failed to parse module header")
 		span := types.NewSpan(start, p.currentSpan().End)
 		return &ast.Module{
@@ -136,7 +136,7 @@ func (p *Parser) ParseModule() *ast.Module {
 	if p.check(lexer.TokKwImports) {
 		imports, err := p.parseImports()
 		if err != nil {
-			p.diagnostics = append(p.diagnostics, *err)
+			p.recordParseError(*err)
 			p.Log(slog.LevelWarn, "failed to parse imports", slog.String("module", name.Name))
 		} else {
 			module.Imports = imports
@@ -149,7 +149,7 @@ func (p *Parser) ParseModule() *ast.Module {
 	for !p.check(lexer.TokKwEnd) && !p.isEOF() {
 		def, err := p.parseDefinition()
 		if err != nil {
-			p.diagnostics = append(p.diagnostics, *err)
+			p.recordParseError(*err)
 			p.recoverToDefinition()
 		} else {
 			module.Body = append(module.Body, def)
@@ -159,7 +159,7 @@ func (p *Parser) ParseModule() *ast.Module {
 	if p.check(lexer.TokKwEnd) {
 		p.advance()
 	} else if !p.isEOF() {
-		p.diagnostics = append(p.diagnostics, p.makeError("expected END"))
+		p.recordParseError(p.makeError("expected END"))
 	}
 
 	module.Span = types.NewSpan(start, p.currentSpan().End)
@@ -231,18 +231,18 @@ func (p *Parser) makeIdentWithValidation(token lexer.Token) ast.Ident {
 	return ast.NewIdent(name, token.Span)
 }
 
+// recordParseError appends a structural parse error unconditionally.
+// Parse errors bypass ShouldReport() filtering because they indicate
+// a syntax problem that must be reported at any strictness level.
+func (p *Parser) recordParseError(diag types.Diagnostic) {
+	p.diagnostics = append(p.diagnostics, diag)
+}
+
 func (p *Parser) makeError(message string) types.Diagnostic {
 	return types.Diagnostic{
 		Severity: mib.SeverityError,
+		Code:     "parse-error",
 		Span:     p.currentSpan(),
-		Message:  message,
-	}
-}
-
-func (p *Parser) makeErrorAt(span types.Span, message string) types.Diagnostic {
-	return types.Diagnostic{
-		Severity: mib.SeverityError,
-		Span:     span,
 		Message:  message,
 	}
 }
@@ -251,7 +251,8 @@ func (p *Parser) parseU32(span types.Span, context string) uint32 {
 	text := p.text(span)
 	v, err := strconv.ParseUint(text, 10, 32)
 	if err != nil {
-		p.diagnostics = append(p.diagnostics, p.makeErrorAt(span, fmt.Sprintf("invalid %s (not a valid u32)", context)))
+		p.emitDiagnostic("invalid-u32", mib.SeverityError, span,
+			fmt.Sprintf("invalid %s (not a valid u32)", context))
 		return 0
 	}
 	return uint32(v)
@@ -261,7 +262,8 @@ func (p *Parser) parseI64(span types.Span, context string) int64 {
 	text := p.text(span)
 	v, err := strconv.ParseInt(text, 10, 64)
 	if err != nil {
-		p.diagnostics = append(p.diagnostics, p.makeErrorAt(span, fmt.Sprintf("invalid %s (not a valid integer)", context)))
+		p.emitDiagnostic("invalid-i64", mib.SeverityError, span,
+			fmt.Sprintf("invalid %s (not a valid integer)", context))
 		return 0
 	}
 	return v
@@ -1122,7 +1124,7 @@ func (p *Parser) parseRangeValue() (ast.RangeValue, *types.Diagnostic) {
 		}
 		value, err := strconv.ParseUint(hexPart, 16, 64)
 		if err != nil {
-			p.diagnostics = append(p.diagnostics, p.makeErrorAt(token.Span, "invalid hex value in range"))
+			p.emitDiagnostic("invalid-hex-range", mib.SeverityError, token.Span, "invalid hex value in range")
 		}
 		return &ast.RangeValueUnsigned{Value: value}, nil
 	} else if p.check(lexer.TokUppercaseIdent) || p.check(lexer.TokForbiddenKeyword) {
@@ -1619,7 +1621,7 @@ func (p *Parser) parseDefValSkipBraced(start types.ByteOffset) (ast.DefValConten
 		return nil, err
 	}
 	span := types.NewSpan(start, endToken.Span.End)
-	return &ast.DefValContentBits{Labels: nil, Span: span}, nil
+	return &ast.DefValContentUnparsed{Span: span}, nil
 }
 
 func (p *Parser) parseDefValSkipUnknown(contentStart types.ByteOffset) ast.DefValContent {
@@ -1632,7 +1634,7 @@ func (p *Parser) parseDefValSkipUnknown(contentStart types.ByteOffset) ast.DefVa
 		case lexer.TokRBrace:
 			if depth == 0 {
 				span := types.NewSpan(contentStart, p.currentSpan().Start)
-				return &ast.DefValContentBits{Labels: nil, Span: span}
+				return &ast.DefValContentUnparsed{Span: span}
 			}
 			depth--
 			p.advance()
@@ -1641,7 +1643,7 @@ func (p *Parser) parseDefValSkipUnknown(contentStart types.ByteOffset) ast.DefVa
 		}
 	}
 	span := types.NewSpan(contentStart, p.currentSpan().Start)
-	return &ast.DefValContentBits{Labels: nil, Span: span}
+	return &ast.DefValContentUnparsed{Span: span}
 }
 
 // parseQuotedString consumes a quoted string token and strips the quotes.

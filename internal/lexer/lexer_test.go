@@ -416,6 +416,31 @@ func TestConformanceKeywords(t *testing.T) {
 	testutil.SliceEqual(t, expected, kinds, "conformance keywords")
 }
 
+func TestIsKeywordCoversAllKeywords(t *testing.T) {
+	// Validate that every token in the keywords map passes IsKeyword().
+	// Guards against reordering the iota constants in token.go.
+	for text, kind := range keywords {
+		if !kind.IsKeyword() {
+			t.Errorf("keyword %q (token %d) not in IsKeyword() range", text, kind)
+		}
+	}
+
+	// Non-keywords must not pass.
+	nonKeywords := []TokenKind{
+		TokError, TokEOF, TokForbiddenKeyword,
+		TokUppercaseIdent, TokLowercaseIdent,
+		TokNumber, TokNegativeNumber, TokQuotedString, TokHexString, TokBinString,
+		TokLBracket, TokRBracket, TokLBrace, TokRBrace, TokLParen, TokRParen,
+		TokColon, TokSemicolon, TokComma, TokDot, TokPipe, TokMinus,
+		TokDotDot, TokColonColonEqual,
+	}
+	for _, kind := range nonKeywords {
+		if kind.IsKeyword() {
+			t.Errorf("non-keyword token %d incorrectly passes IsKeyword()", kind)
+		}
+	}
+}
+
 func TestKeywordLookup(t *testing.T) {
 	tests := []struct {
 		text     string

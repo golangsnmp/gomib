@@ -162,11 +162,14 @@ const (
 	TokKwNotAccessible
 	TokKwAccessibleForNotify
 	TokKwNotImplemented
+
+	// Sentinels for keyword range. New keywords must be added above this line.
+	tokKeywordEnd // must remain last
 )
 
 // IsKeyword reports whether k is any keyword token.
 func (k TokenKind) IsKeyword() bool {
-	return k >= TokKwDefinitions && k <= TokKwNotImplemented
+	return k >= TokKwDefinitions && k < tokKeywordEnd
 }
 
 // IsTypeKeyword reports whether k is a built-in type keyword

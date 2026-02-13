@@ -315,3 +315,8 @@ type DefValOidValue struct {
 }
 
 func (*DefValOidValue) defVal() {}
+
+// DefValUnparsed represents a DEFVAL whose content could not be parsed.
+type DefValUnparsed struct{}
+
+func (*DefValUnparsed) defVal() {}

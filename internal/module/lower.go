@@ -862,6 +862,9 @@ func lowerDefValContent(content ast.DefValContent, ctx *LoweringContext) DefVal 
 	case *ast.DefValContentBits:
 		return &DefValBits{Labels: identNames(c.Labels)}
 
+	case *ast.DefValContentUnparsed:
+		return &DefValUnparsed{}
+
 	case *ast.DefValContentHexString:
 		return &DefValHexString{Value: c.Content}
 
