@@ -1,6 +1,10 @@
 package mibimpl
 
-import "github.com/golangsnmp/gomib/mib"
+import (
+	"slices"
+
+	"github.com/golangsnmp/gomib/mib"
+)
 
 // Object implements mib.Object, linking an OBJECT-TYPE definition to its
 // node in the OID tree.
@@ -82,19 +86,19 @@ func (o *Object) EffectiveDisplayHint() string {
 }
 
 func (o *Object) EffectiveSizes() []mib.Range {
-	return o.sizes
+	return slices.Clone(o.sizes)
 }
 
 func (o *Object) EffectiveRanges() []mib.Range {
-	return o.ranges
+	return slices.Clone(o.ranges)
 }
 
 func (o *Object) EffectiveEnums() []mib.NamedValue {
-	return o.enums
+	return slices.Clone(o.enums)
 }
 
 func (o *Object) EffectiveBits() []mib.NamedValue {
-	return o.bits
+	return slices.Clone(o.bits)
 }
 
 func (o *Object) Enum(label string) (mib.NamedValue, bool) {
@@ -137,7 +141,7 @@ func (o *Object) Augments() mib.Object {
 }
 
 func (o *Object) Index() []mib.IndexEntry {
-	return o.index
+	return slices.Clone(o.index)
 }
 
 // Table returns the table object that contains this row or column, or nil.

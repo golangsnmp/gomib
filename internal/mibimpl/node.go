@@ -134,12 +134,7 @@ func (n *Node) Children() []mib.Node {
 	if len(n.children) == 0 {
 		return nil
 	}
-	sorted := n.sortedChildren()
-	result := make([]mib.Node, len(sorted))
-	for i, c := range sorted {
-		result[i] = c
-	}
-	return result
+	return mapSlice(n.sortedChildren(), func(v *Node) mib.Node { return v })
 }
 
 func (n *Node) sortedChildren() []*Node {

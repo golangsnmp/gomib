@@ -53,11 +53,7 @@ func (g *Group) Reference() string {
 }
 
 func (g *Group) Members() []mib.Node {
-	result := make([]mib.Node, len(g.members))
-	for i, n := range g.members {
-		result[i] = n
-	}
-	return result
+	return mapSlice(g.members, func(v *Node) mib.Node { return v })
 }
 
 func (g *Group) IsNotificationGroup() bool {

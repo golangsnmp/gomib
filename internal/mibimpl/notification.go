@@ -52,11 +52,7 @@ func (n *Notification) Reference() string {
 }
 
 func (n *Notification) Objects() []mib.Object {
-	result := make([]mib.Object, len(n.objects))
-	for i, obj := range n.objects {
-		result[i] = obj
-	}
-	return result
+	return mapSlice(n.objects, func(v *Object) mib.Object { return v })
 }
 
 // String returns a brief summary: "name (oid)".

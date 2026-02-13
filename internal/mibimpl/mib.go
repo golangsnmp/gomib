@@ -2,6 +2,7 @@ package mibimpl
 
 import (
 	"iter"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib/mib"
@@ -23,6 +24,7 @@ type Data struct {
 	nameToNodes  map[string][]*Node
 	typeByName   map[string]*Type
 
+	nodeCount   int
 	diagnostics []mib.Diagnostic
 	unresolved  []mib.UnresolvedRef
 }
@@ -185,75 +187,35 @@ func (m *Data) Module(name string) mib.Module {
 }
 
 func (m *Data) Modules() []mib.Module {
-	result := make([]mib.Module, len(m.modules))
-	for i, mod := range m.modules {
-		result[i] = mod
-	}
-	return result
+	return mapSlice(m.modules, func(v *Module) mib.Module { return v })
 }
 
 func (m *Data) Objects() []mib.Object {
-	result := make([]mib.Object, len(m.objects))
-	for i, obj := range m.objects {
-		result[i] = obj
-	}
-	return result
+	return mapSlice(m.objects, func(v *Object) mib.Object { return v })
 }
 
 func (m *Data) Types() []mib.Type {
-	result := make([]mib.Type, len(m.types))
-	for i, t := range m.types {
-		result[i] = t
-	}
-	return result
+	return mapSlice(m.types, func(v *Type) mib.Type { return v })
 }
 
 func (m *Data) Notifications() []mib.Notification {
-	result := make([]mib.Notification, len(m.notifications))
-	for i, n := range m.notifications {
-		result[i] = n
-	}
-	return result
+	return mapSlice(m.notifications, func(v *Notification) mib.Notification { return v })
 }
 
 func (m *Data) Tables() []mib.Object {
-	var result []mib.Object
-	for _, obj := range m.objects {
-		if obj.IsTable() {
-			result = append(result, obj)
-		}
-	}
-	return result
+	return objectsByKind(m.objects, mib.KindTable)
 }
 
 func (m *Data) Scalars() []mib.Object {
-	var result []mib.Object
-	for _, obj := range m.objects {
-		if obj.IsScalar() {
-			result = append(result, obj)
-		}
-	}
-	return result
+	return objectsByKind(m.objects, mib.KindScalar)
 }
 
 func (m *Data) Columns() []mib.Object {
-	var result []mib.Object
-	for _, obj := range m.objects {
-		if obj.IsColumn() {
-			result = append(result, obj)
-		}
-	}
-	return result
+	return objectsByKind(m.objects, mib.KindColumn)
 }
 
 func (m *Data) Rows() []mib.Object {
-	var result []mib.Object
-	for _, obj := range m.objects {
-		if obj.IsRow() {
-			result = append(result, obj)
-		}
-	}
-	return result
+	return objectsByKind(m.objects, mib.KindRow)
 }
 
 func (m *Data) ModuleCount() int {
@@ -273,11 +235,7 @@ func (m *Data) NotificationCount() int {
 }
 
 func (m *Data) Groups() []mib.Group {
-	result := make([]mib.Group, len(m.groups))
-	for i, g := range m.groups {
-		result[i] = g
-	}
-	return result
+	return mapSlice(m.groups, func(v *Group) mib.Group { return v })
 }
 
 func (m *Data) FindGroup(query string) mib.Group {
@@ -292,11 +250,7 @@ func (m *Data) GroupCount() int {
 }
 
 func (m *Data) Compliances() []mib.Compliance {
-	result := make([]mib.Compliance, len(m.compliances))
-	for i, c := range m.compliances {
-		result[i] = c
-	}
-	return result
+	return mapSlice(m.compliances, func(v *Compliance) mib.Compliance { return v })
 }
 
 func (m *Data) FindCompliance(query string) mib.Compliance {
@@ -311,11 +265,7 @@ func (m *Data) ComplianceCount() int {
 }
 
 func (m *Data) Capabilities() []mib.Capabilities {
-	result := make([]mib.Capabilities, len(m.capabilities))
-	for i, c := range m.capabilities {
-		result[i] = c
-	}
-	return result
+	return mapSlice(m.capabilities, func(v *Capabilities) mib.Capabilities { return v })
 }
 
 func (m *Data) FindCapabilities(query string) mib.Capabilities {
@@ -330,19 +280,15 @@ func (m *Data) CapabilitiesCount() int {
 }
 
 func (m *Data) NodeCount() int {
-	count := 0
-	for range m.Nodes() {
-		count++
-	}
-	return count
+	return m.nodeCount
 }
 
 func (m *Data) Unresolved() []mib.UnresolvedRef {
-	return m.unresolved
+	return slices.Clone(m.unresolved)
 }
 
 func (m *Data) Diagnostics() []mib.Diagnostic {
-	return m.diagnostics
+	return slices.Clone(m.diagnostics)
 }
 
 func (m *Data) HasErrors() bool {

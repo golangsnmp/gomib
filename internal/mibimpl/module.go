@@ -1,6 +1,10 @@
 package mibimpl
 
-import "github.com/golangsnmp/gomib/mib"
+import (
+	"slices"
+
+	"github.com/golangsnmp/gomib/mib"
+)
 
 // Module implements mib.Module, holding all definitions from a single
 // MIB module.
@@ -47,71 +51,35 @@ func (m *Module) Description() string {
 }
 
 func (m *Module) Revisions() []mib.Revision {
-	return m.revisions
+	return slices.Clone(m.revisions)
 }
 
 func (m *Module) Objects() []mib.Object {
-	result := make([]mib.Object, len(m.objects))
-	for i, obj := range m.objects {
-		result[i] = obj
-	}
-	return result
+	return mapSlice(m.objects, func(v *Object) mib.Object { return v })
 }
 
 func (m *Module) Types() []mib.Type {
-	result := make([]mib.Type, len(m.types))
-	for i, t := range m.types {
-		result[i] = t
-	}
-	return result
+	return mapSlice(m.types, func(v *Type) mib.Type { return v })
 }
 
 func (m *Module) Notifications() []mib.Notification {
-	result := make([]mib.Notification, len(m.notifications))
-	for i, n := range m.notifications {
-		result[i] = n
-	}
-	return result
+	return mapSlice(m.notifications, func(v *Notification) mib.Notification { return v })
 }
 
 func (m *Module) Tables() []mib.Object {
-	var result []mib.Object
-	for _, obj := range m.objects {
-		if obj.IsTable() {
-			result = append(result, obj)
-		}
-	}
-	return result
+	return objectsByKind(m.objects, mib.KindTable)
 }
 
 func (m *Module) Scalars() []mib.Object {
-	var result []mib.Object
-	for _, obj := range m.objects {
-		if obj.IsScalar() {
-			result = append(result, obj)
-		}
-	}
-	return result
+	return objectsByKind(m.objects, mib.KindScalar)
 }
 
 func (m *Module) Columns() []mib.Object {
-	var result []mib.Object
-	for _, obj := range m.objects {
-		if obj.IsColumn() {
-			result = append(result, obj)
-		}
-	}
-	return result
+	return objectsByKind(m.objects, mib.KindColumn)
 }
 
 func (m *Module) Rows() []mib.Object {
-	var result []mib.Object
-	for _, obj := range m.objects {
-		if obj.IsRow() {
-			result = append(result, obj)
-		}
-	}
-	return result
+	return objectsByKind(m.objects, mib.KindRow)
 }
 
 func (m *Module) Node(name string) mib.Node {
@@ -151,11 +119,7 @@ func (m *Module) Notification(name string) mib.Notification {
 }
 
 func (m *Module) Groups() []mib.Group {
-	result := make([]mib.Group, len(m.groups))
-	for i, g := range m.groups {
-		result[i] = g
-	}
-	return result
+	return mapSlice(m.groups, func(v *Group) mib.Group { return v })
 }
 
 func (m *Module) Group(name string) mib.Group {
@@ -168,11 +132,7 @@ func (m *Module) Group(name string) mib.Group {
 }
 
 func (m *Module) Compliances() []mib.Compliance {
-	result := make([]mib.Compliance, len(m.compliances))
-	for i, c := range m.compliances {
-		result[i] = c
-	}
-	return result
+	return mapSlice(m.compliances, func(v *Compliance) mib.Compliance { return v })
 }
 
 func (m *Module) ComplianceByName(name string) mib.Compliance {
@@ -185,11 +145,7 @@ func (m *Module) ComplianceByName(name string) mib.Compliance {
 }
 
 func (m *Module) Capabilities() []mib.Capabilities {
-	result := make([]mib.Capabilities, len(m.capabilities))
-	for i, c := range m.capabilities {
-		result[i] = c
-	}
-	return result
+	return mapSlice(m.capabilities, func(v *Capabilities) mib.Capabilities { return v })
 }
 
 func (m *Module) CapabilitiesByName(name string) mib.Capabilities {

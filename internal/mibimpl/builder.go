@@ -19,10 +19,21 @@ func NewBuilder() *Builder {
 	}
 }
 
-// Mib returns the constructed Mib. The Builder should not be used after
-// this call.
+// Mib returns the constructed Mib. The Builder must not be used after
+// this call; subsequent method calls will panic.
 func (b *Builder) Mib() mib.Mib {
-	return b.data
+	d := b.data
+	d.nodeCount = b.countNodes()
+	b.data = nil
+	return d
+}
+
+func (b *Builder) countNodes() int {
+	count := 0
+	for range b.data.Nodes() {
+		count++
+	}
+	return count
 }
 
 // Root returns the pseudo-root of the OID tree.

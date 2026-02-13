@@ -2,7 +2,11 @@
 // interfaces, along with a Builder for constructing a Mib incrementally.
 package mibimpl
 
-import "github.com/golangsnmp/gomib/mib"
+import (
+	"slices"
+
+	"github.com/golangsnmp/gomib/mib"
+)
 
 // Type implements mib.Type with a parent chain for textual convention
 // inheritance.
@@ -61,19 +65,19 @@ func (t *Type) Reference() string {
 }
 
 func (t *Type) Sizes() []mib.Range {
-	return t.sizes
+	return slices.Clone(t.sizes)
 }
 
 func (t *Type) Ranges() []mib.Range {
-	return t.ranges
+	return slices.Clone(t.ranges)
 }
 
 func (t *Type) Enums() []mib.NamedValue {
-	return t.enums
+	return slices.Clone(t.enums)
 }
 
 func (t *Type) Bits() []mib.NamedValue {
-	return t.bits
+	return slices.Clone(t.bits)
 }
 
 func (t *Type) Enum(label string) (mib.NamedValue, bool) {
@@ -135,7 +139,7 @@ func (t *Type) EffectiveDisplayHint() string {
 func (t *Type) EffectiveSizes() []mib.Range {
 	for current := t; current != nil; current = current.parent {
 		if len(current.sizes) > 0 {
-			return current.sizes
+			return slices.Clone(current.sizes)
 		}
 	}
 	return nil
@@ -144,7 +148,7 @@ func (t *Type) EffectiveSizes() []mib.Range {
 func (t *Type) EffectiveRanges() []mib.Range {
 	for current := t; current != nil; current = current.parent {
 		if len(current.ranges) > 0 {
-			return current.ranges
+			return slices.Clone(current.ranges)
 		}
 	}
 	return nil
@@ -153,7 +157,7 @@ func (t *Type) EffectiveRanges() []mib.Range {
 func (t *Type) EffectiveEnums() []mib.NamedValue {
 	for current := t; current != nil; current = current.parent {
 		if len(current.enums) > 0 {
-			return current.enums
+			return slices.Clone(current.enums)
 		}
 	}
 	return nil
@@ -162,7 +166,7 @@ func (t *Type) EffectiveEnums() []mib.NamedValue {
 func (t *Type) EffectiveBits() []mib.NamedValue {
 	for current := t; current != nil; current = current.parent {
 		if len(current.bits) > 0 {
-			return current.bits
+			return slices.Clone(current.bits)
 		}
 	}
 	return nil

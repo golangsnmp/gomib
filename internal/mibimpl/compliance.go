@@ -1,6 +1,10 @@
 package mibimpl
 
-import "github.com/golangsnmp/gomib/mib"
+import (
+	"slices"
+
+	"github.com/golangsnmp/gomib/mib"
+)
 
 // Compliance implements mib.Compliance for MODULE-COMPLIANCE definitions.
 type Compliance struct {
@@ -51,7 +55,7 @@ func (c *Compliance) Reference() string {
 }
 
 func (c *Compliance) Modules() []mib.ComplianceModule {
-	return c.modules
+	return slices.Clone(c.modules)
 }
 
 // String returns a brief summary: "name (oid)".

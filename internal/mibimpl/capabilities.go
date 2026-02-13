@@ -1,6 +1,10 @@
 package mibimpl
 
-import "github.com/golangsnmp/gomib/mib"
+import (
+	"slices"
+
+	"github.com/golangsnmp/gomib/mib"
+)
 
 // Capabilities implements mib.Capabilities for AGENT-CAPABILITIES
 // definitions.
@@ -57,7 +61,7 @@ func (c *Capabilities) ProductRelease() string {
 }
 
 func (c *Capabilities) Supports() []mib.CapabilitiesModule {
-	return c.supports
+	return slices.Clone(c.supports)
 }
 
 // String returns a brief summary: "name (oid)".
