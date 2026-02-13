@@ -108,32 +108,12 @@ func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, 
 	first := oid.Components[0]
 	switch c := first.(type) {
 	case *module.OidComponentName:
-		if wellKnownRootArc(c.NameValue) >= 0 {
-			return graph.Symbol{}, false
-		}
-		if parentMod := findOidDefiningModule(ctx, def.mod, c.NameValue); parentMod != "" {
-			return graph.Symbol{Module: parentMod, Name: c.NameValue}, true
-		}
-		// Permissive only: SMI global roots as fallback
-		if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
-			if _, ok := smiGlobalOidRoots[c.NameValue]; ok {
-				return graph.Symbol{Module: "SNMPv2-SMI", Name: c.NameValue}, true
-			}
-		}
+		return lookupNamedParentSymbol(ctx, def, c.NameValue)
 	case *module.OidComponentNumber:
 		return graph.Symbol{}, false // Numeric roots have no dependency.
 	case *module.OidComponentNamedNumber:
-		if wellKnownRootArc(c.NameValue) >= 0 {
-			return graph.Symbol{}, false
-		}
-		if parentMod := findOidDefiningModule(ctx, def.mod, c.NameValue); parentMod != "" {
-			return graph.Symbol{Module: parentMod, Name: c.NameValue}, true
-		}
-		// Permissive only: SMI global roots as fallback
-		if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
-			if _, ok := smiGlobalOidRoots[c.NameValue]; ok {
-				return graph.Symbol{Module: "SNMPv2-SMI", Name: c.NameValue}, true
-			}
+		if sym, ok := lookupNamedParentSymbol(ctx, def, c.NameValue); ok {
+			return sym, true
 		}
 		// Has a number, so can be resolved without the name.
 		return graph.Symbol{}, false
@@ -143,6 +123,23 @@ func getOidParentSymbol(ctx *ResolverContext, def oidDefinition) (graph.Symbol, 
 		return graph.Symbol{Module: c.ModuleValue, Name: c.NameValue}, true
 	}
 
+	return graph.Symbol{}, false
+}
+
+// lookupNamedParentSymbol resolves a named OID parent by checking well-known roots,
+// local/imported definitions, and (in permissive mode) SMI global roots.
+func lookupNamedParentSymbol(ctx *ResolverContext, def oidDefinition, name string) (graph.Symbol, bool) {
+	if wellKnownRootArc(name) >= 0 {
+		return graph.Symbol{}, false
+	}
+	if parentMod := findOidDefiningModule(ctx, def.mod, name); parentMod != "" {
+		return graph.Symbol{Module: parentMod, Name: name}, true
+	}
+	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+		if _, ok := smiGlobalOidRoots[name]; ok {
+			return graph.Symbol{Module: "SNMPv2-SMI", Name: name}, true
+		}
+	}
 	return graph.Symbol{}, false
 }
 
@@ -300,12 +297,10 @@ func resolveOidDefinition(ctx *ResolverContext, def oidDefinition) bool {
 	if len(components) == 0 {
 		return false
 	}
-	defName := def.defName()
-
 	var currentNode *mibimpl.Node
 	for idx, component := range components {
 		isLast := idx == len(components)-1
-		node, ok := resolveOidComponent(ctx, def, currentNode, component, isLast, oid.Span, defName)
+		node, ok := resolveOidComponent(ctx, def, currentNode, component, isLast)
 		if !ok {
 			return false
 		}
@@ -313,31 +308,31 @@ func resolveOidDefinition(ctx *ResolverContext, def oidDefinition) bool {
 	}
 
 	if currentNode != nil {
-		finalizeOidDefinition(ctx, def, currentNode, defName)
+		finalizeOidDefinition(ctx, def, currentNode, def.defName())
 	}
 
 	return true
 }
 
-func resolveOidComponent(ctx *ResolverContext, def oidDefinition, currentNode *mibimpl.Node, component module.OidComponent, isLast bool, span types.Span, defName string) (*mibimpl.Node, bool) {
+func resolveOidComponent(ctx *ResolverContext, def oidDefinition, currentNode *mibimpl.Node, component module.OidComponent, isLast bool) (*mibimpl.Node, bool) {
 	switch c := component.(type) {
 	case *module.OidComponentName:
-		return resolveNameComponent(ctx, def, c.NameValue, span, defName)
+		return resolveNameComponent(ctx, def, c.NameValue)
 	case *module.OidComponentNumber:
 		return resolveNumericComponent(ctx, currentNode, c.Value), true
 	case *module.OidComponentNamedNumber:
 		return resolveNamedNumberComponent(ctx, def, currentNode, c.NameValue, c.NumberValue, isLast)
 	case *module.OidComponentQualifiedName:
-		return resolveQualifiedNameComponent(ctx, def, c.ModuleValue, c.NameValue, span, defName)
+		return resolveQualifiedNameComponent(ctx, def, c.ModuleValue, c.NameValue)
 	case *module.OidComponentQualifiedNamedNumber:
 		return resolveQualifiedNamedNumberComponent(ctx, def, currentNode, c.ModuleValue, c.NameValue, c.NumberValue, isLast)
 	default:
-		ctx.RecordUnresolvedOid(def.mod, defName, "", span)
+		ctx.RecordUnresolvedOid(def.mod, def.defName(), "", def.oid().Span)
 		return nil, false
 	}
 }
 
-func resolveNameComponent(ctx *ResolverContext, def oidDefinition, name string, span types.Span, defName string) (*mibimpl.Node, bool) {
+func resolveNameComponent(ctx *ResolverContext, def oidDefinition, name string) (*mibimpl.Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
 		return node, true
 	}
@@ -351,7 +346,7 @@ func resolveNameComponent(ctx *ResolverContext, def oidDefinition, name string, 
 			return node, true
 		}
 	}
-	ctx.RecordUnresolvedOid(def.mod, defName, name, span)
+	ctx.RecordUnresolvedOid(def.mod, def.defName(), name, def.oid().Span)
 	return nil, false
 }
 
@@ -363,11 +358,11 @@ func resolveNamedNumberComponent(ctx *ResolverContext, def oidDefinition, curren
 	return createNamedChild(ctx, def, currentNode, name, number, isLast)
 }
 
-func resolveQualifiedNameComponent(ctx *ResolverContext, def oidDefinition, moduleName, name string, span types.Span, defName string) (*mibimpl.Node, bool) {
+func resolveQualifiedNameComponent(ctx *ResolverContext, def oidDefinition, moduleName, name string) (*mibimpl.Node, bool) {
 	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
 		return node, true
 	}
-	ctx.RecordUnresolvedOid(def.mod, defName, moduleName+"."+name, span)
+	ctx.RecordUnresolvedOid(def.mod, def.defName(), moduleName+"."+name, def.oid().Span)
 	return nil, false
 }
 
@@ -537,13 +532,7 @@ func shouldPreferModule(newMod, currentMod *mibimpl.Module, srcMod *module.Modul
 		return true
 	}
 
-	var currentSrcMod *module.Module
-	for _, mod := range ctx.Modules {
-		if ctx.ModuleToResolved[mod] == currentMod {
-			currentSrcMod = mod
-			break
-		}
-	}
+	currentSrcMod := ctx.ResolvedToModule[currentMod]
 	if currentSrcMod == nil {
 		return true
 	}

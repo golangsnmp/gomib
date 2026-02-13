@@ -44,6 +44,7 @@ func registerModules(ctx *ResolverContext) {
 
 		ctx.Builder.AddModule(resolved)
 		ctx.ModuleToResolved[mod] = resolved
+		ctx.ResolvedToModule[resolved] = mod
 
 		// Collect diagnostics from parsing and lowering
 		for _, d := range mod.Diagnostics {

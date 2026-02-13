@@ -21,6 +21,9 @@ type ResolverContext struct {
 	// ModuleToResolved maps parsed module to resolved module.
 	ModuleToResolved map[*module.Module]*mibimpl.Module
 
+	// ResolvedToModule is the reverse of ModuleToResolved.
+	ResolvedToModule map[*mibimpl.Module]*module.Module
+
 	// ModuleSymbolToNode maps module -> symbol -> Node for OID lookups.
 	ModuleSymbolToNode map[*module.Module]map[string]*mibimpl.Node
 
@@ -129,6 +132,7 @@ func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig m
 		Modules:            mods,
 		ModuleIndex:        make(map[string][]*module.Module, h.modules),
 		ModuleToResolved:   make(map[*module.Module]*mibimpl.Module, h.modules),
+		ResolvedToModule:   make(map[*mibimpl.Module]*module.Module, h.modules),
 		ModuleSymbolToNode: make(map[*module.Module]map[string]*mibimpl.Node, h.modules),
 		ModuleImports:      make(map[*module.Module]map[string]*module.Module, h.modules),
 		ModuleSymbolToType: make(map[*module.Module]map[string]*mibimpl.Type, h.modules),
