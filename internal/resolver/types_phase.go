@@ -153,15 +153,7 @@ func resolveTypeRefParentsGraph(ctx *ResolverContext) {
 	}
 
 	cycles := g.FindCycles()
-	if len(cycles) > 0 && ctx.TraceEnabled() {
-		for _, cycle := range cycles {
-			names := make([]string, len(cycle))
-			for i, s := range cycle {
-				names[i] = s.Module + "::" + s.Name
-			}
-			ctx.Trace("type cycle detected", slog.Any("cycle", names))
-		}
-	}
+	logCycles(ctx, cycles, "type cycle detected")
 
 	order, cyclic := g.ResolutionOrder()
 

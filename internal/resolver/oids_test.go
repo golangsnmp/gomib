@@ -490,7 +490,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx := newTestContext()
 		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{srcMod: newMod}
 
-		if !shouldPreferModule(newMod, nil, srcMod, ctx) {
+		if !shouldPreferModule(ctx, newMod, nil, srcMod) {
 			t.Error("expected true when currentMod is nil")
 		}
 	})
@@ -503,7 +503,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{srcMod: newMod}
 		ctx.ResolvedToModule = map[*mibimpl.Module]*module.Module{} // currentMod not mapped
 
-		if !shouldPreferModule(newMod, currentMod, srcMod, ctx) {
+		if !shouldPreferModule(ctx, newMod, currentMod, srcMod) {
 			t.Error("expected true when currentSrcMod lookup returns nil")
 		}
 	})
@@ -518,7 +518,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*mibimpl.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		if !shouldPreferModule(newMod, oldMod, newSrc, ctx) {
+		if !shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected SMIv2 to be preferred over SMIv1")
 		}
 	})
@@ -533,7 +533,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*mibimpl.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		if shouldPreferModule(newMod, oldMod, newSrc, ctx) {
+		if shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected SMIv1 NOT to be preferred over SMIv2")
 		}
 	})
@@ -560,7 +560,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*mibimpl.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		if !shouldPreferModule(newMod, oldMod, newSrc, ctx) {
+		if !shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected newer LAST-UPDATED to win")
 		}
 	})
@@ -587,7 +587,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*mibimpl.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		if shouldPreferModule(newMod, oldMod, newSrc, ctx) {
+		if shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected older LAST-UPDATED to lose")
 		}
 	})
@@ -848,6 +848,58 @@ func TestTrapTypeRefNilTrapInfo(t *testing.T) {
 	_, _, _, ok := ref.trapInfo()
 	if ok {
 		t.Error("expected ok = false for nil TrapInfo")
+	}
+}
+
+func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
+	// When two modules define MODULE-IDENTITY at the same OID node,
+	// only the preferred module should have SetOID called.
+
+	v2Src := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv2}
+	v1Src := &module.Module{Name: "OLD-MIB", Language: module.LanguageSMIv1}
+	v2Mod := mibimpl.NewModule("NEW-MIB")
+	v1Mod := mibimpl.NewModule("OLD-MIB")
+
+	ctx := newResolverContext([]*module.Module{v2Src, v1Src}, nil, mib.DefaultConfig())
+	ctx.ModuleToResolved[v2Src] = v2Mod
+	ctx.ModuleToResolved[v1Src] = v1Mod
+	ctx.ResolvedToModule[v2Mod] = v2Src
+	ctx.ResolvedToModule[v1Mod] = v1Src
+
+	node := ctx.Builder.GetOrCreateRoot(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1).GetOrCreateChild(2)
+
+	oid := module.NewOidAssignment([]module.OidComponent{
+		&module.OidComponentNumber{Value: 1},
+	}, types.Synthetic)
+
+	// First: finalize the preferred module (SMIv2) - should get OID
+	v2Def := oidDefinition{
+		mod:  v2Src,
+		def:  &module.ModuleIdentity{Name: "newMIB", Oid: oid},
+		kind: defModuleIdentity,
+	}
+	finalizeOidDefinition(ctx, v2Def, node, "newMIB")
+
+	if v2Mod.OID() == nil {
+		t.Fatal("preferred module should have OID set")
+	}
+
+	// Second: finalize the non-preferred module (SMIv1) at the same node
+	v1Def := oidDefinition{
+		mod:  v1Src,
+		def:  &module.ModuleIdentity{Name: "oldMIB", Oid: oid},
+		kind: defModuleIdentity,
+	}
+	finalizeOidDefinition(ctx, v1Def, node, "oldMIB")
+
+	// The non-preferred module should NOT have its OID set
+	if v1Mod.OID() != nil {
+		t.Errorf("non-preferred module should not have OID set, got %v", v1Mod.OID())
+	}
+
+	// The preferred module should still have OID set
+	if v2Mod.OID() == nil {
+		t.Error("preferred module OID should still be set")
 	}
 }
 

@@ -3,6 +3,7 @@ package resolver
 import (
 	"log/slog"
 
+	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
@@ -392,6 +393,20 @@ func (c *ResolverContext) Diagnostics() []mib.Diagnostic {
 // DiagnosticConfig returns the active strictness and filtering configuration.
 func (c *ResolverContext) DiagnosticConfig() mib.DiagnosticConfig {
 	return c.diagConfig
+}
+
+// logCycles logs detected dependency cycles at trace level.
+func logCycles(ctx *ResolverContext, cycles [][]graph.Symbol, msg string) {
+	if len(cycles) == 0 || !ctx.TraceEnabled() {
+		return
+	}
+	for _, cycle := range cycles {
+		names := make([]string, len(cycle))
+		for i, s := range cycle {
+			names[i] = s.Module + "::" + s.Name
+		}
+		ctx.Trace(msg, slog.Any("cycle", names))
+	}
 }
 
 func (c *ResolverContext) emitUnresolvedDiagnostic(mod *module.Module, code string, severity mib.Severity, msg string) {

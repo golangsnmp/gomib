@@ -11,6 +11,11 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
+const (
+	moduleSNMPv2SMI  = "SNMPv2-SMI"
+	moduleRFC1155SMI = "RFC1155-SMI"
+)
+
 var smiGlobalOidRoots = map[string]struct{}{
 	"internet":     {},
 	"directory":    {},
@@ -48,15 +53,7 @@ func resolveOids(ctx *ResolverContext) {
 	}
 
 	cycles := g.FindCycles()
-	if len(cycles) > 0 && ctx.TraceEnabled() {
-		for _, cycle := range cycles {
-			names := make([]string, len(cycle))
-			for i, s := range cycle {
-				names[i] = s.Module + "::" + s.Name
-			}
-			ctx.Trace("OID cycle detected", slog.Any("cycle", names))
-		}
-	}
+	logCycles(ctx, cycles, "OID cycle detected")
 
 	order, cyclic := g.ResolutionOrder()
 
@@ -137,7 +134,7 @@ func lookupNamedParentSymbol(ctx *ResolverContext, def oidDefinition, name strin
 	}
 	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
 		if _, ok := smiGlobalOidRoots[name]; ok {
-			return graph.Symbol{Module: "SNMPv2-SMI", Name: name}, true
+			return graph.Symbol{Module: moduleSNMPv2SMI, Name: name}, true
 		}
 	}
 	return graph.Symbol{}, false
@@ -204,15 +201,15 @@ type oidDefinition struct {
 type definitionKind int
 
 const (
-	defObjectType definitionKind = iota
-	defModuleIdentity
-	defObjectIdentity
-	defNotification
-	defValueAssignment
-	defObjectGroup
-	defNotificationGroup
-	defModuleCompliance
-	defAgentCapabilities
+	defObjectType        definitionKind = iota // OBJECT-TYPE (RFC 2578)
+	defModuleIdentity                          // MODULE-IDENTITY (RFC 2578)
+	defObjectIdentity                          // OBJECT-IDENTITY (RFC 2578)
+	defNotification                            // NOTIFICATION-TYPE or TRAP-TYPE with OID
+	defValueAssignment                         // Plain OID value assignment (e.g., enterprises OBJECT IDENTIFIER ::= ...)
+	defObjectGroup                             // OBJECT-GROUP (RFC 2580)
+	defNotificationGroup                       // NOTIFICATION-GROUP (RFC 2580)
+	defModuleCompliance                        // MODULE-COMPLIANCE (RFC 2580)
+	defAgentCapabilities                       // AGENT-CAPABILITIES (RFC 2580)
 )
 
 func (d oidDefinition) defName() string {
@@ -419,7 +416,7 @@ func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mibimp
 			slog.String("current", currentMod.Name()),
 			slog.String("new", def.mod.Name))
 	}
-	if shouldPreferModule(newMod, currentMod, def.mod, ctx) {
+	if shouldPreferModule(ctx, newMod, currentMod, def.mod) {
 		node.SetModule(newMod)
 		// Only register non-semantic definitions here; object types,
 		// notifications, etc. are registered in the semantics phase.
@@ -427,10 +424,9 @@ func finalizeOidDefinition(ctx *ResolverContext, def oidDefinition, node *mibimp
 		case defValueAssignment, defObjectIdentity, defModuleIdentity:
 			newMod.AddNode(node)
 		}
-	}
-
-	if def.kind == defModuleIdentity {
-		newMod.SetOID(node.OID())
+		if def.kind == defModuleIdentity {
+			newMod.SetOID(node.OID())
+		}
 	}
 
 	ctx.RegisterModuleNodeSymbol(def.mod, label, node)
@@ -503,10 +499,10 @@ func lookupSmiGlobalOidRoot(ctx *ResolverContext, name string) (*mibimpl.Node, b
 	if _, ok := smiGlobalOidRoots[name]; !ok {
 		return nil, false
 	}
-	if node, ok := ctx.LookupNodeInModule("SNMPv2-SMI", name); ok {
+	if node, ok := ctx.LookupNodeInModule(moduleSNMPv2SMI, name); ok {
 		return node, true
 	}
-	if node, ok := ctx.LookupNodeInModule("RFC1155-SMI", name); ok {
+	if node, ok := ctx.LookupNodeInModule(moduleRFC1155SMI, name); ok {
 		return node, true
 	}
 	return nil, false
@@ -527,7 +523,7 @@ func wellKnownRootArc(name string) int {
 
 // shouldPreferModule determines if newMod should replace currentMod as the node's module.
 // Preference order: SMIv2 > SMIv1 > Unknown, with newer LAST-UPDATED as tiebreaker.
-func shouldPreferModule(newMod, currentMod *mibimpl.Module, srcMod *module.Module, ctx *ResolverContext) bool {
+func shouldPreferModule(ctx *ResolverContext, newMod, currentMod *mibimpl.Module, srcMod *module.Module) bool {
 	if currentMod == nil {
 		return true
 	}

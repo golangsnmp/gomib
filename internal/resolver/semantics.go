@@ -188,7 +188,7 @@ func createResolvedObjects(ctx *ResolverContext, objRefs []objectTypeRef) {
 			currentMod = currentObj.InternalModule()
 		}
 		newMod := ctx.ModuleToResolved[ref.mod]
-		if shouldPreferModule(newMod, currentMod, ref.mod, ctx) {
+		if shouldPreferModule(ctx, newMod, currentMod, ref.mod) {
 			node.SetObject(resolved)
 		}
 		created++
