@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
-	"os"
 	"runtime"
 	"slices"
 	"sync"
@@ -33,40 +32,44 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (Mib,
 
 	logger := cfg.logger
 
-	var allFiles []string
+	type sourceModule struct {
+		source Source
+		name   string
+	}
+
+	var allModules []sourceModule
 	for _, src := range sources {
-		files, err := src.ListFiles()
+		names, err := src.ListModules()
 		if err != nil {
 			return nil, err
 		}
-		allFiles = append(allFiles, files...)
+		for _, name := range names {
+			allModules = append(allModules, sourceModule{source: src, name: name})
+		}
 	}
 
-	if len(allFiles) == 0 {
+	if len(allModules) == 0 {
 		return mibimpl.EmptyMib(), nil
 	}
 
 	if logEnabled(logger, slog.LevelInfo) {
 		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading",
-			slog.Int("files", len(allFiles)))
+			slog.Int("modules", len(allModules)))
 	}
 
 	type parseResult struct {
 		mod *module.Module
 	}
-	results := make(chan parseResult, len(allFiles))
+	results := make(chan parseResult, len(allModules))
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, runtime.NumCPU())
 
 	heuristic := defaultHeuristic()
-	if cfg.noHeuristic {
-		heuristic.enabled = false
-	}
 
-	for _, file := range allFiles {
+	for _, sm := range allModules {
 		wg.Add(1)
-		go func(path string) {
+		go func(sm sourceModule) {
 			defer wg.Done()
 
 			select {
@@ -80,26 +83,52 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (Mib,
 				return
 			}
 
-			content, err := os.ReadFile(path)
+			result, err := sm.source.Find(sm.name)
 			if err != nil {
+				if logEnabled(logger, slog.LevelDebug) {
+					logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
+						slog.String("module", sm.name),
+						slog.String("error", err.Error()))
+				}
+				return
+			}
+			content, err := io.ReadAll(result.Reader)
+			_ = result.Reader.Close()
+			if err != nil {
+				if logEnabled(logger, slog.LevelDebug) {
+					logger.LogAttrs(ctx, slog.LevelDebug, "read failed",
+						slog.String("module", sm.name),
+						slog.String("error", err.Error()))
+				}
 				return
 			}
 
 			if !heuristic.looksLikeMIBContent(content) {
+				if logEnabled(logger, slog.LevelDebug) {
+					logger.LogAttrs(ctx, slog.LevelDebug, "content rejected by heuristic",
+						slog.String("module", sm.name))
+				}
 				return
 			}
 
 			p := parser.New(content, componentLogger(logger, "parser"), cfg.diagConfig)
 			ast := p.ParseModule()
 			if ast == nil {
+				if logEnabled(logger, slog.LevelDebug) {
+					logger.LogAttrs(ctx, slog.LevelDebug, "parse failed",
+						slog.String("module", sm.name))
+				}
 				return
 			}
 
 			mod := module.Lower(ast, componentLogger(logger, "module"), cfg.diagConfig)
 			if mod != nil {
 				results <- parseResult{mod: mod}
+			} else if logEnabled(logger, slog.LevelDebug) {
+				logger.LogAttrs(ctx, slog.LevelDebug, "lowering failed",
+					slog.String("module", sm.name))
 			}
-		}(file)
+		}(sm)
 	}
 
 	go func() {
@@ -146,9 +175,6 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 	logger := cfg.logger
 
 	heuristic := defaultHeuristic()
-	if cfg.noHeuristic {
-		heuristic.enabled = false
-	}
 
 	modules := make(map[string]*module.Module)
 	loading := make(map[string]struct{})

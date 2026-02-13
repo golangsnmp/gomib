@@ -21,8 +21,6 @@ type LoadOption func(*loadConfig)
 
 type loadConfig struct {
 	logger      *slog.Logger
-	extensions  []string
-	noHeuristic bool
 	systemPaths bool
 	diagConfig  mib.DiagnosticConfig
 }
@@ -46,6 +44,8 @@ func WithStrictness(level mib.StrictnessLevel) LoadOption {
 		switch level {
 		case mib.StrictnessStrict:
 			c.diagConfig = mib.StrictConfig()
+		case mib.StrictnessNormal:
+			c.diagConfig = mib.DefaultConfig()
 		case mib.StrictnessPermissive:
 			c.diagConfig = mib.PermissiveConfig()
 		case mib.StrictnessSilent:
@@ -75,7 +75,6 @@ func WithStrictness(level mib.StrictnessLevel) LoadOption {
 //	)
 func Load(ctx context.Context, source Source, opts ...LoadOption) (Mib, error) {
 	cfg := loadConfig{
-		extensions: DefaultExtensions(),
 		diagConfig: mib.DefaultConfig(),
 	}
 	for _, opt := range opts {
@@ -100,7 +99,6 @@ func Load(ctx context.Context, source Source, opts ...LoadOption) (Mib, error) {
 //	)
 func LoadModules(ctx context.Context, names []string, source Source, opts ...LoadOption) (Mib, error) {
 	cfg := loadConfig{
-		extensions: DefaultExtensions(),
 		diagConfig: mib.DefaultConfig(),
 	}
 	for _, opt := range opts {

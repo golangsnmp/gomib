@@ -31,8 +31,8 @@ type Source interface {
 	// or fs.ErrNotExist if the module is not available.
 	Find(name string) (FindResult, error)
 
-	// ListFiles returns all MIB file paths known to this source.
-	ListFiles() ([]string, error)
+	// ListModules returns all module names known to this source.
+	ListModules() ([]string, error)
 }
 
 // SourceOption modifies source behavior (extensions, heuristics).
@@ -109,9 +109,10 @@ func (s *dirSource) Find(name string) (FindResult, error) {
 	return FindResult{}, fs.ErrNotExist
 }
 
-func (s *dirSource) ListFiles() ([]string, error) {
+func (s *dirSource) ListModules() ([]string, error) {
 	extSet := makeExtensionSet(s.config.extensions)
-	var files []string
+	seen := make(map[string]struct{})
+	var names []string
 
 	entries, err := os.ReadDir(s.path)
 	if err != nil {
@@ -122,12 +123,15 @@ func (s *dirSource) ListFiles() ([]string, error) {
 		if entry.IsDir() {
 			continue
 		}
-		path := filepath.Join(s.path, entry.Name())
-		if hasValidExtension(path, extSet) {
-			files = append(files, path)
+		if hasValidExtension(entry.Name(), extSet) {
+			name := moduleNameFromPath(entry.Name())
+			if _, ok := seen[name]; !ok {
+				seen[name] = struct{}{}
+				names = append(names, name)
+			}
 		}
 	}
-	return files, nil
+	return names, nil
 }
 
 type treeSource struct {
@@ -203,8 +207,8 @@ func (s *treeSource) Find(name string) (FindResult, error) {
 	return FindResult{Reader: f, Path: path}, nil
 }
 
-func (s *treeSource) ListFiles() ([]string, error) {
-	return slices.Collect(maps.Values(s.index)), nil
+func (s *treeSource) ListModules() ([]string, error) {
+	return slices.Collect(maps.Keys(s.index)), nil
 }
 
 type fsSource struct {
@@ -252,19 +256,14 @@ func (s *fsSource) Find(name string) (FindResult, error) {
 	return FindResult{Reader: f, Path: fullPath}, nil
 }
 
-func (s *fsSource) ListFiles() ([]string, error) {
+func (s *fsSource) ListModules() ([]string, error) {
 	s.once.Do(func() {
 		s.index, s.err = s.buildIndex()
 	})
 	if s.err != nil {
 		return nil, s.err
 	}
-
-	files := make([]string, 0, len(s.index))
-	for _, path := range s.index {
-		files = append(files, s.name+":"+path)
-	}
-	return files, nil
+	return slices.Collect(maps.Keys(s.index)), nil
 }
 
 func (s *fsSource) buildIndex() (map[string]string, error) {
@@ -317,16 +316,16 @@ func (s *multiSource) Find(name string) (FindResult, error) {
 	return FindResult{}, fs.ErrNotExist
 }
 
-func (s *multiSource) ListFiles() ([]string, error) {
-	var files []string
+func (s *multiSource) ListModules() ([]string, error) {
+	var names []string
 	for _, src := range s.sources {
-		f, err := src.ListFiles()
+		n, err := src.ListModules()
 		if err != nil {
 			return nil, err
 		}
-		files = append(files, f...)
+		names = append(names, n...)
 	}
-	return files, nil
+	return names, nil
 }
 
 func makeExtensionSet(extensions []string) map[string]struct{} {

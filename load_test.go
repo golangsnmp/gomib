@@ -59,11 +59,11 @@ func TestDirSource(t *testing.T) {
 		t.Fatalf("Dir failed: %v", err)
 	}
 
-	files, err := src.ListFiles()
+	names, err := src.ListModules()
 	if err != nil {
-		t.Fatalf("ListFiles failed: %v", err)
+		t.Fatalf("ListModules failed: %v", err)
 	}
-	testutil.Greater(t, len(files), 0, "should list files")
+	testutil.Greater(t, len(names), 0, "should list modules")
 }
 
 func TestDirTreeSource(t *testing.T) {
@@ -72,11 +72,11 @@ func TestDirTreeSource(t *testing.T) {
 		t.Fatalf("DirTree failed: %v", err)
 	}
 
-	files, err := src.ListFiles()
+	names, err := src.ListModules()
 	if err != nil {
-		t.Fatalf("ListFiles failed: %v", err)
+		t.Fatalf("ListModules failed: %v", err)
 	}
-	testutil.Greater(t, len(files), 10, "should list many files recursively")
+	testutil.Greater(t, len(names), 10, "should list many modules recursively")
 }
 
 func TestMultiSource(t *testing.T) {

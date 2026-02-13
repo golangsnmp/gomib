@@ -33,9 +33,9 @@ func TestMustDirPanicsOnError(t *testing.T) {
 
 func TestMustDirSucceeds(t *testing.T) {
 	src := MustDir("testdata/corpus/primary/ietf")
-	files, err := src.ListFiles()
-	testutil.NoError(t, err, "ListFiles")
-	testutil.Greater(t, len(files), 0, "should list files")
+	names, err := src.ListModules()
+	testutil.NoError(t, err, "ListModules")
+	testutil.Greater(t, len(names), 0, "should list modules")
 }
 
 func TestDirTreeNonExistentPath(t *testing.T) {
@@ -60,9 +60,9 @@ func TestMustDirTreePanicsOnError(t *testing.T) {
 
 func TestMustDirTreeSucceeds(t *testing.T) {
 	src := MustDirTree("testdata/corpus/primary")
-	files, err := src.ListFiles()
-	testutil.NoError(t, err, "ListFiles")
-	testutil.Greater(t, len(files), 10, "should list many files")
+	names, err := src.ListModules()
+	testutil.NoError(t, err, "ListModules")
+	testutil.Greater(t, len(names), 10, "should list many modules")
 }
 
 func TestDirSourceFindExisting(t *testing.T) {
@@ -135,9 +135,9 @@ END
 	_ = result.Reader.Close()
 	testutil.Contains(t, result.Path, "test-fs:", "Path should contain FS name prefix")
 
-	files, err := src.ListFiles()
-	testutil.NoError(t, err, "ListFiles")
-	testutil.Equal(t, 1, len(files), "should list 1 file")
+	names, err := src.ListModules()
+	testutil.NoError(t, err, "ListModules")
+	testutil.Equal(t, 1, len(names), "should list 1 module")
 }
 
 func TestFSSourceFindNotExist(t *testing.T) {
@@ -151,13 +151,13 @@ func TestFSSourceFindNotExist(t *testing.T) {
 	testutil.True(t, err == fs.ErrNotExist, "error should be fs.ErrNotExist")
 }
 
-func TestFSSourceListFilesEmpty(t *testing.T) {
+func TestFSSourceListModulesEmpty(t *testing.T) {
 	memFS := fstest.MapFS{}
 	src := FS("empty", memFS)
 
-	files, err := src.ListFiles()
-	testutil.NoError(t, err, "ListFiles on empty FS")
-	testutil.Equal(t, 0, len(files), "empty FS should have 0 files")
+	names, err := src.ListModules()
+	testutil.NoError(t, err, "ListModules on empty FS")
+	testutil.Equal(t, 0, len(names), "empty FS should have 0 modules")
 }
 
 func TestFSSourceWithLoad(t *testing.T) {
@@ -208,7 +208,7 @@ func TestMultiSourceFindOrder(t *testing.T) {
 	_ = result.Reader.Close()
 }
 
-func TestMultiSourceListFilesCombines(t *testing.T) {
+func TestMultiSourceListModulesCombines(t *testing.T) {
 	src1, err := Dir("testdata/corpus/primary/ietf")
 	testutil.NoError(t, err, "Dir ietf")
 
@@ -217,13 +217,13 @@ func TestMultiSourceListFilesCombines(t *testing.T) {
 
 	multi := Multi(src1, src2)
 
-	files, err := multi.ListFiles()
-	testutil.NoError(t, err, "ListFiles")
+	names, err := multi.ListModules()
+	testutil.NoError(t, err, "ListModules")
 
-	files1, _ := src1.ListFiles()
-	files2, _ := src2.ListFiles()
-	testutil.Equal(t, len(files1)+len(files2), len(files),
-		"Multi should combine file lists from all sources")
+	names1, _ := src1.ListModules()
+	names2, _ := src2.ListModules()
+	testutil.Equal(t, len(names1)+len(names2), len(names),
+		"Multi should combine module lists from all sources")
 }
 
 func TestMultiSourceFindNotExist(t *testing.T) {
@@ -252,15 +252,15 @@ END
 
 	srcDefault, err := Dir(tmpDir)
 	testutil.NoError(t, err, "Dir default")
-	files, err := srcDefault.ListFiles()
-	testutil.NoError(t, err, "ListFiles default")
-	testutil.Equal(t, 0, len(files), "default extensions should not find .custom files")
+	names, err := srcDefault.ListModules()
+	testutil.NoError(t, err, "ListModules default")
+	testutil.Equal(t, 0, len(names), "default extensions should not find .custom files")
 
 	srcCustom, err := Dir(tmpDir, WithExtensions(".custom"))
 	testutil.NoError(t, err, "Dir custom")
-	files, err = srcCustom.ListFiles()
-	testutil.NoError(t, err, "ListFiles custom")
-	testutil.Equal(t, 1, len(files), "custom extensions should find .custom files")
+	names, err = srcCustom.ListModules()
+	testutil.NoError(t, err, "ListModules custom")
+	testutil.Equal(t, 1, len(names), "custom extensions should find .custom files")
 }
 
 func TestWithNoHeuristicLoadsNonMIBContent(t *testing.T) {
@@ -270,9 +270,9 @@ func TestWithNoHeuristicLoadsNonMIBContent(t *testing.T) {
 
 	src, err := Dir(tmpDir)
 	testutil.NoError(t, err, "Dir")
-	files, err := src.ListFiles()
-	testutil.NoError(t, err, "ListFiles")
-	testutil.Equal(t, 1, len(files), "file should be listed (heuristic is checked at load time, not list time)")
+	names, err := src.ListModules()
+	testutil.NoError(t, err, "ListModules")
+	testutil.Equal(t, 1, len(names), "module should be listed (heuristic is checked at load time, not list time)")
 }
 
 func TestLoadContextCancellation(t *testing.T) {
