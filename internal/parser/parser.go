@@ -695,14 +695,9 @@ func (p *Parser) parseObjectType() (ast.Definition, *types.Diagnostic) {
 	}
 
 	// REFERENCE (optional)
-	var reference *ast.QuotedString
-	if p.check(lexer.TokKwReference) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		reference = &qs
+	reference, err := p.parseOptionalReference()
+	if err != nil {
+		return nil, err
 	}
 
 	// INDEX or AUGMENTS (optional)
@@ -1173,36 +1168,17 @@ func (p *Parser) parseSequenceFields() ([]ast.SequenceField, *types.Diagnostic) 
 }
 
 // parseChoiceAlternatives parses comma-separated name/type pairs within
-// CHOICE { ... }.
+// CHOICE { ... }. Uses parseSequenceFields since the structure is identical.
 func (p *Parser) parseChoiceAlternatives() ([]ast.ChoiceAlternative, *types.Diagnostic) {
-	var alternatives []ast.ChoiceAlternative
-
-	for !p.check(lexer.TokRBrace) && !p.isEOF() {
-		start := p.currentSpan().Start
-		nameToken, err := p.expectIdentifier()
-		if err != nil {
-			return nil, err
-		}
-		name := p.makeIdent(nameToken)
-
-		syntax, err := p.parseTypeSyntax()
-		if err != nil {
-			return nil, err
-		}
-		span := types.NewSpan(start, syntax.SyntaxSpan().End)
-
-		alternatives = append(alternatives, ast.ChoiceAlternative{
-			Name:   name,
-			Syntax: syntax,
-			Span:   span,
-		})
-
-		if p.check(lexer.TokComma) {
-			p.advance()
-		}
+	fields, err := p.parseSequenceFields()
+	if err != nil {
+		return nil, err
 	}
-
-	return alternatives, nil
+	alts := make([]ast.ChoiceAlternative, len(fields))
+	for i, f := range fields {
+		alts[i] = ast.ChoiceAlternative(f)
+	}
+	return alts, nil
 }
 
 // parseAccessClause parses ACCESS, MAX-ACCESS, or MIN-ACCESS with its value.
@@ -1687,6 +1663,20 @@ func (p *Parser) parseQuotedString() (ast.QuotedString, *types.Diagnostic) {
 	return ast.NewQuotedString(value, token.Span), nil
 }
 
+// parseOptionalReference parses an optional REFERENCE clause, returning nil
+// if not present.
+func (p *Parser) parseOptionalReference() (*ast.QuotedString, *types.Diagnostic) {
+	if !p.check(lexer.TokKwReference) {
+		return nil, nil
+	}
+	p.advance()
+	qs, err := p.parseQuotedString()
+	if err != nil {
+		return nil, err
+	}
+	return &qs, nil
+}
+
 // parseModuleIdentity parses a MODULE-IDENTITY macro invocation.
 func (p *Parser) parseModuleIdentity() (ast.Definition, *types.Diagnostic) {
 	start := p.currentSpan().Start
@@ -1809,14 +1799,9 @@ func (p *Parser) parseObjectIdentity() (ast.Definition, *types.Diagnostic) {
 	}
 
 	// REFERENCE (optional)
-	var reference *ast.QuotedString
-	if p.check(lexer.TokKwReference) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		reference = &qs
+	reference, err := p.parseOptionalReference()
+	if err != nil {
+		return nil, err
 	}
 
 	// ::= { oid }
@@ -1884,14 +1869,9 @@ func (p *Parser) parseNotificationType() (ast.Definition, *types.Diagnostic) {
 	}
 
 	// REFERENCE (optional)
-	var reference *ast.QuotedString
-	if p.check(lexer.TokKwReference) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		reference = &qs
+	reference, err := p.parseOptionalReference()
+	if err != nil {
+		return nil, err
 	}
 
 	// ::= { oid }
@@ -1966,14 +1946,9 @@ func (p *Parser) parseTrapType() (ast.Definition, *types.Diagnostic) {
 	}
 
 	// REFERENCE (optional)
-	var reference *ast.QuotedString
-	if p.check(lexer.TokKwReference) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		reference = &qs
+	reference, err := p.parseOptionalReference()
+	if err != nil {
+		return nil, err
 	}
 
 	// ::= number
@@ -2060,14 +2035,9 @@ func (p *Parser) parseTextualConventionBody(name ast.Ident, start types.ByteOffs
 	}
 
 	// REFERENCE (optional)
-	var reference *ast.QuotedString
-	if p.check(lexer.TokKwReference) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		reference = &qs
+	reference, err := p.parseOptionalReference()
+	if err != nil {
+		return nil, err
 	}
 
 	// SYNTAX
@@ -2158,14 +2128,9 @@ func (p *Parser) parseObjectGroup() (ast.Definition, *types.Diagnostic) {
 	}
 
 	// REFERENCE (optional)
-	var reference *ast.QuotedString
-	if p.check(lexer.TokKwReference) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		reference = &qs
+	reference, err := p.parseOptionalReference()
+	if err != nil {
+		return nil, err
 	}
 
 	// ::= { oid }
@@ -2232,14 +2197,9 @@ func (p *Parser) parseNotificationGroup() (ast.Definition, *types.Diagnostic) {
 	}
 
 	// REFERENCE (optional)
-	var reference *ast.QuotedString
-	if p.check(lexer.TokKwReference) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		reference = &qs
+	reference, err := p.parseOptionalReference()
+	if err != nil {
+		return nil, err
 	}
 
 	// ::= { oid }
@@ -2291,14 +2251,9 @@ func (p *Parser) parseModuleCompliance() (ast.Definition, *types.Diagnostic) {
 	}
 
 	// REFERENCE (optional)
-	var reference *ast.QuotedString
-	if p.check(lexer.TokKwReference) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		reference = &qs
+	reference, err := p.parseOptionalReference()
+	if err != nil {
+		return nil, err
 	}
 
 	// Parse MODULE clauses
@@ -2542,14 +2497,9 @@ func (p *Parser) parseAgentCapabilities() (ast.Definition, *types.Diagnostic) {
 	}
 
 	// REFERENCE (optional)
-	var reference *ast.QuotedString
-	if p.check(lexer.TokKwReference) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		reference = &qs
+	reference, err := p.parseOptionalReference()
+	if err != nil {
+		return nil, err
 	}
 
 	// Parse SUPPORTS clauses
