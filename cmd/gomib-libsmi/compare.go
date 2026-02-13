@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 
@@ -128,6 +129,7 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 	for _, p := range mibPaths {
 		src, err := gomib.DirTree(p)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: skipping path %s: %v\n", p, err)
 			continue
 		}
 		sources = append(sources, src)

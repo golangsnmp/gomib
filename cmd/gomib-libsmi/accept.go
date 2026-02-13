@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -109,6 +110,7 @@ func testAcceptance(modules []string, mibPaths []string, level int, showAll bool
 	for _, p := range mibPaths {
 		src, err := gomib.DirTree(p)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: skipping path %s: %v\n", p, err)
 			continue
 		}
 		sources = append(sources, src)

@@ -59,7 +59,7 @@ func cmdDump(args []string) int {
 	mib, err := loadMib(modules)
 	if err != nil {
 		printError("failed to load: %v", err)
-		return 1
+		return 2
 	}
 
 	opts := JSONOptions{

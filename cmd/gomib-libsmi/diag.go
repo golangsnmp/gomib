@@ -150,6 +150,7 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 	for _, p := range mibPaths {
 		src, err := gomib.DirTree(p)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: skipping path %s: %v\n", p, err)
 			continue
 		}
 		sources = append(sources, src)
@@ -169,7 +170,10 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 		}
 
 		ctx := context.Background()
-		m, _ := gomib.LoadModules(ctx, []string{module}, source, gomib.WithDiagnosticConfig(cfg))
+		m, err := gomib.LoadModules(ctx, []string{module}, source, gomib.WithDiagnosticConfig(cfg))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: gomib load failed for %s: %v\n", module, err)
+		}
 
 		if m != nil {
 			for _, d := range m.Diagnostics() {

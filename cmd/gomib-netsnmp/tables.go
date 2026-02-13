@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 )
@@ -79,14 +80,14 @@ Options:
 	}
 	defer cleanup()
 
-	fmt.Fprintln(out, "Loading MIBs with net-snmp...")
+	fmt.Fprintln(os.Stderr, "Loading MIBs with net-snmp...")
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, modules)
 	if err != nil {
 		printError("net-snmp load failed: %v", err)
 		return 1
 	}
 
-	fmt.Fprintln(out, "Loading MIBs with gomib...")
+	fmt.Fprintln(os.Stderr, "Loading MIBs with gomib...")
 	gomibNodes, err := loadGomibNodes(mibPaths, modules)
 	if err != nil {
 		printError("gomib load failed: %v", err)

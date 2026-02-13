@@ -145,15 +145,20 @@ func cmdLint(args []string) int {
 	result := runLint(modules, cfg)
 
 	if !cfg.quiet {
+		var err error
 		switch cfg.format {
 		case "json":
-			printLintJSON(result)
+			err = printLintJSON(result)
 		case "sarif":
-			printLintSARIF(result)
+			err = printLintSARIF(result)
 		case "compact":
 			printLintCompact(result, cfg)
 		default:
 			printLintText(result, cfg)
+		}
+		if err != nil {
+			printError("output encoding failed: %v", err)
+			return 1
 		}
 	}
 
@@ -430,15 +435,15 @@ func printLintCompact(result *lintResult, cfg lintConfig) {
 	}
 }
 
-func printLintJSON(result *lintResult) {
+func printLintJSON(result *lintResult) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	_ = enc.Encode(result)
+	return enc.Encode(result)
 }
 
 // SARIF (Static Analysis Results Interchange Format) output
 // https://sarifweb.azurewebsites.net/
-func printLintSARIF(result *lintResult) {
+func printLintSARIF(result *lintResult) error {
 	sarif := sarifOutput{
 		Schema:  "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
 		Version: "2.1.0",
@@ -456,7 +461,7 @@ func printLintSARIF(result *lintResult) {
 
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	_ = enc.Encode(sarif)
+	return enc.Encode(sarif)
 }
 
 type sarifOutput struct {
