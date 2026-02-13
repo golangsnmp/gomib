@@ -46,37 +46,46 @@ func (m *Data) Nodes() iter.Seq[mib.Node] {
 	}
 }
 
-func (m *Data) FindNode(query string) mib.Node {
-	if moduleName, nodeName, ok := strings.Cut(query, "::"); ok {
-		if m.moduleByName[moduleName] == nil {
-			return nil
+// resolveQuery parses a query string and returns matching nodes.
+// For MODULE::name queries, moduleName is set to the qualifier.
+// Handles numeric OIDs, dot-prefixed OIDs, and plain name lookups.
+func (m *Data) resolveQuery(query string) (nodes []*Node, moduleName string) {
+	if modName, itemName, ok := strings.Cut(query, "::"); ok {
+		if m.moduleByName[modName] == nil {
+			return nil, modName
 		}
-		for _, nd := range m.nameToNodes[nodeName] {
+		return m.nameToNodes[itemName], modName
+	}
+
+	q := query
+	if len(q) > 0 && q[0] == '.' {
+		q = q[1:]
+	}
+	if len(q) > 0 && q[0] >= '0' && q[0] <= '9' {
+		oid, err := mib.ParseOID(q)
+		if err != nil || len(oid) == 0 {
+			return nil, ""
+		}
+		if nd := m.nodeByOID(oid); nd != nil {
+			return []*Node{nd}, ""
+		}
+		return nil, ""
+	}
+
+	return m.nameToNodes[query], ""
+}
+
+func (m *Data) FindNode(query string) mib.Node {
+	nodes, moduleName := m.resolveQuery(query)
+	if moduleName != "" {
+		for _, nd := range nodes {
 			if nd.Module() != nil && nd.Module().Name() == moduleName {
 				return nd
 			}
 		}
 		return nil
 	}
-
-	if len(query) > 0 && query[0] >= '0' && query[0] <= '9' {
-		oid, err := mib.ParseOID(query)
-		if err != nil || len(oid) == 0 {
-			return nil
-		}
-		return m.NodeByOID(oid)
-	}
-
-	if len(query) > 0 && query[0] == '.' {
-		oid, err := mib.ParseOID(query[1:])
-		if err != nil || len(oid) == 0 {
-			return nil
-		}
-		return m.NodeByOID(oid)
-	}
-
 	// Prefer nodes with objects, then notifications, then any match.
-	nodes := m.nameToNodes[query]
 	for _, nd := range nodes {
 		if nd.obj != nil {
 			return nd
@@ -90,7 +99,6 @@ func (m *Data) FindNode(query string) mib.Node {
 	if len(nodes) > 0 {
 		return nodes[0]
 	}
-
 	return nil
 }
 
@@ -310,50 +318,17 @@ type nodeEntity interface {
 	*Object | *Notification | *Group | *Compliance | *Capabilities
 }
 
-// findEntity resolves a query to a node-attached entity. It accepts
-// qualified names (MODULE::name), numeric OIDs, dot-prefixed OIDs,
-// and plain names.
+// findEntity resolves a query to a node-attached entity using resolveQuery.
 func findEntity[T nodeEntity](m *Data, query string, fromNode func(*Node) T) T {
 	var zero T
-
-	if moduleName, itemName, ok := strings.Cut(query, "::"); ok {
-		if m.moduleByName[moduleName] == nil {
-			return zero
-		}
-		for _, nd := range m.nameToNodes[itemName] {
-			if v := fromNode(nd); v != zero {
-				if ndMod := nd.Module(); ndMod != nil && ndMod.Name() == moduleName {
-					return v
+	nodes, moduleName := m.resolveQuery(query)
+	for _, nd := range nodes {
+		if v := fromNode(nd); v != zero {
+			if moduleName != "" {
+				if ndMod := nd.Module(); ndMod == nil || ndMod.Name() != moduleName {
+					continue
 				}
 			}
-		}
-		return zero
-	}
-
-	if len(query) > 0 && query[0] >= '0' && query[0] <= '9' {
-		oid, err := mib.ParseOID(query)
-		if err != nil || len(oid) == 0 {
-			return zero
-		}
-		if nd := m.nodeByOID(oid); nd != nil {
-			return fromNode(nd)
-		}
-		return zero
-	}
-
-	if len(query) > 0 && query[0] == '.' {
-		oid, err := mib.ParseOID(query[1:])
-		if err != nil || len(oid) == 0 {
-			return zero
-		}
-		if nd := m.nodeByOID(oid); nd != nil {
-			return fromNode(nd)
-		}
-		return zero
-	}
-
-	for _, nd := range m.nameToNodes[query] {
-		if v := fromNode(nd); v != zero {
 			return v
 		}
 	}

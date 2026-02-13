@@ -39,6 +39,10 @@ func (n *Node) IsRoot() bool {
 	return n.parent == nil
 }
 
+// Module returns the module that defines this node's primary entity.
+// Priority: object > notification > group > compliance > capabilities > base module.
+// The most specific entity type wins because it represents the definition
+// that gives the node its semantic meaning.
 func (n *Node) Module() mib.Module {
 	if n.obj != nil {
 		return n.obj.module

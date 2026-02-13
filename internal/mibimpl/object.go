@@ -219,6 +219,10 @@ func (o *Object) Columns() []mib.Object {
 }
 
 func (o *Object) EffectiveIndexes() []mib.IndexEntry {
+	return o.effectiveIndexes(make(map[*Object]struct{}))
+}
+
+func (o *Object) effectiveIndexes(visited map[*Object]struct{}) []mib.IndexEntry {
 	if o.node == nil || o.node.kind != mib.KindRow {
 		return nil
 	}
@@ -226,7 +230,11 @@ func (o *Object) EffectiveIndexes() []mib.IndexEntry {
 		return o.index
 	}
 	if o.augments != nil {
-		return o.augments.EffectiveIndexes()
+		if _, seen := visited[o]; seen {
+			return nil
+		}
+		visited[o] = struct{}{}
+		return o.augments.effectiveIndexes(visited)
 	}
 	return nil
 }
