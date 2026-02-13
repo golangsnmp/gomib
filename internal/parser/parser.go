@@ -1666,8 +1666,12 @@ func (p *Parser) parseQuotedString() (ast.QuotedString, *types.Diagnostic) {
 	token := p.advance()
 	fullText := p.text(token.Span)
 	value := ""
-	if len(fullText) >= 2 {
+	if len(fullText) >= 2 && fullText[len(fullText)-1] == '"' {
+		// Properly terminated: strip both quotes
 		value = fullText[1 : len(fullText)-1]
+	} else if len(fullText) >= 1 {
+		// Unterminated: strip only the opening quote
+		value = fullText[1:]
 	}
 	return ast.NewQuotedString(value, token.Span), nil
 }
@@ -1994,62 +1998,7 @@ func (p *Parser) parseTextualConvention() (ast.Definition, *types.Diagnostic) {
 		return nil, err
 	}
 
-	// DISPLAY-HINT (optional)
-	var displayHint *ast.QuotedString
-	if p.check(lexer.TokKwDisplayHint) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		displayHint = &qs
-	}
-
-	// STATUS
-	status, err := p.parseStatusClause()
-	if err != nil {
-		return nil, err
-	}
-
-	// DESCRIPTION
-	if _, err := p.expect(lexer.TokKwDescription); err != nil {
-		return nil, err
-	}
-	description, err := p.parseQuotedString()
-	if err != nil {
-		return nil, err
-	}
-
-	// REFERENCE (optional)
-	var reference *ast.QuotedString
-	if p.check(lexer.TokKwReference) {
-		p.advance()
-		qs, err := p.parseQuotedString()
-		if err != nil {
-			return nil, err
-		}
-		reference = &qs
-	}
-
-	// SYNTAX
-	if _, err := p.expect(lexer.TokKwSyntax); err != nil {
-		return nil, err
-	}
-	syntax, err := p.parseSyntaxClause()
-	if err != nil {
-		return nil, err
-	}
-
-	span := types.NewSpan(start, syntax.Span.End)
-	return &ast.TextualConventionDef{
-		Name:        name,
-		DisplayHint: displayHint,
-		Status:      status,
-		Description: description,
-		Reference:   reference,
-		Syntax:      syntax,
-		Span:        span,
-	}, nil
+	return p.parseTextualConventionBody(name, start)
 }
 
 // parseTextualConventionWithAssignment parses the alternate form:
@@ -2067,6 +2016,12 @@ func (p *Parser) parseTextualConventionWithAssignment() (ast.Definition, *types.
 		return nil, err
 	}
 
+	return p.parseTextualConventionBody(name, start)
+}
+
+// parseTextualConventionBody parses the shared body of a TEXTUAL-CONVENTION
+// (DISPLAY-HINT, STATUS, DESCRIPTION, REFERENCE, SYNTAX).
+func (p *Parser) parseTextualConventionBody(name ast.Ident, start types.ByteOffset) (ast.Definition, *types.Diagnostic) {
 	// DISPLAY-HINT (optional)
 	var displayHint *ast.QuotedString
 	if p.check(lexer.TokKwDisplayHint) {
@@ -2757,7 +2712,8 @@ func (p *Parser) parseVariationClause() (ast.Variation, *types.Diagnostic) {
 
 	end := description.Span.End
 
-	// Determine if this is an object or notification variation
+	// If any object-specific clauses are present, this is an ObjectVariation.
+	// Otherwise treat as NotificationVariation per RFC 2580.
 	if syntax != nil || writeSyntax != nil || len(creationRequires) > 0 || defval != nil {
 		return &ast.ObjectVariation{
 			Object:           name,
@@ -2771,12 +2727,11 @@ func (p *Parser) parseVariationClause() (ast.Variation, *types.Diagnostic) {
 		}, nil
 	}
 
-	// Default to ObjectVariation for ambiguous cases
-	return &ast.ObjectVariation{
-		Object:      name,
-		Access:      access,
-		Description: description,
-		Span:        types.NewSpan(start, end),
+	return &ast.NotificationVariation{
+		Notification: name,
+		Access:       access,
+		Description:  description,
+		Span:         types.NewSpan(start, end),
 	}, nil
 }
 
@@ -2839,10 +2794,11 @@ func (p *Parser) recoverToDefinition() {
 		current := p.peek().Kind
 		next := p.peekNth(1).Kind
 
-		if (current == lexer.TokLowercaseIdent && next.IsMacroKeyword()) ||
+		if (isValueRefToken(current) && next.IsMacroKeyword()) ||
 			(current == lexer.TokUppercaseIdent && next == lexer.TokColonColonEqual) ||
 			(current == lexer.TokUppercaseIdent && next == lexer.TokKwTextualConvention) ||
-			(current == lexer.TokLowercaseIdent && next == lexer.TokKwObject &&
+			(current == lexer.TokUppercaseIdent && next == lexer.TokKwMacro) ||
+			(isValueRefToken(current) && next == lexer.TokKwObject &&
 				p.peekNth(2).Kind == lexer.TokKwIdentifier) {
 			break
 		}

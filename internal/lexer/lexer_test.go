@@ -189,10 +189,59 @@ func TestDoubleHyphenBreaksIdentifier(t *testing.T) {
 	lexer := New([]byte(source), nil)
 	tokens, _ := lexer.Tokenize()
 
-	testutil.Len(t, tokens, 4, "token count")
+	// foo--bar should tokenize as identifier "foo" then comment "--bar"
 	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token kind")
 	text := source[tokens[0].Span.Start:tokens[0].Span.End]
-	testutil.Equal(t, "foo-", text, "first token text")
+	testutil.Equal(t, "foo", text, "first token text")
+	testutil.Equal(t, TokEOF, tokens[1].Kind, "second token (comment consumed)")
+}
+
+func TestDoubleHyphenAfterIdentifierPreservesComment(t *testing.T) {
+	// Realistic MIB pattern: identifier immediately before -- comment,
+	// then more tokens on the next line
+	source := "ifIndex--index column\nOBJECT-TYPE"
+	lexer := New([]byte(source), nil)
+	tokens, _ := lexer.Tokenize()
+
+	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "identifier")
+	text := source[tokens[0].Span.Start:tokens[0].Span.End]
+	testutil.Equal(t, "ifIndex", text, "identifier text should not include hyphen")
+	testutil.Equal(t, TokKwObjectType, tokens[1].Kind, "next token after comment")
+}
+
+func TestManyJunkLinesNoStackOverflow(t *testing.T) {
+	// Verify iterative handling of many consecutive lines of unexpected chars.
+	// Previously this would recurse once per line and risk stack overflow.
+	var source string
+	for i := 0; i < 10000; i++ {
+		source += "@@@@\n"
+	}
+	source += "OBJECT"
+	lexer := New([]byte(source), nil)
+	tokens, diags := lexer.Tokenize()
+
+	// Should find OBJECT after all the junk
+	var found bool
+	for _, tok := range tokens {
+		if tok.Kind == TokKwObject {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "should find OBJECT token after junk lines")
+	testutil.Greater(t, len(diags), 0, "should have diagnostics for unexpected chars")
+}
+
+func TestManyConsecutiveCommentsNoStackOverflow(t *testing.T) {
+	var source string
+	for i := 0; i < 10000; i++ {
+		source += "-- comment\n"
+	}
+	source += "OBJECT"
+	lexer := New([]byte(source), nil)
+	tokens, _ := lexer.Tokenize()
+
+	testutil.Equal(t, TokKwObject, tokens[0].Kind, "should find OBJECT after many comments")
 }
 
 func TestUnterminatedQuotedString(t *testing.T) {

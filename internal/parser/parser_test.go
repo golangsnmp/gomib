@@ -757,3 +757,140 @@ func TestReservedKeywordDiagnostic(t *testing.T) {
 	}
 	testutil.Equal(t, 1, keywordDiags, "expected keyword-reserved diagnostic")
 }
+
+func TestParseUnterminatedStringPreservesContent(t *testing.T) {
+	// Test parseQuotedString directly with an unterminated string.
+	// The lexer produces a TokQuotedString for unterminated strings
+	// (span covers from opening quote to EOF). The parser should
+	// strip only the opening quote, not the last content char.
+	source := []byte(`"hello world`)
+	p := New(source, nil, mib.PermissiveConfig())
+
+	qs, err := p.parseQuotedString()
+	testutil.Nil(t, err, "parseQuotedString should not return error for TokQuotedString")
+	testutil.Equal(t, "hello world", qs.Value, "unterminated string should preserve all content after opening quote")
+}
+
+func TestParseVariationNotification(t *testing.T) {
+	// A VARIATION clause with only ACCESS and DESCRIPTION (no SYNTAX,
+	// WRITE-SYNTAX, CREATION-REQUIRES, or DEFVAL) should produce a
+	// NotificationVariation, not an ObjectVariation.
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testAgent AGENT-CAPABILITIES
+			PRODUCT-RELEASE "1.0"
+			STATUS current
+			DESCRIPTION "Test"
+			SUPPORTS IF-MIB
+				INCLUDES { ifGeneralGroup }
+				VARIATION ifLinkUpNotification
+					DESCRIPTION "Supported"
+			::= { test 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Fatal("expected definitions in module body")
+	}
+
+	def, ok := module.Body[0].(*ast.AgentCapabilitiesDef)
+	if !ok {
+		t.Fatalf("expected AgentCapabilitiesDef, got %T", module.Body[0])
+	}
+	if len(def.Supports) == 0 {
+		t.Fatal("expected SUPPORTS clause")
+	}
+	if len(def.Supports[0].Variations) == 0 {
+		t.Fatal("expected VARIATION clause")
+	}
+
+	_, ok = def.Supports[0].Variations[0].(*ast.NotificationVariation)
+	testutil.True(t, ok, "variation with only DESCRIPTION should be NotificationVariation, got %T",
+		def.Supports[0].Variations[0])
+}
+
+func TestParseVariationObject(t *testing.T) {
+	// A VARIATION clause with SYNTAX should produce an ObjectVariation.
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testAgent AGENT-CAPABILITIES
+			PRODUCT-RELEASE "1.0"
+			STATUS current
+			DESCRIPTION "Test"
+			SUPPORTS IF-MIB
+				INCLUDES { ifGeneralGroup }
+				VARIATION ifIndex
+					SYNTAX Integer32 (1..100)
+					DESCRIPTION "Restricted range"
+			::= { test 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	if len(module.Body) == 0 {
+		t.Fatal("expected definitions in module body")
+	}
+
+	def, ok := module.Body[0].(*ast.AgentCapabilitiesDef)
+	if !ok {
+		t.Fatalf("expected AgentCapabilitiesDef, got %T", module.Body[0])
+	}
+	if len(def.Supports) == 0 || len(def.Supports[0].Variations) == 0 {
+		t.Fatal("expected SUPPORTS with VARIATION")
+	}
+
+	_, ok = def.Supports[0].Variations[0].(*ast.ObjectVariation)
+	testutil.True(t, ok, "variation with SYNTAX should be ObjectVariation, got %T",
+		def.Supports[0].Variations[0])
+}
+
+func TestRecoverToUppercaseObjectType(t *testing.T) {
+	// Tests that recoverToDefinition finds definitions starting with
+	// uppercase identifiers followed by macro keywords (e.g. vendor MIBs
+	// that use uppercase value references like "FooEntry OBJECT-TYPE").
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		badDef GARBAGE NONSENSE
+		FooCount OBJECT-TYPE
+			SYNTAX Counter32
+			MAX-ACCESS read-only
+			STATUS current
+			DESCRIPTION "Found after recovery"
+			::= { test 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	// Should recover and parse FooCount despite the uppercase identifier
+	var found bool
+	for _, def := range module.Body {
+		if ot, ok := def.(*ast.ObjectTypeDef); ok && ot.Name.Name == "FooCount" {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "should recover and parse uppercase OBJECT-TYPE definition")
+}
+
+func TestParseTextualConventionWithAssignment(t *testing.T) {
+	// Verify the ::= form still works after TC dedup refactor
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		TestDisplay ::= TEXTUAL-CONVENTION
+			DISPLAY-HINT "255a"
+			STATUS current
+			DESCRIPTION "A display string"
+			REFERENCE "RFC 1213"
+			SYNTAX OCTET STRING (SIZE (0..255))
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.TextualConventionDef)
+	if !ok {
+		t.Fatalf("expected TextualConventionDef, got %T", module.Body[0])
+	}
+	testutil.Equal(t, "TestDisplay", def.Name.Name, "TC name")
+	testutil.NotNil(t, def.DisplayHint, "display hint should be set")
+	testutil.Equal(t, "255a", def.DisplayHint.Value, "display hint value")
+	testutil.NotNil(t, def.Reference, "reference should be set")
+	testutil.Equal(t, "RFC 1213", def.Reference.Value, "reference value")
+}

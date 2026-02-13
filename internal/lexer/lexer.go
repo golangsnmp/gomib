@@ -77,17 +77,22 @@ func (l *Lexer) Tokenize() ([]Token, []types.Diagnostic) {
 // NextToken advances the lexer and returns the next token.
 // Returns TokEOF when all input is consumed.
 func (l *Lexer) NextToken() Token {
-	switch l.state {
-	case stateNormal:
-		return l.nextNormalToken()
-	case stateInMacro:
-		return l.skipMacroBody()
-	case stateInExports:
-		return l.skipExportsBody()
-	case stateInComment:
-		return l.skipComment()
-	default:
-		return l.nextNormalToken()
+	for {
+		switch l.state {
+		case stateInComment:
+			l.consumeComment()
+			continue
+		case stateInMacro:
+			return l.skipMacroBody()
+		case stateInExports:
+			return l.skipExportsBody()
+		default:
+			tok, retry := l.nextNormalToken()
+			if retry {
+				continue
+			}
+			return tok
+		}
 	}
 }
 
@@ -183,14 +188,17 @@ func (l *Lexer) token(kind TokenKind, start int) Token {
 	return tok
 }
 
-func (l *Lexer) nextNormalToken() Token {
+// nextNormalToken scans the next token in normal state. Returns (token, retry)
+// where retry=true means the caller should loop (e.g. after skipping junk or
+// entering comment state).
+func (l *Lexer) nextNormalToken() (Token, bool) {
 	l.skipWhitespace()
 
 	start := l.pos
 
 	b, ok := l.peek()
 	if !ok {
-		return l.token(TokEOF, start)
+		return l.token(TokEOF, start), false
 	}
 
 	if b == '-' {
@@ -199,47 +207,47 @@ func (l *Lexer) nextNormalToken() Token {
 			l.advance()
 			l.state = stateInComment
 			l.Log(slog.LevelDebug, "entering comment", slog.Int("offset", start))
-			return l.skipComment()
+			return Token{}, true
 		}
 	}
 
 	switch b {
 	case '[':
 		l.advance()
-		return l.token(TokLBracket, start)
+		return l.token(TokLBracket, start), false
 	case ']':
 		l.advance()
-		return l.token(TokRBracket, start)
+		return l.token(TokRBracket, start), false
 	case '{':
 		l.advance()
-		return l.token(TokLBrace, start)
+		return l.token(TokLBrace, start), false
 	case '}':
 		l.advance()
-		return l.token(TokRBrace, start)
+		return l.token(TokRBrace, start), false
 	case '(':
 		l.advance()
-		return l.token(TokLParen, start)
+		return l.token(TokLParen, start), false
 	case ')':
 		l.advance()
-		return l.token(TokRParen, start)
+		return l.token(TokRParen, start), false
 	case ';':
 		l.advance()
-		return l.token(TokSemicolon, start)
+		return l.token(TokSemicolon, start), false
 	case ',':
 		l.advance()
-		return l.token(TokComma, start)
+		return l.token(TokComma, start), false
 	case '|':
 		l.advance()
-		return l.token(TokPipe, start)
+		return l.token(TokPipe, start), false
 	}
 
 	if b == '.' {
 		l.advance()
 		if next, ok := l.peek(); ok && next == '.' {
 			l.advance()
-			return l.token(TokDotDot, start)
+			return l.token(TokDotDot, start), false
 		}
-		return l.token(TokDot, start)
+		return l.token(TokDot, start), false
 	}
 
 	if b == ':' {
@@ -248,41 +256,41 @@ func (l *Lexer) nextNormalToken() Token {
 			if after, ok := l.peekAt(1); ok && after == '=' {
 				l.advance()
 				l.advance()
-				return l.token(TokColonColonEqual, start)
+				return l.token(TokColonColonEqual, start), false
 			}
 		}
-		return l.token(TokColon, start)
+		return l.token(TokColon, start), false
 	}
 
 	if b == '-' {
 		if next, ok := l.peekAt(1); ok && isDigit(next) {
-			return l.scanNegativeNumber()
+			return l.scanNegativeNumber(), false
 		}
 		l.advance()
-		return l.token(TokMinus, start)
+		return l.token(TokMinus, start), false
 	}
 
 	if isDigit(b) {
-		return l.scanNumber()
+		return l.scanNumber(), false
 	}
 
 	if b == '"' {
-		return l.scanQuotedString()
+		return l.scanQuotedString(), false
 	}
 
 	if b == '\'' {
-		return l.scanHexOrBinString()
+		return l.scanHexOrBinString(), false
 	}
 
 	if isAlpha(b) {
-		return l.scanIdentifierOrKeyword()
+		return l.scanIdentifierOrKeyword(), false
 	}
 
 	l.advance()
 	span := l.spanFrom(start)
 	l.error(span, fmt.Sprintf("unexpected character: 0x%02x", b))
 	l.skipToEOL()
-	return l.NextToken()
+	return Token{}, true
 }
 
 func (l *Lexer) tryConsumeTripleDashEOL() bool {
@@ -310,30 +318,32 @@ func (l *Lexer) tryConsumeTripleDashEOL() bool {
 	return false
 }
 
-func (l *Lexer) skipComment() Token {
+// consumeComment skips over comment text and sets state back to normal.
+// Called from the NextToken loop when state is stateInComment.
+func (l *Lexer) consumeComment() {
 	for {
 		b, ok := l.peek()
 		if !ok {
 			l.state = stateNormal
-			return l.NextToken()
+			return
 		}
 
 		if b == '\n' || b == '\r' {
 			l.skipLineEnding()
 			l.state = stateNormal
-			return l.NextToken()
+			return
 		}
 
 		if b == '-' {
 			if l.tryConsumeTripleDashEOL() {
 				l.state = stateNormal
-				return l.NextToken()
+				return
 			}
 			if next, ok := l.peekAt(1); ok && next == '-' {
 				l.advance()
 				l.advance()
 				l.state = stateNormal
-				return l.NextToken()
+				return
 			}
 			l.advance()
 			continue
@@ -438,10 +448,10 @@ func (l *Lexer) scanIdentifierOrKeyword() Token {
 		if isAlphanumeric(b) || b == '_' {
 			l.advance()
 		} else if b == '-' {
-			l.advance()
-			if next, ok := l.peek(); ok && next == '-' {
+			if next, ok := l.peekAt(1); ok && next == '-' {
 				break
 			}
+			l.advance()
 		} else {
 			break
 		}
