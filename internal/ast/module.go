@@ -2,6 +2,7 @@ package ast
 
 import (
 	"github.com/golangsnmp/gomib/internal/types"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 // Module is the top-level AST node for a parsed MIB module.
@@ -31,7 +32,7 @@ func NewModule(name Ident, definitionsKind DefinitionsKind, span types.Span) *Mo
 // HasErrors reports whether any diagnostic has error severity or worse.
 func (m *Module) HasErrors() bool {
 	for _, d := range m.Diagnostics {
-		if d.Severity <= types.SeverityError {
+		if d.Severity <= mib.SeverityError {
 			return true
 		}
 	}

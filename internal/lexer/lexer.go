@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/golangsnmp/gomib/internal/types"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 type lexerState int
@@ -166,7 +167,7 @@ func (l *Lexer) skipToEOL() {
 
 func (l *Lexer) error(span types.Span, message string) {
 	l.diagnostics = append(l.diagnostics, types.Diagnostic{
-		Severity: types.SeverityError,
+		Severity: mib.SeverityError,
 		Span:     span,
 		Message:  message,
 	})

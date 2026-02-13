@@ -117,7 +117,7 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 	for _, d := range astModule.Diagnostics {
 		line, col := spanToLineCol(ctx.source, d.Span.Start)
 		module.Diagnostics = append(module.Diagnostics, mib.Diagnostic{
-			Severity: mib.Severity(d.Severity),
+			Severity: d.Severity,
 			Code:     d.Code,
 			Message:  d.Message,
 			Module:   module.Name,

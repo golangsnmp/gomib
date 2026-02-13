@@ -61,8 +61,8 @@ func New(source []byte, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *P
 }
 
 // emitDiagnostic records a diagnostic if the current config reports it.
-func (p *Parser) emitDiagnostic(code string, severity int, span types.Span, message string) {
-	if !p.diagConfig.ShouldReport(code, mib.Severity(severity)) {
+func (p *Parser) emitDiagnostic(code string, severity mib.Severity, span types.Span, message string) {
+	if !p.diagConfig.ShouldReport(code, severity) {
 		return
 	}
 	p.diagnostics = append(p.diagnostics, types.Diagnostic{
@@ -77,20 +77,20 @@ func (p *Parser) emitDiagnostic(code string, severity int, span types.Span, mess
 // (underscores, trailing hyphens, length limits).
 func (p *Parser) validateIdentifier(name string, span types.Span) {
 	if strings.Contains(name, "_") {
-		p.emitDiagnostic("identifier-underscore", types.SeverityStyle, span,
+		p.emitDiagnostic("identifier-underscore", mib.SeverityStyle, span,
 			fmt.Sprintf("identifier %q contains underscore (RFC violation)", name))
 	}
 
 	if strings.HasSuffix(name, "-") {
-		p.emitDiagnostic("identifier-hyphen-end", types.SeverityError, span,
+		p.emitDiagnostic("identifier-hyphen-end", mib.SeverityError, span,
 			fmt.Sprintf("identifier %q ends with hyphen", name))
 	}
 
 	if len(name) > 64 {
-		p.emitDiagnostic("identifier-length-64", types.SeverityError, span,
+		p.emitDiagnostic("identifier-length-64", mib.SeverityError, span,
 			fmt.Sprintf("identifier %q exceeds 64 character limit (%d chars)", name, len(name)))
 	} else if len(name) > 32 {
-		p.emitDiagnostic("identifier-length-32", types.SeverityWarning, span,
+		p.emitDiagnostic("identifier-length-32", mib.SeverityWarning, span,
 			fmt.Sprintf("identifier %q exceeds 32 character recommendation (%d chars)", name, len(name)))
 	}
 }
@@ -99,7 +99,7 @@ func (p *Parser) validateIdentifier(name string, span types.Span) {
 // Per RFC 2578, value references (used in OID assignments) should start with lowercase.
 func (p *Parser) validateValueReference(name string, span types.Span) {
 	if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
-		p.emitDiagnostic("bad-identifier-case", types.SeverityError, span,
+		p.emitDiagnostic("bad-identifier-case", mib.SeverityError, span,
 			fmt.Sprintf("%q should start with a lowercase letter", name))
 	}
 }
@@ -233,7 +233,7 @@ func (p *Parser) makeIdentWithValidation(token lexer.Token) ast.Ident {
 
 func (p *Parser) makeError(message string) types.Diagnostic {
 	return types.Diagnostic{
-		Severity: types.SeverityError,
+		Severity: mib.SeverityError,
 		Span:     p.currentSpan(),
 		Message:  message,
 	}
@@ -241,7 +241,7 @@ func (p *Parser) makeError(message string) types.Diagnostic {
 
 func (p *Parser) makeErrorAt(span types.Span, message string) types.Diagnostic {
 	return types.Diagnostic{
-		Severity: types.SeverityError,
+		Severity: mib.SeverityError,
 		Span:     span,
 		Message:  message,
 	}
@@ -330,7 +330,7 @@ func (p *Parser) expectIdentifier() (lexer.Token, *types.Diagnostic) {
 	if p.check(lexer.TokForbiddenKeyword) {
 		token := p.advance()
 		name := p.text(token.Span)
-		p.emitDiagnostic("keyword-reserved", types.SeveritySevere, token.Span,
+		p.emitDiagnostic("keyword-reserved", mib.SeveritySevere, token.Span,
 			fmt.Sprintf("identifier %q is a reserved ASN.1 keyword", name))
 		return token, nil
 	}

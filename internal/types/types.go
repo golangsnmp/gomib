@@ -4,6 +4,8 @@ package types
 import (
 	"context"
 	"log/slog"
+
+	"github.com/golangsnmp/gomib/mib"
 )
 
 // LevelTrace is a custom log level more verbose than Debug.
@@ -76,19 +78,8 @@ func (s Span) IsSynthetic() bool {
 // Converted to mib.Diagnostic during lowering with module name and
 // line/column info.
 type Diagnostic struct {
-	Severity int    // Uses mib.Severity values (0=Fatal, 1=Severe, etc.)
+	Severity mib.Severity
 	Code     string // Diagnostic code (e.g., "identifier-underscore")
 	Span     Span
 	Message  string
 }
-
-// Severity constants, mirroring mib.Severity values.
-const (
-	SeverityFatal   = 0
-	SeveritySevere  = 1
-	SeverityError   = 2
-	SeverityMinor   = 3
-	SeverityStyle   = 4
-	SeverityWarning = 5
-	SeverityInfo    = 6
-)
