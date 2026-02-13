@@ -7,12 +7,11 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 )
 
 const usage = `gomib-libsmi - Compare gomib against libsmi (smilint)
@@ -41,7 +40,6 @@ var (
 	paths      []string
 	outputFile string
 	jsonOutput bool
-	helpFlag   bool
 )
 
 func main() {
@@ -49,49 +47,12 @@ func main() {
 }
 
 func run() int {
-	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+	flags, cmd, cmdArgs := cliutil.ParseCGOArgs(os.Args[1:])
+	paths = flags.Paths
+	outputFile = flags.OutputFile
+	jsonOutput = flags.JSONOutput
 
-	args := os.Args[1:]
-	var cmdArgs []string
-	var cmd string
-
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		switch {
-		case arg == "-h" || arg == "--help":
-			helpFlag = true
-		case arg == "-json":
-			jsonOutput = true
-		case arg == "-p" || arg == "--path":
-			if i+1 < len(args) {
-				i++
-				paths = append(paths, args[i])
-			}
-		case strings.HasPrefix(arg, "-p"):
-			paths = append(paths, arg[2:])
-		case strings.HasPrefix(arg, "--path="):
-			paths = append(paths, arg[7:])
-		case arg == "-o" || arg == "--output":
-			if i+1 < len(args) {
-				i++
-				outputFile = args[i]
-			}
-		case strings.HasPrefix(arg, "-o"):
-			outputFile = arg[2:]
-		case strings.HasPrefix(arg, "--output="):
-			outputFile = arg[9:]
-		case len(arg) > 0 && arg[0] == '-':
-			cmdArgs = append(cmdArgs, arg)
-		default:
-			if cmd == "" {
-				cmd = arg
-			} else {
-				cmdArgs = append(cmdArgs, arg)
-			}
-		}
-	}
-
-	if helpFlag && cmd == "" {
+	if flags.HelpFlag && cmd == "" {
 		fmt.Fprint(os.Stdout, usage)
 		return 0
 	}
@@ -119,14 +80,7 @@ func run() int {
 }
 
 func getOutput() (*os.File, func(), error) {
-	if outputFile == "" {
-		return os.Stdout, func() {}, nil
-	}
-	f, err := os.Create(outputFile)
-	if err != nil {
-		return nil, nil, err
-	}
-	return f, func() { _ = f.Close() }, nil
+	return cliutil.GetOutput(outputFile)
 }
 
 func getMIBPaths() []string {
@@ -134,7 +88,7 @@ func getMIBPaths() []string {
 }
 
 func printError(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "error: "+format+"\n", args...)
+	cliutil.PrintError(format, args...)
 }
 
 // buildSource creates a gomib.Source from multiple directory paths.

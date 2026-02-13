@@ -168,6 +168,29 @@ func makeMismatch(oid, field, gomibVal, netsnmpVal string, gNode, nsNode *Normal
 	return m
 }
 
+// compareStringField compares a string field, tracking match/mismatch/missing.
+func (r *ComparisonResult) compareStringField(counts *CountPair, oid, field, gVal, nsVal string, eq func(string, string) bool, gNode, nsNode *NormalizedNode) {
+	if eq(gVal, nsVal) {
+		counts.Match++
+	} else if gVal != "" {
+		counts.Mismatch++
+		r.Mismatches = append(r.Mismatches, makeMismatch(oid, field, gVal, nsVal, gNode, nsNode))
+	} else {
+		counts.Missing++
+		r.Mismatches = append(r.Mismatches, makeMismatch(oid, field, "", nsVal, gNode, nsNode))
+	}
+}
+
+// compareCollectionField compares a collection field, tracking match/mismatch.
+func (r *ComparisonResult) compareCollectionField(counts *CountPair, oid, field, gFmt, nsFmt string, equal bool, gNode, nsNode *NormalizedNode) {
+	if equal {
+		counts.Match++
+	} else {
+		counts.Mismatch++
+		r.Mismatches = append(r.Mismatches, makeMismatch(oid, field, gFmt, nsFmt, gNode, nsNode))
+	}
+}
+
 // compareNodes performs a full comparison between net-snmp and gomib nodes.
 func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 	result := &ComparisonResult{
@@ -182,6 +205,8 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 	for oid := range gomib {
 		allOIDs[oid] = true
 	}
+
+	eq := func(a, b string) bool { return a == b }
 
 	for oid := range allOIDs {
 		nsNode := netsnmp[oid]
@@ -198,133 +223,54 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 
 		result.MatchedNodes++
 
+		// String fields: match / mismatch / missing
 		if nsNode.Type != "" && nsNode.Type != "OTHER" && nsNode.Type != "UNKNOWN" {
-			if typesEquivalent(gNode.Type, nsNode.Type) {
-				result.Summary.Type.Match++
-			} else if gNode.Type != "" {
-				result.Summary.Type.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "type", gNode.Type, nsNode.Type, gNode, nsNode))
-			} else {
-				result.Summary.Type.Missing++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "type", "", nsNode.Type, gNode, nsNode))
-			}
+			result.compareStringField(&result.Summary.Type, oid, "type", gNode.Type, nsNode.Type, typesEquivalent, gNode, nsNode)
 		}
-
 		if nsNode.Access != "" {
-			if gNode.Access == nsNode.Access {
-				result.Summary.Access.Match++
-			} else if gNode.Access != "" {
-				result.Summary.Access.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "access", gNode.Access, nsNode.Access, gNode, nsNode))
-			} else {
-				result.Summary.Access.Missing++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "access", "", nsNode.Access, gNode, nsNode))
-			}
+			result.compareStringField(&result.Summary.Access, oid, "access", gNode.Access, nsNode.Access, eq, gNode, nsNode)
 		}
-
 		if nsNode.Status != "" {
-			if gNode.Status == nsNode.Status {
-				result.Summary.Status.Match++
-			} else if gNode.Status != "" {
-				result.Summary.Status.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "status", gNode.Status, nsNode.Status, gNode, nsNode))
-			} else {
-				result.Summary.Status.Missing++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "status", "", nsNode.Status, gNode, nsNode))
-			}
+			result.compareStringField(&result.Summary.Status, oid, "status", gNode.Status, nsNode.Status, eq, gNode, nsNode)
 		}
-
-		if len(nsNode.EnumValues) > 0 {
-			if enumsEqual(nsNode.EnumValues, gNode.EnumValues) {
-				result.Summary.Enums.Match++
-			} else {
-				result.Summary.Enums.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "enums", formatEnums(gNode.EnumValues), formatEnums(nsNode.EnumValues), gNode, nsNode))
-			}
-		}
-
-		if len(nsNode.Indexes) > 0 {
-			if indexesEqual(nsNode.Indexes, gNode.Indexes) {
-				result.Summary.Index.Match++
-			} else {
-				result.Summary.Index.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "index", indexString(gNode.Indexes), indexString(nsNode.Indexes), gNode, nsNode))
-			}
-		}
-
 		if nsNode.Hint != "" {
-			if hintsEquivalent(gNode.Hint, nsNode.Hint) {
-				result.Summary.Hint.Match++
-			} else if gNode.Hint != "" {
-				result.Summary.Hint.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "hint", gNode.Hint, nsNode.Hint, gNode, nsNode))
-			} else {
-				result.Summary.Hint.Missing++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "hint", "", nsNode.Hint, gNode, nsNode))
-			}
+			result.compareStringField(&result.Summary.Hint, oid, "hint", gNode.Hint, nsNode.Hint, hintsEquivalent, gNode, nsNode)
 		}
-
 		if nsNode.TCName != "" {
-			if gNode.TCName == nsNode.TCName {
-				result.Summary.TCName.Match++
-			} else if gNode.TCName != "" {
-				result.Summary.TCName.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "tc_name", gNode.TCName, nsNode.TCName, gNode, nsNode))
-			} else {
-				result.Summary.TCName.Missing++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "tc_name", "", nsNode.TCName, gNode, nsNode))
-			}
+			result.compareStringField(&result.Summary.TCName, oid, "tc_name", gNode.TCName, nsNode.TCName, eq, gNode, nsNode)
 		}
-
 		if nsNode.Units != "" {
-			if gNode.Units == nsNode.Units {
-				result.Summary.Units.Match++
-			} else if gNode.Units != "" {
-				result.Summary.Units.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "units", gNode.Units, nsNode.Units, gNode, nsNode))
-			} else {
-				result.Summary.Units.Missing++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "units", "", nsNode.Units, gNode, nsNode))
-			}
+			result.compareStringField(&result.Summary.Units, oid, "units", gNode.Units, nsNode.Units, eq, gNode, nsNode)
 		}
-
-		if len(nsNode.Ranges) > 0 {
-			if rangesEqual(nsNode.Ranges, gNode.Ranges) {
-				result.Summary.Ranges.Match++
-			} else {
-				result.Summary.Ranges.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "ranges", rangesString(gNode.Ranges), rangesString(nsNode.Ranges), gNode, nsNode))
-			}
-		}
-
 		if nsNode.DefaultValue != "" {
-			if defaultValuesEquivalent(gNode.DefaultValue, nsNode.DefaultValue) {
-				result.Summary.DefaultValue.Match++
-			} else if gNode.DefaultValue != "" {
-				result.Summary.DefaultValue.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "defval", gNode.DefaultValue, nsNode.DefaultValue, gNode, nsNode))
-			} else {
-				result.Summary.DefaultValue.Missing++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "defval", "", nsNode.DefaultValue, gNode, nsNode))
-			}
+			result.compareStringField(&result.Summary.DefaultValue, oid, "defval", gNode.DefaultValue, nsNode.DefaultValue, defaultValuesEquivalent, gNode, nsNode)
 		}
 
+		// Collection fields: match / mismatch
+		if len(nsNode.EnumValues) > 0 {
+			result.compareCollectionField(&result.Summary.Enums, oid, "enums",
+				formatEnums(gNode.EnumValues), formatEnums(nsNode.EnumValues),
+				enumsEqual(nsNode.EnumValues, gNode.EnumValues), gNode, nsNode)
+		}
+		if len(nsNode.Indexes) > 0 {
+			result.compareCollectionField(&result.Summary.Index, oid, "index",
+				indexString(gNode.Indexes), indexString(nsNode.Indexes),
+				indexesEqual(nsNode.Indexes, gNode.Indexes), gNode, nsNode)
+		}
+		if len(nsNode.Ranges) > 0 {
+			result.compareCollectionField(&result.Summary.Ranges, oid, "ranges",
+				rangesString(gNode.Ranges), rangesString(nsNode.Ranges),
+				rangesEqual(nsNode.Ranges, gNode.Ranges), gNode, nsNode)
+		}
 		if len(nsNode.BitValues) > 0 {
-			if enumsEqual(nsNode.BitValues, gNode.BitValues) {
-				result.Summary.Bits.Match++
-			} else {
-				result.Summary.Bits.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "bits", bitsString(gNode.BitValues), bitsString(nsNode.BitValues), gNode, nsNode))
-			}
+			result.compareCollectionField(&result.Summary.Bits, oid, "bits",
+				bitsString(gNode.BitValues), bitsString(nsNode.BitValues),
+				enumsEqual(nsNode.BitValues, gNode.BitValues), gNode, nsNode)
 		}
-
 		if len(nsNode.Varbinds) > 0 {
-			if varbindsEqual(nsNode.Varbinds, gNode.Varbinds) {
-				result.Summary.Varbinds.Match++
-			} else {
-				result.Summary.Varbinds.Mismatch++
-				result.Mismatches = append(result.Mismatches, makeMismatch(oid, "varbinds", varbindsString(gNode.Varbinds), varbindsString(nsNode.Varbinds), gNode, nsNode))
-			}
+			result.compareCollectionField(&result.Summary.Varbinds, oid, "varbinds",
+				varbindsString(gNode.Varbinds), varbindsString(nsNode.Varbinds),
+				varbindsEqual(nsNode.Varbinds, gNode.Varbinds), gNode, nsNode)
 		}
 	}
 

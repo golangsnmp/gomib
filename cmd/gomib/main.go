@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 )
 
 const usage = `gomib - MIB parser and query tool
@@ -172,5 +173,5 @@ func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (gomib.Mib
 }
 
 func printError(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "error: "+format+"\n", args...)
+	cliutil.PrintError(format, args...)
 }
