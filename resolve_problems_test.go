@@ -777,18 +777,15 @@ func TestProblemDefvalLargeHex(t *testing.T) {
 	testutil.NotNil(t, obj, "FindObject(problemDefvalLargeHex)")
 
 	dv := obj.DefaultValue()
-	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalLargeHex")
+	testutil.True(t, !dv.IsZero(), "DefaultValue() for problemDefvalLargeHex")
+	testutil.Equal(t, mib.DefValKindBytes, dv.Kind(), "large hex defval kind")
 
 	got := dv.String()
-	// gomib: "0x00000000000000000000000000000000" (16 bytes > 8, uses hex format)
-	// net-snmp: "0" (truncates all-zero hex)
-	if !defvalEquivalent(got, "0") {
-		// Not equivalent to net-snmp's "0" - that's OK if it's our hex representation
-		if dv.Kind() != mib.DefValKindBytes {
-			t.Errorf("large hex defval kind: got %v, want DefValKindBytes", dv.Kind())
-		}
-	}
-	t.Logf("large hex defval: %q (kind=%v)", got, dv.Kind())
+	// 16 bytes > 8, so DefVal.String() uses hex format instead of decimal
+	testutil.Equal(t, "0x00000000000000000000000000000000", got, "large hex defval string")
+
+	// Verify equivalence with net-snmp's representation ("0" for all-zero hex)
+	testutil.True(t, defvalEquivalent(got, "0"), "large hex defval should be equivalent to net-snmp's \"0\"")
 }
 
 // TestProblemDefvalBinary verifies binary string DEFVAL parsing.
