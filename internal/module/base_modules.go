@@ -141,8 +141,8 @@ func CreateBaseModules() []*Module {
 		createSNMPv2SMI(),
 		createSNMPv2TC(),
 		createSNMPv2CONF(),
-		createRFC1155SMI(),
-		createRFC1065SMI(),
+		createSMIv1Base("RFC1155-SMI"),
+		createSMIv1Base("RFC1065-SMI"),
 		createRFC1212(),
 		createRFC1215(),
 	}
@@ -178,18 +178,8 @@ func createSNMPv2CONF() *Module {
 	return module
 }
 
-func createRFC1155SMI() *Module {
-	module := NewModule("RFC1155-SMI", types.Synthetic)
-	module.Language = LanguageSMIv1
-
-	module.Definitions = append(module.Definitions, createSMIv1TypeDefinitions()...)
-	module.Definitions = append(module.Definitions, createSMIv1OidDefinitions()...)
-
-	return module
-}
-
-func createRFC1065SMI() *Module {
-	module := NewModule("RFC1065-SMI", types.Synthetic)
+func createSMIv1Base(name string) *Module {
+	module := NewModule(name, types.Synthetic)
 	module.Language = LanguageSMIv1
 
 	module.Definitions = append(module.Definitions, createSMIv1TypeDefinitions()...)
@@ -253,13 +243,15 @@ func makeOidValue(name string, components []OidComponent) Definition {
 	}
 }
 
-func makeTypeDef(name string, syntax TypeSyntax) Definition {
+func basePtr(b BaseType) *BaseType { return &b }
+
+func makeTypeDef(name string, syntax TypeSyntax, base *BaseType, status Status) Definition {
 	return &TypeDef{
 		Name:                name,
 		Syntax:              syntax,
-		BaseType:            nil,
+		BaseType:            base,
 		DisplayHint:         "",
-		Status:              StatusCurrent,
+		Status:              status,
 		Description:         "",
 		Reference:           "",
 		IsTextualConvention: false,
@@ -267,69 +259,13 @@ func makeTypeDef(name string, syntax TypeSyntax) Definition {
 	}
 }
 
-func makeTypeDefWithBase(name string, syntax TypeSyntax, base BaseType) Definition {
-	return &TypeDef{
-		Name:                name,
-		Syntax:              syntax,
-		BaseType:            &base,
-		DisplayHint:         "",
-		Status:              StatusCurrent,
-		Description:         "",
-		Reference:           "",
-		IsTextualConvention: false,
-		Span:                types.Synthetic,
-	}
-}
-
-func makeTypeDefObsolete(name string, syntax TypeSyntax) Definition {
-	return &TypeDef{
-		Name:                name,
-		Syntax:              syntax,
-		BaseType:            nil,
-		DisplayHint:         "",
-		Status:              StatusObsolete,
-		Description:         "",
-		Reference:           "",
-		IsTextualConvention: false,
-		Span:                types.Synthetic,
-	}
-}
-
-func makeTC(name, displayHint string, syntax TypeSyntax) Definition {
+func makeTC(name, displayHint string, syntax TypeSyntax, status Status) Definition {
 	return &TypeDef{
 		Name:                name,
 		Syntax:              syntax,
 		BaseType:            nil,
 		DisplayHint:         displayHint,
-		Status:              StatusCurrent,
-		Description:         "",
-		Reference:           "",
-		IsTextualConvention: true,
-		Span:                types.Synthetic,
-	}
-}
-
-func makeTCObsolete(name, displayHint string, syntax TypeSyntax) Definition {
-	return &TypeDef{
-		Name:                name,
-		Syntax:              syntax,
-		BaseType:            nil,
-		DisplayHint:         displayHint,
-		Status:              StatusObsolete,
-		Description:         "",
-		Reference:           "",
-		IsTextualConvention: true,
-		Span:                types.Synthetic,
-	}
-}
-
-func makeTCWithEnum(name string, values []NamedNumber) Definition {
-	return &TypeDef{
-		Name:                name,
-		Syntax:              &TypeSyntaxIntegerEnum{NamedNumbers: values},
-		BaseType:            nil,
-		DisplayHint:         "",
-		Status:              StatusCurrent,
+		Status:              status,
 		Description:         "",
 		Reference:           "",
 		IsTextualConvention: true,
@@ -441,63 +377,43 @@ func createBaseTypeDefinitions() []Definition {
 
 	return []Definition{
 		// Integer32 ::= INTEGER (-2147483648..2147483647)
-		makeTypeDefWithBase("Integer32",
+		makeTypeDef("Integer32",
 			constrainedIntRange(
 				&RangeValueSigned{Value: int32Min},
 				&RangeValueSigned{Value: int32Max},
 			),
-			BaseInteger32,
+			basePtr(BaseInteger32), StatusCurrent,
 		),
 		// Counter32 ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("Counter32",
-			constrainedUintRange(uint32Max),
-			BaseCounter32,
-		),
+		makeTypeDef("Counter32", constrainedUintRange(uint32Max), basePtr(BaseCounter32), StatusCurrent),
 		// Counter64 ::= [APPLICATION 6] IMPLICIT INTEGER (0..18446744073709551615)
-		makeTypeDefWithBase("Counter64",
-			constrainedUintRange(uint64Max),
-			BaseCounter64,
-		),
+		makeTypeDef("Counter64", constrainedUintRange(uint64Max), basePtr(BaseCounter64), StatusCurrent),
 		// Gauge32 ::= [APPLICATION 2] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("Gauge32",
-			constrainedUintRange(uint32Max),
-			BaseGauge32,
-		),
+		makeTypeDef("Gauge32", constrainedUintRange(uint32Max), basePtr(BaseGauge32), StatusCurrent),
 		// Unsigned32 ::= [APPLICATION 2] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("Unsigned32",
-			constrainedUintRange(uint32Max),
-			BaseUnsigned32,
-		),
+		makeTypeDef("Unsigned32", constrainedUintRange(uint32Max), basePtr(BaseUnsigned32), StatusCurrent),
 		// TimeTicks ::= [APPLICATION 3] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("TimeTicks",
-			constrainedUintRange(uint32Max),
-			BaseTimeTicks,
-		),
+		makeTypeDef("TimeTicks", constrainedUintRange(uint32Max), basePtr(BaseTimeTicks), StatusCurrent),
 		// IpAddress ::= [APPLICATION 0] IMPLICIT OCTET STRING (SIZE (4))
-		makeTypeDefWithBase("IpAddress",
-			constrainedOctetFixed(4),
-			BaseIpAddress,
-		),
+		makeTypeDef("IpAddress", constrainedOctetFixed(4), basePtr(BaseIpAddress), StatusCurrent),
 		// Opaque ::= [APPLICATION 4] IMPLICIT OCTET STRING
-		makeTypeDefWithBase("Opaque",
-			&TypeSyntaxOctetString{},
-			BaseOpaque,
-		),
+		makeTypeDef("Opaque", &TypeSyntaxOctetString{}, basePtr(BaseOpaque), StatusCurrent),
 		// ObjectName ::= OBJECT IDENTIFIER
-		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}),
+		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}, nil, StatusCurrent),
 		// NotificationName ::= OBJECT IDENTIFIER
-		makeTypeDef("NotificationName", &TypeSyntaxObjectIdentifier{}),
+		makeTypeDef("NotificationName", &TypeSyntaxObjectIdentifier{}, nil, StatusCurrent),
 		// ExtUTCTime ::= OCTET STRING (SIZE (11 | 13)) - obsolete
-		makeTypeDefObsolete("ExtUTCTime",
+		makeTypeDef("ExtUTCTime",
 			constrainedOctetSize([]Range{
 				{Min: &RangeValueUnsigned{Value: 11}, Max: nil},
 				{Min: &RangeValueUnsigned{Value: 13}, Max: nil},
 			}),
+			nil, StatusObsolete,
 		),
 		// ObjectSyntax, SimpleSyntax, ApplicationSyntax - protocol meta-types
-		makeTypeDef("ObjectSyntax", &TypeSyntaxTypeRef{Name: "SimpleSyntax"}),
-		makeTypeDef("SimpleSyntax", &TypeSyntaxTypeRef{Name: "INTEGER"}),
-		makeTypeDef("ApplicationSyntax", &TypeSyntaxTypeRef{Name: "IpAddress"}),
+		makeTypeDef("ObjectSyntax", &TypeSyntaxTypeRef{Name: "SimpleSyntax"}, nil, StatusCurrent),
+		makeTypeDef("SimpleSyntax", &TypeSyntaxTypeRef{Name: "INTEGER"}, nil, StatusCurrent),
+		makeTypeDef("ApplicationSyntax", &TypeSyntaxTypeRef{Name: "IpAddress"}, nil, StatusCurrent),
 	}
 }
 
@@ -506,19 +422,19 @@ func createSMIv1TypeDefinitions() []Definition {
 
 	return []Definition{
 		// Counter ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("Counter", constrainedUintRange(uint32Max), BaseCounter32),
+		makeTypeDef("Counter", constrainedUintRange(uint32Max), basePtr(BaseCounter32), StatusCurrent),
 		// Gauge ::= [APPLICATION 2] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("Gauge", constrainedUintRange(uint32Max), BaseGauge32),
+		makeTypeDef("Gauge", constrainedUintRange(uint32Max), basePtr(BaseGauge32), StatusCurrent),
 		// IpAddress ::= [APPLICATION 0] IMPLICIT OCTET STRING (SIZE (4))
-		makeTypeDefWithBase("IpAddress", constrainedOctetFixed(4), BaseIpAddress),
+		makeTypeDef("IpAddress", constrainedOctetFixed(4), basePtr(BaseIpAddress), StatusCurrent),
 		// NetworkAddress ::= CHOICE { internet IpAddress }
-		makeTypeDefWithBase("NetworkAddress", &TypeSyntaxTypeRef{Name: "IpAddress"}, BaseIpAddress),
+		makeTypeDef("NetworkAddress", &TypeSyntaxTypeRef{Name: "IpAddress"}, basePtr(BaseIpAddress), StatusCurrent),
 		// TimeTicks ::= [APPLICATION 3] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("TimeTicks", constrainedUintRange(uint32Max), BaseTimeTicks),
+		makeTypeDef("TimeTicks", constrainedUintRange(uint32Max), basePtr(BaseTimeTicks), StatusCurrent),
 		// Opaque ::= [APPLICATION 4] IMPLICIT OCTET STRING
-		makeTypeDefWithBase("Opaque", &TypeSyntaxOctetString{}, BaseOpaque),
+		makeTypeDef("Opaque", &TypeSyntaxOctetString{}, basePtr(BaseOpaque), StatusCurrent),
 		// ObjectName ::= OBJECT IDENTIFIER
-		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}),
+		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}, nil, StatusCurrent),
 	}
 }
 
@@ -574,67 +490,67 @@ func createTCDefinitions() []Definition {
 
 	return []Definition{
 		// DisplayString ::= TEXTUAL-CONVENTION DISPLAY-HINT "255a" SYNTAX OCTET STRING (SIZE (0..255))
-		makeTC("DisplayString", "255a", constrainedOctetRange(0, 255)),
+		makeTC("DisplayString", "255a", constrainedOctetRange(0, 255), StatusCurrent),
 		// PhysAddress ::= TEXTUAL-CONVENTION DISPLAY-HINT "1x:" SYNTAX OCTET STRING
-		makeTC("PhysAddress", "1x:", &TypeSyntaxOctetString{}),
+		makeTC("PhysAddress", "1x:", &TypeSyntaxOctetString{}, StatusCurrent),
 		// MacAddress ::= TEXTUAL-CONVENTION DISPLAY-HINT "1x:" SYNTAX OCTET STRING (SIZE (6))
-		makeTC("MacAddress", "1x:", constrainedOctetFixed(6)),
+		makeTC("MacAddress", "1x:", constrainedOctetFixed(6), StatusCurrent),
 		// TruthValue ::= TEXTUAL-CONVENTION SYNTAX INTEGER { true(1), false(2) }
-		makeTCWithEnum("TruthValue", []NamedNumber{
+		makeTC("TruthValue", "", &TypeSyntaxIntegerEnum{NamedNumbers: []NamedNumber{
 			{Name: "true", Value: 1},
 			{Name: "false", Value: 2},
-		}),
+		}}, StatusCurrent),
 		// RowStatus ::= TEXTUAL-CONVENTION SYNTAX INTEGER { active(1), ... }
-		makeTCWithEnum("RowStatus", []NamedNumber{
+		makeTC("RowStatus", "", &TypeSyntaxIntegerEnum{NamedNumbers: []NamedNumber{
 			{Name: "active", Value: 1},
 			{Name: "notInService", Value: 2},
 			{Name: "notReady", Value: 3},
 			{Name: "createAndGo", Value: 4},
 			{Name: "createAndWait", Value: 5},
 			{Name: "destroy", Value: 6},
-		}),
+		}}, StatusCurrent),
 		// StorageType ::= TEXTUAL-CONVENTION SYNTAX INTEGER { other(1), ... }
-		makeTCWithEnum("StorageType", []NamedNumber{
+		makeTC("StorageType", "", &TypeSyntaxIntegerEnum{NamedNumbers: []NamedNumber{
 			{Name: "other", Value: 1},
 			{Name: "volatile", Value: 2},
 			{Name: "nonVolatile", Value: 3},
 			{Name: "permanent", Value: 4},
 			{Name: "readOnly", Value: 5},
-		}),
+		}}, StatusCurrent),
 		// TimeStamp ::= TEXTUAL-CONVENTION SYNTAX TimeTicks
-		makeTC("TimeStamp", "", &TypeSyntaxTypeRef{Name: "TimeTicks"}),
+		makeTC("TimeStamp", "", &TypeSyntaxTypeRef{Name: "TimeTicks"}, StatusCurrent),
 		// TimeInterval ::= TEXTUAL-CONVENTION SYNTAX INTEGER (0..2147483647)
 		makeTC("TimeInterval", "",
 			constrainedIntRange(
 				&RangeValueUnsigned{Value: 0},
 				&RangeValueSigned{Value: int32Max},
-			),
+			), StatusCurrent,
 		),
 		// DateAndTime ::= TEXTUAL-CONVENTION DISPLAY-HINT "2d-1d-1d,1d:1d:1d.1d,1a1d:1d" SYNTAX OCTET STRING (SIZE (8 | 11))
 		makeTC("DateAndTime", "2d-1d-1d,1d:1d:1d.1d,1a1d:1d",
 			constrainedOctetSize([]Range{
 				{Min: &RangeValueUnsigned{Value: 8}, Max: nil},
 				{Min: &RangeValueUnsigned{Value: 11}, Max: nil},
-			}),
+			}), StatusCurrent,
 		),
 		// TestAndIncr ::= TEXTUAL-CONVENTION SYNTAX INTEGER (0..2147483647)
 		makeTC("TestAndIncr", "",
 			constrainedIntRange(
 				&RangeValueUnsigned{Value: 0},
 				&RangeValueSigned{Value: int32Max},
-			),
+			), StatusCurrent,
 		),
 		// AutonomousType ::= TEXTUAL-CONVENTION SYNTAX OBJECT IDENTIFIER
-		makeTC("AutonomousType", "", &TypeSyntaxObjectIdentifier{}),
+		makeTC("AutonomousType", "", &TypeSyntaxObjectIdentifier{}, StatusCurrent),
 		// InstancePointer ::= TEXTUAL-CONVENTION (obsolete) SYNTAX OBJECT IDENTIFIER
-		makeTCObsolete("InstancePointer", "", &TypeSyntaxObjectIdentifier{}),
+		makeTC("InstancePointer", "", &TypeSyntaxObjectIdentifier{}, StatusObsolete),
 		// VariablePointer ::= TEXTUAL-CONVENTION SYNTAX OBJECT IDENTIFIER
-		makeTC("VariablePointer", "", &TypeSyntaxObjectIdentifier{}),
+		makeTC("VariablePointer", "", &TypeSyntaxObjectIdentifier{}, StatusCurrent),
 		// RowPointer ::= TEXTUAL-CONVENTION SYNTAX OBJECT IDENTIFIER
-		makeTC("RowPointer", "", &TypeSyntaxObjectIdentifier{}),
+		makeTC("RowPointer", "", &TypeSyntaxObjectIdentifier{}, StatusCurrent),
 		// TDomain ::= TEXTUAL-CONVENTION SYNTAX OBJECT IDENTIFIER
-		makeTC("TDomain", "", &TypeSyntaxObjectIdentifier{}),
+		makeTC("TDomain", "", &TypeSyntaxObjectIdentifier{}, StatusCurrent),
 		// TAddress ::= TEXTUAL-CONVENTION SYNTAX OCTET STRING (SIZE (1..255))
-		makeTC("TAddress", "", constrainedOctetRange(1, 255)),
+		makeTC("TAddress", "", constrainedOctetRange(1, 255), StatusCurrent),
 	}
 }
