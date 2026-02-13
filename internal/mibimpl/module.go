@@ -24,6 +24,15 @@ type Module struct {
 	compliances   []*Compliance
 	capabilities  []*Capabilities
 	nodes         []*Node
+
+	// Name-indexed maps for O(1) lookups, populated by Add*() methods.
+	objectsByName       map[string]*Object
+	typesByName         map[string]*Type
+	notificationsByName map[string]*Notification
+	groupsByName        map[string]*Group
+	compliancesByName   map[string]*Compliance
+	capabilitiesByName  map[string]*Capabilities
+	nodesByName         map[string]*Node
 }
 
 func (m *Module) Name() string {
@@ -35,7 +44,7 @@ func (m *Module) Language() mib.Language {
 }
 
 func (m *Module) OID() mib.Oid {
-	return m.oid
+	return slices.Clone(m.oid)
 }
 
 func (m *Module) Organization() string {
@@ -83,37 +92,29 @@ func (m *Module) Rows() []mib.Object {
 }
 
 func (m *Module) Node(name string) mib.Node {
-	for _, n := range m.nodes {
-		if n.name == name {
-			return n
-		}
+	if n := m.nodesByName[name]; n != nil {
+		return n
 	}
 	return nil
 }
 
 func (m *Module) Object(name string) mib.Object {
-	for _, obj := range m.objects {
-		if obj.name == name {
-			return obj
-		}
+	if obj := m.objectsByName[name]; obj != nil {
+		return obj
 	}
 	return nil
 }
 
 func (m *Module) Type(name string) mib.Type {
-	for _, t := range m.types {
-		if t.name == name {
-			return t
-		}
+	if t := m.typesByName[name]; t != nil {
+		return t
 	}
 	return nil
 }
 
 func (m *Module) Notification(name string) mib.Notification {
-	for _, n := range m.notifications {
-		if n.name == name {
-			return n
-		}
+	if n := m.notificationsByName[name]; n != nil {
+		return n
 	}
 	return nil
 }
@@ -123,10 +124,8 @@ func (m *Module) Groups() []mib.Group {
 }
 
 func (m *Module) Group(name string) mib.Group {
-	for _, g := range m.groups {
-		if g.name == name {
-			return g
-		}
+	if g := m.groupsByName[name]; g != nil {
+		return g
 	}
 	return nil
 }
@@ -136,10 +135,8 @@ func (m *Module) Compliances() []mib.Compliance {
 }
 
 func (m *Module) ComplianceByName(name string) mib.Compliance {
-	for _, c := range m.compliances {
-		if c.name == name {
-			return c
-		}
+	if c := m.compliancesByName[name]; c != nil {
+		return c
 	}
 	return nil
 }
@@ -149,10 +146,8 @@ func (m *Module) Capabilities() []mib.Capabilities {
 }
 
 func (m *Module) CapabilitiesByName(name string) mib.Capabilities {
-	for _, c := range m.capabilities {
-		if c.name == name {
-			return c
-		}
+	if c := m.capabilitiesByName[name]; c != nil {
+		return c
 	}
 	return nil
 }
@@ -183,78 +178,66 @@ func (m *Module) SetRevisions(revs []mib.Revision) {
 
 func (m *Module) AddObject(obj *Object) {
 	m.objects = append(m.objects, obj)
+	if m.objectsByName == nil {
+		m.objectsByName = make(map[string]*Object)
+	}
+	m.objectsByName[obj.name] = obj
 }
 
 func (m *Module) AddType(t *Type) {
 	m.types = append(m.types, t)
+	if m.typesByName == nil {
+		m.typesByName = make(map[string]*Type)
+	}
+	m.typesByName[t.name] = t
 }
 
 func (m *Module) AddNotification(n *Notification) {
 	m.notifications = append(m.notifications, n)
+	if m.notificationsByName == nil {
+		m.notificationsByName = make(map[string]*Notification)
+	}
+	m.notificationsByName[n.name] = n
 }
 
 func (m *Module) AddGroup(g *Group) {
 	m.groups = append(m.groups, g)
+	if m.groupsByName == nil {
+		m.groupsByName = make(map[string]*Group)
+	}
+	m.groupsByName[g.name] = g
 }
 
 func (m *Module) AddCompliance(c *Compliance) {
 	m.compliances = append(m.compliances, c)
+	if m.compliancesByName == nil {
+		m.compliancesByName = make(map[string]*Compliance)
+	}
+	m.compliancesByName[c.name] = c
 }
 
 func (m *Module) AddCapabilities(c *Capabilities) {
 	m.capabilities = append(m.capabilities, c)
+	if m.capabilitiesByName == nil {
+		m.capabilitiesByName = make(map[string]*Capabilities)
+	}
+	m.capabilitiesByName[c.name] = c
 }
 
 func (m *Module) AddNode(n *Node) {
 	m.nodes = append(m.nodes, n)
+	if m.nodesByName == nil {
+		m.nodesByName = make(map[string]*Node)
+	}
+	m.nodesByName[n.name] = n
 }
 
 // InternalObject looks up a concrete object by name.
 func (m *Module) InternalObject(name string) *Object {
-	for _, obj := range m.objects {
-		if obj.name == name {
-			return obj
-		}
-	}
-	return nil
+	return m.objectsByName[name]
 }
 
 // InternalType looks up a concrete type by name.
 func (m *Module) InternalType(name string) *Type {
-	for _, t := range m.types {
-		if t.name == name {
-			return t
-		}
-	}
-	return nil
-}
-
-// InternalObjects returns the concrete objects slice.
-func (m *Module) InternalObjects() []*Object {
-	return m.objects
-}
-
-// InternalTypes returns the concrete types slice.
-func (m *Module) InternalTypes() []*Type {
-	return m.types
-}
-
-// InternalNotifications returns the concrete notifications slice.
-func (m *Module) InternalNotifications() []*Notification {
-	return m.notifications
-}
-
-// InternalGroups returns the concrete groups slice.
-func (m *Module) InternalGroups() []*Group {
-	return m.groups
-}
-
-// InternalCompliances returns the concrete compliances slice.
-func (m *Module) InternalCompliances() []*Compliance {
-	return m.compliances
-}
-
-// InternalCapabilities returns the concrete capabilities slice.
-func (m *Module) InternalCapabilities() []*Capabilities {
-	return m.capabilities
+	return m.typesByName[name]
 }

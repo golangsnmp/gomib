@@ -21,6 +21,7 @@ type Node struct {
 	capabilities *Capabilities
 	parent       *Node
 	children     map[uint32]*Node
+	sortedCache  []*Node // lazily computed sorted children; nil = invalidated
 }
 
 func (n *Node) Arc() uint32 {
@@ -69,17 +70,13 @@ func (n *Node) OID() mib.Oid {
 	if n.parent == nil {
 		return nil
 	}
-	depth := 0
+	// Collect arcs bottom-up in a single traversal, then reverse.
+	var arcs mib.Oid
 	for nd := n; nd.parent != nil; nd = nd.parent {
-		depth++
+		arcs = append(arcs, nd.arc)
 	}
-	oid := make(mib.Oid, depth)
-	i := depth - 1
-	for nd := n; nd.parent != nil; nd = nd.parent {
-		oid[i] = nd.arc
-		i--
-	}
-	return oid
+	slices.Reverse(arcs)
+	return arcs
 }
 
 func (n *Node) Object() mib.Object {
@@ -145,6 +142,9 @@ func (n *Node) sortedChildren() []*Node {
 	if len(n.children) == 0 {
 		return nil
 	}
+	if n.sortedCache != nil {
+		return n.sortedCache
+	}
 	result := make([]*Node, 0, len(n.children))
 	for _, child := range n.children {
 		result = append(result, child)
@@ -152,6 +152,7 @@ func (n *Node) sortedChildren() []*Node {
 	slices.SortFunc(result, func(a, b *Node) int {
 		return cmp.Compare(a.arc, b.arc)
 	})
+	n.sortedCache = result
 	return result
 }
 
@@ -222,6 +223,7 @@ func (n *Node) GetOrCreateChild(arc uint32) *Node {
 		kind:   mib.KindInternal,
 	}
 	n.children[arc] = child
+	n.sortedCache = nil
 	return child
 }
 
