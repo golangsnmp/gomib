@@ -121,7 +121,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (Mib,
 				return
 			}
 
-			mod := module.Lower(ast, componentLogger(logger, "module"), cfg.diagConfig)
+			mod := module.Lower(ast, content, componentLogger(logger, "module"), cfg.diagConfig)
 			if mod != nil {
 				results <- parseResult{mod: mod}
 			} else if logEnabled(logger, slog.LevelDebug) {
@@ -227,7 +227,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			return nil
 		}
 
-		mod := module.Lower(ast, componentLogger(logger, "module"), cfg.diagConfig)
+		mod := module.Lower(ast, content, componentLogger(logger, "module"), cfg.diagConfig)
 		if mod == nil {
 			if logEnabled(logger, slog.LevelDebug) {
 				logger.LogAttrs(ctx, slog.LevelDebug, "lowering failed",

@@ -14,16 +14,36 @@ type LoweringContext struct {
 	Diagnostics []mib.Diagnostic
 	Language    Language
 	DiagConfig  mib.DiagnosticConfig
+	source      []byte // source text for span-to-line/column conversion
 	types.Logger
 }
 
 // newLoweringContext returns a LoweringContext. A nil logger disables logging.
-func newLoweringContext(logger *slog.Logger, diagConfig mib.DiagnosticConfig) *LoweringContext {
+func newLoweringContext(source []byte, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *LoweringContext {
 	return &LoweringContext{
 		Language:   LanguageUnknown,
 		DiagConfig: diagConfig,
+		source:     source,
 		Logger:     types.Logger{L: logger},
 	}
+}
+
+// spanToLineCol converts a byte offset to 1-based line and column numbers.
+// Returns (0, 0) if the source is nil or the offset is out of range.
+func spanToLineCol(source []byte, offset types.ByteOffset) (line, col int) {
+	if source == nil || int(offset) > len(source) {
+		return 0, 0
+	}
+	line = 1
+	lastNewline := -1
+	for i := 0; i < int(offset); i++ {
+		if source[i] == '\n' {
+			line++
+			lastNewline = i
+		}
+	}
+	col = int(offset) - lastNewline
+	return line, col
 }
 
 // emitDiagnostic records a diagnostic if the current config allows it.
@@ -46,20 +66,17 @@ func (ctx *LoweringContext) AddDiagnostic(d mib.Diagnostic) {
 	ctx.Diagnostics = append(ctx.Diagnostics, d)
 }
 
-// isSMIv2BaseModule reports whether name is an SMIv2 base module.
-func isSMIv2BaseModule(module string) bool {
-	switch module {
-	case "SNMPv2-SMI", "SNMPv2-TC", "SNMPv2-CONF", "SNMPv2-MIB":
-		return true
-	default:
-		return false
-	}
+// isSMIv2Import reports whether importing from this module indicates SMIv2.
+func isSMIv2Import(name string) bool {
+	bm, ok := BaseModuleFromName(name)
+	return ok && bm.IsSMIv2()
 }
 
 // Lower transforms an AST module into a normalized Module. The AST is not
-// needed after lowering. A nil logger disables logging.
-func Lower(astModule *ast.Module, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *Module {
-	ctx := newLoweringContext(logger, diagConfig)
+// needed after lowering. Source is the original source text used to compute
+// diagnostic line/column from byte offset spans. A nil logger disables logging.
+func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *Module {
+	ctx := newLoweringContext(source, logger, diagConfig)
 
 	module := NewModule(astModule.Name.Name, astModule.Span)
 
@@ -82,7 +99,7 @@ func Lower(astModule *ast.Module, logger *slog.Logger, diagConfig mib.Diagnostic
 		slog.String("module", module.Name),
 		slog.Int("definitions", len(module.Definitions)))
 
-	if module.Language == LanguageSMIv2 && !isSMIv2BaseModule(module.Name) {
+	if module.Language == LanguageSMIv2 && !IsBaseModule(module.Name) {
 		hasModuleIdentity := false
 		for _, def := range module.Definitions {
 			if mi, ok := def.(*ModuleIdentity); ok {
@@ -98,13 +115,14 @@ func Lower(astModule *ast.Module, logger *slog.Logger, diagConfig mib.Diagnostic
 	}
 
 	for _, d := range astModule.Diagnostics {
+		line, col := spanToLineCol(ctx.source, d.Span.Start)
 		module.Diagnostics = append(module.Diagnostics, mib.Diagnostic{
 			Severity: mib.Severity(d.Severity),
 			Code:     d.Code,
 			Message:  d.Message,
 			Module:   module.Name,
-			Line:     0,
-			Column:   0,
+			Line:     line,
+			Column:   col,
 		})
 	}
 
@@ -120,7 +138,7 @@ func lowerImports(importClauses []ast.ImportClause, ctx *LoweringContext) []Impo
 	for _, clause := range importClauses {
 		fromModule := clause.FromModule.Name
 
-		if isSMIv2BaseModule(fromModule) {
+		if isSMIv2Import(fromModule) {
 			ctx.Language = LanguageSMIv2
 		}
 
