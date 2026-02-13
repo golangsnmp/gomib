@@ -87,8 +87,10 @@ func convertLanguage(lang module.Language) mib.Language {
 		return mib.LanguageSMIv1
 	case module.LanguageSMIv2:
 		return mib.LanguageSMIv2
+	case module.LanguageSPPI:
+		return mib.LanguageSPPI
 	default:
-		return mib.LanguageSMIv1
+		return mib.LanguageUnknown
 	}
 }
 

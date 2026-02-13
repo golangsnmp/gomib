@@ -220,6 +220,30 @@ func TestParseIndex(t *testing.T) {
 	testutil.True(t, indexClause.Items[1].Implied, "second index should be IMPLIED")
 }
 
+func TestParseIndexBareOctetString(t *testing.T) {
+	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+		testEntry OBJECT-TYPE
+			SYNTAX TestEntry
+			MAX-ACCESS not-accessible
+			STATUS current
+			DESCRIPTION "Test entry"
+			INDEX { OCTET STRING, testOther }
+			::= { testTable 1 }
+		END`)
+	p := New(source, nil, mib.PermissiveConfig())
+	module := p.ParseModule()
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
+	testutil.True(t, def.Index != nil, "INDEX should be set")
+	indexClause, ok := def.Index.(*ast.IndexClauseIndex)
+	testutil.True(t, ok, "expected IndexClauseIndex, got %T", def.Index)
+	testutil.Len(t, indexClause.Items, 2, "OCTET STRING should be one index item, not two")
+	testutil.Equal(t, "OCTET STRING", indexClause.Items[0].Object.Name, "first index should be OCTET STRING")
+	testutil.Equal(t, "testOther", indexClause.Items[1].Object.Name, "second index should be testOther")
+}
+
 func TestParseErrorRecovery(t *testing.T) {
 	// This source has an error in the first definition but should parse the second
 	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN

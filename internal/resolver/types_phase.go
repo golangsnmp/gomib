@@ -62,7 +62,15 @@ func createUserTypes(ctx *ResolverContext) {
 				hasBase = true
 			}
 			if !hasBase {
+				// Type references (e.g., DisplayString) don't have an intrinsic
+				// base type. Default to Integer32 as a placeholder; the real base
+				// is inherited from the parent during resolveTypeBases.
 				base = mib.BaseInteger32
+				if ctx.TraceEnabled() {
+					ctx.Trace("type has no intrinsic base, defaulting to Integer32",
+						slog.String("type", td.Name),
+						slog.String("module", mod.Name))
+				}
 			}
 
 			typ := mibimpl.NewType(td.Name)
@@ -441,8 +449,10 @@ func convertBaseType(b module.BaseType) mib.BaseType {
 		return mib.BaseOpaque
 	case module.BaseBits:
 		return mib.BaseBits
+	case module.BaseSequence:
+		return mib.BaseSequence
 	default:
-		return mib.BaseInteger32
+		return mib.BaseUnknown
 	}
 }
 

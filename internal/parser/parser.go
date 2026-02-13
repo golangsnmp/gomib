@@ -1316,9 +1316,20 @@ func (p *Parser) parseIndexOrAugments() (ast.IndexClause, *ast.AugmentsClause, *
 			if err != nil {
 				return nil, nil, err
 			}
-			object := p.makeIdent(objToken)
 
-			span := types.NewSpan(itemStart, objToken.Span.End)
+			// Combine "OCTET" + "STRING" into a single "OCTET STRING" index item.
+			// Vendor MIBs sometimes use bare type names in INDEX clauses, and the
+			// lexer tokenizes OCTET and STRING as separate keywords.
+			var object ast.Ident
+			if objToken.Kind == lexer.TokKwOctet && p.check(lexer.TokKwString) {
+				strToken := p.advance()
+				span := types.NewSpan(objToken.Span.Start, strToken.Span.End)
+				object = ast.NewIdent("OCTET STRING", span)
+			} else {
+				object = p.makeIdent(objToken)
+			}
+
+			span := types.NewSpan(itemStart, object.Span.End)
 			indexes = append(indexes, ast.IndexItem{
 				Implied: implied,
 				Object:  object,

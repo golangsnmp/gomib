@@ -778,7 +778,7 @@ func convertAccess(a module.Access) mib.Access {
 func isBareTypeIndex(name string) bool {
 	switch name {
 	case "INTEGER", "Integer32", "Unsigned32", "Counter32", "Counter64", "Gauge32",
-		"IpAddress", "Opaque", "TimeTicks", "BITS", "OCTET", "STRING", "Counter", "Gauge", "NetworkAddress":
+		"IpAddress", "Opaque", "TimeTicks", "BITS", "OCTET STRING", "Counter", "Gauge", "NetworkAddress":
 		return true
 	default:
 		return false
