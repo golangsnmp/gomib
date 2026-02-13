@@ -46,6 +46,14 @@ func (g *Graph) FindCycles() [][]Symbol {
 			}
 			if len(scc) > 1 {
 				sccs = append(sccs, scc)
+			} else if len(scc) == 1 {
+				// Check for self-loop.
+				for _, dep := range g.edges[scc[0]] {
+					if dep == scc[0] {
+						sccs = append(sccs, scc)
+						break
+					}
+				}
 			}
 		}
 	}

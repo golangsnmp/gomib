@@ -18,9 +18,7 @@ func TestGraphBasic(t *testing.T) {
 
 	testutil.Equal(t, 2, len(g.Nodes()), "node count")
 	testutil.Len(t, g.Dependencies(a), 1, "a dependencies")
-	testutil.Len(t, g.Dependents(b), 1, "b dependents")
 	testutil.Equal(t, b, g.Dependencies(a)[0], "a depends on b")
-	testutil.Equal(t, a, g.Dependents(b)[0], "b is depended on by a")
 }
 
 func TestFindCyclesNoCycle(t *testing.T) {
@@ -134,4 +132,62 @@ func TestMarkResolved(t *testing.T) {
 
 	g.MarkResolved(a)
 	testutil.True(t, g.IsResolved(a), "now resolved")
+}
+
+func TestSelfLoop(t *testing.T) {
+	g := New()
+
+	a := Symbol{Module: "M", Name: "a"}
+	b := Symbol{Module: "M", Name: "b"}
+
+	g.AddNode(a, NodeKindType)
+	g.AddNode(b, NodeKindType)
+	g.AddEdge(a, a) // self-loop
+	g.AddEdge(b, a)
+
+	// FindCycles should detect the self-loop.
+	cycles := g.FindCycles()
+	testutil.Len(t, cycles, 1, "one cycle expected")
+	testutil.Len(t, cycles[0], 1, "self-loop is single node")
+	testutil.Equal(t, a, cycles[0][0], "self-loop node")
+
+	// TopologicalOrder should also report it as cyclic.
+	_, cyclic := g.TopologicalOrder()
+	testutil.Greater(t, len(cyclic), 0, "self-loop should be cyclic in topo sort")
+}
+
+func TestDuplicateEdges(t *testing.T) {
+	g := New()
+
+	a := Symbol{Module: "M", Name: "a"}
+	b := Symbol{Module: "M", Name: "b"}
+
+	g.AddNode(a, NodeKindType)
+	g.AddNode(b, NodeKindType)
+	g.AddEdge(a, b)
+	g.AddEdge(a, b) // duplicate
+	g.AddEdge(a, b) // duplicate
+
+	// Should only have one edge.
+	testutil.Len(t, g.Dependencies(a), 1, "duplicate edges deduplicated")
+
+	// Topo sort should work correctly.
+	order, cyclic := g.TopologicalOrder()
+	testutil.Len(t, cyclic, 0, "no cyclic nodes")
+	testutil.Len(t, order, 2, "all nodes in order")
+}
+
+func TestImplicitNodeKindUpdate(t *testing.T) {
+	g := New()
+
+	a := Symbol{Module: "M", Name: "a"}
+	b := Symbol{Module: "M", Name: "b"}
+
+	// b is implicitly created by AddEdge with zero-value kind.
+	g.AddEdge(a, b)
+	testutil.Equal(t, NodeKind(0), g.Node(b).Kind, "implicit node has zero kind")
+
+	// Explicit AddNode should update the kind.
+	g.AddNode(b, NodeKindOID)
+	testutil.Equal(t, NodeKindOID, g.Node(b).Kind, "kind updated after AddNode")
 }

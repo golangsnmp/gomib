@@ -17,11 +17,10 @@ const (
 	NodeKindNotification
 )
 
-// Graph is a dependency graph of symbols with forward and reverse edges.
+// Graph is a dependency graph of symbols with forward edges.
 type Graph struct {
-	nodes   map[Symbol]*Node
-	edges   map[Symbol][]Symbol
-	reverse map[Symbol][]Symbol
+	nodes map[Symbol]*Node
+	edges map[Symbol][]Symbol
 }
 
 // Node holds metadata about a symbol in the graph.
@@ -34,25 +33,27 @@ type Node struct {
 // New creates an empty dependency graph.
 func New() *Graph {
 	return &Graph{
-		nodes:   make(map[Symbol]*Node),
-		edges:   make(map[Symbol][]Symbol),
-		reverse: make(map[Symbol][]Symbol),
+		nodes: make(map[Symbol]*Node),
+		edges: make(map[Symbol][]Symbol),
 	}
 }
 
-// AddNode registers a symbol with its kind, if not already present.
+// AddNode registers a symbol with its kind. If the node was implicitly
+// created by AddEdge, the kind is updated.
 func (g *Graph) AddNode(sym Symbol, kind NodeKind) {
-	if _, exists := g.nodes[sym]; !exists {
+	if n, exists := g.nodes[sym]; exists {
+		n.Kind = kind
+	} else {
 		g.nodes[sym] = &Node{
-			Symbol:   sym,
-			Kind:     kind,
-			Resolved: false,
+			Symbol: sym,
+			Kind:   kind,
 		}
 	}
 }
 
 // AddEdge records that "from" depends on "to", meaning "to" must be
 // resolved before "from". Missing nodes are created implicitly.
+// Duplicate edges are ignored.
 func (g *Graph) AddEdge(from, to Symbol) {
 	if _, ok := g.nodes[from]; !ok {
 		g.nodes[from] = &Node{Symbol: from}
@@ -61,8 +62,12 @@ func (g *Graph) AddEdge(from, to Symbol) {
 		g.nodes[to] = &Node{Symbol: to}
 	}
 
+	for _, existing := range g.edges[from] {
+		if existing == to {
+			return
+		}
+	}
 	g.edges[from] = append(g.edges[from], to)
-	g.reverse[to] = append(g.reverse[to], from)
 }
 
 // Node returns the metadata for a symbol, or nil if not present.
@@ -73,11 +78,6 @@ func (g *Graph) Node(sym Symbol) *Node {
 // Dependencies returns the symbols that sym depends on (forward edges).
 func (g *Graph) Dependencies(sym Symbol) []Symbol {
 	return g.edges[sym]
-}
-
-// Dependents returns the symbols that depend on sym (reverse edges).
-func (g *Graph) Dependents(sym Symbol) []Symbol {
-	return g.reverse[sym]
 }
 
 // Nodes returns all registered nodes.
