@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"strings"
 
@@ -52,7 +51,7 @@ type MatchCount struct {
 }
 
 func cmdCompare(args []string) int {
-	fs := flag.NewFlagSet("compare", flag.ExitOnError)
+	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
 
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(), `Usage: gomib-libsmi compare [options] [MODULE...]
@@ -125,26 +124,9 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 
 	result.TotalLibsmi = len(libsmiNodes)
 
-	var sources []gomib.Source
-	for _, p := range mibPaths {
-		src, err := gomib.DirTree(p)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: skipping path %s: %v\n", p, err)
-			continue
-		}
-		sources = append(sources, src)
-	}
-
 	gomibNodes := make(map[string]gomibNode)
 
-	if len(sources) > 0 {
-		var source gomib.Source
-		if len(sources) == 1 {
-			source = sources[0]
-		} else {
-			source = gomib.Multi(sources...)
-		}
-
+	if source := buildSource(mibPaths); source != nil {
 		ctx := context.Background()
 		var m gomib.Mib
 		var err error
@@ -292,89 +274,25 @@ type gomibNode struct {
 }
 
 func kindToString(k gomib.Kind) string {
-	switch k {
-	case gomib.KindScalar:
-		return "scalar"
-	case gomib.KindTable:
-		return "table"
-	case gomib.KindRow:
-		return "row"
-	case gomib.KindColumn:
-		return "column"
-	case gomib.KindNotification:
-		return "notification"
-	case gomib.KindGroup:
-		return "group"
-	case gomib.KindCompliance:
-		return "compliance"
-	case gomib.KindCapabilities:
-		return "capabilities"
-	case gomib.KindNode:
-		return "node"
-	default:
+	if k == gomib.KindUnknown {
 		return ""
 	}
+	return k.String()
 }
 
 func statusToString(s gomib.Status) string {
-	switch s {
-	case gomib.StatusCurrent:
-		return "current"
-	case gomib.StatusDeprecated:
-		return "deprecated"
-	case gomib.StatusObsolete:
-		return "obsolete"
-	default:
-		return ""
-	}
+	return s.String()
 }
 
 func accessToString(a gomib.Access) string {
-	switch a {
-	case gomib.AccessNotAccessible:
-		return "not-accessible"
-	case gomib.AccessAccessibleForNotify:
-		return "accessible-for-notify"
-	case gomib.AccessReadOnly:
-		return "read-only"
-	case gomib.AccessReadWrite:
-		return "read-write"
-	case gomib.AccessReadCreate:
-		return "read-create"
-	case gomib.AccessWriteOnly:
-		return "write-only"
-	default:
-		return ""
-	}
+	return a.String()
 }
 
 func baseTypeToString(b gomib.BaseType) string {
-	switch b {
-	case gomib.BaseInteger32:
-		return "Integer32"
-	case gomib.BaseUnsigned32:
-		return "Unsigned32"
-	case gomib.BaseCounter32:
-		return "Counter32"
-	case gomib.BaseCounter64:
-		return "Counter64"
-	case gomib.BaseGauge32:
-		return "Gauge32"
-	case gomib.BaseTimeTicks:
-		return "TimeTicks"
-	case gomib.BaseIpAddress:
-		return "IpAddress"
-	case gomib.BaseOctetString:
-		return "OCTET STRING"
-	case gomib.BaseObjectIdentifier:
-		return "OBJECT IDENTIFIER"
-	case gomib.BaseBits:
-		return "BITS"
-	case gomib.BaseOpaque:
-		return "Opaque"
-	default:
+	if b == gomib.BaseUnknown {
 		return ""
 	}
+	return b.String()
 }
 
 func kindsEquivalent(a, b string) bool {

@@ -141,6 +141,10 @@ const (
 	AccessReadWrite           = mib.AccessReadWrite
 	AccessReadCreate          = mib.AccessReadCreate
 	AccessWriteOnly           = mib.AccessWriteOnly
+	AccessInstall             = mib.AccessInstall
+	AccessInstallNotify       = mib.AccessInstallNotify
+	AccessReportOnly          = mib.AccessReportOnly
+	AccessNotImplemented      = mib.AccessNotImplemented
 )
 
 const (
@@ -152,11 +156,14 @@ const (
 )
 
 const (
-	LanguageSMIv1 = mib.LanguageSMIv1
-	LanguageSMIv2 = mib.LanguageSMIv2
+	LanguageUnknown = mib.LanguageUnknown
+	LanguageSMIv1   = mib.LanguageSMIv1
+	LanguageSMIv2   = mib.LanguageSMIv2
+	LanguageSPPI    = mib.LanguageSPPI
 )
 
 const (
+	BaseUnknown          = mib.BaseUnknown
 	BaseInteger32        = mib.BaseInteger32
 	BaseUnsigned32       = mib.BaseUnsigned32
 	BaseCounter32        = mib.BaseCounter32
@@ -168,6 +175,7 @@ const (
 	BaseObjectIdentifier = mib.BaseObjectIdentifier
 	BaseBits             = mib.BaseBits
 	BaseOpaque           = mib.BaseOpaque
+	BaseSequence         = mib.BaseSequence
 )
 
 // Severity constants (libsmi-compatible, lower = more severe).

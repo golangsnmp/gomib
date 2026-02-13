@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/golangsnmp/gomib"
 )
 
 const usage = `gomib-libsmi - Compare gomib against libsmi (smilint)
@@ -133,4 +135,25 @@ func getMIBPaths() []string {
 
 func printError(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "error: "+format+"\n", args...)
+}
+
+// buildSource creates a gomib.Source from multiple directory paths.
+// Returns nil if no valid paths are found.
+func buildSource(mibPaths []string) gomib.Source {
+	var sources []gomib.Source
+	for _, p := range mibPaths {
+		src, err := gomib.DirTree(p)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: skipping path %s: %v\n", p, err)
+			continue
+		}
+		sources = append(sources, src)
+	}
+	if len(sources) == 0 {
+		return nil
+	}
+	if len(sources) == 1 {
+		return sources[0]
+	}
+	return gomib.Multi(sources...)
 }

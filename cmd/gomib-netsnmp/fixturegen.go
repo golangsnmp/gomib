@@ -12,7 +12,7 @@ import (
 )
 
 func cmdFixturegen(args []string) int {
-	fs := flag.NewFlagSet("fixturegen", flag.ExitOnError)
+	fs := flag.NewFlagSet("fixturegen", flag.ContinueOnError)
 
 	var outDir string
 	fs.StringVar(&outDir, "dir", "", "Output directory for fixture files (default: stdout for single module)")

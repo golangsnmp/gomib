@@ -50,7 +50,7 @@ type TableComparison struct {
 }
 
 func cmdTables(args []string) int {
-	fs := flag.NewFlagSet("tables", flag.ExitOnError)
+	fs := flag.NewFlagSet("tables", flag.ContinueOnError)
 	detailed := fs.Bool("detailed", false, "Show detailed per-table comparison")
 
 	fs.Usage = func() {

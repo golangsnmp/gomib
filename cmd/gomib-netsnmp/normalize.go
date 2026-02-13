@@ -278,84 +278,22 @@ func normalizeGomibType(t gomib.Type) string {
 	if t == nil {
 		return ""
 	}
-	base := t.EffectiveBase()
-	switch base {
-	case gomib.BaseInteger32:
-		return "Integer32"
-	case gomib.BaseUnsigned32:
-		return "Unsigned32"
-	case gomib.BaseCounter32:
-		return "Counter32"
-	case gomib.BaseCounter64:
-		return "Counter64"
-	case gomib.BaseGauge32:
-		return "Gauge32"
-	case gomib.BaseTimeTicks:
-		return "TimeTicks"
-	case gomib.BaseIpAddress:
-		return "IpAddress"
-	case gomib.BaseOctetString:
-		return "OCTET STRING"
-	case gomib.BaseObjectIdentifier:
-		return "OBJECT IDENTIFIER"
-	case gomib.BaseBits:
-		return "BITS"
-	case gomib.BaseOpaque:
-		return "Opaque"
-	default:
-		return base.String()
-	}
+	return t.EffectiveBase().String()
 }
 
 func normalizeGomibAccess(a gomib.Access) string {
-	switch a {
-	case gomib.AccessNotAccessible:
-		return "not-accessible"
-	case gomib.AccessAccessibleForNotify:
-		return "accessible-for-notify"
-	case gomib.AccessReadOnly:
-		return "read-only"
-	case gomib.AccessReadWrite:
-		return "read-write"
-	case gomib.AccessReadCreate:
-		return "read-create"
-	case gomib.AccessWriteOnly:
-		return "write-only"
-	default:
-		return ""
-	}
+	return a.String()
 }
 
 func normalizeGomibStatus(s gomib.Status) string {
-	switch s {
-	case gomib.StatusCurrent:
-		return "current"
-	case gomib.StatusDeprecated:
-		return "deprecated"
-	case gomib.StatusObsolete:
-		return "obsolete"
-	case gomib.StatusMandatory:
-		return "mandatory"
-	case gomib.StatusOptional:
-		return "optional"
-	default:
-		return ""
-	}
+	return s.String()
 }
 
 func normalizeGomibKind(k gomib.Kind) string {
-	switch k {
-	case gomib.KindTable:
-		return "table"
-	case gomib.KindRow:
-		return "row"
-	case gomib.KindColumn:
-		return "column"
-	case gomib.KindScalar:
-		return "scalar"
-	default:
-		return ""
+	if k.IsObjectType() {
+		return k.String()
 	}
+	return ""
 }
 
 func filterByModules(nodes map[string]*NormalizedNode, modules []string) map[string]*NormalizedNode {

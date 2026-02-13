@@ -38,7 +38,7 @@ type ValidationIssue struct {
 }
 
 func cmdValidate(args []string) int {
-	fs := flag.NewFlagSet("validate", flag.ExitOnError)
+	fs := flag.NewFlagSet("validate", flag.ContinueOnError)
 	testDir := fs.String("tests", "", "Directory containing test files (default: ./integration)")
 
 	fs.Usage = func() {

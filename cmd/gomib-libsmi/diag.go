@@ -48,7 +48,7 @@ type DiagSummary struct {
 }
 
 func cmdDiag(args []string) int {
-	fs := flag.NewFlagSet("diag", flag.ExitOnError)
+	fs := flag.NewFlagSet("diag", flag.ContinueOnError)
 	level := fs.Int("level", 3, "Error level threshold (0-6, lower=stricter)")
 
 	fs.Usage = func() {
@@ -146,24 +146,7 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 		result.Summary.BySeverity["libsmi:"+entry.SevName]++
 	}
 
-	var sources []gomib.Source
-	for _, p := range mibPaths {
-		src, err := gomib.DirTree(p)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: skipping path %s: %v\n", p, err)
-			continue
-		}
-		sources = append(sources, src)
-	}
-
-	if len(sources) > 0 {
-		var source gomib.Source
-		if len(sources) == 1 {
-			source = sources[0]
-		} else {
-			source = gomib.Multi(sources...)
-		}
-
+	if source := buildSource(mibPaths); source != nil {
 		cfg := mib.DiagnosticConfig{
 			Level:  mib.StrictnessLevel(level),
 			FailAt: mib.SeverityFatal,
@@ -265,24 +248,7 @@ func printDiagComparison(w io.Writer, result *DiagComparison) {
 }
 
 func severityToString(s gomib.Severity) string {
-	switch s {
-	case gomib.SeverityFatal:
-		return "fatal"
-	case gomib.SeveritySevere:
-		return "severe"
-	case gomib.SeverityError:
-		return "error"
-	case gomib.SeverityMinor:
-		return "minor"
-	case gomib.SeverityStyle:
-		return "style"
-	case gomib.SeverityWarning:
-		return "warning"
-	case gomib.SeverityInfo:
-		return "info"
-	default:
-		return "unknown"
-	}
+	return s.String()
 }
 
 func expandDirs(roots []string) []string {

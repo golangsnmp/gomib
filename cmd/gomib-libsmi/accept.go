@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -43,7 +42,7 @@ type ModuleAccept struct {
 }
 
 func cmdAccept(args []string) int {
-	fs := flag.NewFlagSet("accept", flag.ExitOnError)
+	fs := flag.NewFlagSet("accept", flag.ContinueOnError)
 	level := fs.Int("level", 2, "Error level threshold (0-6)")
 	showAll := fs.Bool("all", false, "Show all modules, not just discrepancies")
 	details := fs.Bool("details", false, "Show diagnostic messages for discrepancies")
@@ -106,22 +105,7 @@ func testAcceptance(modules []string, mibPaths []string, level int, showAll bool
 		TotalModules: len(modules),
 	}
 
-	var sources []gomib.Source
-	for _, p := range mibPaths {
-		src, err := gomib.DirTree(p)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: skipping path %s: %v\n", p, err)
-			continue
-		}
-		sources = append(sources, src)
-	}
-
-	var gomibSource gomib.Source
-	if len(sources) == 1 {
-		gomibSource = sources[0]
-	} else if len(sources) > 1 {
-		gomibSource = gomib.Multi(sources...)
-	}
+	gomibSource := buildSource(mibPaths)
 
 	libsmiPath := BuildMIBPath(expandDirs(mibPaths))
 	InitLibsmi(libsmiPath, level)

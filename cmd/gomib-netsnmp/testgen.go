@@ -13,7 +13,7 @@ import (
 )
 
 func cmdTestgen(args []string) int {
-	fs := flag.NewFlagSet("testgen", flag.ExitOnError)
+	fs := flag.NewFlagSet("testgen", flag.ContinueOnError)
 	testType := fs.String("type", "tables", "Test type: tables, oids, enums, access")
 	varName := fs.String("var", "", "Variable name for generated slice (default: auto)")
 

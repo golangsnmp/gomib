@@ -62,7 +62,7 @@ type CountPair struct {
 }
 
 func cmdCompare(args []string) int {
-	fs := flag.NewFlagSet("compare", flag.ExitOnError)
+	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
 
 	var fieldFilter string
 	var exampleLimit int
