@@ -13,7 +13,8 @@ import (
 // Enable with: &slog.HandlerOptions{Level: slog.Level(-8)}
 const LevelTrace = slog.Level(-8)
 
-var ctx = context.Background()
+// noCtx is a background context used for slog calls that don't need cancellation.
+var noCtx = context.Background() //nolint:gochecknoglobals
 
 // Logger wraps slog.Logger with nil-safe convenience methods.
 type Logger struct {
@@ -22,13 +23,13 @@ type Logger struct {
 
 // Enabled reports whether logging is active at the given level.
 func (l *Logger) Enabled(level slog.Level) bool {
-	return l.L != nil && l.L.Enabled(ctx, level)
+	return l.L != nil && l.L.Enabled(noCtx, level)
 }
 
 // Log emits a structured log message at the given level. No-op if nil.
 func (l *Logger) Log(level slog.Level, msg string, attrs ...slog.Attr) {
-	if l.L != nil && l.L.Enabled(ctx, level) {
-		l.L.LogAttrs(ctx, level, msg, attrs...)
+	if l.L != nil && l.L.Enabled(noCtx, level) {
+		l.L.LogAttrs(noCtx, level, msg, attrs...)
 	}
 }
 
@@ -57,21 +58,6 @@ var Synthetic = Span{Start: 0, End: 0}
 // NewSpan creates a Span from start and end byte offsets.
 func NewSpan(start, end ByteOffset) Span {
 	return Span{Start: start, End: end}
-}
-
-// Len returns the byte length of the span.
-func (s Span) Len() ByteOffset {
-	return s.End - s.Start
-}
-
-// IsEmpty reports whether the span covers zero bytes.
-func (s Span) IsEmpty() bool {
-	return s.Start == s.End
-}
-
-// IsSynthetic reports whether this is a compiler-generated span.
-func (s Span) IsSynthetic() bool {
-	return s.Start == 0 && s.End == 0
 }
 
 // Diagnostic is an internal diagnostic from the lexer or parser.

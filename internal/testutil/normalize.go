@@ -44,56 +44,17 @@ func NormalizeType(t mib.Type) string {
 
 // NormalizeAccess converts a gomib Access to the normalized string used in fixtures.
 func NormalizeAccess(a mib.Access) string {
-	switch a {
-	case mib.AccessNotAccessible:
-		return "not-accessible"
-	case mib.AccessAccessibleForNotify:
-		return "accessible-for-notify"
-	case mib.AccessReadOnly:
-		return "read-only"
-	case mib.AccessReadWrite:
-		return "read-write"
-	case mib.AccessReadCreate:
-		return "read-create"
-	case mib.AccessWriteOnly:
-		return "write-only"
-	default:
-		return ""
-	}
+	return a.String()
 }
 
 // NormalizeStatus converts a gomib Status to the normalized string used in fixtures.
 func NormalizeStatus(s mib.Status) string {
-	switch s {
-	case mib.StatusCurrent:
-		return "current"
-	case mib.StatusDeprecated:
-		return "deprecated"
-	case mib.StatusObsolete:
-		return "obsolete"
-	case mib.StatusMandatory:
-		return "mandatory"
-	case mib.StatusOptional:
-		return "optional"
-	default:
-		return ""
-	}
+	return s.String()
 }
 
 // NormalizeKind converts a gomib Kind to the normalized string used in fixtures.
 func NormalizeKind(k mib.Kind) string {
-	switch k {
-	case mib.KindTable:
-		return "table"
-	case mib.KindRow:
-		return "row"
-	case mib.KindColumn:
-		return "column"
-	case mib.KindScalar:
-		return "scalar"
-	default:
-		return ""
-	}
+	return k.String()
 }
 
 // NormalizeEnums converts gomib NamedValue slice to the map[int]string format used in fixtures.
