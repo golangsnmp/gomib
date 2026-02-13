@@ -147,6 +147,16 @@ const (
 	AccessNotImplemented      = mib.AccessNotImplemented
 )
 
+// AccessKeyword indicates which keyword was used in the source MIB.
+type AccessKeyword = mib.AccessKeyword
+
+const (
+	AccessKeywordAccess    = mib.AccessKeywordAccess
+	AccessKeywordMaxAccess = mib.AccessKeywordMaxAccess
+	AccessKeywordMinAccess = mib.AccessKeywordMinAccess
+	AccessKeywordPibAccess = mib.AccessKeywordPibAccess
+)
+
 const (
 	StatusCurrent    = mib.StatusCurrent
 	StatusDeprecated = mib.StatusDeprecated

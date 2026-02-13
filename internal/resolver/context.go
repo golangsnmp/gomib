@@ -439,7 +439,7 @@ func (c *ResolverContext) RecordUnresolvedOid(mod *module.Module, defName, compo
 		component:  component,
 		span:       span,
 	})
-	c.emitUnresolvedDiagnostic(mod, "oid-orphan", mib.SeverityWarning,
+	c.emitUnresolvedDiagnostic(mod, "oid-orphan", mib.SeverityError,
 		"unresolved OID: "+defName+" references unknown parent "+component)
 }
 
@@ -463,7 +463,7 @@ func (c *ResolverContext) RecordUnresolvedNotificationObject(mod *module.Module,
 		object:       object,
 		span:         span,
 	})
-	c.emitUnresolvedDiagnostic(mod, "objects-unresolved", mib.SeverityWarning,
+	c.emitUnresolvedDiagnostic(mod, "objects-unresolved", mib.SeverityError,
 		"unresolved OBJECTS: "+notification+" references unknown object "+object)
 }
 
