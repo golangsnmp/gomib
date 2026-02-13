@@ -155,10 +155,26 @@ func (c *ResolverContext) LookupNodeInModule(moduleName, name string) (*mibimpl.
 }
 
 // LookupNodeGlobal searches all modules for a node with the given name.
+// Iterates in module-list order for deterministic results.
 func (c *ResolverContext) LookupNodeGlobal(name string) (*mibimpl.Node, bool) {
-	for _, symbols := range c.ModuleSymbolToNode {
-		if node, ok := symbols[name]; ok {
-			return node, true
+	for _, mod := range c.Modules {
+		if symbols := c.ModuleSymbolToNode[mod]; symbols != nil {
+			if node, ok := symbols[name]; ok {
+				return node, true
+			}
+		}
+	}
+	return nil, false
+}
+
+// lookupTypeInModule looks up a type directly in a module's symbol table.
+func (c *ResolverContext) lookupTypeInModule(mod *module.Module, name string) (*mibimpl.Type, bool) {
+	if mod == nil {
+		return nil, false
+	}
+	if symbols := c.ModuleSymbolToType[mod]; symbols != nil {
+		if t, ok := symbols[name]; ok {
+			return t, true
 		}
 	}
 	return nil, false
@@ -168,11 +184,9 @@ func (c *ResolverContext) LookupNodeGlobal(name string) (*mibimpl.Node, bool) {
 // Beyond ASN.1 primitives, global search is only enabled in permissive mode.
 func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
 	// RFC-compliant: ASN.1 primitives are always available
-	if isASN1Primitive(name) && c.Snmpv2SMIModule != nil {
-		if symbols := c.ModuleSymbolToType[c.Snmpv2SMIModule]; symbols != nil {
-			if t, ok := symbols[name]; ok {
-				return t, true
-			}
+	if isASN1Primitive(name) {
+		if t, ok := c.lookupTypeInModule(c.Snmpv2SMIModule, name); ok {
+			return t, ok
 		}
 	}
 
@@ -189,26 +203,25 @@ func (c *ResolverContext) LookupType(name string) (*mibimpl.Type, bool) {
 	}
 
 	// Try RFC1155-SMI for SMIv1 types (Counter, Gauge, NetworkAddress)
-	if c.Rfc1155SMIModule != nil && isSmiV1GlobalType(name) {
-		if symbols := c.ModuleSymbolToType[c.Rfc1155SMIModule]; symbols != nil {
-			if t, ok := symbols[name]; ok {
-				return t, true
-			}
+	if isSmiV1GlobalType(name) {
+		if t, ok := c.lookupTypeInModule(c.Rfc1155SMIModule, name); ok {
+			return t, ok
 		}
 	}
 
 	// Try SNMPv2-TC for standard textual conventions (DisplayString, TruthValue, etc.)
-	if c.Snmpv2TCModule != nil && isSNMPv2TCType(name) {
-		if symbols := c.ModuleSymbolToType[c.Snmpv2TCModule]; symbols != nil {
-			if t, ok := symbols[name]; ok {
-				return t, true
-			}
+	if isSNMPv2TCType(name) {
+		if t, ok := c.lookupTypeInModule(c.Snmpv2TCModule, name); ok {
+			return t, ok
 		}
 	}
 
-	for _, symbols := range c.ModuleSymbolToType {
-		if t, ok := symbols[name]; ok {
-			return t, true
+	// Iterate in module-list order for deterministic results.
+	for _, mod := range c.Modules {
+		if symbols := c.ModuleSymbolToType[mod]; symbols != nil {
+			if t, ok := symbols[name]; ok {
+				return t, true
+			}
 		}
 	}
 	return nil, false
@@ -221,41 +234,35 @@ func (c *ResolverContext) LookupTypeForModule(mod *module.Module, name string) (
 		return t, true
 	}
 
-	if c.Snmpv2SMIModule != nil {
-		// RFC-compliant: ASN.1 primitives are always available
-		if isASN1Primitive(name) {
-			if symbols := c.ModuleSymbolToType[c.Snmpv2SMIModule]; symbols != nil {
-				if t, ok := symbols[name]; ok {
-					return t, true
-				}
-			}
+	// RFC-compliant: ASN.1 primitives are always available
+	if isASN1Primitive(name) {
+		if t, ok := c.lookupTypeInModule(c.Snmpv2SMIModule, name); ok {
+			return t, ok
 		}
+	}
 
-		// Permissive only: SMI global types without explicit import
-		if c.diagConfig.AllowBestGuessFallbacks() && isSmiGlobalType(name) {
-			if symbols := c.ModuleSymbolToType[c.Snmpv2SMIModule]; symbols != nil {
-				if t, ok := symbols[name]; ok {
-					return t, true
-				}
-			}
+	if !c.diagConfig.AllowBestGuessFallbacks() {
+		return nil, false
+	}
+
+	// Permissive only: SMI global types without explicit import
+	if isSmiGlobalType(name) {
+		if t, ok := c.lookupTypeInModule(c.Snmpv2SMIModule, name); ok {
+			return t, ok
 		}
 	}
 
 	// Permissive only: SMIv1 types (Counter, Gauge, NetworkAddress) from RFC1155-SMI
-	if c.Rfc1155SMIModule != nil && c.diagConfig.AllowBestGuessFallbacks() && isSmiV1GlobalType(name) {
-		if symbols := c.ModuleSymbolToType[c.Rfc1155SMIModule]; symbols != nil {
-			if t, ok := symbols[name]; ok {
-				return t, true
-			}
+	if isSmiV1GlobalType(name) {
+		if t, ok := c.lookupTypeInModule(c.Rfc1155SMIModule, name); ok {
+			return t, ok
 		}
 	}
 
 	// Permissive only: SNMPv2-TC textual conventions (DisplayString, TruthValue, etc.)
-	if c.Snmpv2TCModule != nil && c.diagConfig.AllowBestGuessFallbacks() && isSNMPv2TCType(name) {
-		if symbols := c.ModuleSymbolToType[c.Snmpv2TCModule]; symbols != nil {
-			if t, ok := symbols[name]; ok {
-				return t, true
-			}
+	if isSNMPv2TCType(name) {
+		if t, ok := c.lookupTypeInModule(c.Snmpv2TCModule, name); ok {
+			return t, ok
 		}
 	}
 
@@ -339,6 +346,11 @@ func (c *ResolverContext) RegisterModuleNodeSymbol(mod *module.Module, symbol st
 	if symbols == nil {
 		symbols = make(map[string]*mibimpl.Node)
 		c.ModuleSymbolToNode[mod] = symbols
+	}
+	if _, exists := symbols[symbol]; exists && c.TraceEnabled() {
+		c.Trace("overwriting node symbol registration",
+			slog.String("module", mod.Name),
+			slog.String("symbol", symbol))
 	}
 	symbols[symbol] = node
 }
@@ -490,6 +502,28 @@ func (c *ResolverContext) FinalizeUnresolved() {
 		c.Builder.AddUnresolved(mib.UnresolvedRef{
 			Kind:   "oid",
 			Symbol: u.component,
+			Module: modName,
+		})
+	}
+	for _, u := range c.unresolvedIndexes {
+		modName := ""
+		if u.module != nil {
+			modName = u.module.Name
+		}
+		c.Builder.AddUnresolved(mib.UnresolvedRef{
+			Kind:   "index",
+			Symbol: u.indexObject,
+			Module: modName,
+		})
+	}
+	for _, u := range c.unresolvedNotifObjects {
+		modName := ""
+		if u.module != nil {
+			modName = u.module.Name
+		}
+		c.Builder.AddUnresolved(mib.UnresolvedRef{
+			Kind:   "notification-object",
+			Symbol: u.object,
 			Module: modName,
 		})
 	}
