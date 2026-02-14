@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -60,9 +61,10 @@ func (o Oid) String() string {
 		return ""
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d", o[0])
+	b.WriteString(strconv.FormatUint(uint64(o[0]), 10))
 	for _, arc := range o[1:] {
-		fmt.Fprintf(&b, ".%d", arc)
+		b.WriteByte('.')
+		b.WriteString(strconv.FormatUint(uint64(arc), 10))
 	}
 	return b.String()
 }
@@ -78,23 +80,12 @@ func (o Oid) Parent() Oid {
 
 // Child returns a new OID with the given arc appended.
 func (o Oid) Child(arc uint32) Oid {
-	result := make(Oid, len(o)+1)
-	copy(result, o)
-	result[len(result)-1] = arc
-	return result
+	return append(slices.Clip(o), arc)
 }
 
 // HasPrefix returns true if this OID starts with the given prefix.
 func (o Oid) HasPrefix(prefix Oid) bool {
-	if len(prefix) > len(o) {
-		return false
-	}
-	for i, arc := range prefix {
-		if o[i] != arc {
-			return false
-		}
-	}
-	return true
+	return len(o) >= len(prefix) && slices.Equal(o[:len(prefix)], prefix)
 }
 
 // Equal returns true if the OIDs are identical.
