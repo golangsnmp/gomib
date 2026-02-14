@@ -134,7 +134,7 @@ func (m *Module) Compliances() []mib.Compliance {
 	return mapSlice(m.compliances, func(v *Compliance) mib.Compliance { return v })
 }
 
-func (m *Module) ComplianceByName(name string) mib.Compliance {
+func (m *Module) Compliance(name string) mib.Compliance {
 	if c := m.compliancesByName[name]; c != nil {
 		return c
 	}

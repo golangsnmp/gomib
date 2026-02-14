@@ -195,7 +195,7 @@ func tryImportForwarding(ctx *resolverContext, candidates []*module.Module, symb
 			}
 			forwarded = append(forwarded, forwardedSymbol{
 				symbol: sym.name,
-				source: sourceCandidates[0],
+				source: bestCandidate(sourceCandidates),
 			})
 		}
 		if allFound && len(forwarded) > 0 {
@@ -254,6 +254,21 @@ func findCandidateWithAllSymbols(ctx *resolverContext, candidates []*module.Modu
 	}
 
 	return nil, false
+}
+
+// bestCandidate picks the module with the newest LAST-UPDATED timestamp.
+// Falls back to the first candidate when no timestamps are present.
+func bestCandidate(candidates []*module.Module) *module.Module {
+	best := candidates[0]
+	bestTS := extractLastUpdated(best)
+	for _, c := range candidates[1:] {
+		ts := extractLastUpdated(c)
+		if ts > bestTS {
+			best = c
+			bestTS = ts
+		}
+	}
+	return best
 }
 
 func extractLastUpdated(mod *module.Module) string {

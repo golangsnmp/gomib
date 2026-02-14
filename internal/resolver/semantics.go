@@ -692,27 +692,40 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		}
 		return nil
 	case *module.DefValOidValue:
-		if len(v.Components) > 0 {
-			var name string
-			switch c := v.Components[0].(type) {
-			case *module.OidComponentName:
-				name = c.NameValue
+		if len(v.Components) == 0 {
+			return nil
+		}
+		var name string
+		switch c := v.Components[0].(type) {
+		case *module.OidComponentName:
+			name = c.NameValue
+		case *module.OidComponentNamedNumber:
+			name = c.NameValue
+		case *module.OidComponentQualifiedName:
+			name = c.NameValue
+		case *module.OidComponentQualifiedNamedNumber:
+			name = c.NameValue
+		}
+		if name == "" {
+			return nil
+		}
+		node, ok := ctx.LookupNodeForModule(mod, name)
+		if !ok {
+			return nil
+		}
+		oid := mib.Oid(node.OID())
+		for _, comp := range v.Components[1:] {
+			switch c := comp.(type) {
+			case *module.OidComponentNumber:
+				oid = append(oid, c.Value)
 			case *module.OidComponentNamedNumber:
-				name = c.NameValue
-			case *module.OidComponentQualifiedName:
-				name = c.NameValue
+				oid = append(oid, c.NumberValue)
 			case *module.OidComponentQualifiedNamedNumber:
-				name = c.NameValue
-			}
-			if name != "" {
-				if node, ok := ctx.LookupNodeForModule(mod, name); ok {
-					oid := mib.Oid(node.OID())
-					dv := mib.NewDefValOID(oid, name)
-					return &dv
-				}
+				oid = append(oid, c.NumberValue)
 			}
 		}
-		return nil
+		dv := mib.NewDefValOID(oid, name)
+		return &dv
 	default:
 		return nil
 	}

@@ -121,7 +121,7 @@ type Module interface {
 	Type(name string) Type
 	Notification(name string) Notification
 	Group(name string) Group
-	ComplianceByName(name string) Compliance
+	Compliance(name string) Compliance
 	CapabilitiesByName(name string) Capabilities
 }
 

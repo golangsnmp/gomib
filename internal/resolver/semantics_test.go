@@ -1032,11 +1032,12 @@ func TestConvertDefValOidValue(t *testing.T) {
 	child2.SetName("enterprises")
 	ctx.RegisterModuleNodeSymbol(mod, "enterprises", child2)
 
-	t.Run("resolves first component name", func(t *testing.T) {
+	t.Run("resolves name with trailing numeric arcs", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
 			Components: []module.OidComponent{
 				&module.OidComponentName{NameValue: "enterprises"},
 				&module.OidComponentNumber{Value: 42},
+				&module.OidComponentNumber{Value: 1},
 			},
 		}, mod, nil)
 		if dv == nil {
@@ -1044,20 +1045,53 @@ func TestConvertDefValOidValue(t *testing.T) {
 		}
 		if dv.Kind() != mib.DefValKindOID {
 			t.Errorf("kind = %v, want DefValKindOID", dv.Kind())
+		}
+		oid, ok := mib.DefValAs[mib.Oid](*dv)
+		if !ok {
+			t.Fatal("expected Oid value")
+		}
+		want := mib.Oid{1, 3, 42, 1}
+		if oid.String() != want.String() {
+			t.Errorf("oid = %v, want %v", oid, want)
 		}
 	})
 
-	t.Run("resolves first component named number", func(t *testing.T) {
+	t.Run("resolves single name component", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
 			Components: []module.OidComponent{
-				&module.OidComponentNamedNumber{NameValue: "enterprises", NumberValue: 1},
+				&module.OidComponentName{NameValue: "enterprises"},
 			},
 		}, mod, nil)
 		if dv == nil {
 			t.Fatal("expected non-nil")
 		}
-		if dv.Kind() != mib.DefValKindOID {
-			t.Errorf("kind = %v, want DefValKindOID", dv.Kind())
+		oid, ok := mib.DefValAs[mib.Oid](*dv)
+		if !ok {
+			t.Fatal("expected Oid value")
+		}
+		want := mib.Oid{1, 3}
+		if oid.String() != want.String() {
+			t.Errorf("oid = %v, want %v", oid, want)
+		}
+	})
+
+	t.Run("resolves named number with trailing arcs", func(t *testing.T) {
+		dv := convertDefVal(ctx, &module.DefValOidValue{
+			Components: []module.OidComponent{
+				&module.OidComponentNamedNumber{NameValue: "enterprises", NumberValue: 1},
+				&module.OidComponentNumber{Value: 5},
+			},
+		}, mod, nil)
+		if dv == nil {
+			t.Fatal("expected non-nil")
+		}
+		oid, ok := mib.DefValAs[mib.Oid](*dv)
+		if !ok {
+			t.Fatal("expected Oid value")
+		}
+		want := mib.Oid{1, 3, 5}
+		if oid.String() != want.String() {
+			t.Errorf("oid = %v, want %v", oid, want)
 		}
 	})
 

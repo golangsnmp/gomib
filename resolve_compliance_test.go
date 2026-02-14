@@ -50,15 +50,15 @@ func TestModuleComplianceLookup(t *testing.T) {
 		t.Fatal("SNMPv2-MIB not found")
 	}
 
-	c := snmpMIB.ComplianceByName("snmpBasicComplianceRev2")
-	testutil.NotNil(t, c, "Module.ComplianceByName(snmpBasicComplianceRev2) should not be nil")
+	c := snmpMIB.Compliance("snmpBasicComplianceRev2")
+	testutil.NotNil(t, c, "Module.Compliance(snmpBasicComplianceRev2) should not be nil")
 	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
 
-	testutil.Nil(t, snmpMIB.ComplianceByName("noSuchCompliance"),
+	testutil.Nil(t, snmpMIB.Compliance("noSuchCompliance"),
 		"non-existent compliance should return nil")
 }
 
-func TestFindComplianceByName(t *testing.T) {
+func TestFindCompliance(t *testing.T) {
 	m := loadTestMIB(t)
 
 	c := m.FindCompliance("snmpBasicComplianceRev2")
