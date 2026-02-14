@@ -151,8 +151,8 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 		resolved := mibimpl.NewObject(obj.Name)
 		resolved.SetNode(node)
 		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetAccess(convertAccess(obj.Access))
-		resolved.SetStatus(convertStatus(obj.Status))
+		resolved.SetAccess(obj.Access)
+		resolved.SetStatus(obj.Status)
 		resolved.SetDescription(obj.Description)
 		resolved.SetUnits(obj.Units)
 		resolved.SetReference(obj.Reference)
@@ -288,7 +288,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 		resolved := mibimpl.NewNotification(notif.Name)
 		resolved.SetNode(node)
 		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetStatus(convertStatus(notif.Status))
+		resolved.SetStatus(notif.Status)
 		resolved.SetDescription(notif.Description)
 		resolved.SetReference(notif.Reference)
 
@@ -365,7 +365,7 @@ func createResolvedObjectGroups(ctx *resolverContext) int {
 		resolved := mibimpl.NewGroup(grp.Name)
 		resolved.SetNode(node)
 		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetStatus(convertStatus(grp.Status))
+		resolved.SetStatus(grp.Status)
 		resolved.SetDescription(grp.Description)
 		resolved.SetReference(grp.Reference)
 
@@ -403,7 +403,7 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 		resolved := mibimpl.NewGroup(grp.Name)
 		resolved.SetNode(node)
 		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetStatus(convertStatus(grp.Status))
+		resolved.SetStatus(grp.Status)
 		resolved.SetDescription(grp.Description)
 		resolved.SetReference(grp.Reference)
 		resolved.SetIsNotificationGroup(true)
@@ -455,7 +455,7 @@ func createResolvedCompliances(ctx *resolverContext) {
 		resolved := mibimpl.NewCompliance(comp.Name)
 		resolved.SetNode(node)
 		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetStatus(convertStatus(comp.Status))
+		resolved.SetStatus(comp.Status)
 		resolved.SetDescription(comp.Description)
 		resolved.SetReference(comp.Reference)
 		resolved.SetModules(convertComplianceModules(comp.Modules))
@@ -499,8 +499,7 @@ func convertComplianceModules(modules []module.ComplianceModule) []mib.Complianc
 					Description: o.Description,
 				}
 				if o.MinAccess != nil {
-					a := convertAccess(*o.MinAccess)
-					objects[j].MinAccess = &a
+					objects[j].MinAccess = o.MinAccess
 				}
 			}
 			result[i].Objects = objects
@@ -526,7 +525,7 @@ func createResolvedCapabilities(ctx *resolverContext) {
 		resolved := mibimpl.NewCapabilities(cap.Name)
 		resolved.SetNode(node)
 		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetStatus(convertStatus(cap.Status))
+		resolved.SetStatus(cap.Status)
 		resolved.SetDescription(cap.Description)
 		resolved.SetReference(cap.Reference)
 		resolved.SetProductRelease(cap.ProductRelease)
@@ -561,8 +560,7 @@ func convertSupportsModules(modules []module.SupportsModule) []mib.CapabilitiesM
 					Description: v.Description,
 				}
 				if v.Access != nil {
-					a := convertAccess(*v.Access)
-					vars[j].Access = &a
+					vars[j].Access = v.Access
 				}
 			}
 			result[i].ObjectVariations = vars
@@ -575,8 +573,7 @@ func convertSupportsModules(modules []module.SupportsModule) []mib.CapabilitiesM
 					Description:  v.Description,
 				}
 				if v.Access != nil {
-					a := convertAccess(*v.Access)
-					vars[j].Access = &a
+					vars[j].Access = v.Access
 				}
 			}
 			result[i].NotificationVariations = vars
@@ -766,25 +763,6 @@ func binaryToBytes(s string) []byte {
 		result[i/8] = b
 	}
 	return result
-}
-
-func convertAccess(a module.Access) mib.Access {
-	switch a {
-	case module.AccessNotAccessible:
-		return mib.AccessNotAccessible
-	case module.AccessAccessibleForNotify:
-		return mib.AccessAccessibleForNotify
-	case module.AccessReadOnly:
-		return mib.AccessReadOnly
-	case module.AccessReadWrite:
-		return mib.AccessReadWrite
-	case module.AccessReadCreate:
-		return mib.AccessReadCreate
-	case module.AccessWriteOnly:
-		return mib.AccessWriteOnly
-	default:
-		return mib.AccessNotAccessible
-	}
 }
 
 // isBareTypeIndex returns true for primitive/global type names that can appear

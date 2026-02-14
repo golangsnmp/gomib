@@ -210,35 +210,6 @@ func TestBinaryToBytes(t *testing.T) {
 	}
 }
 
-func TestConvertAccess(t *testing.T) {
-	tests := []struct {
-		input module.Access
-		want  mib.Access
-	}{
-		{module.AccessNotAccessible, mib.AccessNotAccessible},
-		{module.AccessAccessibleForNotify, mib.AccessAccessibleForNotify},
-		{module.AccessReadOnly, mib.AccessReadOnly},
-		{module.AccessReadWrite, mib.AccessReadWrite},
-		{module.AccessReadCreate, mib.AccessReadCreate},
-		{module.AccessWriteOnly, mib.AccessWriteOnly},
-	}
-	for _, tt := range tests {
-		t.Run(tt.want.String(), func(t *testing.T) {
-			if got := convertAccess(tt.input); got != tt.want {
-				t.Errorf("convertAccess(%d) = %v, want %v", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestConvertAccessUnknown(t *testing.T) {
-	// Unknown access values should default to not-accessible
-	got := convertAccess(module.Access(999))
-	if got != mib.AccessNotAccessible {
-		t.Errorf("convertAccess(999) = %v, want %v", got, mib.AccessNotAccessible)
-	}
-}
-
 func TestConvertDefValInteger(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}
@@ -994,6 +965,29 @@ func TestConvertSupportsModules(t *testing.T) {
 		}
 		if vars[1].Access != nil {
 			t.Errorf("expected nil access for second variation")
+		}
+	})
+
+	t.Run("SPPI access values preserved in variations", func(t *testing.T) {
+		notImpl := module.AccessNotImplemented
+		input := []module.SupportsModule{
+			{
+				ModuleName: "TEST-MIB",
+				ObjectVariations: []module.ObjectVariation{
+					{Object: "testObj", Access: &notImpl, Description: "not implemented"},
+				},
+			},
+		}
+		result := convertSupportsModules(input)
+		vars := result[0].ObjectVariations
+		if len(vars) != 1 {
+			t.Fatalf("variations = %d, want 1", len(vars))
+		}
+		if vars[0].Access == nil {
+			t.Fatal("access is nil, want not-implemented")
+		}
+		if *vars[0].Access != mib.AccessNotImplemented {
+			t.Errorf("access = %v, want not-implemented (%v)", *vars[0].Access, mib.AccessNotImplemented)
 		}
 	})
 

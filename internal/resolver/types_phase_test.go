@@ -85,62 +85,6 @@ func TestSyntaxToBaseType(t *testing.T) {
 	}
 }
 
-func TestConvertBaseType(t *testing.T) {
-	tests := []struct {
-		name string
-		in   module.BaseType
-		want mib.BaseType
-	}{
-		{"Integer32", module.BaseInteger32, mib.BaseInteger32},
-		{"Unsigned32", module.BaseUnsigned32, mib.BaseUnsigned32},
-		{"Counter32", module.BaseCounter32, mib.BaseCounter32},
-		{"Counter64", module.BaseCounter64, mib.BaseCounter64},
-		{"Gauge32", module.BaseGauge32, mib.BaseGauge32},
-		{"TimeTicks", module.BaseTimeTicks, mib.BaseTimeTicks},
-		{"IpAddress", module.BaseIpAddress, mib.BaseIpAddress},
-		{"OctetString", module.BaseOctetString, mib.BaseOctetString},
-		{"ObjectIdentifier", module.BaseObjectIdentifier, mib.BaseObjectIdentifier},
-		{"Opaque", module.BaseOpaque, mib.BaseOpaque},
-		{"Bits", module.BaseBits, mib.BaseBits},
-		{"Sequence", module.BaseSequence, mib.BaseSequence},
-		{"Unknown", module.BaseUnknown, mib.BaseUnknown},
-		{"out of range", module.BaseType(99), mib.BaseUnknown},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := convertBaseType(tt.in)
-			if got != tt.want {
-				t.Errorf("convertBaseType(%v) = %v, want %v", tt.in, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestConvertStatus(t *testing.T) {
-	tests := []struct {
-		name string
-		in   module.Status
-		want mib.Status
-	}{
-		{"current", module.StatusCurrent, mib.StatusCurrent},
-		{"deprecated", module.StatusDeprecated, mib.StatusDeprecated},
-		{"obsolete", module.StatusObsolete, mib.StatusObsolete},
-		{"mandatory", module.StatusMandatory, mib.StatusMandatory},
-		{"optional", module.StatusOptional, mib.StatusOptional},
-		{"unknown defaults to current", module.Status(99), mib.StatusCurrent},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := convertStatus(tt.in)
-			if got != tt.want {
-				t.Errorf("convertStatus(%v) = %v, want %v", tt.in, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestGetTypeRefBaseName(t *testing.T) {
 	tests := []struct {
 		name   string

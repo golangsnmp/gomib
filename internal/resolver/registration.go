@@ -30,7 +30,7 @@ func registerModules(ctx *resolverContext) {
 
 	for _, mod := range ctx.Modules {
 		resolved := mibimpl.NewModule(mod.Name)
-		resolved.SetLanguage(convertLanguage(mod.Language))
+		resolved.SetLanguage(mod.Language)
 
 		for _, def := range mod.Definitions {
 			if mi, ok := def.(*module.ModuleIdentity); ok {
@@ -79,19 +79,6 @@ func registerModules(ctx *resolverContext) {
 				slog.String("name", mod.Name),
 				slog.Int("definitions", len(mod.Definitions)))
 		}
-	}
-}
-
-func convertLanguage(lang module.Language) mib.Language {
-	switch lang {
-	case module.LanguageSMIv1:
-		return mib.LanguageSMIv1
-	case module.LanguageSMIv2:
-		return mib.LanguageSMIv2
-	case module.LanguageSPPI:
-		return mib.LanguageSPPI
-	default:
-		return mib.LanguageUnknown
 	}
 }
 

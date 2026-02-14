@@ -59,7 +59,7 @@ func createUserTypes(ctx *resolverContext) {
 
 			base, hasBase := syntaxToBaseType(td.Syntax)
 			if td.BaseType != nil {
-				base = convertBaseType(*td.BaseType)
+				base = *td.BaseType
 				hasBase = true
 			}
 			if !hasBase {
@@ -78,7 +78,7 @@ func createUserTypes(ctx *resolverContext) {
 			typ.SetModule(resolved)
 			typ.SetBase(base)
 			typ.SetIsTC(td.IsTextualConvention)
-			typ.SetStatus(convertStatus(td.Status))
+			typ.SetStatus(td.Status)
 			typ.SetDisplayHint(td.DisplayHint)
 			typ.SetDescription(td.Description)
 
@@ -415,54 +415,6 @@ func syntaxToBaseType(syntax module.TypeSyntax) (mib.BaseType, bool) {
 		return syntaxToBaseType(s.Base)
 	default:
 		return 0, false
-	}
-}
-
-func convertBaseType(b module.BaseType) mib.BaseType {
-	switch b {
-	case module.BaseInteger32:
-		return mib.BaseInteger32
-	case module.BaseUnsigned32:
-		return mib.BaseUnsigned32
-	case module.BaseCounter32:
-		return mib.BaseCounter32
-	case module.BaseCounter64:
-		return mib.BaseCounter64
-	case module.BaseGauge32:
-		return mib.BaseGauge32
-	case module.BaseTimeTicks:
-		return mib.BaseTimeTicks
-	case module.BaseIpAddress:
-		return mib.BaseIpAddress
-	case module.BaseOctetString:
-		return mib.BaseOctetString
-	case module.BaseObjectIdentifier:
-		return mib.BaseObjectIdentifier
-	case module.BaseOpaque:
-		return mib.BaseOpaque
-	case module.BaseBits:
-		return mib.BaseBits
-	case module.BaseSequence:
-		return mib.BaseSequence
-	default:
-		return mib.BaseUnknown
-	}
-}
-
-func convertStatus(s module.Status) mib.Status {
-	switch s {
-	case module.StatusCurrent:
-		return mib.StatusCurrent
-	case module.StatusDeprecated:
-		return mib.StatusDeprecated
-	case module.StatusObsolete:
-		return mib.StatusObsolete
-	case module.StatusMandatory:
-		return mib.StatusMandatory
-	case module.StatusOptional:
-		return mib.StatusOptional
-	default:
-		return mib.StatusCurrent
 	}
 }
 

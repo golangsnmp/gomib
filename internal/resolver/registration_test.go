@@ -8,28 +8,6 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-func TestConvertLanguage(t *testing.T) {
-	tests := []struct {
-		name string
-		in   module.Language
-		want mib.Language
-	}{
-		{"SMIv1", module.LanguageSMIv1, mib.LanguageSMIv1},
-		{"SMIv2", module.LanguageSMIv2, mib.LanguageSMIv2},
-		{"SPPI", module.LanguageSPPI, mib.LanguageSPPI},
-		{"unknown", module.LanguageUnknown, mib.LanguageUnknown},
-		{"out of range", module.Language(99), mib.LanguageUnknown},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := convertLanguage(tt.in)
-			if got != tt.want {
-				t.Errorf("convertLanguage(%d) = %d, want %d", tt.in, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestConvertRevisions(t *testing.T) {
 	t.Run("nil input", func(t *testing.T) {
 		got := convertRevisions(nil)
