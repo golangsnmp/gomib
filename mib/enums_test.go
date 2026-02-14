@@ -141,28 +141,6 @@ func TestAccessString(t *testing.T) {
 	}
 }
 
-func TestAccessKeywordString(t *testing.T) {
-	tests := []struct {
-		kw   AccessKeyword
-		want string
-	}{
-		{AccessKeywordAccess, "ACCESS"},
-		{AccessKeywordMaxAccess, "MAX-ACCESS"},
-		{AccessKeywordMinAccess, "MIN-ACCESS"},
-		{AccessKeywordPibAccess, "PIB-ACCESS"},
-		{AccessKeyword(99), "AccessKeyword(99)"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
-			got := tt.kw.String()
-			if got != tt.want {
-				t.Errorf("String() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestStatusString(t *testing.T) {
 	tests := []struct {
 		status Status

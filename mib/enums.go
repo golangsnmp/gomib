@@ -175,32 +175,6 @@ func (a Access) String() string {
 	}
 }
 
-// AccessKeyword indicates which keyword was used in the source MIB.
-// Preserved for accurate MIB generation.
-type AccessKeyword int
-
-const (
-	AccessKeywordAccess    AccessKeyword = iota // SMIv1: ACCESS
-	AccessKeywordMaxAccess                      // SMIv2: MAX-ACCESS
-	AccessKeywordMinAccess                      // SMIv2: MIN-ACCESS (compliance)
-	AccessKeywordPibAccess                      // SPPI: PIB-ACCESS
-)
-
-func (k AccessKeyword) String() string {
-	switch k {
-	case AccessKeywordAccess:
-		return "ACCESS"
-	case AccessKeywordMaxAccess:
-		return "MAX-ACCESS"
-	case AccessKeywordMinAccess:
-		return "MIN-ACCESS"
-	case AccessKeywordPibAccess:
-		return "PIB-ACCESS"
-	default:
-		return fmt.Sprintf("AccessKeyword(%d)", k)
-	}
-}
-
 // Status represents the lifecycle state of a MIB definition.
 // Preserves SMIv1-specific values (mandatory, optional) without normalizing.
 type Status int

@@ -39,7 +39,7 @@ func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) mib.
 	return m
 }
 
-func unresolvedSymbols(m mib.Mib, module, kind string) map[string]bool {
+func unresolvedSymbols(m mib.Mib, module string, kind mib.UnresolvedKind) map[string]bool {
 	result := make(map[string]bool)
 	for _, u := range m.Unresolved() {
 		if u.Module == module && u.Kind == kind {
@@ -75,7 +75,7 @@ func TestTypeFallbackPermissiveOnly(t *testing.T) {
 
 	t.Run("strict", func(t *testing.T) {
 		m := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.StrictnessStrict)
-		unresolved := unresolvedSymbols(m, "PROBLEM-IMPORTS-MIB", "type")
+		unresolved := unresolvedSymbols(m, "PROBLEM-IMPORTS-MIB", mib.UnresolvedType)
 
 		for _, tt := range smiTypes {
 			t.Run(tt.object, func(t *testing.T) {
@@ -90,7 +90,7 @@ func TestTypeFallbackPermissiveOnly(t *testing.T) {
 
 	t.Run("normal", func(t *testing.T) {
 		m := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.StrictnessNormal)
-		unresolved := unresolvedSymbols(m, "PROBLEM-IMPORTS-MIB", "type")
+		unresolved := unresolvedSymbols(m, "PROBLEM-IMPORTS-MIB", mib.UnresolvedType)
 
 		for _, tt := range smiTypes {
 			t.Run(tt.object, func(t *testing.T) {
@@ -107,7 +107,7 @@ func TestTypeFallbackPermissiveOnly(t *testing.T) {
 
 	t.Run("permissive", func(t *testing.T) {
 		m := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.StrictnessPermissive)
-		unresolved := unresolvedSymbols(m, "PROBLEM-IMPORTS-MIB", "type")
+		unresolved := unresolvedSymbols(m, "PROBLEM-IMPORTS-MIB", mib.UnresolvedType)
 
 		for _, tt := range smiTypes {
 			t.Run(tt.object, func(t *testing.T) {
@@ -213,7 +213,7 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 		// Module aliases are disabled, so imports from SNMPv2-SMI-v1 and
 		// SNMPv2-TC-v1 fail. This cascades: enterprises is unresolved,
 		// so the entire OID chain fails, and objects are not created.
-		unresolvedImports := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", "import")
+		unresolvedImports := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", mib.UnresolvedImport)
 		testutil.True(t, unresolvedImports["enterprises"],
 			"enterprises should be unresolved (aliased module not found)")
 		testutil.True(t, unresolvedImports["Integer32"],
@@ -221,7 +221,7 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 		testutil.True(t, unresolvedImports["DisplayString"],
 			"DisplayString should be unresolved (aliased module not found)")
 
-		unresolvedOids := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", "oid")
+		unresolvedOids := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", mib.UnresolvedOID)
 		testutil.True(t, unresolvedOids["enterprises"],
 			"enterprises OID should be unresolved")
 
@@ -237,7 +237,7 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 		// Normal mode: AllowSafeFallbacks = true.
 		// Module alias table maps SNMPv2-SMI-v1 -> SNMPv2-SMI and
 		// SNMPv2-TC-v1 -> SNMPv2-TC. All imports resolve.
-		unresolvedImports := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", "import")
+		unresolvedImports := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", mib.UnresolvedImport)
 		testutil.Equal(t, 0, len(unresolvedImports),
 			"no imports should be unresolved with alias fallback")
 
@@ -259,7 +259,7 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 
 		// Permissive mode should behave the same as normal for module aliases
 		// (safe fallbacks are available at both levels).
-		unresolvedImports := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", "import")
+		unresolvedImports := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", mib.UnresolvedImport)
 		testutil.Equal(t, 0, len(unresolvedImports),
 			"no imports should be unresolved with alias fallback")
 
@@ -314,7 +314,7 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 
 	t.Run("strict", func(t *testing.T) {
 		m := load(t, mib.StrictnessStrict)
-		unresolvedOids := unresolvedSymbols(m, "MISSING-IMPORT-TEST-MIB", "oid")
+		unresolvedOids := unresolvedSymbols(m, "MISSING-IMPORT-TEST-MIB", mib.UnresolvedOID)
 
 		testutil.True(t, unresolvedOids["enterprises"],
 			"enterprises OID should be unresolved in strict mode")
@@ -324,7 +324,7 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 
 	t.Run("normal", func(t *testing.T) {
 		m := load(t, mib.StrictnessNormal)
-		unresolvedOids := unresolvedSymbols(m, "MISSING-IMPORT-TEST-MIB", "oid")
+		unresolvedOids := unresolvedSymbols(m, "MISSING-IMPORT-TEST-MIB", mib.UnresolvedOID)
 
 		// Normal mode has safe fallbacks but NOT best-guess fallbacks.
 		// Global OID root lookup requires best-guess (level >= 5).
@@ -336,7 +336,7 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 
 	t.Run("permissive", func(t *testing.T) {
 		m := load(t, mib.StrictnessPermissive)
-		unresolvedOids := unresolvedSymbols(m, "MISSING-IMPORT-TEST-MIB", "oid")
+		unresolvedOids := unresolvedSymbols(m, "MISSING-IMPORT-TEST-MIB", mib.UnresolvedOID)
 
 		testutil.Equal(t, 0, len(unresolvedOids),
 			"no OID should be unresolved in permissive mode")
@@ -428,7 +428,7 @@ func TestImportForwardingRequiresSafeFallbacks(t *testing.T) {
 		// In strict mode, forwarding is disabled. The relay module doesn't
 		// directly define ForwardedType or forwardedSourceRoot, so the
 		// imports should fail.
-		unresolved := unresolvedSymbols(m, "PROBLEM-FORWARDING-MIB", "import")
+		unresolved := unresolvedSymbols(m, "PROBLEM-FORWARDING-MIB", mib.UnresolvedImport)
 
 		// At minimum, the forwarded symbols should be unresolved.
 		// Check that at least one is unresolved (the exact set depends on
@@ -445,7 +445,7 @@ func TestImportForwardingRequiresSafeFallbacks(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
 		m := loadAtStrictness(t, "PROBLEM-FORWARDING-MIB", mib.StrictnessNormal)
 
-		unresolvedImports := unresolvedSymbols(m, "PROBLEM-FORWARDING-MIB", "import")
+		unresolvedImports := unresolvedSymbols(m, "PROBLEM-FORWARDING-MIB", mib.UnresolvedImport)
 		testutil.Equal(t, 0, len(unresolvedImports),
 			"normal mode should resolve all imports via forwarding")
 	})
@@ -488,7 +488,7 @@ func TestImportForwardingRelayOwnObjects(t *testing.T) {
 func TestPartialResolution(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.StrictnessStrict)
 
-	unresolvedImports := unresolvedSymbols(m, "PROBLEM-IMPORTS-MIB", "import")
+	unresolvedImports := unresolvedSymbols(m, "PROBLEM-IMPORTS-MIB", mib.UnresolvedImport)
 	testutil.False(t, unresolvedImports["Integer32"],
 		"Integer32 should resolve (directly imported from SNMPv2-SMI)")
 	testutil.False(t, unresolvedImports["enterprises"],

@@ -943,7 +943,7 @@ func TestProblemImportsAliasNormal(t *testing.T) {
 func TestProblemImportsAliasStrict(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-IMPORTS-ALIAS-MIB", mib.StrictnessStrict)
 
-	unresolved := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", "import")
+	unresolved := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", mib.UnresolvedImport)
 	if len(unresolved) == 0 {
 		t.Error("strict mode should have unresolved imports from aliased module names")
 	}

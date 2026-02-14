@@ -204,18 +204,37 @@ type NotificationVariation struct {
 	Description  string
 }
 
+// UnresolvedKind identifies the category of an unresolved reference.
+type UnresolvedKind int
+
+const (
+	UnresolvedImport             UnresolvedKind = iota // cross-module import
+	UnresolvedType                                     // type reference
+	UnresolvedOID                                      // OID component
+	UnresolvedIndex                                    // INDEX object reference
+	UnresolvedNotificationObject                       // OBJECTS entry in notification
+)
+
+func (k UnresolvedKind) String() string {
+	switch k {
+	case UnresolvedImport:
+		return "import"
+	case UnresolvedType:
+		return "type"
+	case UnresolvedOID:
+		return "oid"
+	case UnresolvedIndex:
+		return "index"
+	case UnresolvedNotificationObject:
+		return "notification-object"
+	default:
+		return "unknown"
+	}
+}
+
 // UnresolvedRef describes a symbol that could not be resolved.
 type UnresolvedRef struct {
-	Kind   string
+	Kind   UnresolvedKind
 	Symbol string
 	Module string
 }
-
-// UnresolvedRef Kind values.
-const (
-	UnresolvedImport             = "import"
-	UnresolvedType               = "type"
-	UnresolvedOID                = "oid"
-	UnresolvedIndex              = "index"
-	UnresolvedNotificationObject = "notification-object"
-)

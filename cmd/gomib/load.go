@@ -114,11 +114,11 @@ func cmdLoad(args []string) int {
 		objectCount := 0
 		for _, u := range unresolved {
 			switch u.Kind {
-			case "import":
+			case gomib.UnresolvedImport:
 				importCount++
-			case "type":
+			case gomib.UnresolvedType:
 				typeCount++
-			case "object", "oid", "index", "notification":
+			case gomib.UnresolvedOID, gomib.UnresolvedIndex, gomib.UnresolvedNotificationObject:
 				objectCount++
 			}
 		}

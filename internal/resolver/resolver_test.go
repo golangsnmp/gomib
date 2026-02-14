@@ -210,7 +210,7 @@ func TestResolveUnresolvedImportProducesDiagnostic(t *testing.T) {
 
 	found := false
 	for _, u := range unresolved {
-		if u.Kind == "import" && u.Symbol == "fakeObject" {
+		if u.Kind == mib.UnresolvedImport && u.Symbol == "fakeObject" {
 			found = true
 			break
 		}

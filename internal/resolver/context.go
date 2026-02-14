@@ -449,7 +449,7 @@ func (c *resolverContext) DropModules() {
 	c.ModuleDefNames = nil
 }
 
-func addUnresolved(b *mibimpl.Builder, kind string, symbol string, mod *module.Module) {
+func addUnresolved(b *mibimpl.Builder, kind mib.UnresolvedKind, symbol string, mod *module.Module) {
 	modName := ""
 	if mod != nil {
 		modName = mod.Name

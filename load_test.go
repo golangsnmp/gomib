@@ -447,7 +447,7 @@ func TestMissingImportFailsInStrictMode(t *testing.T) {
 	unresolved := mib.Unresolved()
 	var oidUnresolved int
 	for _, u := range unresolved {
-		if u.Kind == "oid" {
+		if u.Kind == UnresolvedOID {
 			oidUnresolved++
 		}
 	}
@@ -478,7 +478,7 @@ func TestMissingImportWorksInPermissiveMode(t *testing.T) {
 	unresolved := mib.Unresolved()
 	var oidUnresolved int
 	for _, u := range unresolved {
-		if u.Kind == "oid" && u.Module == "MISSING-IMPORT-TEST-MIB" {
+		if u.Kind == UnresolvedOID && u.Module == "MISSING-IMPORT-TEST-MIB" {
 			oidUnresolved++
 		}
 	}
@@ -509,7 +509,7 @@ func TestMissingImportFailsInNormalMode(t *testing.T) {
 	unresolved := mib.Unresolved()
 	var oidUnresolved int
 	for _, u := range unresolved {
-		if u.Kind == "oid" && u.Module == "MISSING-IMPORT-TEST-MIB" {
+		if u.Kind == UnresolvedOID && u.Module == "MISSING-IMPORT-TEST-MIB" {
 			oidUnresolved++
 		}
 	}

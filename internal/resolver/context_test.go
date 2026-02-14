@@ -804,18 +804,18 @@ func TestFinalizeUnresolved(t *testing.T) {
 	}
 
 	// Verify each kind is present.
-	kindCounts := map[string]int{}
+	kindCounts := map[mib.UnresolvedKind]int{}
 	for _, u := range unresolved {
 		kindCounts[u.Kind]++
 		if u.Module != "TEST-MIB" {
-			t.Errorf("unresolved ref kind=%q has module=%q, want TEST-MIB", u.Kind, u.Module)
+			t.Errorf("unresolved ref kind=%s has module=%q, want TEST-MIB", u.Kind, u.Module)
 		}
 	}
 
-	expectedKinds := []string{"import", "type", "oid", "index", "notification-object"}
+	expectedKinds := []mib.UnresolvedKind{mib.UnresolvedImport, mib.UnresolvedType, mib.UnresolvedOID, mib.UnresolvedIndex, mib.UnresolvedNotificationObject}
 	for _, k := range expectedKinds {
 		if kindCounts[k] != 1 {
-			t.Errorf("expected 1 unresolved ref of kind %q, got %d", k, kindCounts[k])
+			t.Errorf("expected 1 unresolved ref of kind %s, got %d", k, kindCounts[k])
 		}
 	}
 

@@ -69,6 +69,17 @@ type Diagnostic = mib.Diagnostic
 // UnresolvedRef describes a symbol that could not be resolved.
 type UnresolvedRef = mib.UnresolvedRef
 
+// UnresolvedKind identifies the category of an unresolved reference.
+type UnresolvedKind = mib.UnresolvedKind
+
+const (
+	UnresolvedImport             = mib.UnresolvedImport
+	UnresolvedType               = mib.UnresolvedType
+	UnresolvedOID                = mib.UnresolvedOID
+	UnresolvedIndex              = mib.UnresolvedIndex
+	UnresolvedNotificationObject = mib.UnresolvedNotificationObject
+)
+
 // ComplianceModule is a MODULE clause within a MODULE-COMPLIANCE definition.
 type ComplianceModule = mib.ComplianceModule
 
@@ -145,16 +156,6 @@ const (
 	AccessInstallNotify       = mib.AccessInstallNotify
 	AccessReportOnly          = mib.AccessReportOnly
 	AccessNotImplemented      = mib.AccessNotImplemented
-)
-
-// AccessKeyword indicates which keyword was used in the source MIB.
-type AccessKeyword = mib.AccessKeyword
-
-const (
-	AccessKeywordAccess    = mib.AccessKeywordAccess
-	AccessKeywordMaxAccess = mib.AccessKeywordMaxAccess
-	AccessKeywordMinAccess = mib.AccessKeywordMinAccess
-	AccessKeywordPibAccess = mib.AccessKeywordPibAccess
 )
 
 const (

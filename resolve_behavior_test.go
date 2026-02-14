@@ -363,7 +363,7 @@ func TestDiagnosticEmissionUnresolvedType(t *testing.T) {
 	}
 	testutil.True(t, found, "should emit type-unknown diagnostic for NonExistentType")
 
-	unresolved := unresolvedSymbols(m, "PROBLEM-DIAGNOSTICS-MIB", "type")
+	unresolved := unresolvedSymbols(m, "PROBLEM-DIAGNOSTICS-MIB", mib.UnresolvedType)
 	testutil.True(t, unresolved["NonExistentType"],
 		"NonExistentType should be in unresolved list")
 }

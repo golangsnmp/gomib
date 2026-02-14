@@ -62,13 +62,13 @@ const (
 )
 
 // AccessKeyword records which keyword was used (ACCESS, MAX-ACCESS, etc.).
-type AccessKeyword = mib.AccessKeyword
+type AccessKeyword int
 
 const (
-	AccessKeywordAccess    = mib.AccessKeywordAccess
-	AccessKeywordMaxAccess = mib.AccessKeywordMaxAccess
-	AccessKeywordMinAccess = mib.AccessKeywordMinAccess
-	AccessKeywordPibAccess = mib.AccessKeywordPibAccess
+	AccessKeywordAccess    AccessKeyword = iota // SMIv1: ACCESS
+	AccessKeywordMaxAccess                      // SMIv2: MAX-ACCESS
+	AccessKeywordMinAccess                      // SMIv2: MIN-ACCESS (compliance)
+	AccessKeywordPibAccess                      // SPPI: PIB-ACCESS
 )
 
 // BaseType is the underlying ASN.1 type of a MIB object.
