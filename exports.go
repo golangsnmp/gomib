@@ -114,16 +114,26 @@ const (
 	DefValKindOID    = mib.DefValKindOID
 )
 
-// DefVal constructors for each value kind.
-var (
-	NewDefValInt    = mib.NewDefValInt
-	NewDefValUint   = mib.NewDefValUint
-	NewDefValString = mib.NewDefValString
-	NewDefValBytes  = mib.NewDefValBytes
-	NewDefValEnum   = mib.NewDefValEnum
-	NewDefValBits   = mib.NewDefValBits
-	NewDefValOID    = mib.NewDefValOID
-)
+// NewDefValInt creates a DefVal holding an int64.
+func NewDefValInt(v int64, raw string) DefVal { return mib.NewDefValInt(v, raw) }
+
+// NewDefValUint creates a DefVal holding a uint64.
+func NewDefValUint(v uint64, raw string) DefVal { return mib.NewDefValUint(v, raw) }
+
+// NewDefValString creates a DefVal holding a string.
+func NewDefValString(v string, raw string) DefVal { return mib.NewDefValString(v, raw) }
+
+// NewDefValBytes creates a DefVal holding a byte slice.
+func NewDefValBytes(v []byte, raw string) DefVal { return mib.NewDefValBytes(v, raw) }
+
+// NewDefValEnum creates a DefVal holding a named enum label.
+func NewDefValEnum(label string, raw string) DefVal { return mib.NewDefValEnum(label, raw) }
+
+// NewDefValBits creates a DefVal holding a set of BITS labels.
+func NewDefValBits(labels []string, raw string) DefVal { return mib.NewDefValBits(labels, raw) }
+
+// NewDefValOID creates a DefVal holding an OID.
+func NewDefValOID(oid OID, raw string) DefVal { return mib.NewDefValOID(oid, raw) }
 
 // DefValAs returns the value as type T if compatible.
 // Usage: value, ok := gomib.DefValAs[int64](defval)
@@ -213,12 +223,14 @@ const (
 // DiagnosticConfig controls strictness and diagnostic filtering.
 type DiagnosticConfig = mib.DiagnosticConfig
 
-// Preset diagnostic configuration constructors.
-var (
-	DefaultConfig    = mib.DefaultConfig
-	StrictConfig     = mib.StrictConfig
-	PermissiveConfig = mib.PermissiveConfig
-)
+// DefaultConfig returns the default diagnostic configuration.
+func DefaultConfig() DiagnosticConfig { return mib.DefaultConfig() }
+
+// StrictConfig returns a strict diagnostic configuration.
+func StrictConfig() DiagnosticConfig { return mib.StrictConfig() }
+
+// PermissiveConfig returns a permissive diagnostic configuration.
+func PermissiveConfig() DiagnosticConfig { return mib.PermissiveConfig() }
 
 // ParseOID parses an OID from a dotted string (e.g., "1.3.6.1.2.1").
-var ParseOID = mib.ParseOID
+func ParseOID(s string) (OID, error) { return mib.ParseOID(s) }

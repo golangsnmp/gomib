@@ -227,7 +227,7 @@ func (o *Object) effectiveIndexes(visited map[*Object]struct{}) []mib.IndexEntry
 		return nil
 	}
 	if len(o.index) > 0 {
-		return o.index
+		return slices.Clone(o.index)
 	}
 	if o.augments != nil {
 		if _, seen := visited[o]; seen {

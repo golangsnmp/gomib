@@ -13,8 +13,7 @@ type Mib interface {
 	Root() Node
 	Nodes() iter.Seq[Node]
 
-	// Lookups by name, OID string, or qualified name (e.g. "IF-MIB::ifIndex").
-	// All return nil if no match is found.
+	// Lookups by name. All return nil if no match is found.
 	Node(query string) Node
 	Object(query string) Object
 	Type(query string) Type

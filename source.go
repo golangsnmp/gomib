@@ -179,7 +179,7 @@ func (s *treeSource) Find(name string) (FindResult, error) {
 }
 
 func (s *treeSource) ListModules() ([]string, error) {
-	return slices.Collect(maps.Keys(s.index)), nil
+	return slices.Sorted(maps.Keys(s.index)), nil
 }
 
 type fsSource struct {
@@ -238,7 +238,7 @@ func (s *fsSource) ListModules() ([]string, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return slices.Collect(maps.Keys(s.index)), nil
+	return slices.Sorted(maps.Keys(s.index)), nil
 }
 
 func (s *fsSource) buildIndex() (map[string]string, error) {
