@@ -22,8 +22,8 @@ func TestParseOID(t *testing.T) {
 		{"overflow large", "1.3.99999999999.1", "", true, false},
 		{"invalid char", "1.3.x.1", "", true, false},
 		{"empty arc", "1..3", "", true, false},
-		// trailing dot: silently ignored, produces [1, 3]
-		{"trailing dot", "1.3.", "1.3", false, false},
+		{"trailing dot", "1.3.", "", true, false},
+		{"leading and trailing dot", ".1.3.", "", true, false},
 	}
 
 	for _, tt := range tests {
@@ -52,14 +52,9 @@ func TestParseOID(t *testing.T) {
 }
 
 func TestParseOIDTrailingDot(t *testing.T) {
-	// "1.3." has a trailing dot. The parser silently ignores it,
-	// producing [1, 3] - same as "1.3".
-	oid, err := ParseOID("1.3.")
-	if err != nil {
-		t.Fatalf("ParseOID(\"1.3.\") unexpected error: %v", err)
-	}
-	if oid.String() != "1.3" {
-		t.Errorf("ParseOID(\"1.3.\") = %q, want \"1.3\"", oid.String())
+	_, err := ParseOID("1.3.")
+	if err == nil {
+		t.Fatal("ParseOID(\"1.3.\") should return error for trailing dot")
 	}
 }
 

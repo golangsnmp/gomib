@@ -317,13 +317,19 @@ func (s *multiSource) Find(name string) (FindResult, error) {
 }
 
 func (s *multiSource) ListModules() ([]string, error) {
+	seen := make(map[string]struct{})
 	var names []string
 	for _, src := range s.sources {
 		n, err := src.ListModules()
 		if err != nil {
 			return nil, err
 		}
-		names = append(names, n...)
+		for _, name := range n {
+			if _, ok := seen[name]; !ok {
+				seen[name] = struct{}{}
+				names = append(names, name)
+			}
+		}
 	}
 	return names, nil
 }

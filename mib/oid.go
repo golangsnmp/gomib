@@ -47,9 +47,10 @@ func ParseOID(s string) (Oid, error) {
 			return nil, fmt.Errorf("invalid character in OID: %c", c)
 		}
 	}
-	if hasDigit {
-		arcs = append(arcs, current)
+	if !hasDigit {
+		return nil, fmt.Errorf("trailing dot in OID: %s", s)
 	}
+	arcs = append(arcs, current)
 	return arcs, nil
 }
 

@@ -222,8 +222,34 @@ func TestMultiSourceListModulesCombines(t *testing.T) {
 
 	names1, _ := src1.ListModules()
 	names2, _ := src2.ListModules()
+	// ietf and iana have no overlapping names, so combined == sum
 	testutil.Equal(t, len(names1)+len(names2), len(names),
 		"Multi should combine module lists from all sources")
+}
+
+func TestMultiSourceListModulesDeduplicates(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := []byte("X DEFINITIONS ::= BEGIN\nEND\n")
+	err := os.WriteFile(filepath.Join(tmpDir, "SHARED-MIB.mib"), content, 0644)
+	testutil.NoError(t, err, "write file")
+
+	src1, err := Dir(tmpDir)
+	testutil.NoError(t, err, "Dir 1")
+	src2, err := Dir(tmpDir)
+	testutil.NoError(t, err, "Dir 2")
+
+	multi := Multi(src1, src2)
+	names, err := multi.ListModules()
+	testutil.NoError(t, err, "ListModules")
+
+	// Count occurrences of SHARED-MIB
+	count := 0
+	for _, n := range names {
+		if n == "SHARED-MIB" {
+			count++
+		}
+	}
+	testutil.Equal(t, 1, count, "SHARED-MIB should appear exactly once, got %d", count)
 }
 
 func TestMultiSourceFindNotExist(t *testing.T) {
