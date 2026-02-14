@@ -71,7 +71,7 @@ src := gomib.Multi(systemSrc, vendorSrc)
 
 `Must` variants (`MustDir`, `MustDirTree`) panic on error for use in `var` blocks.
 
-Files are matched by extension: no extension, `.mib`, `.smi`, `.txt`, `.my`. Override with `WithExtensions`. Disable the `DEFINITIONS ::=` content heuristic with `WithNoHeuristic`.
+Files are matched by extension: no extension, `.mib`, `.smi`, `.txt`, `.my`. Override with `WithExtensions`. Non-MIB files are filtered during loading by checking for `DEFINITIONS ::=` in the content.
 
 ### Options
 

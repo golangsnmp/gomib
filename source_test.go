@@ -289,18 +289,6 @@ END
 	testutil.Equal(t, 1, len(names), "custom extensions should find .custom files")
 }
 
-func TestWithNoHeuristicLoadsNonMIBContent(t *testing.T) {
-	tmpDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tmpDir, "NOT-A-MIB.mib"), []byte("this is not a MIB file"), 0644)
-	testutil.NoError(t, err, "write test file")
-
-	src, err := Dir(tmpDir)
-	testutil.NoError(t, err, "Dir")
-	names, err := src.ListModules()
-	testutil.NoError(t, err, "ListModules")
-	testutil.Equal(t, 1, len(names), "module should be listed (heuristic is checked at load time, not list time)")
-}
-
 func TestLoadContextCancellation(t *testing.T) {
 	src, err := DirTree("testdata/corpus/primary")
 	testutil.NoError(t, err, "DirTree")

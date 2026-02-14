@@ -35,12 +35,11 @@ type Source interface {
 	ListModules() ([]string, error)
 }
 
-// SourceOption modifies source behavior (extensions, heuristics).
+// SourceOption modifies source behavior.
 type SourceOption func(*sourceConfig)
 
 type sourceConfig struct {
-	extensions  []string
-	noHeuristic bool
+	extensions []string
 }
 
 func defaultSourceConfig() sourceConfig {
@@ -53,14 +52,6 @@ func defaultSourceConfig() sourceConfig {
 func WithExtensions(exts ...string) SourceOption {
 	return func(c *sourceConfig) {
 		c.extensions = exts
-	}
-}
-
-// WithNoHeuristic disables the DEFINITIONS/::= content check,
-// treating all matched files as MIB sources.
-func WithNoHeuristic() SourceOption {
-	return func(c *sourceConfig) {
-		c.noHeuristic = true
 	}
 }
 
