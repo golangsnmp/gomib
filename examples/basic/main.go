@@ -23,7 +23,12 @@ func main() {
 		}
 	}
 
-	m, err := gomib.LoadModules(context.Background(), []string{"IF-MIB"}, src, gomib.WithSystemPaths())
+	var opts []gomib.LoadOption
+	if src != nil {
+		opts = append(opts, gomib.WithSource(src))
+	}
+	opts = append(opts, gomib.WithModules("IF-MIB"), gomib.WithSystemPaths())
+	m, err := gomib.Load(context.Background(), opts...)
 	if err != nil {
 		log.Fatal(err)
 	}

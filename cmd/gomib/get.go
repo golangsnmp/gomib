@@ -19,7 +19,6 @@ Query formats:
   Numeric OID:     1.3.6.1.2.1.2.2.1.1
   Name:            ifIndex
   Qualified:       IF-MIB::ifIndex
-  Partial OID:     .1.2.1.2 (relative lookup)
 
 Options:
   -m, --module MODULE   Module to load (repeatable)
@@ -105,7 +104,7 @@ func cmdGet(args []string) int {
 		return 2
 	}
 
-	node := mib.Node(query)
+	node := resolveQuery(mib, query)
 	if node == nil {
 		printError("not found: %s", query)
 		return 1
@@ -118,6 +117,35 @@ func cmdGet(args []string) int {
 	}
 
 	return 0
+}
+
+// resolveQuery parses a user query string and returns the matching node.
+// Supports: plain name, MODULE::name, numeric OID (with optional leading dot).
+func resolveQuery(m *gomib.Mib, query string) *gomib.Node {
+	// Qualified name: MODULE::name
+	if modName, itemName, ok := strings.Cut(query, "::"); ok {
+		mod := m.Module(modName)
+		if mod == nil {
+			return nil
+		}
+		return mod.Node(itemName)
+	}
+
+	// Numeric OID string
+	q := query
+	if len(q) > 0 && q[0] == '.' {
+		q = q[1:]
+	}
+	if len(q) > 0 && q[0] >= '0' && q[0] <= '9' {
+		oid, err := gomib.ParseOID(q)
+		if err != nil || len(oid) == 0 {
+			return nil
+		}
+		return m.NodeByOID(oid)
+	}
+
+	// Plain name
+	return m.Node(query)
 }
 
 func printNode(node *gomib.Node) {

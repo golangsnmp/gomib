@@ -21,9 +21,9 @@ func main() {
 	embedded := gomib.FS("embedded", mibFS)
 
 	// Embedded MIBs checked first, then fall back to system MIBs for imports
-	m, err := gomib.LoadModules(context.Background(),
-		[]string{"EXAMPLE-MIB"},
-		embedded,
+	m, err := gomib.Load(context.Background(),
+		gomib.WithSource(embedded),
+		gomib.WithModules("EXAMPLE-MIB"),
 		gomib.WithSystemPaths(),
 		gomib.WithStrictness(gomib.StrictnessPermissive),
 	)

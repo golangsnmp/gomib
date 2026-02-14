@@ -131,11 +131,11 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 		var m *gomib.Mib
 		var err error
 
+		loadOpts := []gomib.LoadOption{gomib.WithSource(source)}
 		if len(modules) > 0 {
-			m, err = gomib.LoadModules(ctx, modules, source)
-		} else {
-			m, err = gomib.Load(ctx, source)
+			loadOpts = append(loadOpts, gomib.WithModules(modules...))
 		}
+		m, err = gomib.Load(ctx, loadOpts...)
 
 		if err == nil && m != nil {
 			for node := range m.Nodes() {

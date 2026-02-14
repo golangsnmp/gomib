@@ -1,4 +1,4 @@
-// Show different query patterns: by name, OID, qualified name, and prefix matching.
+// Show different query patterns: by name, module-scoped, OID, and prefix matching.
 package main
 
 import (
@@ -23,36 +23,43 @@ func main() {
 		}
 	}
 
-	m, err := gomib.LoadModules(context.Background(), []string{"IF-MIB"}, src, gomib.WithSystemPaths())
+	var opts []gomib.LoadOption
+	if src != nil {
+		opts = append(opts, gomib.WithSource(src))
+	}
+	opts = append(opts, gomib.WithModules("IF-MIB"), gomib.WithSystemPaths())
+	m, err := gomib.Load(context.Background(), opts...)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Query by unqualified name
+	// Query by name
 	fmt.Println("=== By name ===")
 	obj := m.Object("ifIndex")
 	if obj != nil {
 		fmt.Printf("%-20s %s\n", obj.Name(), obj.OID())
 	}
 
-	// Query by qualified name (MODULE::name)
-	fmt.Println("\n=== By qualified name ===")
-	obj = m.Object("IF-MIB::ifDescr")
+	// Qualified lookup via Module().Object()
+	fmt.Println("\n=== Module-scoped object ===")
+	obj = m.Module("IF-MIB").Object("ifDescr")
 	if obj != nil {
 		fmt.Printf("%-20s %s\n", obj.Name(), obj.OID())
 	}
 
-	// Query by numeric OID string
-	fmt.Println("\n=== By OID string ===")
-	obj = m.Object("1.3.6.1.2.1.2.2.1.3")
-	if obj != nil {
+	// OID-based lookup via NodeByOID().Object()
+	fmt.Println("\n=== By OID ===")
+	oid, _ := gomib.ParseOID("1.3.6.1.2.1.2.2.1.3")
+	node := m.NodeByOID(oid)
+	if node != nil && node.Object() != nil {
+		obj = node.Object()
 		fmt.Printf("%-20s %s\n", obj.Name(), obj.OID())
 	}
 
 	// Exact OID lookup
 	fmt.Println("\n=== NodeByOID (exact) ===")
-	oid, _ := gomib.ParseOID("1.3.6.1.2.1.2.2.1.1")
-	node := m.NodeByOID(oid)
+	oid, _ = gomib.ParseOID("1.3.6.1.2.1.2.2.1.1")
+	node = m.NodeByOID(oid)
 	if node != nil {
 		fmt.Printf("%-20s %s  kind=%s\n", node.Name(), node.OID(), node.Kind())
 	}
@@ -65,8 +72,8 @@ func main() {
 		fmt.Printf("%-20s %s  (matched from %s)\n", prefix.Name(), prefix.OID(), instanceOID)
 	}
 
-	// Module-scoped lookup
-	fmt.Println("\n=== Module-scoped ===")
+	// Module-scoped type lookup
+	fmt.Println("\n=== Module-scoped type ===")
 	mod := m.Module("IF-MIB")
 	typ := mod.Type("InterfaceIndex")
 	if typ != nil {

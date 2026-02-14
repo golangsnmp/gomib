@@ -16,13 +16,16 @@ var ErrNoSources = errors.New("no MIB sources provided")
 // Enable with: &slog.HandlerOptions{Level: slog.Level(-8)}
 const LevelTrace = slog.Level(-8)
 
-// LoadOption configures Load and LoadModules.
+// LoadOption configures Load.
 type LoadOption func(*loadConfig)
 
 type loadConfig struct {
 	logger      *slog.Logger
 	systemPaths bool
 	diagConfig  mib.DiagnosticConfig
+	sources     []Source
+	modules     []string
+	hasModules  bool // true when WithModules was called (even with empty list)
 }
 
 // WithLogger sets the logger for debug/trace output.
@@ -59,21 +62,32 @@ func WithStrictness(level mib.StrictnessLevel) LoadOption {
 	}
 }
 
-// Load loads all MIB modules from the given source and resolves them.
-// Use Multi() to combine multiple sources.
+// WithSource appends one or more MIB sources to the load configuration.
+// Sources are searched in the order they are added.
+func WithSource(src ...Source) LoadOption {
+	return func(c *loadConfig) { c.sources = append(c.sources, src...) }
+}
+
+// WithModules restricts loading to the named modules and their dependencies.
+// Omit to load all modules from the configured sources.
+func WithModules(names ...string) LoadOption {
+	return func(c *loadConfig) {
+		c.modules = append(c.modules, names...)
+		c.hasModules = true
+	}
+}
+
+// Load loads MIB modules from configured sources and resolves them.
 //
 // Example:
 //
-//	mib, err := gomib.Load(ctx,
-//	    gomib.DirTree("/usr/share/snmp/mibs"),
-//	    gomib.WithLogger(slog.Default()),
+//	m, err := gomib.Load(ctx,
+//	    gomib.WithSource(gomib.MustDirTree("/usr/share/snmp/mibs")),
+//	    gomib.WithModules("IF-MIB", "IP-MIB"),
 //	)
 //
-//	// Multiple sources:
-//	mib, err := gomib.Load(ctx,
-//	    gomib.Multi(gomib.DirTree("/usr/share/snmp/mibs"), gomib.Dir("./custom")),
-//	)
-func Load(ctx context.Context, source Source, opts ...LoadOption) (*Mib, error) {
+//	m, err := gomib.Load(ctx, gomib.WithSystemPaths())
+func Load(ctx context.Context, opts ...LoadOption) (*Mib, error) {
 	cfg := loadConfig{
 		diagConfig: mib.DefaultConfig(),
 	}
@@ -81,40 +95,7 @@ func Load(ctx context.Context, source Source, opts ...LoadOption) (*Mib, error) 
 		opt(&cfg)
 	}
 
-	var sources []Source
-	if source != nil {
-		sources = append(sources, source)
-	}
-	return loadFromSources(ctx, sources, nil, cfg)
-}
-
-// LoadModules loads specific MIB modules by name, along with their dependencies.
-// Use Multi() to combine multiple sources.
-//
-// Example:
-//
-//	mib, err := gomib.LoadModules(ctx,
-//	    []string{"IF-MIB", "IP-MIB"},
-//	    gomib.DirTree("/usr/share/snmp/mibs"),
-//	)
-func LoadModules(ctx context.Context, names []string, source Source, opts ...LoadOption) (*Mib, error) {
-	cfg := loadConfig{
-		diagConfig: mib.DefaultConfig(),
-	}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-
-	var sources []Source
-	if source != nil {
-		sources = append(sources, source)
-	}
-	return loadFromSources(ctx, sources, names, cfg)
-}
-
-// loadFromSources loads all modules if names is nil, or only named
-// modules (plus dependencies) if names is non-nil.
-func loadFromSources(ctx context.Context, sources []Source, names []string, cfg loadConfig) (*Mib, error) {
+	sources := cfg.sources
 	if cfg.systemPaths {
 		sources = append(sources, discoverSystemSources()...)
 	}
@@ -122,8 +103,8 @@ func loadFromSources(ctx context.Context, sources []Source, names []string, cfg 
 		return nil, ErrNoSources
 	}
 
-	if names != nil {
-		return loadModulesByName(ctx, sources, names, cfg)
+	if cfg.hasModules {
+		return loadModulesByName(ctx, sources, cfg.modules, cfg)
 	}
 	return loadAllModules(ctx, sources, cfg)
 }

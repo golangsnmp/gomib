@@ -166,10 +166,13 @@ func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (*gomib.Mi
 	}
 	opts = append(opts, extraOpts...)
 
-	if len(modules) > 0 {
-		return gomib.LoadModules(context.Background(), modules, source, opts...)
+	if source != nil {
+		opts = append(opts, gomib.WithSource(source))
 	}
-	return gomib.Load(context.Background(), source, opts...)
+	if len(modules) > 0 {
+		opts = append(opts, gomib.WithModules(modules...))
+	}
+	return gomib.Load(context.Background(), opts...)
 }
 
 func printError(format string, args ...any) {

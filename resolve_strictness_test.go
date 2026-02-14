@@ -30,11 +30,10 @@ func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) *mib
 	if err != nil {
 		t.Fatalf("DirTree problems failed: %v", err)
 	}
-	src := Multi(corpus, problems)
 	ctx := context.Background()
-	m, err := LoadModules(ctx, []string{name}, src, WithStrictness(level))
+	m, err := Load(ctx, WithSource(corpus, problems), WithModules(name), WithStrictness(level))
 	if err != nil {
-		t.Fatalf("LoadModules(%s, %s) failed: %v", name, level, err)
+		t.Fatalf("Load(%s, %s) failed: %v", name, level, err)
 	}
 	return m
 }
@@ -300,14 +299,12 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DirTree violations failed: %v", err)
 	}
-	src := Multi(corpus, violations)
-
 	load := func(t *testing.T, level mib.StrictnessLevel) *mib.Mib {
 		t.Helper()
 		ctx := context.Background()
-		m, err := LoadModules(ctx, []string{"MISSING-IMPORT-TEST-MIB"}, src, WithStrictness(level))
+		m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(level))
 		if err != nil {
-			t.Fatalf("LoadModules failed: %v", err)
+			t.Fatalf("Load failed: %v", err)
 		}
 		return m
 	}

@@ -20,7 +20,7 @@ Traces how a symbol is resolved across loaded modules. Useful for debugging
 resolution issues like missing INDEX references or duplicate definitions.
 
 Options:
-  -m, --module MODULE   Module to load (repeatable, uses LoadModules)
+  -m, --module MODULE   Module to load (repeatable, uses WithModules)
   --all                 Load all MIBs from search path (uses Load)
   -h, --help            Show help
 
@@ -78,10 +78,10 @@ func cmdTrace(args []string) int {
 	var loadMode string
 
 	if *loadAll {
-		loadMode = "Load() - all modules from search path"
+		loadMode = "Load - all modules from search path"
 		mib, err = loadMib(nil)
 	} else {
-		loadMode = fmt.Sprintf("LoadModules(%v)", modules)
+		loadMode = fmt.Sprintf("Load WithModules(%v)", modules)
 		mib, err = loadMib(modules)
 	}
 

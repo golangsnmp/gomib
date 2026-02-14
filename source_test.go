@@ -187,8 +187,8 @@ END
 
 	src := FS("test", memFS)
 	ctx := context.Background()
-	m, err := LoadModules(ctx, []string{"TEST-FS-LOAD-MIB"}, src)
-	testutil.NoError(t, err, "LoadModules with FS source")
+	m, err := Load(ctx, WithSource(src), WithModules("TEST-FS-LOAD-MIB"))
+	testutil.NoError(t, err, "Load with FS source")
 
 	obj := m.Object("testFsScalar")
 	testutil.NotNil(t, obj, "testFsScalar should resolve from FS source")
@@ -296,22 +296,22 @@ func TestLoadContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
 
-	_, err = Load(ctx, src)
+	_, err = Load(ctx, WithSource(src))
 	// Pre-cancelled context should produce context.Canceled.
 	testutil.Error(t, err, "Load with cancelled context should return error")
 	testutil.Equal(t, context.Canceled, err, "error should be context.Canceled")
 }
 
-func TestLoadModulesContextCancellation(t *testing.T) {
+func TestLoadWithModulesContextCancellation(t *testing.T) {
 	src, err := DirTree("testdata/corpus/primary")
 	testutil.NoError(t, err, "DirTree")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err = LoadModules(ctx, []string{"IF-MIB"}, src)
+	_, err = Load(ctx, WithSource(src), WithModules("IF-MIB"))
 	// Pre-cancelled context should produce context.Canceled.
-	testutil.Error(t, err, "LoadModules with cancelled context should return error")
+	testutil.Error(t, err, "Load with cancelled context should return error")
 	testutil.Equal(t, context.Canceled, err, "error should be context.Canceled")
 }
 
@@ -401,7 +401,7 @@ func TestLoadEmptyDirProducesEmptyMib(t *testing.T) {
 	testutil.NoError(t, err, "Dir empty")
 
 	ctx := context.Background()
-	m, err := Load(ctx, src)
+	m, err := Load(ctx, WithSource(src))
 	testutil.NoError(t, err, "Load from empty dir should succeed")
 	testutil.NotNil(t, m, "should return non-nil Mib")
 	testutil.Equal(t, 0, len(m.Objects()), "empty source should have no user objects")
@@ -412,8 +412,8 @@ func TestLoadMultipleModules(t *testing.T) {
 	testutil.NoError(t, err, "DirTree")
 
 	ctx := context.Background()
-	m, err := LoadModules(ctx, []string{"IF-MIB", "SNMPv2-MIB"}, src)
-	testutil.NoError(t, err, "LoadModules")
+	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB", "SNMPv2-MIB"))
+	testutil.NoError(t, err, "Load")
 
 	testutil.NotNil(t, m.Module("IF-MIB"), "IF-MIB should be loaded")
 	testutil.NotNil(t, m.Module("SNMPv2-MIB"), "SNMPv2-MIB should be loaded")
@@ -424,13 +424,13 @@ func TestLoadModulesEmptyList(t *testing.T) {
 	testutil.NoError(t, err, "DirTree")
 
 	ctx := context.Background()
-	m, err := LoadModules(ctx, []string{}, src)
-	testutil.NoError(t, err, "LoadModules with empty list should succeed")
+	m, err := Load(ctx, WithSource(src), WithModules())
+	testutil.NoError(t, err, "Load with empty module list should succeed")
 	testutil.NotNil(t, m, "should return non-nil Mib")
 }
 
-func TestLoadModulesNilSource(t *testing.T) {
+func TestLoadNoSourceModules(t *testing.T) {
 	ctx := context.Background()
-	_, err := LoadModules(ctx, []string{"IF-MIB"}, nil)
-	testutil.Error(t, err, "LoadModules with nil source should fail")
+	_, err := Load(ctx, WithModules("IF-MIB"))
+	testutil.Error(t, err, "Load with no source should fail")
 }

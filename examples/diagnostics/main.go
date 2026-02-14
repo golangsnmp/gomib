@@ -34,12 +34,12 @@ func main() {
 
 	for _, l := range levels {
 		fmt.Printf("=== %s ===\n", l.name)
-		m, err := gomib.LoadModules(context.Background(),
-			[]string{"IF-MIB"},
-			src,
-			gomib.WithSystemPaths(),
-			gomib.WithStrictness(l.level),
-		)
+		var loadOpts []gomib.LoadOption
+		if src != nil {
+			loadOpts = append(loadOpts, gomib.WithSource(src))
+		}
+		loadOpts = append(loadOpts, gomib.WithModules("IF-MIB"), gomib.WithSystemPaths(), gomib.WithStrictness(l.level))
+		m, err := gomib.Load(context.Background(), loadOpts...)
 		if err != nil {
 			fmt.Printf("  load error: %v\n\n", err)
 			continue
@@ -78,16 +78,17 @@ func main() {
 
 	// Fine-grained diagnostic config
 	fmt.Println("=== Custom config ===")
-	m, err := gomib.LoadModules(context.Background(),
-		[]string{"IF-MIB"},
-		src,
-		gomib.WithSystemPaths(),
+	var customOpts []gomib.LoadOption
+	if src != nil {
+		customOpts = append(customOpts, gomib.WithSource(src))
+	}
+	customOpts = append(customOpts, gomib.WithModules("IF-MIB"), gomib.WithSystemPaths(),
 		gomib.WithDiagnosticConfig(gomib.DiagnosticConfig{
 			Level:  gomib.StrictnessNormal,
 			FailAt: gomib.SeverityFatal,
 			Ignore: []string{"identifier-*"},
-		}),
-	)
+		}))
+	m, err := gomib.Load(context.Background(), customOpts...)
 	if err != nil {
 		log.Fatal(err)
 	}

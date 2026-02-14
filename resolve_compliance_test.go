@@ -64,14 +64,15 @@ func TestCompliance(t *testing.T) {
 	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
 }
 
-func TestComplianceByQualifiedName(t *testing.T) {
+func TestComplianceQualifiedLookup(t *testing.T) {
 	m := loadTestMIB(t)
 
-	c := m.Compliance("SNMPv2-MIB::snmpBasicComplianceRev2")
-	testutil.NotNil(t, c, "Compliance(SNMPv2-MIB::snmpBasicComplianceRev2) should not be nil")
+	// Qualified lookup via Module().Compliance()
+	c := m.Module("SNMPv2-MIB").Compliance("snmpBasicComplianceRev2")
+	testutil.NotNil(t, c, "Module(SNMPv2-MIB).Compliance(snmpBasicComplianceRev2) should not be nil")
 	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
 
-	testutil.Nil(t, m.Compliance("IF-MIB::snmpBasicComplianceRev2"),
+	testutil.Nil(t, m.Module("IF-MIB").Compliance("snmpBasicComplianceRev2"),
 		"snmpBasicComplianceRev2 should not be in IF-MIB")
 }
 
@@ -81,14 +82,11 @@ func TestComplianceByOID(t *testing.T) {
 	c := m.Compliance("snmpBasicComplianceRev2")
 	testutil.NotNil(t, c, "Compliance(snmpBasicComplianceRev2)")
 
-	oid := c.OID().String()
-
-	c2 := m.Compliance(oid)
-	testutil.NotNil(t, c2, "Compliance by numeric OID %s should work", oid)
-	testutil.Equal(t, "snmpBasicComplianceRev2", c2.Name(), "compliance found by OID")
-
-	c3 := m.Compliance("." + oid)
-	testutil.NotNil(t, c3, "Compliance by dotted OID .%s should work", oid)
+	// OID-based lookup via NodeByOID().Compliance()
+	nd := m.NodeByOID(c.OID())
+	testutil.NotNil(t, nd, "NodeByOID should find compliance node")
+	testutil.NotNil(t, nd.Compliance(), "node should have Compliance()")
+	testutil.Equal(t, "snmpBasicComplianceRev2", nd.Compliance().Name(), "compliance found by OID")
 }
 
 func TestComplianceNotFound(t *testing.T) {
@@ -96,10 +94,6 @@ func TestComplianceNotFound(t *testing.T) {
 
 	testutil.Nil(t, m.Compliance("noSuchCompliance"),
 		"non-existent compliance name should return nil")
-	testutil.Nil(t, m.Compliance("99.99.99"),
-		"non-existent OID should return nil")
-	testutil.Nil(t, m.Compliance("FAKE-MIB::snmpBasicCompliance"),
-		"non-existent module should return nil")
 }
 
 func TestComplianceMetadata(t *testing.T) {

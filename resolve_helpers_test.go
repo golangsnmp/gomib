@@ -30,7 +30,7 @@ func loadTestMIB(t testing.TB) *mib.Mib {
 			loadErr = err
 			return
 		}
-		loadedMib, loadErr = LoadModules(context.Background(), fixtureModules, src)
+		loadedMib, loadErr = Load(context.Background(), WithSource(src), WithModules(fixtureModules...))
 	})
 	if loadErr != nil {
 		t.Fatalf("failed to load test MIBs: %v", loadErr)

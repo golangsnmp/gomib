@@ -69,14 +69,15 @@ func TestGroupByName(t *testing.T) {
 	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 }
 
-func TestGroupByQualifiedName(t *testing.T) {
+func TestGroupQualifiedLookup(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.Group("SNMPv2-MIB::snmpGroup")
-	testutil.NotNil(t, g, "Group(SNMPv2-MIB::snmpGroup) should not be nil")
+	// Qualified lookup via Module().Group()
+	g := m.Module("SNMPv2-MIB").Group("snmpGroup")
+	testutil.NotNil(t, g, "Module(SNMPv2-MIB).Group(snmpGroup) should not be nil")
 	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 
-	testutil.Nil(t, m.Group("IF-MIB::snmpGroup"),
+	testutil.Nil(t, m.Module("IF-MIB").Group("snmpGroup"),
 		"snmpGroup should not be in IF-MIB")
 }
 
@@ -86,14 +87,11 @@ func TestGroupByOID(t *testing.T) {
 	g := m.Group("snmpGroup")
 	testutil.NotNil(t, g, "Group(snmpGroup)")
 
-	oid := g.OID().String()
-
-	g2 := m.Group(oid)
-	testutil.NotNil(t, g2, "Group by numeric OID %s should work", oid)
-	testutil.Equal(t, "snmpGroup", g2.Name(), "group found by OID")
-
-	g3 := m.Group("." + oid)
-	testutil.NotNil(t, g3, "Group by dotted OID .%s should work", oid)
+	// OID-based lookup via NodeByOID().Group()
+	nd := m.NodeByOID(g.OID())
+	testutil.NotNil(t, nd, "NodeByOID should find group node")
+	testutil.NotNil(t, nd.Group(), "node should have Group()")
+	testutil.Equal(t, "snmpGroup", nd.Group().Name(), "group found by OID")
 }
 
 func TestGroupNotFound(t *testing.T) {
@@ -101,10 +99,6 @@ func TestGroupNotFound(t *testing.T) {
 
 	testutil.Nil(t, m.Group("noSuchGroup"),
 		"non-existent group name should return nil")
-	testutil.Nil(t, m.Group("99.99.99"),
-		"non-existent OID should return nil")
-	testutil.Nil(t, m.Group("FAKE-MIB::snmpGroup"),
-		"non-existent module should return nil")
 }
 
 func TestGroupMetadata(t *testing.T) {

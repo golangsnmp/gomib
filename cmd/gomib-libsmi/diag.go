@@ -153,7 +153,7 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 		}
 
 		ctx := context.Background()
-		m, err := gomib.LoadModules(ctx, []string{module}, source, gomib.WithDiagnosticConfig(cfg))
+		m, err := gomib.Load(ctx, gomib.WithSource(source), gomib.WithModules(module), gomib.WithDiagnosticConfig(cfg))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: gomib load failed for %s: %v\n", module, err)
 		}

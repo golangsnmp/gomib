@@ -3,7 +3,6 @@ package mib
 import (
 	"iter"
 	"slices"
-	"strings"
 )
 
 // Mib is the top-level container for loaded MIB data.
@@ -49,43 +48,10 @@ func (m *Mib) Nodes() iter.Seq[*Node] {
 	}
 }
 
-// resolveQuery parses a query string and returns matching nodes.
-func (m *Mib) resolveQuery(query string) (nodes []*Node, moduleName string) {
-	if modName, itemName, ok := strings.Cut(query, "::"); ok {
-		if m.moduleByName[modName] == nil {
-			return nil, modName
-		}
-		return m.nameToNodes[itemName], modName
-	}
-
-	q := query
-	if len(q) > 0 && q[0] == '.' {
-		q = q[1:]
-	}
-	if len(q) > 0 && q[0] >= '0' && q[0] <= '9' {
-		oid, err := ParseOID(q)
-		if err != nil || len(oid) == 0 {
-			return nil, ""
-		}
-		if nd := m.nodeByOID(oid); nd != nil {
-			return []*Node{nd}, ""
-		}
-		return nil, ""
-	}
-
-	return m.nameToNodes[query], ""
-}
-
-func (m *Mib) Node(query string) *Node {
-	nodes, moduleName := m.resolveQuery(query)
-	if moduleName != "" {
-		for _, nd := range nodes {
-			if mod := nd.Module(); mod != nil && mod.Name() == moduleName {
-				return nd
-			}
-		}
-		return nil
-	}
+// Node returns the node with the given name, or nil if not found.
+// Prefers nodes with object definitions, then notifications, then any.
+func (m *Mib) Node(name string) *Node {
+	nodes := m.nameToNodes[name]
 	for _, nd := range nodes {
 		if nd.obj != nil {
 			return nd
@@ -102,40 +68,34 @@ func (m *Mib) Node(query string) *Node {
 	return nil
 }
 
-func (m *Mib) Object(query string) *Object {
-	return findEntity(m, query, func(nd *Node) *Object { return nd.obj })
+// Object returns the object with the given name, or nil if not found.
+func (m *Mib) Object(name string) *Object {
+	return findEntity(m, name, func(nd *Node) *Object { return nd.obj })
 }
 
-func (m *Mib) Type(query string) *Type {
-	if moduleName, typeName, ok := strings.Cut(query, "::"); ok {
-		mod := m.moduleByName[moduleName]
-		if mod == nil {
-			return nil
-		}
-		for _, t := range mod.types {
-			if t.name == typeName {
-				return t
-			}
-		}
-		return nil
-	}
-	return m.typeByName[query]
+// Type returns the type with the given name, or nil if not found.
+func (m *Mib) Type(name string) *Type {
+	return m.typeByName[name]
 }
 
-func (m *Mib) Notification(query string) *Notification {
-	return findEntity(m, query, func(nd *Node) *Notification { return nd.notif })
+// Notification returns the notification with the given name, or nil if not found.
+func (m *Mib) Notification(name string) *Notification {
+	return findEntity(m, name, func(nd *Node) *Notification { return nd.notif })
 }
 
-func (m *Mib) Group(query string) *Group {
-	return findEntity(m, query, func(nd *Node) *Group { return nd.group })
+// Group returns the group with the given name, or nil if not found.
+func (m *Mib) Group(name string) *Group {
+	return findEntity(m, name, func(nd *Node) *Group { return nd.group })
 }
 
-func (m *Mib) Compliance(query string) *Compliance {
-	return findEntity(m, query, func(nd *Node) *Compliance { return nd.compliance })
+// Compliance returns the compliance with the given name, or nil if not found.
+func (m *Mib) Compliance(name string) *Compliance {
+	return findEntity(m, name, func(nd *Node) *Compliance { return nd.compliance })
 }
 
-func (m *Mib) Capability(query string) *Capability {
-	return findEntity(m, query, func(nd *Node) *Capability { return nd.capabilities })
+// Capability returns the capability with the given name, or nil if not found.
+func (m *Mib) Capability(name string) *Capability {
+	return findEntity(m, name, func(nd *Node) *Capability { return nd.capabilities })
 }
 
 func (m *Mib) NodeByOID(oid OID) *Node {
@@ -269,17 +229,11 @@ type nodeEntity interface {
 	*Object | *Notification | *Group | *Compliance | *Capability
 }
 
-// findEntity resolves a query to a node-attached entity using resolveQuery.
-func findEntity[T nodeEntity](m *Mib, query string, fromNode func(*Node) T) T {
+// findEntity looks up a node-attached entity by name.
+func findEntity[T nodeEntity](m *Mib, name string, fromNode func(*Node) T) T {
 	var zero T
-	nodes, moduleName := m.resolveQuery(query)
-	for _, nd := range nodes {
+	for _, nd := range m.nameToNodes[name] {
 		if v := fromNode(nd); v != zero {
-			if moduleName != "" {
-				if ndMod := nd.Module(); ndMod == nil || ndMod.Name() != moduleName {
-					continue
-				}
-			}
 			return v
 		}
 	}

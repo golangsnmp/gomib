@@ -184,11 +184,11 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 	var mib *gomib.Mib
 	var err error
 
+	loadOpts := []gomib.LoadOption{gomib.WithSource(source)}
 	if len(modules) > 0 {
-		mib, err = gomib.LoadModules(ctx, modules, source)
-	} else {
-		mib, err = gomib.Load(ctx, source)
+		loadOpts = append(loadOpts, gomib.WithModules(modules...))
 	}
+	mib, err = gomib.Load(ctx, loadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("gomib load failed: %w", err)
 	}

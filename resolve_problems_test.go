@@ -27,11 +27,10 @@ func loadProblemMIB(t testing.TB, name string) *mib.Mib {
 	if err != nil {
 		t.Fatalf("DirTree problems failed: %v", err)
 	}
-	src := Multi(corpus, problems)
 	ctx := context.Background()
-	m, err := LoadModules(ctx, []string{name}, src, WithStrictness(StrictnessPermissive))
+	m, err := Load(ctx, WithSource(corpus, problems), WithModules(name), WithStrictness(StrictnessPermissive))
 	if err != nil {
-		t.Fatalf("LoadModules(%s) failed: %v", name, err)
+		t.Fatalf("Load(%s) failed: %v", name, err)
 	}
 	return m
 }

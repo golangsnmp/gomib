@@ -121,7 +121,7 @@ func testAcceptance(modules []string, mibPaths []string, level int, showAll bool
 			}
 
 			ctx := context.Background()
-			m, err := gomib.LoadModules(ctx, []string{mod}, gomibSource, gomib.WithDiagnosticConfig(cfg))
+			m, err := gomib.Load(ctx, gomib.WithSource(gomibSource), gomib.WithModules(mod), gomib.WithDiagnosticConfig(cfg))
 			if err == nil && m != nil {
 				for _, d := range m.Diagnostics() {
 					if int(d.Severity) <= level {

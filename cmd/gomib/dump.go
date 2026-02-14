@@ -126,7 +126,7 @@ func buildDumpOutput(m *gomib.Mib, opts JSONOptions) *DumpOutput {
 
 	if opts.IncludeTree {
 		if opts.OidFilter != "" {
-			node := m.Node(opts.OidFilter)
+			node := resolveQuery(m, opts.OidFilter)
 			if node != nil {
 				output.Tree = buildTreeJSON(node, opts)
 			}
