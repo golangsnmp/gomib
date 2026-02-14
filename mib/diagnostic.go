@@ -2,6 +2,7 @@ package mib
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -98,10 +99,10 @@ func PermissiveConfig() DiagnosticConfig {
 //
 // Lower severity numbers are more severe (Fatal=0, Info=6).
 func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
-	for _, pattern := range c.Ignore {
-		if matchGlob(pattern, code) {
-			return false
-		}
+	if slices.ContainsFunc(c.Ignore, func(pattern string) bool {
+		return matchGlob(pattern, code)
+	}) {
+		return false
 	}
 
 	if override, ok := c.Overrides[code]; ok {
@@ -147,19 +148,11 @@ func (c DiagnosticConfig) AllowBestGuessFallbacks() bool {
 
 // matchGlob performs simple glob matching with * wildcard.
 func matchGlob(pattern, s string) bool {
-	if pattern == "*" {
-		return true
+	if prefix, ok := strings.CutSuffix(pattern, "*"); ok {
+		return strings.HasPrefix(s, prefix)
 	}
-
-	if len(pattern) > 0 && pattern[len(pattern)-1] == '*' {
-		prefix := pattern[:len(pattern)-1]
-		return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+	if suffix, ok := strings.CutPrefix(pattern, "*"); ok {
+		return strings.HasSuffix(s, suffix)
 	}
-
-	if len(pattern) > 0 && pattern[0] == '*' {
-		suffix := pattern[1:]
-		return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
-	}
-
 	return pattern == s
 }
