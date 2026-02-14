@@ -40,7 +40,7 @@ func (o *Object) Module() mib.Module {
 	return o.module
 }
 
-func (o *Object) OID() mib.Oid {
+func (o *Object) OID() mib.OID {
 	if o.node == nil {
 		return nil
 	}

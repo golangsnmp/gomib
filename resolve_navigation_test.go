@@ -20,7 +20,7 @@ func TestNodeParent(t *testing.T) {
 	m := loadTestMIB(t)
 
 	// ifIndex = 1.3.6.1.2.1.2.2.1.1
-	node := m.FindNode("ifIndex")
+	node := m.Node("ifIndex")
 	if node == nil {
 		t.Fatal("ifIndex not found")
 	}
@@ -39,8 +39,8 @@ func TestNodeParent(t *testing.T) {
 func TestNodeChildren(t *testing.T) {
 	m := loadTestMIB(t)
 
-	entry := m.FindNode("ifEntry")
-	testutil.NotNil(t, entry, "FindNode(ifEntry)")
+	entry := m.Node("ifEntry")
+	testutil.NotNil(t, entry, "Node(ifEntry)")
 
 	children := entry.Children()
 	testutil.Greater(t, len(children), 0,
@@ -59,8 +59,8 @@ func TestNodeChildren(t *testing.T) {
 func TestNodeChild(t *testing.T) {
 	m := loadTestMIB(t)
 
-	entry := m.FindNode("ifEntry")
-	testutil.NotNil(t, entry, "FindNode(ifEntry)")
+	entry := m.Node("ifEntry")
+	testutil.NotNil(t, entry, "Node(ifEntry)")
 
 	// ifIndex is arc 1 under ifEntry
 	child := entry.Child(1)
@@ -71,14 +71,14 @@ func TestNodeChild(t *testing.T) {
 	testutil.Nil(t, noChild, "Child(99999) should return nil for non-existent arc")
 }
 
-func TestNodeDescendants(t *testing.T) {
+func TestNodeSubtree(t *testing.T) {
 	m := loadTestMIB(t)
 
-	table := m.FindNode("ifTable")
-	testutil.NotNil(t, table, "FindNode(ifTable)")
+	table := m.Node("ifTable")
+	testutil.NotNil(t, table, "Node(ifTable)")
 
 	count := 0
-	for range table.Descendants() {
+	for range table.Subtree() {
 		count++
 	}
 	// ifTable -> ifEntry -> ifIndex, ifDescr, ifType, ... (22+ columns)
@@ -90,7 +90,7 @@ func TestNodeArc(t *testing.T) {
 	m := loadTestMIB(t)
 
 	// ifIndex OID = 1.3.6.1.2.1.2.2.1.1 (last arc is 1)
-	node := m.FindNode("ifIndex")
+	node := m.Node("ifIndex")
 	if node == nil {
 		t.Fatal("ifIndex not found")
 	}
@@ -100,7 +100,7 @@ func TestNodeArc(t *testing.T) {
 func TestNodeObjectAndNotification(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.FindNode("ifIndex")
+	node := m.Node("ifIndex")
 	if node == nil {
 		t.Fatal("ifIndex not found")
 	}
@@ -110,8 +110,8 @@ func TestNodeObjectAndNotification(t *testing.T) {
 
 	testutil.Nil(t, node.Notification(), "ifIndex should not have a notification")
 
-	linkDown := m.FindNode("linkDown")
-	testutil.NotNil(t, linkDown, "FindNode(linkDown)")
+	linkDown := m.Node("linkDown")
+	testutil.NotNil(t, linkDown, "Node(linkDown)")
 	notif := linkDown.Notification()
 	testutil.NotNil(t, notif, "linkDown node should have an associated notification")
 	testutil.Equal(t, "linkDown", notif.Name(), "linkDown notification name")
@@ -121,7 +121,7 @@ func TestObjectTableNavigation(t *testing.T) {
 	m := loadTestMIB(t)
 
 	t.Run("column to table", func(t *testing.T) {
-		col := m.FindObject("ifIndex")
+		col := m.Object("ifIndex")
 		if col == nil {
 			t.Fatal("ifIndex not found")
 		}
@@ -137,7 +137,7 @@ func TestObjectTableNavigation(t *testing.T) {
 	})
 
 	t.Run("column to row", func(t *testing.T) {
-		col := m.FindObject("ifIndex")
+		col := m.Object("ifIndex")
 		if col == nil {
 			t.Fatal("ifIndex not found")
 		}
@@ -149,8 +149,8 @@ func TestObjectTableNavigation(t *testing.T) {
 	})
 
 	t.Run("table to entry", func(t *testing.T) {
-		tbl := m.FindObject("ifTable")
-		testutil.NotNil(t, tbl, "FindObject(ifTable)")
+		tbl := m.Object("ifTable")
+		testutil.NotNil(t, tbl, "Object(ifTable)")
 		testutil.True(t, tbl.IsTable(), "ifTable should be a table")
 
 		entry := tbl.Entry()
@@ -159,8 +159,8 @@ func TestObjectTableNavigation(t *testing.T) {
 	})
 
 	t.Run("row columns", func(t *testing.T) {
-		row := m.FindObject("ifEntry")
-		testutil.NotNil(t, row, "FindObject(ifEntry)")
+		row := m.Object("ifEntry")
+		testutil.NotNil(t, row, "Object(ifEntry)")
 
 		cols := row.Columns()
 		testutil.Greater(t, len(cols), 5, "ifEntry should have many columns")
@@ -176,8 +176,8 @@ func TestObjectTableNavigation(t *testing.T) {
 	})
 
 	t.Run("scalar predicates", func(t *testing.T) {
-		scalar := m.FindObject("sysDescr")
-		testutil.NotNil(t, scalar, "FindObject(sysDescr)")
+		scalar := m.Object("sysDescr")
+		testutil.NotNil(t, scalar, "Object(sysDescr)")
 		testutil.True(t, scalar.IsScalar(), "sysDescr should be a scalar")
 		testutil.False(t, scalar.IsTable(), "sysDescr should not be a table")
 		testutil.False(t, scalar.IsRow(), "sysDescr should not be a row")
@@ -188,8 +188,8 @@ func TestObjectTableNavigation(t *testing.T) {
 func TestObjectEffectiveIndexes(t *testing.T) {
 	m := loadTestMIB(t)
 
-	entry := m.FindObject("ifEntry")
-	testutil.NotNil(t, entry, "FindObject(ifEntry)")
+	entry := m.Object("ifEntry")
+	testutil.NotNil(t, entry, "Object(ifEntry)")
 
 	indexes := entry.EffectiveIndexes()
 	testutil.NotEmpty(t, indexes, "EffectiveIndexes() for ifEntry")
@@ -201,8 +201,8 @@ func TestObjectEffectiveIndexes(t *testing.T) {
 func TestObjectEnumLookup(t *testing.T) {
 	m := loadTestMIB(t)
 
-	obj := m.FindObject("ifType")
-	testutil.NotNil(t, obj, "FindObject(ifType)")
+	obj := m.Object("ifType")
+	testutil.NotNil(t, obj, "Object(ifType)")
 
 	enums := obj.EffectiveEnums()
 	testutil.NotEmpty(t, enums, "EffectiveEnums() for ifType")
@@ -219,8 +219,8 @@ func TestObjectBitLookup(t *testing.T) {
 	// Use PROBLEM-DEFVAL-MIB which has BITS objects (problemDefvalEmptyBits, problemDefvalMultiBits)
 	pm := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
-	obj := pm.FindObject("problemDefvalMultiBits")
-	testutil.NotNil(t, obj, "FindObject(problemDefvalMultiBits)")
+	obj := pm.Object("problemDefvalMultiBits")
+	testutil.NotNil(t, obj, "Object(problemDefvalMultiBits)")
 
 	bits := obj.EffectiveBits()
 	testutil.NotEmpty(t, bits, "EffectiveBits() for problemDefvalMultiBits")
@@ -241,8 +241,8 @@ func TestTypePredicates(t *testing.T) {
 	m := loadTestMIB(t)
 
 	t.Run("IsString", func(t *testing.T) {
-		typ := m.FindType("DisplayString")
-		testutil.NotNil(t, typ, "FindType(DisplayString)")
+		typ := m.Type("DisplayString")
+		testutil.NotNil(t, typ, "Type(DisplayString)")
 		testutil.True(t, typ.IsString(), "DisplayString should be IsString()")
 		testutil.False(t, typ.IsCounter(), "DisplayString should not be IsCounter()")
 		testutil.False(t, typ.IsGauge(), "DisplayString should not be IsGauge()")
@@ -250,8 +250,8 @@ func TestTypePredicates(t *testing.T) {
 
 	t.Run("IsEnumeration", func(t *testing.T) {
 		// ifType uses IANAifType which is an enumeration
-		obj := m.FindObject("ifType")
-		testutil.NotNil(t, obj, "FindObject(ifType)")
+		obj := m.Object("ifType")
+		testutil.NotNil(t, obj, "Object(ifType)")
 		testutil.NotNil(t, obj.Type(), "ifType type")
 		enums := obj.EffectiveEnums()
 		testutil.NotEmpty(t, enums, "EffectiveEnums() for ifType")
@@ -260,8 +260,8 @@ func TestTypePredicates(t *testing.T) {
 
 	t.Run("counter type from problem MIBs", func(t *testing.T) {
 		pm := loadTypeChainsMIB(t)
-		obj := pm.FindObject("problemAppTypeChain")
-		testutil.NotNil(t, obj, "FindObject(problemAppTypeChain)")
+		obj := pm.Object("problemAppTypeChain")
+		testutil.NotNil(t, obj, "Object(problemAppTypeChain)")
 		testutil.NotNil(t, obj.Type(), "problemAppTypeChain type")
 		testutil.True(t, obj.Type().IsCounter(),
 			"MyCounter (based on Counter32) should report IsCounter()")
@@ -269,8 +269,8 @@ func TestTypePredicates(t *testing.T) {
 
 	t.Run("gauge type from problem MIBs", func(t *testing.T) {
 		pm := loadTypeChainsMIB(t)
-		obj := pm.FindObject("problemInheritedHint")
-		testutil.NotNil(t, obj, "FindObject(problemInheritedHint)")
+		obj := pm.Object("problemInheritedHint")
+		testutil.NotNil(t, obj, "Object(problemInheritedHint)")
 		testutil.NotNil(t, obj.Type(), "problemInheritedHint type")
 		testutil.True(t, obj.Type().IsGauge(),
 			"MySpecialGauge (based on Gauge32) should report IsGauge()")
@@ -278,8 +278,8 @@ func TestTypePredicates(t *testing.T) {
 
 	t.Run("IsBits", func(t *testing.T) {
 		pm := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
-		obj := pm.FindObject("problemDefvalMultiBits")
-		testutil.NotNil(t, obj, "FindObject(problemDefvalMultiBits)")
+		obj := pm.Object("problemDefvalMultiBits")
+		testutil.NotNil(t, obj, "Object(problemDefvalMultiBits)")
 		testutil.NotNil(t, obj.Type(), "problemDefvalMultiBits type")
 		testutil.Equal(t, mib.BaseBits, obj.Type().EffectiveBase(),
 			"BITS object should have BaseBits effective base")
@@ -295,8 +295,8 @@ func TestTypePredicates(t *testing.T) {
 func TestTypeParent(t *testing.T) {
 	m := loadTestMIB(t)
 
-	typ := m.FindType("DisplayString")
-	testutil.NotNil(t, typ, "FindType(DisplayString)")
+	typ := m.Type("DisplayString")
+	testutil.NotNil(t, typ, "Type(DisplayString)")
 
 	parent := typ.Parent()
 	testutil.NotNil(t, parent, "DisplayString Parent()")
@@ -309,8 +309,8 @@ func TestTypeParent(t *testing.T) {
 func TestTypeEnumLookup(t *testing.T) {
 	pm := loadTypeChainsMIB(t)
 
-	obj := pm.FindObject("problemEnumChain")
-	testutil.NotNil(t, obj, "FindObject(problemEnumChain)")
+	obj := pm.Object("problemEnumChain")
+	testutil.NotNil(t, obj, "Object(problemEnumChain)")
 	testutil.NotNil(t, obj.Type(), "problemEnumChain type")
 
 	typ := obj.Type()
@@ -512,7 +512,7 @@ func TestNodeLongestPrefix(t *testing.T) {
 func TestObjectDescription(t *testing.T) {
 	m := loadTestMIB(t)
 
-	obj := m.FindObject("sysDescr")
+	obj := m.Object("sysDescr")
 	if obj == nil {
 		t.Fatal("sysDescr not found")
 	}
@@ -526,7 +526,7 @@ func TestObjectDescription(t *testing.T) {
 func TestObjectNode(t *testing.T) {
 	m := loadTestMIB(t)
 
-	obj := m.FindObject("ifIndex")
+	obj := m.Object("ifIndex")
 	if obj == nil {
 		t.Fatal("ifIndex not found")
 	}
@@ -541,8 +541,8 @@ func TestObjectNode(t *testing.T) {
 func TestNotificationMetadataFields(t *testing.T) {
 	m := loadTestMIB(t)
 
-	notif := m.FindNotification("linkDown")
-	testutil.NotNil(t, notif, "FindNotification(linkDown)")
+	notif := m.Notification("linkDown")
+	testutil.NotNil(t, notif, "Notification(linkDown)")
 
 	node := notif.Node()
 	testutil.NotNil(t, node, "Notification.Node() should not be nil")
@@ -598,8 +598,8 @@ func TestModuleNotifications(t *testing.T) {
 func TestNotificationObjects(t *testing.T) {
 	m := loadTestMIB(t)
 
-	notif := m.FindNotification("linkDown")
-	testutil.NotNil(t, notif, "FindNotification(linkDown)")
+	notif := m.Notification("linkDown")
+	testutil.NotNil(t, notif, "Notification(linkDown)")
 
 	objects := notif.Objects()
 	testutil.NotEmpty(t, objects, "linkDown Objects()")
@@ -615,8 +615,8 @@ func TestNotificationObjects(t *testing.T) {
 func TestAugmentsEffectiveIndexes(t *testing.T) {
 	pm := loadSemanticsMIB(t)
 
-	entry := pm.FindObject("problemAugEntry")
-	testutil.NotNil(t, entry, "FindObject(problemAugEntry)")
+	entry := pm.Object("problemAugEntry")
+	testutil.NotNil(t, entry, "Object(problemAugEntry)")
 
 	// AUGMENTS { problemSemEntry } which has INDEX { problemSemIndex }
 	aug := entry.Augments()

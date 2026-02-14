@@ -11,7 +11,7 @@ import (
 type Module struct {
 	name         string
 	language     mib.Language
-	oid          mib.Oid
+	oid          mib.OID
 	organization string
 	contactInfo  string
 	description  string
@@ -22,7 +22,7 @@ type Module struct {
 	notifications []*Notification
 	groups        []*Group
 	compliances   []*Compliance
-	capabilities  []*Capabilities
+	capabilities  []*Capability
 	nodes         []*Node
 
 	// Name-indexed maps for O(1) lookups, populated by Add*() methods.
@@ -31,7 +31,7 @@ type Module struct {
 	notificationsByName map[string]*Notification
 	groupsByName        map[string]*Group
 	compliancesByName   map[string]*Compliance
-	capabilitiesByName  map[string]*Capabilities
+	capabilitiesByName  map[string]*Capability
 	nodesByName         map[string]*Node
 }
 
@@ -43,7 +43,7 @@ func (m *Module) Language() mib.Language {
 	return m.language
 }
 
-func (m *Module) OID() mib.Oid {
+func (m *Module) OID() mib.OID {
 	return slices.Clone(m.oid)
 }
 
@@ -141,11 +141,11 @@ func (m *Module) Compliance(name string) mib.Compliance {
 	return nil
 }
 
-func (m *Module) Capabilities() []mib.Capabilities {
-	return mapSlice(m.capabilities, func(v *Capabilities) mib.Capabilities { return v })
+func (m *Module) Capabilities() []mib.Capability {
+	return mapSlice(m.capabilities, func(v *Capability) mib.Capability { return v })
 }
 
-func (m *Module) CapabilitiesByName(name string) mib.Capabilities {
+func (m *Module) Capability(name string) mib.Capability {
 	if c := m.capabilitiesByName[name]; c != nil {
 		return c
 	}
@@ -156,7 +156,7 @@ func (m *Module) SetLanguage(l mib.Language) {
 	m.language = l
 }
 
-func (m *Module) SetOID(oid mib.Oid) {
+func (m *Module) SetOID(oid mib.OID) {
 	m.oid = oid
 }
 
@@ -216,10 +216,10 @@ func (m *Module) AddCompliance(c *Compliance) {
 	m.compliancesByName[c.name] = c
 }
 
-func (m *Module) AddCapabilities(c *Capabilities) {
+func (m *Module) AddCapability(c *Capability) {
 	m.capabilities = append(m.capabilities, c)
 	if m.capabilitiesByName == nil {
-		m.capabilitiesByName = make(map[string]*Capabilities)
+		m.capabilitiesByName = make(map[string]*Capability)
 	}
 	m.capabilitiesByName[c.name] = c
 }

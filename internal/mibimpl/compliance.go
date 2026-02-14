@@ -35,7 +35,7 @@ func (c *Compliance) Module() mib.Module {
 	return c.module
 }
 
-func (c *Compliance) OID() mib.Oid {
+func (c *Compliance) OID() mib.OID {
 	if c.node == nil {
 		return nil
 	}

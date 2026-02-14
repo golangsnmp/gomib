@@ -403,7 +403,7 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *mibimp
 	case defModuleCompliance:
 		node.SetKind(mib.KindCompliance)
 	case defAgentCapabilities:
-		node.SetKind(mib.KindCapabilities)
+		node.SetKind(mib.KindCapability)
 	}
 	node.SetName(label)
 

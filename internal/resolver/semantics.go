@@ -522,7 +522,7 @@ func createResolvedCapabilities(ctx *resolverContext) {
 			continue
 		}
 
-		resolved := mibimpl.NewCapabilities(cap.Name)
+		resolved := mibimpl.NewCapability(cap.Name)
 		resolved.SetNode(node)
 		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
 		resolved.SetStatus(cap.Status)
@@ -531,12 +531,12 @@ func createResolvedCapabilities(ctx *resolverContext) {
 		resolved.SetProductRelease(cap.ProductRelease)
 		resolved.SetSupports(convertSupportsModules(cap.Supports))
 
-		ctx.Builder.AddCapabilities(resolved)
-		node.SetCapabilities(resolved)
+		ctx.Builder.AddCapability(resolved)
+		node.SetCapability(resolved)
 		created++
 
 		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
-			resolvedMod.AddCapabilities(resolved)
+			resolvedMod.AddCapability(resolved)
 		}
 	}
 
@@ -668,7 +668,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		// the name is actually an OID reference.
 		if isOIDType(syntax) {
 			if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
-				oid := mib.Oid(node.OID())
+				oid := mib.OID(node.OID())
 				dv := mib.NewDefValOID(oid, v.Name)
 				return &dv
 			}
@@ -684,7 +684,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		return &dv
 	case *module.DefValOidRef:
 		if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
-			oid := mib.Oid(node.OID())
+			oid := mib.OID(node.OID())
 			dv := mib.NewDefValOID(oid, v.Name)
 			return &dv
 		}
@@ -711,7 +711,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		if !ok {
 			return nil
 		}
-		oid := mib.Oid(node.OID())
+		oid := mib.OID(node.OID())
 		for _, comp := range v.Components[1:] {
 			switch c := comp.(type) {
 			case *module.OidComponentNumber:

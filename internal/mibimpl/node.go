@@ -18,7 +18,7 @@ type Node struct {
 	notif        *Notification
 	group        *Group
 	compliance   *Compliance
-	capabilities *Capabilities
+	capabilities *Capability
 	parent       *Node
 	children     map[uint32]*Node
 	sortedCache  []*Node // lazily computed sorted children; nil = invalidated
@@ -41,7 +41,7 @@ func (n *Node) IsRoot() bool {
 }
 
 // Module returns the module that defines this node's primary entity.
-// Priority: object > notification > group > compliance > capabilities > base module.
+// Priority: object > notification > group > compliance > capability > base module.
 // The most specific entity type wins because it represents the definition
 // that gives the node its semantic meaning.
 func (n *Node) Module() mib.Module {
@@ -66,12 +66,12 @@ func (n *Node) Module() mib.Module {
 	return nil
 }
 
-func (n *Node) OID() mib.Oid {
+func (n *Node) OID() mib.OID {
 	if n.parent == nil {
 		return nil
 	}
 	// Collect arcs bottom-up in a single traversal, then reverse.
-	var arcs mib.Oid
+	var arcs mib.OID
 	for nd := n; nd.parent != nil; nd = nd.parent {
 		arcs = append(arcs, nd.arc)
 	}
@@ -107,7 +107,7 @@ func (n *Node) Compliance() mib.Compliance {
 	return n.compliance
 }
 
-func (n *Node) Capabilities() mib.Capabilities {
+func (n *Node) Capability() mib.Capability {
 	if n.capabilities == nil {
 		return nil
 	}
@@ -156,7 +156,7 @@ func (n *Node) sortedChildren() []*Node {
 	return result
 }
 
-func (n *Node) Descendants() iter.Seq[mib.Node] {
+func (n *Node) Subtree() iter.Seq[mib.Node] {
 	return func(yield func(mib.Node) bool) {
 		n.yieldAll(yield)
 	}
@@ -174,7 +174,7 @@ func (n *Node) yieldAll(yield func(mib.Node) bool) bool {
 	return true
 }
 
-func (n *Node) LongestPrefix(oid mib.Oid) mib.Node {
+func (n *Node) LongestPrefix(oid mib.OID) mib.Node {
 	if len(oid) == 0 {
 		return nil
 	}
@@ -255,7 +255,7 @@ func (n *Node) SetCompliance(c *Compliance) {
 	n.compliance = c
 }
 
-func (n *Node) SetCapabilities(c *Capabilities) {
+func (n *Node) SetCapability(c *Capability) {
 	n.capabilities = c
 }
 
@@ -279,8 +279,8 @@ func (n *Node) InternalCompliance() *Compliance {
 	return n.compliance
 }
 
-// InternalCapabilities returns the concrete capabilities.
-func (n *Node) InternalCapabilities() *Capabilities {
+// InternalCapability returns the concrete capability.
+func (n *Node) InternalCapability() *Capability {
 	return n.capabilities
 }
 

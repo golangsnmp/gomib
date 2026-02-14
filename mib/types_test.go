@@ -19,7 +19,7 @@ func TestDefValString(t *testing.T) {
 		{"bits multiple", NewDefValBits([]string{"read", "write"}, "{ read, write }"), "{ read, write }"},
 		{"bits empty", NewDefValBits([]string{}, "{ }"), "{ }"},
 		{"bits single", NewDefValBits([]string{"read"}, "{ read }"), "{ read }"},
-		{"oid", NewDefValOID(Oid{0, 0}, "zeroDotZero"), "zeroDotZero"},
+		{"oid", NewDefValOID(OID{0, 0}, "zeroDotZero"), "zeroDotZero"},
 		{"bytes empty", NewDefValBytes([]byte{}, "''H"), "0"},
 		{"bytes 1 byte", NewDefValBytes([]byte{0xFF}, "'FF'H"), "255"},
 		{"bytes 4 bytes", NewDefValBytes([]byte{0xDE, 0xAD, 0xBE, 0xEF}, "'DEADBEEF'H"), "3735928559"},
@@ -62,7 +62,7 @@ func TestDefValKind(t *testing.T) {
 		{"bytes", NewDefValBytes([]byte{1}, "x"), DefValKindBytes},
 		{"enum", NewDefValEnum("x", "x"), DefValKindEnum},
 		{"bits", NewDefValBits([]string{"x"}, "x"), DefValKindBits},
-		{"oid", NewDefValOID(Oid{1}, "1"), DefValKindOID},
+		{"oid", NewDefValOID(OID{1}, "1"), DefValKindOID},
 	}
 
 	for _, tt := range tests {
@@ -154,10 +154,10 @@ func TestDefValAs(t *testing.T) {
 	})
 
 	t.Run("oid match", func(t *testing.T) {
-		dv := NewDefValOID(Oid{1, 3}, "1.3")
-		v, ok := DefValAs[Oid](dv)
+		dv := NewDefValOID(OID{1, 3}, "1.3")
+		v, ok := DefValAs[OID](dv)
 		if !ok {
-			t.Fatal("DefValAs[Oid] should succeed")
+			t.Fatal("DefValAs[OID] should succeed")
 		}
 		if v.String() != "1.3" {
 			t.Errorf("got %v, want 1.3", v)

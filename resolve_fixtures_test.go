@@ -16,7 +16,7 @@ func TestResolveOIDs(t *testing.T) {
 
 			for oid, fn := range fixture {
 				t.Run(fn.Name, func(t *testing.T) {
-					node := m.FindNode(fn.Name)
+					node := m.Node(fn.Name)
 					if node == nil {
 						t.Errorf("divergence: gomib cannot find node %q (fixture OID %s)", fn.Name, oid)
 						return
@@ -44,7 +44,7 @@ func TestResolveTypes(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					obj := m.FindObject(fn.Name)
+					obj := m.Object(fn.Name)
 					if obj == nil {
 						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
@@ -96,7 +96,7 @@ func TestResolveEnums(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					obj := m.FindObject(fn.Name)
+					obj := m.Object(fn.Name)
 					if obj == nil {
 						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
@@ -131,7 +131,7 @@ func TestResolveBits(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					obj := m.FindObject(fn.Name)
+					obj := m.Object(fn.Name)
 					if obj == nil {
 						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
@@ -164,7 +164,7 @@ func TestResolveTables(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					obj := m.FindObject(fn.Name)
+					obj := m.Object(fn.Name)
 					if obj == nil {
 						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
@@ -217,7 +217,7 @@ func TestResolveAccess(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					obj := m.FindObject(fn.Name)
+					obj := m.Object(fn.Name)
 					if obj == nil {
 						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
@@ -249,9 +249,9 @@ func TestResolveStatus(t *testing.T) {
 
 				t.Run(fn.Name, func(t *testing.T) {
 					gomibStatus := ""
-					if obj := m.FindObject(fn.Name); obj != nil {
+					if obj := m.Object(fn.Name); obj != nil {
 						gomibStatus = testutil.NormalizeStatus(obj.Status())
-					} else if notif := m.FindNotification(fn.Name); notif != nil {
+					} else if notif := m.Notification(fn.Name); notif != nil {
 						gomibStatus = testutil.NormalizeStatus(notif.Status())
 					} else {
 						t.Errorf("divergence: gomib does not have node %q", fn.Name)
@@ -284,7 +284,7 @@ func TestResolveRanges(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					obj := m.FindObject(fn.Name)
+					obj := m.Object(fn.Name)
 					if obj == nil {
 						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
@@ -319,7 +319,7 @@ func TestResolveNotifications(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					notif := m.FindNotification(fn.Name)
+					notif := m.Notification(fn.Name)
 					if notif == nil {
 						t.Errorf("divergence: gomib does not have notification %q", fn.Name)
 						return
@@ -368,7 +368,7 @@ func TestResolveUnits(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					obj := m.FindObject(fn.Name)
+					obj := m.Object(fn.Name)
 					if obj == nil {
 						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
@@ -401,7 +401,7 @@ func TestResolveDefval(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					obj := m.FindObject(fn.Name)
+					obj := m.Object(fn.Name)
 					if obj == nil {
 						t.Errorf("divergence: gomib does not have object %q", fn.Name)
 						return
@@ -439,9 +439,9 @@ func TestResolveReference(t *testing.T) {
 
 				t.Run(fn.Name, func(t *testing.T) {
 					gomibRef := ""
-					if obj := m.FindObject(fn.Name); obj != nil {
+					if obj := m.Object(fn.Name); obj != nil {
 						gomibRef = obj.Reference()
-					} else if notif := m.FindNotification(fn.Name); notif != nil {
+					} else if notif := m.Notification(fn.Name); notif != nil {
 						gomibRef = notif.Reference()
 					} else {
 						t.Errorf("divergence: gomib does not have node %q", fn.Name)
@@ -471,7 +471,7 @@ func TestResolveModule(t *testing.T) {
 				}
 
 				t.Run(fn.Name, func(t *testing.T) {
-					node := m.FindNode(fn.Name)
+					node := m.Node(fn.Name)
 					if node == nil {
 						t.Errorf("divergence: gomib cannot find node %q", fn.Name)
 						return

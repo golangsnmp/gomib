@@ -77,7 +77,7 @@ const (
 	KindNotification      // NOTIFICATION-TYPE or TRAP-TYPE
 	KindGroup             // OBJECT-GROUP or NOTIFICATION-GROUP
 	KindCompliance        // MODULE-COMPLIANCE
-	KindCapabilities      // AGENT-CAPABILITIES
+	KindCapability        // AGENT-CAPABILITIES
 )
 
 func (k Kind) String() string {
@@ -102,7 +102,7 @@ func (k Kind) String() string {
 		return "group"
 	case KindCompliance:
 		return "compliance"
-	case KindCapabilities:
+	case KindCapability:
 		return "capabilities"
 	default:
 		return fmt.Sprintf("Kind(%d)", k)
@@ -122,7 +122,7 @@ func (k Kind) IsObjectType() bool {
 // IsConformance reports whether this is a group/compliance/capabilities node.
 func (k Kind) IsConformance() bool {
 	switch k {
-	case KindGroup, KindCompliance, KindCapabilities:
+	case KindGroup, KindCompliance, KindCapability:
 		return true
 	default:
 		return false

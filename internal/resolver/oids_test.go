@@ -607,7 +607,7 @@ func TestFinalizeOidDefinition(t *testing.T) {
 		{"ObjectGroup", defObjectGroup, mib.KindGroup},
 		{"NotificationGroup", defNotificationGroup, mib.KindGroup},
 		{"ModuleCompliance", defModuleCompliance, mib.KindCompliance},
-		{"AgentCapabilities", defAgentCapabilities, mib.KindCapabilities},
+		{"AgentCapabilities", defAgentCapabilities, mib.KindCapability},
 	}
 
 	for _, tt := range tests {

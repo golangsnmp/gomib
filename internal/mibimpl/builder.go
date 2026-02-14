@@ -49,7 +49,7 @@ func (b *Builder) RegisterNode(name string, n *Node) {
 }
 
 // GetOrCreateNode walks the OID tree, creating intermediate nodes as needed.
-func (b *Builder) GetOrCreateNode(oid mib.Oid) *Node {
+func (b *Builder) GetOrCreateNode(oid mib.OID) *Node {
 	nd := b.data.root
 	for _, arc := range oid {
 		nd = nd.GetOrCreateChild(arc)
@@ -99,8 +99,8 @@ func (b *Builder) AddCompliance(c *Compliance) {
 	b.data.compliances = append(b.data.compliances, c)
 }
 
-// AddCapabilities registers a resolved agent capabilities statement.
-func (b *Builder) AddCapabilities(c *Capabilities) {
+// AddCapability registers a resolved agent capability statement.
+func (b *Builder) AddCapability(c *Capability) {
 	b.data.capabilities = append(b.data.capabilities, c)
 }
 
@@ -144,8 +144,8 @@ func (b *Builder) ComplianceCount() int {
 	return len(b.data.compliances)
 }
 
-// CapabilitiesCount reports the number of registered capabilities.
-func (b *Builder) CapabilitiesCount() int {
+// CapabilityCount reports the number of registered capabilities.
+func (b *Builder) CapabilityCount() int {
 	return len(b.data.capabilities)
 }
 
@@ -198,9 +198,9 @@ func NewCompliance(name string) *Compliance {
 	return &Compliance{name: name}
 }
 
-// NewCapabilities returns a Capabilities initialized with the given name.
-func NewCapabilities(name string) *Capabilities {
-	return &Capabilities{name: name}
+// NewCapability returns a Capability initialized with the given name.
+func NewCapability(name string) *Capability {
+	return &Capability{name: name}
 }
 
 // EmptyMib returns a Mib with no modules or definitions loaded.

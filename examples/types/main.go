@@ -30,7 +30,7 @@ func main() {
 
 	// Walk the type chain for DisplayString
 	fmt.Println("=== Type chain: DisplayString ===")
-	typ := m.FindType("DisplayString")
+	typ := m.Type("DisplayString")
 	for t := typ; t != nil; t = t.Parent() {
 		fmt.Printf("  %s (base: %s)\n", t.Name(), t.Base())
 		if t.IsTextualConvention() {
@@ -54,7 +54,7 @@ func main() {
 
 	// Enumeration type (ifType -> IANAifType)
 	fmt.Println("\n=== Enum type: ifType ===")
-	obj := m.FindObject("ifType")
+	obj := m.Object("ifType")
 	if obj != nil {
 		fmt.Printf("  object type: %s\n", obj.Type().Name())
 		fmt.Printf("  is enum:     %v\n", obj.Type().IsEnumeration())
@@ -71,7 +71,7 @@ func main() {
 
 	// InterfaceIndex - TC with range constraint
 	fmt.Println("\n=== Textual convention: InterfaceIndex ===")
-	tc := m.FindType("InterfaceIndex")
+	tc := m.Type("InterfaceIndex")
 	if tc != nil {
 		fmt.Printf("  TC:     %v\n", tc.IsTextualConvention())
 		fmt.Printf("  Base:   %s\n", tc.Base())
@@ -82,7 +82,7 @@ func main() {
 	// Classification helpers
 	fmt.Println("\n=== Type classification ===")
 	for _, name := range []string{"ifIndex", "ifDescr", "ifType", "ifInOctets", "ifSpeed"} {
-		o := m.FindObject(name)
+		o := m.Object(name)
 		if o == nil || o.Type() == nil {
 			continue
 		}

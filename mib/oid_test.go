@@ -61,20 +61,20 @@ func TestParseOIDTrailingDot(t *testing.T) {
 func TestOidString(t *testing.T) {
 	tests := []struct {
 		name string
-		oid  Oid
+		oid  OID
 		want string
 	}{
 		{"nil", nil, ""},
-		{"empty", Oid{}, ""},
-		{"single", Oid{1}, "1"},
-		{"multi", Oid{1, 3, 6, 1}, "1.3.6.1"},
+		{"empty", OID{}, ""},
+		{"single", OID{1}, "1"},
+		{"multi", OID{1, 3, 6, 1}, "1.3.6.1"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.oid.String()
 			if got != tt.want {
-				t.Errorf("Oid.String() = %q, want %q", got, tt.want)
+				t.Errorf("OID.String() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -83,14 +83,14 @@ func TestOidString(t *testing.T) {
 func TestOidParent(t *testing.T) {
 	tests := []struct {
 		name    string
-		oid     Oid
+		oid     OID
 		wantNil bool
 		want    string
 	}{
 		{"nil", nil, true, ""},
-		{"single", Oid{1}, true, ""},
-		{"two arcs", Oid{1, 3}, false, "1"},
-		{"long", Oid{1, 3, 6, 1, 2, 1}, false, "1.3.6.1.2"},
+		{"single", OID{1}, true, ""},
+		{"two arcs", OID{1, 3}, false, "1"},
+		{"long", OID{1, 3, 6, 1, 2, 1}, false, "1.3.6.1.2"},
 	}
 
 	for _, tt := range tests {
@@ -110,7 +110,7 @@ func TestOidParent(t *testing.T) {
 }
 
 func TestOidParentDoesNotMutate(t *testing.T) {
-	original := Oid{1, 3, 6}
+	original := OID{1, 3, 6}
 	parent := original.Parent()
 	// Mutating parent should not affect original
 	if parent != nil {
@@ -122,7 +122,7 @@ func TestOidParentDoesNotMutate(t *testing.T) {
 }
 
 func TestOidChild(t *testing.T) {
-	oid := Oid{1, 3, 6}
+	oid := OID{1, 3, 6}
 	child := oid.Child(1)
 	if child.String() != "1.3.6.1" {
 		t.Errorf("Child(1) = %q, want 1.3.6.1", child.String())
@@ -134,7 +134,7 @@ func TestOidChild(t *testing.T) {
 	}
 
 	// Nil oid
-	var nilOid Oid
+	var nilOid OID
 	c := nilOid.Child(1)
 	if c.String() != "1" {
 		t.Errorf("nil.Child(1) = %q, want 1", c.String())
@@ -144,18 +144,18 @@ func TestOidChild(t *testing.T) {
 func TestOidHasPrefix(t *testing.T) {
 	tests := []struct {
 		name   string
-		oid    Oid
-		prefix Oid
+		oid    OID
+		prefix OID
 		want   bool
 	}{
-		{"exact match", Oid{1, 3, 6}, Oid{1, 3, 6}, true},
-		{"prefix match", Oid{1, 3, 6, 1}, Oid{1, 3}, true},
-		{"no match", Oid{1, 3, 6}, Oid{1, 4}, false},
-		{"prefix longer", Oid{1, 3}, Oid{1, 3, 6}, false},
-		{"empty prefix", Oid{1, 3, 6}, Oid{}, true},
-		{"nil prefix", Oid{1, 3}, nil, true},
-		{"nil oid", nil, Oid{1}, false},
-		{"both empty", Oid{}, Oid{}, true},
+		{"exact match", OID{1, 3, 6}, OID{1, 3, 6}, true},
+		{"prefix match", OID{1, 3, 6, 1}, OID{1, 3}, true},
+		{"no match", OID{1, 3, 6}, OID{1, 4}, false},
+		{"prefix longer", OID{1, 3}, OID{1, 3, 6}, false},
+		{"empty prefix", OID{1, 3, 6}, OID{}, true},
+		{"nil prefix", OID{1, 3}, nil, true},
+		{"nil oid", nil, OID{1}, false},
+		{"both empty", OID{}, OID{}, true},
 	}
 
 	for _, tt := range tests {
@@ -171,14 +171,14 @@ func TestOidHasPrefix(t *testing.T) {
 func TestOidEqual(t *testing.T) {
 	tests := []struct {
 		name string
-		a, b Oid
+		a, b OID
 		want bool
 	}{
-		{"equal", Oid{1, 3, 6}, Oid{1, 3, 6}, true},
-		{"different", Oid{1, 3, 6}, Oid{1, 3, 7}, false},
-		{"different length", Oid{1, 3}, Oid{1, 3, 6}, false},
+		{"equal", OID{1, 3, 6}, OID{1, 3, 6}, true},
+		{"different", OID{1, 3, 6}, OID{1, 3, 7}, false},
+		{"different length", OID{1, 3}, OID{1, 3, 6}, false},
 		{"both nil", nil, nil, true},
-		{"one nil", Oid{1}, nil, false},
+		{"one nil", OID{1}, nil, false},
 	}
 
 	for _, tt := range tests {
@@ -194,14 +194,14 @@ func TestOidEqual(t *testing.T) {
 func TestOidCompare(t *testing.T) {
 	tests := []struct {
 		name string
-		a, b Oid
+		a, b OID
 		want int
 	}{
-		{"equal", Oid{1, 3, 6}, Oid{1, 3, 6}, 0},
-		{"less by value", Oid{1, 3, 5}, Oid{1, 3, 6}, -1},
-		{"greater by value", Oid{1, 3, 7}, Oid{1, 3, 6}, 1},
-		{"less by length", Oid{1, 3}, Oid{1, 3, 6}, -1},
-		{"greater by length", Oid{1, 3, 6}, Oid{1, 3}, 1},
+		{"equal", OID{1, 3, 6}, OID{1, 3, 6}, 0},
+		{"less by value", OID{1, 3, 5}, OID{1, 3, 6}, -1},
+		{"greater by value", OID{1, 3, 7}, OID{1, 3, 6}, 1},
+		{"less by length", OID{1, 3}, OID{1, 3, 6}, -1},
+		{"greater by length", OID{1, 3, 6}, OID{1, 3}, 1},
 	}
 
 	for _, tt := range tests {
@@ -217,12 +217,12 @@ func TestOidCompare(t *testing.T) {
 func TestOidLastArc(t *testing.T) {
 	tests := []struct {
 		name string
-		oid  Oid
+		oid  OID
 		want uint32
 	}{
-		{"normal", Oid{1, 3, 6}, 6},
-		{"single", Oid{42}, 42},
-		{"empty", Oid{}, 0},
+		{"normal", OID{1, 3, 6}, 6},
+		{"single", OID{42}, 42},
+		{"empty", OID{}, 0},
 		{"nil", nil, 0},
 	}
 

@@ -63,56 +63,56 @@ func TestModuleGroupLookup(t *testing.T) {
 		"non-existent group should return nil")
 }
 
-func TestFindGroupByName(t *testing.T) {
+func TestGroupByName(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.FindGroup("snmpGroup")
-	testutil.NotNil(t, g, "FindGroup(snmpGroup) should not be nil")
+	g := m.Group("snmpGroup")
+	testutil.NotNil(t, g, "Group(snmpGroup) should not be nil")
 	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 }
 
-func TestFindGroupByQualifiedName(t *testing.T) {
+func TestGroupByQualifiedName(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.FindGroup("SNMPv2-MIB::snmpGroup")
-	testutil.NotNil(t, g, "FindGroup(SNMPv2-MIB::snmpGroup) should not be nil")
+	g := m.Group("SNMPv2-MIB::snmpGroup")
+	testutil.NotNil(t, g, "Group(SNMPv2-MIB::snmpGroup) should not be nil")
 	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 
-	testutil.Nil(t, m.FindGroup("IF-MIB::snmpGroup"),
+	testutil.Nil(t, m.Group("IF-MIB::snmpGroup"),
 		"snmpGroup should not be in IF-MIB")
 }
 
-func TestFindGroupByOID(t *testing.T) {
+func TestGroupByOID(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.FindGroup("snmpGroup")
-	testutil.NotNil(t, g, "FindGroup(snmpGroup)")
+	g := m.Group("snmpGroup")
+	testutil.NotNil(t, g, "Group(snmpGroup)")
 
 	oid := g.OID().String()
 
-	g2 := m.FindGroup(oid)
-	testutil.NotNil(t, g2, "FindGroup by numeric OID %s should work", oid)
+	g2 := m.Group(oid)
+	testutil.NotNil(t, g2, "Group by numeric OID %s should work", oid)
 	testutil.Equal(t, "snmpGroup", g2.Name(), "group found by OID")
 
-	g3 := m.FindGroup("." + oid)
-	testutil.NotNil(t, g3, "FindGroup by dotted OID .%s should work", oid)
+	g3 := m.Group("." + oid)
+	testutil.NotNil(t, g3, "Group by dotted OID .%s should work", oid)
 }
 
-func TestFindGroupNotFound(t *testing.T) {
+func TestGroupNotFound(t *testing.T) {
 	m := loadTestMIB(t)
 
-	testutil.Nil(t, m.FindGroup("noSuchGroup"),
+	testutil.Nil(t, m.Group("noSuchGroup"),
 		"non-existent group name should return nil")
-	testutil.Nil(t, m.FindGroup("99.99.99"),
+	testutil.Nil(t, m.Group("99.99.99"),
 		"non-existent OID should return nil")
-	testutil.Nil(t, m.FindGroup("FAKE-MIB::snmpGroup"),
+	testutil.Nil(t, m.Group("FAKE-MIB::snmpGroup"),
 		"non-existent module should return nil")
 }
 
 func TestGroupMetadata(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.FindGroup("snmpGroup")
+	g := m.Group("snmpGroup")
 	if g == nil {
 		t.Fatal("snmpGroup not found")
 	}
@@ -143,7 +143,7 @@ func TestGroupMetadata(t *testing.T) {
 func TestObjectGroupMembers(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.FindGroup("snmpGroup")
+	g := m.Group("snmpGroup")
 	if g == nil {
 		t.Fatal("snmpGroup not found")
 	}
@@ -166,7 +166,7 @@ func TestObjectGroupMembers(t *testing.T) {
 func TestNotificationGroupMembers(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.FindGroup("snmpBasicNotificationsGroup")
+	g := m.Group("snmpBasicNotificationsGroup")
 	if g == nil {
 		t.Fatal("snmpBasicNotificationsGroup not found")
 	}
@@ -191,7 +191,7 @@ func TestNotificationGroupMembers(t *testing.T) {
 func TestNodeGroup(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.FindNode("snmpGroup")
+	node := m.Node("snmpGroup")
 	if node == nil {
 		t.Fatal("snmpGroup node not found")
 	}
@@ -200,7 +200,7 @@ func TestNodeGroup(t *testing.T) {
 	testutil.NotNil(t, g, "group node should have Group()")
 	testutil.Equal(t, "snmpGroup", g.Name(), "node Group() name")
 
-	ifIndex := m.FindNode("ifIndex")
+	ifIndex := m.Node("ifIndex")
 	if ifIndex == nil {
 		t.Fatal("ifIndex not found")
 	}
@@ -210,7 +210,7 @@ func TestNodeGroup(t *testing.T) {
 func TestGroupNodeModule(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.FindNode("snmpGroup")
+	node := m.Node("snmpGroup")
 	if node == nil {
 		t.Fatal("snmpGroup node not found")
 	}
@@ -226,8 +226,8 @@ func TestSmallObjectGroup(t *testing.T) {
 
 	// snmpCommunityGroup has 2 members:
 	// OBJECTS { snmpInBadCommunityNames, snmpInBadCommunityUses }
-	g := m.FindGroup("snmpCommunityGroup")
-	testutil.NotNil(t, g, "FindGroup(snmpCommunityGroup)")
+	g := m.Group("snmpCommunityGroup")
+	testutil.NotNil(t, g, "Group(snmpCommunityGroup)")
 
 	testutil.False(t, g.IsNotificationGroup(),
 		"snmpCommunityGroup is an OBJECT-GROUP")
@@ -240,8 +240,8 @@ func TestWarmStartNotificationGroup(t *testing.T) {
 
 	// snmpWarmStartNotificationGroup NOTIFICATION-GROUP
 	// NOTIFICATIONS { warmStart }
-	g := m.FindGroup("snmpWarmStartNotificationGroup")
-	testutil.NotNil(t, g, "FindGroup(snmpWarmStartNotificationGroup)")
+	g := m.Group("snmpWarmStartNotificationGroup")
+	testutil.NotNil(t, g, "Group(snmpWarmStartNotificationGroup)")
 
 	testutil.True(t, g.IsNotificationGroup(),
 		"snmpWarmStartNotificationGroup should be a NOTIFICATION-GROUP")

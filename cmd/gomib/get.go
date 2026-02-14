@@ -105,7 +105,7 @@ func cmdGet(args []string) int {
 		return 2
 	}
 
-	node := mib.FindNode(query)
+	node := mib.Node(query)
 	if node == nil {
 		printError("not found: %s", query)
 		return 1

@@ -79,7 +79,7 @@ func TestTypeFallbackPermissiveOnly(t *testing.T) {
 
 		for _, tt := range smiTypes {
 			t.Run(tt.object, func(t *testing.T) {
-				obj := m.FindObject(tt.object)
+				obj := m.Object(tt.object)
 				testutil.NotNil(t, obj, "object should exist (OID resolves via imported enterprises)")
 				testutil.Nil(t, obj.Type(), "type should be nil in strict mode (no global type fallback)")
 				testutil.True(t, unresolved[tt.wantBase.String()],
@@ -94,7 +94,7 @@ func TestTypeFallbackPermissiveOnly(t *testing.T) {
 
 		for _, tt := range smiTypes {
 			t.Run(tt.object, func(t *testing.T) {
-				obj := m.FindObject(tt.object)
+				obj := m.Object(tt.object)
 				testutil.NotNil(t, obj, "object should exist (OID resolves via imported enterprises)")
 				// Normal mode (level 3) does NOT enable best-guess fallbacks (level >= 5),
 				// so global type lookup is disabled - same outcome as strict for types.
@@ -111,7 +111,7 @@ func TestTypeFallbackPermissiveOnly(t *testing.T) {
 
 		for _, tt := range smiTypes {
 			t.Run(tt.object, func(t *testing.T) {
-				obj := m.FindObject(tt.object)
+				obj := m.Object(tt.object)
 				testutil.NotNil(t, obj, "object should exist")
 				if obj == nil {
 					return
@@ -157,7 +157,7 @@ func TestTCFallbackStrictness(t *testing.T) {
 
 			for _, tc := range tcObjects {
 				t.Run(tc.name, func(t *testing.T) {
-					obj := m.FindObject(tc.name)
+					obj := m.Object(tc.name)
 					testutil.NotNil(t, obj, "object should exist (OID resolves)")
 					if obj == nil {
 						return
@@ -175,7 +175,7 @@ func TestTCFallbackStrictness(t *testing.T) {
 
 		for _, tc := range tcObjects {
 			t.Run(tc.name, func(t *testing.T) {
-				obj := m.FindObject(tc.name)
+				obj := m.Object(tc.name)
 				testutil.NotNil(t, obj, "object should resolve")
 				if obj == nil {
 					return
@@ -225,9 +225,9 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 		testutil.True(t, unresolvedOids["enterprises"],
 			"enterprises OID should be unresolved")
 
-		testutil.Nil(t, m.FindObject("problemAliasString"),
+		testutil.Nil(t, m.Object("problemAliasString"),
 			"problemAliasString should not resolve in strict mode")
-		testutil.Nil(t, m.FindObject("problemAliasInteger"),
+		testutil.Nil(t, m.Object("problemAliasInteger"),
 			"problemAliasInteger should not resolve in strict mode")
 	})
 
@@ -241,13 +241,13 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 		testutil.Equal(t, 0, len(unresolvedImports),
 			"no imports should be unresolved with alias fallback")
 
-		str := m.FindObject("problemAliasString")
+		str := m.Object("problemAliasString")
 		testutil.NotNil(t, str, "problemAliasString should resolve in normal mode")
 		testutil.NotNil(t, str.Type(), "type should resolve")
 		testutil.Equal(t, mib.BaseOctetString, str.Type().EffectiveBase(),
 			"DisplayString base type should be OCTET STRING")
 
-		intObj := m.FindObject("problemAliasInteger")
+		intObj := m.Object("problemAliasInteger")
 		testutil.NotNil(t, intObj, "problemAliasInteger should resolve in normal mode")
 		testutil.NotNil(t, intObj.Type(), "type should resolve")
 		testutil.Equal(t, mib.BaseInteger32, intObj.Type().EffectiveBase(),
@@ -263,14 +263,14 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 		testutil.Equal(t, 0, len(unresolvedImports),
 			"no imports should be unresolved with alias fallback")
 
-		str := m.FindObject("problemAliasString")
+		str := m.Object("problemAliasString")
 		testutil.NotNil(t, str, "problemAliasString should resolve in permissive mode")
 		if str != nil && str.Type() != nil {
 			testutil.Equal(t, mib.BaseOctetString, str.Type().EffectiveBase(),
 				"DisplayString base type should be OCTET STRING")
 		}
 
-		intObj := m.FindObject("problemAliasInteger")
+		intObj := m.Object("problemAliasInteger")
 		testutil.NotNil(t, intObj, "problemAliasInteger should resolve in permissive mode")
 		if intObj != nil && intObj.Type() != nil {
 			testutil.Equal(t, mib.BaseInteger32, intObj.Type().EffectiveBase(),
@@ -318,7 +318,7 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 
 		testutil.True(t, unresolvedOids["enterprises"],
 			"enterprises OID should be unresolved in strict mode")
-		testutil.Nil(t, m.FindObject("testObject"),
+		testutil.Nil(t, m.Object("testObject"),
 			"testObject should not resolve (OID chain broken)")
 	})
 
@@ -330,7 +330,7 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 		// Global OID root lookup requires best-guess (level >= 5).
 		testutil.True(t, len(unresolvedOids) > 0,
 			"should have unresolved OIDs in normal mode")
-		testutil.Nil(t, m.FindObject("testObject"),
+		testutil.Nil(t, m.Object("testObject"),
 			"testObject should not resolve in normal mode")
 	})
 
@@ -341,7 +341,7 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 		testutil.Equal(t, 0, len(unresolvedOids),
 			"no OID should be unresolved in permissive mode")
 
-		obj := m.FindObject("testObject")
+		obj := m.Object("testObject")
 		testutil.NotNil(t, obj, "testObject should resolve in permissive mode")
 		// enterprises = 1.3.6.1.4.1, MIB = .99999, object = .1
 		testutil.Equal(t, "1.3.6.1.4.1.99999.1", obj.OID().String(),
@@ -391,8 +391,8 @@ func TestStrictnessLevelBoundaries(t *testing.T) {
 func TestImportForwardingTypeResolution(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-FORWARDING-MIB", mib.StrictnessNormal)
 
-	obj := m.FindObject("problemForwardedTypeObject")
-	testutil.NotNil(t, obj, "FindObject(problemForwardedTypeObject)")
+	obj := m.Object("problemForwardedTypeObject")
+	testutil.NotNil(t, obj, "Object(problemForwardedTypeObject)")
 
 	typ := obj.Type()
 	testutil.NotNil(t, typ, "Type()")
@@ -410,8 +410,8 @@ func TestImportForwardingTypeResolution(t *testing.T) {
 func TestImportForwardingOidResolution(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-FORWARDING-MIB", mib.StrictnessNormal)
 
-	obj := m.FindObject("problemForwardedOidObject")
-	testutil.NotNil(t, obj, "FindObject(problemForwardedOidObject)")
+	obj := m.Object("problemForwardedOidObject")
+	testutil.NotNil(t, obj, "Object(problemForwardedOidObject)")
 
 	// forwardedSourceRoot = enterprises.99998.20.1
 	// problemForwardedOidObject = forwardedSourceRoot.10
@@ -457,8 +457,8 @@ func TestImportForwardingRequiresSafeFallbacks(t *testing.T) {
 func TestImportForwardingSourceModuleCorrectness(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-FORWARDING-MIB", mib.StrictnessNormal)
 
-	srcObj := m.FindObject("forwardedSourceObject")
-	testutil.NotNil(t, srcObj, "FindObject(forwardedSourceObject)")
+	srcObj := m.Object("forwardedSourceObject")
+	testutil.NotNil(t, srcObj, "Object(forwardedSourceObject)")
 
 	testutil.NotNil(t, srcObj.Module(), "Module()")
 
@@ -471,7 +471,7 @@ func TestImportForwardingSourceModuleCorrectness(t *testing.T) {
 func TestImportForwardingRelayOwnObjects(t *testing.T) {
 	m := loadAtStrictness(t, "PROBLEM-FORWARDING-RELAY-MIB", mib.StrictnessNormal)
 
-	obj := m.FindObject("relayOwnObject")
+	obj := m.Object("relayOwnObject")
 	testutil.NotNil(t, obj, "relay module's own object should resolve")
 	if obj == nil {
 		return

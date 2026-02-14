@@ -24,14 +24,14 @@ type Group = mib.Group
 // Compliance is a MODULE-COMPLIANCE definition.
 type Compliance = mib.Compliance
 
-// Capabilities is an AGENT-CAPABILITIES definition.
-type Capabilities = mib.Capabilities
+// Capability is an AGENT-CAPABILITIES definition.
+type Capability = mib.Capability
 
 // Module is a parsed MIB module with its definitions.
 type Module = mib.Module
 
-// Oid is a sequence of arc values representing an SNMP Object Identifier.
-type Oid = mib.Oid
+// OID is a sequence of arc values representing an SNMP Object Identifier.
+type OID = mib.OID
 
 // Kind identifies what an OID node represents.
 type Kind = mib.Kind
@@ -142,7 +142,7 @@ const (
 	KindNotification = mib.KindNotification
 	KindGroup        = mib.KindGroup
 	KindCompliance   = mib.KindCompliance
-	KindCapabilities = mib.KindCapabilities
+	KindCapability   = mib.KindCapability
 )
 
 const (

@@ -67,7 +67,7 @@ func TestKindString(t *testing.T) {
 		{KindNotification, "notification"},
 		{KindGroup, "group"},
 		{KindCompliance, "compliance"},
-		{KindCapabilities, "capabilities"},
+		{KindCapability, "capabilities"},
 		{Kind(99), "Kind(99)"},
 	}
 
@@ -83,7 +83,7 @@ func TestKindString(t *testing.T) {
 
 func TestKindIsObjectType(t *testing.T) {
 	objectTypes := []Kind{KindScalar, KindTable, KindRow, KindColumn}
-	nonObjectTypes := []Kind{KindUnknown, KindInternal, KindNode, KindNotification, KindGroup, KindCompliance, KindCapabilities}
+	nonObjectTypes := []Kind{KindUnknown, KindInternal, KindNode, KindNotification, KindGroup, KindCompliance, KindCapability}
 
 	for _, k := range objectTypes {
 		if !k.IsObjectType() {
@@ -98,7 +98,7 @@ func TestKindIsObjectType(t *testing.T) {
 }
 
 func TestKindIsConformance(t *testing.T) {
-	conformance := []Kind{KindGroup, KindCompliance, KindCapabilities}
+	conformance := []Kind{KindGroup, KindCompliance, KindCapability}
 	nonConformance := []Kind{KindUnknown, KindInternal, KindNode, KindScalar, KindTable, KindRow, KindColumn, KindNotification}
 
 	for _, k := range conformance {

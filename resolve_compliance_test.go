@@ -58,56 +58,56 @@ func TestModuleComplianceLookup(t *testing.T) {
 		"non-existent compliance should return nil")
 }
 
-func TestFindCompliance(t *testing.T) {
+func TestCompliance(t *testing.T) {
 	m := loadTestMIB(t)
 
-	c := m.FindCompliance("snmpBasicComplianceRev2")
-	testutil.NotNil(t, c, "FindCompliance(snmpBasicComplianceRev2) should not be nil")
+	c := m.Compliance("snmpBasicComplianceRev2")
+	testutil.NotNil(t, c, "Compliance(snmpBasicComplianceRev2) should not be nil")
 	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
 }
 
-func TestFindComplianceByQualifiedName(t *testing.T) {
+func TestComplianceByQualifiedName(t *testing.T) {
 	m := loadTestMIB(t)
 
-	c := m.FindCompliance("SNMPv2-MIB::snmpBasicComplianceRev2")
-	testutil.NotNil(t, c, "FindCompliance(SNMPv2-MIB::snmpBasicComplianceRev2) should not be nil")
+	c := m.Compliance("SNMPv2-MIB::snmpBasicComplianceRev2")
+	testutil.NotNil(t, c, "Compliance(SNMPv2-MIB::snmpBasicComplianceRev2) should not be nil")
 	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
 
-	testutil.Nil(t, m.FindCompliance("IF-MIB::snmpBasicComplianceRev2"),
+	testutil.Nil(t, m.Compliance("IF-MIB::snmpBasicComplianceRev2"),
 		"snmpBasicComplianceRev2 should not be in IF-MIB")
 }
 
-func TestFindComplianceByOID(t *testing.T) {
+func TestComplianceByOID(t *testing.T) {
 	m := loadTestMIB(t)
 
-	c := m.FindCompliance("snmpBasicComplianceRev2")
-	testutil.NotNil(t, c, "FindCompliance(snmpBasicComplianceRev2)")
+	c := m.Compliance("snmpBasicComplianceRev2")
+	testutil.NotNil(t, c, "Compliance(snmpBasicComplianceRev2)")
 
 	oid := c.OID().String()
 
-	c2 := m.FindCompliance(oid)
-	testutil.NotNil(t, c2, "FindCompliance by numeric OID %s should work", oid)
+	c2 := m.Compliance(oid)
+	testutil.NotNil(t, c2, "Compliance by numeric OID %s should work", oid)
 	testutil.Equal(t, "snmpBasicComplianceRev2", c2.Name(), "compliance found by OID")
 
-	c3 := m.FindCompliance("." + oid)
-	testutil.NotNil(t, c3, "FindCompliance by dotted OID .%s should work", oid)
+	c3 := m.Compliance("." + oid)
+	testutil.NotNil(t, c3, "Compliance by dotted OID .%s should work", oid)
 }
 
-func TestFindComplianceNotFound(t *testing.T) {
+func TestComplianceNotFound(t *testing.T) {
 	m := loadTestMIB(t)
 
-	testutil.Nil(t, m.FindCompliance("noSuchCompliance"),
+	testutil.Nil(t, m.Compliance("noSuchCompliance"),
 		"non-existent compliance name should return nil")
-	testutil.Nil(t, m.FindCompliance("99.99.99"),
+	testutil.Nil(t, m.Compliance("99.99.99"),
 		"non-existent OID should return nil")
-	testutil.Nil(t, m.FindCompliance("FAKE-MIB::snmpBasicCompliance"),
+	testutil.Nil(t, m.Compliance("FAKE-MIB::snmpBasicCompliance"),
 		"non-existent module should return nil")
 }
 
 func TestComplianceMetadata(t *testing.T) {
 	m := loadTestMIB(t)
 
-	c := m.FindCompliance("snmpBasicComplianceRev2")
+	c := m.Compliance("snmpBasicComplianceRev2")
 	if c == nil {
 		t.Fatal("snmpBasicComplianceRev2 not found")
 	}
@@ -135,8 +135,8 @@ func TestComplianceMetadata(t *testing.T) {
 func TestDeprecatedCompliance(t *testing.T) {
 	m := loadTestMIB(t)
 
-	c := m.FindCompliance("snmpBasicCompliance")
-	testutil.NotNil(t, c, "FindCompliance(snmpBasicCompliance)")
+	c := m.Compliance("snmpBasicCompliance")
+	testutil.NotNil(t, c, "Compliance(snmpBasicCompliance)")
 
 	testutil.Equal(t, mib.StatusDeprecated, c.Status(),
 		"snmpBasicCompliance should be deprecated")
@@ -145,7 +145,7 @@ func TestDeprecatedCompliance(t *testing.T) {
 func TestComplianceModules(t *testing.T) {
 	m := loadTestMIB(t)
 
-	c := m.FindCompliance("snmpBasicComplianceRev2")
+	c := m.Compliance("snmpBasicComplianceRev2")
 	if c == nil {
 		t.Fatal("snmpBasicComplianceRev2 not found")
 	}
@@ -179,7 +179,7 @@ func TestComplianceModules(t *testing.T) {
 func TestNodeCompliance(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.FindNode("snmpBasicComplianceRev2")
+	node := m.Node("snmpBasicComplianceRev2")
 	if node == nil {
 		t.Fatal("snmpBasicComplianceRev2 node not found")
 	}
@@ -188,7 +188,7 @@ func TestNodeCompliance(t *testing.T) {
 	testutil.NotNil(t, c, "compliance node should have Compliance()")
 	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "node Compliance() name")
 
-	ifIndex := m.FindNode("ifIndex")
+	ifIndex := m.Node("ifIndex")
 	if ifIndex == nil {
 		t.Fatal("ifIndex not found")
 	}
@@ -198,7 +198,7 @@ func TestNodeCompliance(t *testing.T) {
 func TestComplianceNodeModule(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.FindNode("snmpBasicComplianceRev2")
+	node := m.Node("snmpBasicComplianceRev2")
 	if node == nil {
 		t.Fatal("snmpBasicComplianceRev2 node not found")
 	}

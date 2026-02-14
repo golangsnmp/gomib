@@ -6,9 +6,9 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// Capabilities implements mib.Capabilities for AGENT-CAPABILITIES
+// Capability implements mib.Capability for AGENT-CAPABILITIES
 // definitions.
-type Capabilities struct {
+type Capability struct {
 	name           string
 	node           *Node
 	module         *Module
@@ -19,93 +19,93 @@ type Capabilities struct {
 	supports       []mib.CapabilitiesModule
 }
 
-func (c *Capabilities) Name() string {
+func (c *Capability) Name() string {
 	return c.name
 }
 
-func (c *Capabilities) Node() mib.Node {
+func (c *Capability) Node() mib.Node {
 	if c.node == nil {
 		return nil
 	}
 	return c.node
 }
 
-func (c *Capabilities) Module() mib.Module {
+func (c *Capability) Module() mib.Module {
 	if c.module == nil {
 		return nil
 	}
 	return c.module
 }
 
-func (c *Capabilities) OID() mib.Oid {
+func (c *Capability) OID() mib.OID {
 	if c.node == nil {
 		return nil
 	}
 	return c.node.OID()
 }
 
-func (c *Capabilities) Status() mib.Status {
+func (c *Capability) Status() mib.Status {
 	return c.status
 }
 
-func (c *Capabilities) Description() string {
+func (c *Capability) Description() string {
 	return c.desc
 }
 
-func (c *Capabilities) Reference() string {
+func (c *Capability) Reference() string {
 	return c.ref
 }
 
-func (c *Capabilities) ProductRelease() string {
+func (c *Capability) ProductRelease() string {
 	return c.productRelease
 }
 
-func (c *Capabilities) Supports() []mib.CapabilitiesModule {
+func (c *Capability) Supports() []mib.CapabilitiesModule {
 	return slices.Clone(c.supports)
 }
 
 // String returns a brief summary: "name (oid)".
-func (c *Capabilities) String() string {
+func (c *Capability) String() string {
 	if c == nil {
 		return "<nil>"
 	}
 	return c.name + " (" + c.OID().String() + ")"
 }
 
-func (c *Capabilities) SetNode(nd *Node) {
+func (c *Capability) SetNode(nd *Node) {
 	c.node = nd
 }
 
-func (c *Capabilities) SetModule(m *Module) {
+func (c *Capability) SetModule(m *Module) {
 	c.module = m
 }
 
-func (c *Capabilities) SetStatus(s mib.Status) {
+func (c *Capability) SetStatus(s mib.Status) {
 	c.status = s
 }
 
-func (c *Capabilities) SetDescription(d string) {
+func (c *Capability) SetDescription(d string) {
 	c.desc = d
 }
 
-func (c *Capabilities) SetReference(r string) {
+func (c *Capability) SetReference(r string) {
 	c.ref = r
 }
 
-func (c *Capabilities) SetProductRelease(r string) {
+func (c *Capability) SetProductRelease(r string) {
 	c.productRelease = r
 }
 
-func (c *Capabilities) SetSupports(supports []mib.CapabilitiesModule) {
+func (c *Capability) SetSupports(supports []mib.CapabilitiesModule) {
 	c.supports = supports
 }
 
 // InternalNode returns the concrete node.
-func (c *Capabilities) InternalNode() *Node {
+func (c *Capability) InternalNode() *Node {
 	return c.node
 }
 
 // InternalModule returns the concrete module.
-func (c *Capabilities) InternalModule() *Module {
+func (c *Capability) InternalModule() *Module {
 	return c.module
 }

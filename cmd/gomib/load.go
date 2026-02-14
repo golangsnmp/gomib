@@ -174,7 +174,7 @@ func printDetailedStats(m gomib.Mib) {
 
 	fmt.Println()
 	fmt.Println("Nodes by kind:")
-	for kind := gomib.KindInternal; kind <= gomib.KindCapabilities; kind++ {
+	for kind := gomib.KindInternal; kind <= gomib.KindCapability; kind++ {
 		if count := kindCounts[kind]; count > 0 {
 			fmt.Printf("  %-15s %d\n", kind.String()+":", count)
 		}

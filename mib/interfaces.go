@@ -5,7 +5,7 @@ import "iter"
 // Mib is the top-level container for loaded MIB data.
 // It is immutable after construction and safe for concurrent reads.
 //
-// Collection methods return slices, except Nodes() and Node.Descendants()
+// Collection methods return slices, except Nodes() and Node.Subtree()
 // which return iter.Seq[Node] because the full node set can be large and
 // callers typically filter or stop early.
 type Mib interface {
@@ -14,18 +14,18 @@ type Mib interface {
 	Nodes() iter.Seq[Node]
 
 	// Lookups by name, OID string, or qualified name (e.g. "IF-MIB::ifIndex").
-	// All Find* methods return nil if no match is found.
-	FindNode(query string) Node
-	FindObject(query string) Object
-	FindType(query string) Type
-	FindNotification(query string) Notification
-	FindGroup(query string) Group
-	FindCompliance(query string) Compliance
-	FindCapabilities(query string) Capabilities
+	// All return nil if no match is found.
+	Node(query string) Node
+	Object(query string) Object
+	Type(query string) Type
+	Notification(query string) Notification
+	Group(query string) Group
+	Compliance(query string) Compliance
+	Capability(query string) Capability
 
 	// By OID value. Returns nil if no matching node exists.
-	NodeByOID(oid Oid) Node
-	LongestPrefixByOID(oid Oid) Node
+	NodeByOID(oid OID) Node
+	LongestPrefixByOID(oid OID) Node
 
 	// Module access. Returns nil if no module with the given name is loaded.
 	Module(name string) Module
@@ -37,7 +37,7 @@ type Mib interface {
 	Notifications() []Notification
 	Groups() []Group
 	Compliances() []Compliance
-	Capabilities() []Capabilities
+	Capabilities() []Capability
 
 	// Filtered collections
 	Tables() []Object
@@ -52,7 +52,7 @@ type Mib interface {
 	NotificationCount() int
 	GroupCount() int
 	ComplianceCount() int
-	CapabilitiesCount() int
+	CapabilityCount() int
 	NodeCount() int
 
 	// Diagnostics
@@ -65,7 +65,7 @@ type Mib interface {
 type Node interface {
 	Arc() uint32
 	Name() string
-	OID() Oid
+	OID() OID
 	Kind() Kind
 	Module() Module
 
@@ -74,18 +74,18 @@ type Node interface {
 	Notification() Notification
 	Group() Group
 	Compliance() Compliance
-	Capabilities() Capabilities
+	Capability() Capability
 
 	// Tree navigation. Parent returns nil for the root node.
 	Parent() Node
 	// Child returns nil if no child with the given arc exists.
 	Child(arc uint32) Node
 	Children() []Node
-	// Descendants returns all nodes in the subtree via lazy iteration.
-	Descendants() iter.Seq[Node]
+	// Subtree returns all nodes in the subtree via lazy iteration.
+	Subtree() iter.Seq[Node]
 
 	// Prefix matching. Returns nil if no prefix matches.
-	LongestPrefix(oid Oid) Node
+	LongestPrefix(oid OID) Node
 
 	// Predicates
 	IsRoot() bool
@@ -95,7 +95,7 @@ type Node interface {
 type Module interface {
 	Name() string
 	Language() Language
-	OID() Oid
+	OID() OID
 	Organization() string
 	ContactInfo() string
 	Description() string
@@ -107,7 +107,7 @@ type Module interface {
 	Notifications() []Notification
 	Groups() []Group
 	Compliances() []Compliance
-	Capabilities() []Capabilities
+	Capabilities() []Capability
 
 	// Filtered collections
 	Tables() []Object
@@ -122,7 +122,7 @@ type Module interface {
 	Notification(name string) Notification
 	Group(name string) Group
 	Compliance(name string) Compliance
-	CapabilitiesByName(name string) Capabilities
+	Capability(name string) Capability
 }
 
 // Object is an OBJECT-TYPE definition.
@@ -130,7 +130,7 @@ type Object interface {
 	Name() string
 	Node() Node
 	Module() Module
-	OID() Oid
+	OID() OID
 
 	// Type info. Type returns nil if the type could not be resolved.
 	Type() Type
@@ -223,7 +223,7 @@ type Notification interface {
 	Name() string
 	Node() Node
 	Module() Module
-	OID() Oid
+	OID() OID
 	Status() Status
 	Description() string
 	Reference() string
@@ -235,7 +235,7 @@ type Group interface {
 	Name() string
 	Node() Node
 	Module() Module
-	OID() Oid
+	OID() OID
 	Status() Status
 	Description() string
 	Reference() string
@@ -254,7 +254,7 @@ type Compliance interface {
 	Name() string
 	Node() Node
 	Module() Module
-	OID() Oid
+	OID() OID
 	Status() Status
 	Description() string
 	Reference() string
@@ -263,12 +263,12 @@ type Compliance interface {
 	Modules() []ComplianceModule
 }
 
-// Capabilities is an AGENT-CAPABILITIES definition.
-type Capabilities interface {
+// Capability is an AGENT-CAPABILITIES definition.
+type Capability interface {
 	Name() string
 	Node() Node
 	Module() Module
-	OID() Oid
+	OID() OID
 	Status() Status
 	Description() string
 	Reference() string

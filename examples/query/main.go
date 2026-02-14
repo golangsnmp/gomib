@@ -30,21 +30,21 @@ func main() {
 
 	// Query by unqualified name
 	fmt.Println("=== By name ===")
-	obj := m.FindObject("ifIndex")
+	obj := m.Object("ifIndex")
 	if obj != nil {
 		fmt.Printf("%-20s %s\n", obj.Name(), obj.OID())
 	}
 
 	// Query by qualified name (MODULE::name)
 	fmt.Println("\n=== By qualified name ===")
-	obj = m.FindObject("IF-MIB::ifDescr")
+	obj = m.Object("IF-MIB::ifDescr")
 	if obj != nil {
 		fmt.Printf("%-20s %s\n", obj.Name(), obj.OID())
 	}
 
 	// Query by numeric OID string
 	fmt.Println("\n=== By OID string ===")
-	obj = m.FindObject("1.3.6.1.2.1.2.2.1.3")
+	obj = m.Object("1.3.6.1.2.1.2.2.1.3")
 	if obj != nil {
 		fmt.Printf("%-20s %s\n", obj.Name(), obj.OID())
 	}
@@ -75,11 +75,11 @@ func main() {
 
 	// Find different definition kinds
 	fmt.Println("\n=== Other definitions ===")
-	notif := m.FindNotification("linkDown")
+	notif := m.Notification("linkDown")
 	if notif != nil {
 		fmt.Printf("notification %-16s %s\n", notif.Name(), notif.OID())
 	}
-	grp := m.FindGroup("ifGeneralInformationGroup")
+	grp := m.Group("ifGeneralInformationGroup")
 	if grp != nil {
 		fmt.Printf("group        %-16s %s  members=%d\n", grp.Name(), grp.OID(), len(grp.Members()))
 	}

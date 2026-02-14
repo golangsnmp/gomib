@@ -109,9 +109,9 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		}
 	}
 
-	node := mib.FindNode(symbol)
-	obj := mib.FindObject(symbol)
-	typ := mib.FindType(symbol)
+	node := mib.Node(symbol)
+	obj := mib.Object(symbol)
+	typ := mib.Type(symbol)
 
 	fmt.Println("DEFINITIONS:")
 	if len(definingModules) == 0 {
@@ -141,12 +141,12 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		if node.Module() != nil {
 			modName = node.Module().Name()
 		}
-		fmt.Printf("  FindNode:    %s::%s  OID=%s  Kind=%s\n",
+		fmt.Printf("  Node:        %s::%s  OID=%s  Kind=%s\n",
 			modName, node.Name(), node.OID(), node.Kind())
 		fmt.Printf("               Object attached: %v\n", node.Object() != nil)
 		fmt.Printf("               Notification attached: %v\n", node.Notification() != nil)
 	} else {
-		fmt.Println("  FindNode:    (not found)")
+		fmt.Println("  Node:        (not found)")
 	}
 
 	if obj != nil {
@@ -154,10 +154,10 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		if obj.Module() != nil {
 			modName = obj.Module().Name()
 		}
-		fmt.Printf("  FindObject:  %s::%s  OID=%s  Kind=%s\n",
+		fmt.Printf("  Object:      %s::%s  OID=%s  Kind=%s\n",
 			modName, obj.Name(), obj.OID(), obj.Kind())
 	} else {
-		fmt.Println("  FindObject:  (not found)")
+		fmt.Println("  Object:      (not found)")
 	}
 
 	if typ != nil {
@@ -165,10 +165,10 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		if typ.Module() != nil {
 			modName = typ.Module().Name()
 		}
-		fmt.Printf("  FindType:    %s::%s  Base=%s\n",
+		fmt.Printf("  Type:        %s::%s  Base=%s\n",
 			modName, typ.Name(), typ.Base())
 	} else {
-		fmt.Println("  FindType:    (not found)")
+		fmt.Println("  Type:        (not found)")
 	}
 	fmt.Println()
 

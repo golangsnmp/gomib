@@ -190,7 +190,7 @@ END
 	m, err := LoadModules(ctx, []string{"TEST-FS-LOAD-MIB"}, src)
 	testutil.NoError(t, err, "LoadModules with FS source")
 
-	obj := m.FindObject("testFsScalar")
+	obj := m.Object("testFsScalar")
 	testutil.NotNil(t, obj, "testFsScalar should resolve from FS source")
 }
 

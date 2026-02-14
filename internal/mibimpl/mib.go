@@ -18,7 +18,7 @@ type Data struct {
 	notifications []*Notification
 	groups        []*Group
 	compliances   []*Compliance
-	capabilities  []*Capabilities
+	capabilities  []*Capability
 
 	moduleByName map[string]*Module
 	nameToNodes  map[string][]*Node
@@ -75,7 +75,7 @@ func (m *Data) resolveQuery(query string) (nodes []*Node, moduleName string) {
 	return m.nameToNodes[query], ""
 }
 
-func (m *Data) FindNode(query string) mib.Node {
+func (m *Data) Node(query string) mib.Node {
 	nodes, moduleName := m.resolveQuery(query)
 	if moduleName != "" {
 		for _, nd := range nodes {
@@ -102,14 +102,14 @@ func (m *Data) FindNode(query string) mib.Node {
 	return nil
 }
 
-func (m *Data) FindObject(query string) mib.Object {
+func (m *Data) Object(query string) mib.Object {
 	if v := findEntity(m, query, func(nd *Node) *Object { return nd.obj }); v != nil {
 		return v
 	}
 	return nil
 }
 
-func (m *Data) FindType(query string) mib.Type {
+func (m *Data) Type(query string) mib.Type {
 	if moduleName, typeName, ok := strings.Cut(query, "::"); ok {
 		mod := m.moduleByName[moduleName]
 		if mod == nil {
@@ -130,14 +130,14 @@ func (m *Data) FindType(query string) mib.Type {
 	return t
 }
 
-func (m *Data) FindNotification(query string) mib.Notification {
+func (m *Data) Notification(query string) mib.Notification {
 	if v := findEntity(m, query, func(nd *Node) *Notification { return nd.notif }); v != nil {
 		return v
 	}
 	return nil
 }
 
-func (m *Data) NodeByOID(oid mib.Oid) mib.Node {
+func (m *Data) NodeByOID(oid mib.OID) mib.Node {
 	nd := m.nodeByOID(oid)
 	if nd == nil {
 		return nil
@@ -145,7 +145,7 @@ func (m *Data) NodeByOID(oid mib.Oid) mib.Node {
 	return nd
 }
 
-func (m *Data) nodeByOID(oid mib.Oid) *Node {
+func (m *Data) nodeByOID(oid mib.OID) *Node {
 	if len(oid) == 0 {
 		return nil
 	}
@@ -163,7 +163,7 @@ func (m *Data) nodeByOID(oid mib.Oid) *Node {
 	return nd
 }
 
-func (m *Data) LongestPrefixByOID(oid mib.Oid) mib.Node {
+func (m *Data) LongestPrefixByOID(oid mib.OID) mib.Node {
 	if len(oid) == 0 {
 		return nil
 	}
@@ -246,7 +246,7 @@ func (m *Data) Groups() []mib.Group {
 	return mapSlice(m.groups, func(v *Group) mib.Group { return v })
 }
 
-func (m *Data) FindGroup(query string) mib.Group {
+func (m *Data) Group(query string) mib.Group {
 	if v := findEntity(m, query, func(nd *Node) *Group { return nd.group }); v != nil {
 		return v
 	}
@@ -261,7 +261,7 @@ func (m *Data) Compliances() []mib.Compliance {
 	return mapSlice(m.compliances, func(v *Compliance) mib.Compliance { return v })
 }
 
-func (m *Data) FindCompliance(query string) mib.Compliance {
+func (m *Data) Compliance(query string) mib.Compliance {
 	if v := findEntity(m, query, func(nd *Node) *Compliance { return nd.compliance }); v != nil {
 		return v
 	}
@@ -272,18 +272,18 @@ func (m *Data) ComplianceCount() int {
 	return len(m.compliances)
 }
 
-func (m *Data) Capabilities() []mib.Capabilities {
-	return mapSlice(m.capabilities, func(v *Capabilities) mib.Capabilities { return v })
+func (m *Data) Capabilities() []mib.Capability {
+	return mapSlice(m.capabilities, func(v *Capability) mib.Capability { return v })
 }
 
-func (m *Data) FindCapabilities(query string) mib.Capabilities {
-	if v := findEntity(m, query, func(nd *Node) *Capabilities { return nd.capabilities }); v != nil {
+func (m *Data) Capability(query string) mib.Capability {
+	if v := findEntity(m, query, func(nd *Node) *Capability { return nd.capabilities }); v != nil {
 		return v
 	}
 	return nil
 }
 
-func (m *Data) CapabilitiesCount() int {
+func (m *Data) CapabilityCount() int {
 	return len(m.capabilities)
 }
 
@@ -315,7 +315,7 @@ func (m *Data) IsComplete() bool {
 // nodeEntity constrains the entity types that can be attached to a Node.
 type nodeEntity interface {
 	comparable
-	*Object | *Notification | *Group | *Compliance | *Capabilities
+	*Object | *Notification | *Group | *Compliance | *Capability
 }
 
 // findEntity resolves a query to a node-attached entity using resolveQuery.

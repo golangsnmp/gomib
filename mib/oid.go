@@ -8,12 +8,12 @@ import (
 	"strings"
 )
 
-// Oid is a sequence of arc values representing an SNMP Object Identifier.
-type Oid []uint32
+// OID is a sequence of arc values representing an SNMP Object Identifier.
+type OID []uint32
 
 // ParseOID parses an OID from a dotted string (e.g., "1.3.6.1.2.1").
 // Returns an error for empty input or arc values exceeding uint32.
-func ParseOID(s string) (Oid, error) {
+func ParseOID(s string) (OID, error) {
 	if s == "" {
 		return nil, fmt.Errorf("empty OID string")
 	}
@@ -56,7 +56,7 @@ func ParseOID(s string) (Oid, error) {
 }
 
 // String returns the dotted string representation (e.g., "1.3.6.1.2.1").
-func (o Oid) String() string {
+func (o OID) String() string {
 	if len(o) == 0 {
 		return ""
 	}
@@ -71,7 +71,7 @@ func (o Oid) String() string {
 
 // Parent returns the parent OID (all arcs except the last).
 // Returns nil for single-arc and empty OIDs.
-func (o Oid) Parent() Oid {
+func (o OID) Parent() OID {
 	if len(o) <= 1 {
 		return nil
 	}
@@ -79,27 +79,27 @@ func (o Oid) Parent() Oid {
 }
 
 // Child returns a new OID with the given arc appended.
-func (o Oid) Child(arc uint32) Oid {
+func (o OID) Child(arc uint32) OID {
 	return append(slices.Clip(o), arc)
 }
 
 // HasPrefix returns true if this OID starts with the given prefix.
-func (o Oid) HasPrefix(prefix Oid) bool {
+func (o OID) HasPrefix(prefix OID) bool {
 	return len(o) >= len(prefix) && slices.Equal(o[:len(prefix)], prefix)
 }
 
 // Equal returns true if the OIDs are identical.
-func (o Oid) Equal(other Oid) bool {
+func (o OID) Equal(other OID) bool {
 	return slices.Equal(o, other)
 }
 
 // Compare returns -1 if o < other, 0 if equal, 1 if o > other.
-func (o Oid) Compare(other Oid) int {
+func (o OID) Compare(other OID) int {
 	return slices.Compare(o, other)
 }
 
 // LastArc returns the last arc value, or 0 if empty.
-func (o Oid) LastArc() uint32 {
+func (o OID) LastArc() uint32 {
 	if len(o) == 0 {
 		return 0
 	}

@@ -33,7 +33,7 @@ func (g *Group) Module() mib.Module {
 	return g.module
 }
 
-func (g *Group) OID() mib.Oid {
+func (g *Group) OID() mib.OID {
 	if g.node == nil {
 		return nil
 	}

@@ -26,7 +26,7 @@ func TestLoadSingleMIB(t *testing.T) {
 	ifMIB := mib.Module("IF-MIB")
 	testutil.NotNil(t, ifMIB, "IF-MIB module should be found")
 
-	ifIndex := mib.FindObject("ifIndex")
+	ifIndex := mib.Object("ifIndex")
 	testutil.NotNil(t, ifIndex, "ifIndex object should be found")
 }
 
@@ -120,74 +120,74 @@ func TestLoadNoSources(t *testing.T) {
 	testutil.Error(t, err, "loading with nil source should fail")
 }
 
-func TestFindNodeByName(t *testing.T) {
+func TestNodeByName(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.FindNode("ifIndex")
+	node := m.Node("ifIndex")
 	testutil.NotNil(t, node, "should find ifIndex by name")
 }
 
-func TestFindNodeByNumericOID(t *testing.T) {
+func TestNodeByNumericOID(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.FindNode("1.3.6.1.2.1.2.2.1.1")
-	testutil.NotNil(t, node, "FindNode(1.3.6.1.2.1.2.2.1.1)")
+	node := m.Node("1.3.6.1.2.1.2.2.1.1")
+	testutil.NotNil(t, node, "Node(1.3.6.1.2.1.2.2.1.1)")
 	testutil.Equal(t, "ifIndex", node.Name(), "node found by OID should be ifIndex")
 }
 
-func TestFindNodeByDottedOID(t *testing.T) {
+func TestNodeByDottedOID(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.FindNode(".1.3.6.1.2.1.2.2.1.1")
-	testutil.NotNil(t, node, "FindNode(.1.3.6.1.2.1.2.2.1.1)")
+	node := m.Node(".1.3.6.1.2.1.2.2.1.1")
+	testutil.NotNil(t, node, "Node(.1.3.6.1.2.1.2.2.1.1)")
 	testutil.Equal(t, "ifIndex", node.Name(), "node found by dotted OID should be ifIndex")
 }
 
-func TestFindNodeByQualifiedName(t *testing.T) {
+func TestNodeByQualifiedName(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.FindNode("IF-MIB::ifIndex")
-	testutil.NotNil(t, node, "FindNode(IF-MIB::ifIndex)")
+	node := m.Node("IF-MIB::ifIndex")
+	testutil.NotNil(t, node, "Node(IF-MIB::ifIndex)")
 	testutil.Equal(t, "ifIndex", node.Name(), "node found by qualified name should be ifIndex")
 }
 
-func TestFindNodeNotFound(t *testing.T) {
+func TestNodeNotFound(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.FindNode("totallyNonExistentSymbol")
+	node := m.Node("totallyNonExistentSymbol")
 	testutil.Nil(t, node, "nonexistent symbol should return nil")
 }
 
-func TestFindObjectByName(t *testing.T) {
+func TestObjectByName(t *testing.T) {
 	m := loadTestMIB(t)
 
-	obj := m.FindObject("sysDescr")
+	obj := m.Object("sysDescr")
 	testutil.NotNil(t, obj, "should find sysDescr by name")
 	testutil.Equal(t, "sysDescr", obj.Name(), "object name")
 }
 
-func TestFindObjectByQualifiedName(t *testing.T) {
+func TestObjectByQualifiedName(t *testing.T) {
 	m := loadTestMIB(t)
 
-	obj := m.FindObject("SNMPv2-MIB::sysDescr")
-	testutil.NotNil(t, obj, "FindObject(SNMPv2-MIB::sysDescr)")
+	obj := m.Object("SNMPv2-MIB::sysDescr")
+	testutil.NotNil(t, obj, "Object(SNMPv2-MIB::sysDescr)")
 	testutil.Equal(t, "sysDescr", obj.Name(), "qualified object name")
 }
 
-func TestFindType(t *testing.T) {
+func TestType(t *testing.T) {
 	m := loadTestMIB(t)
 
-	typ := m.FindType("DisplayString")
-	testutil.NotNil(t, typ, "FindType(DisplayString)")
+	typ := m.Type("DisplayString")
+	testutil.NotNil(t, typ, "Type(DisplayString)")
 	testutil.Equal(t, "DisplayString", typ.Name(), "type name")
 	testutil.True(t, typ.IsTextualConvention(), "DisplayString should be a TC")
 }
 
-func TestFindNotification(t *testing.T) {
+func TestNotification(t *testing.T) {
 	m := loadTestMIB(t)
 
-	notif := m.FindNotification("linkDown")
-	testutil.NotNil(t, notif, "FindNotification(linkDown)")
+	notif := m.Notification("linkDown")
+	testutil.NotNil(t, notif, "Notification(linkDown)")
 	testutil.Equal(t, "linkDown", notif.Name(), "notification name")
 }
 
@@ -383,7 +383,7 @@ func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
 	}
 	testutil.Equal(t, 4, caseDiags, "expected 4 bad-identifier-case diagnostics in normal mode")
 
-	node := m.FindNode("NetEngine8000SysOid")
+	node := m.Node("NetEngine8000SysOid")
 	testutil.NotNil(t, node, "uppercase identifier should resolve in normal mode")
 
 	m, err = LoadModules(ctx, []string{"PROBLEM-NAMING-MIB"}, src, WithStrictness(StrictnessPermissive))
@@ -453,7 +453,7 @@ func TestMissingImportFailsInStrictMode(t *testing.T) {
 	}
 	testutil.Greater(t, oidUnresolved, 0, "strict mode should have unresolved OID references")
 
-	testObj := mib.FindObject("testObject")
+	testObj := mib.Object("testObject")
 	testutil.Nil(t, testObj, "testObject should not resolve in strict mode")
 }
 
@@ -484,7 +484,7 @@ func TestMissingImportWorksInPermissiveMode(t *testing.T) {
 	}
 	testutil.Equal(t, 0, oidUnresolved, "permissive mode should resolve enterprises via fallback")
 
-	testObj := mib.FindObject("testObject")
+	testObj := mib.Object("testObject")
 	testutil.NotNil(t, testObj, "testObject should resolve in permissive mode")
 }
 

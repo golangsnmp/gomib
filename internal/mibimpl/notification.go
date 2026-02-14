@@ -32,7 +32,7 @@ func (n *Notification) Module() mib.Module {
 	return n.module
 }
 
-func (n *Notification) OID() mib.Oid {
+func (n *Notification) OID() mib.OID {
 	if n.node == nil {
 		return nil
 	}

@@ -390,9 +390,9 @@ func TestConvertDefValEnumOnOIDType(t *testing.T) {
 	if dv.Kind() != mib.DefValKindOID {
 		t.Errorf("kind = %v, want DefValKindOID", dv.Kind())
 	}
-	oid, ok := mib.DefValAs[mib.Oid](*dv)
+	oid, ok := mib.DefValAs[mib.OID](*dv)
 	if !ok {
-		t.Fatal("value is not mib.Oid")
+		t.Fatal("value is not mib.OID")
 	}
 	if len(oid) != 2 || oid[0] != 1 || oid[1] != 3 {
 		t.Errorf("oid = %v, want [1 3]", oid)
@@ -1040,11 +1040,11 @@ func TestConvertDefValOidValue(t *testing.T) {
 		if dv.Kind() != mib.DefValKindOID {
 			t.Errorf("kind = %v, want DefValKindOID", dv.Kind())
 		}
-		oid, ok := mib.DefValAs[mib.Oid](*dv)
+		oid, ok := mib.DefValAs[mib.OID](*dv)
 		if !ok {
-			t.Fatal("expected Oid value")
+			t.Fatal("expected OID value")
 		}
-		want := mib.Oid{1, 3, 42, 1}
+		want := mib.OID{1, 3, 42, 1}
 		if oid.String() != want.String() {
 			t.Errorf("oid = %v, want %v", oid, want)
 		}
@@ -1059,11 +1059,11 @@ func TestConvertDefValOidValue(t *testing.T) {
 		if dv == nil {
 			t.Fatal("expected non-nil")
 		}
-		oid, ok := mib.DefValAs[mib.Oid](*dv)
+		oid, ok := mib.DefValAs[mib.OID](*dv)
 		if !ok {
-			t.Fatal("expected Oid value")
+			t.Fatal("expected OID value")
 		}
-		want := mib.Oid{1, 3}
+		want := mib.OID{1, 3}
 		if oid.String() != want.String() {
 			t.Errorf("oid = %v, want %v", oid, want)
 		}
@@ -1079,11 +1079,11 @@ func TestConvertDefValOidValue(t *testing.T) {
 		if dv == nil {
 			t.Fatal("expected non-nil")
 		}
-		oid, ok := mib.DefValAs[mib.Oid](*dv)
+		oid, ok := mib.DefValAs[mib.OID](*dv)
 		if !ok {
-			t.Fatal("expected Oid value")
+			t.Fatal("expected OID value")
 		}
-		want := mib.Oid{1, 3, 5}
+		want := mib.OID{1, 3, 5}
 		if oid.String() != want.String() {
 			t.Errorf("oid = %v, want %v", oid, want)
 		}

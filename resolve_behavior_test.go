@@ -39,8 +39,8 @@ func TestTypeChainBaseTypeInheritance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obj := m.FindObject(tt.name)
-			testutil.NotNil(t, obj, "FindObject(%s)", tt.name)
+			obj := m.Object(tt.name)
+			testutil.NotNil(t, obj, "Object(%s)", tt.name)
 			typ := obj.Type()
 			testutil.NotNil(t, typ, "Type() for %s", tt.name)
 			testutil.Equal(t, tt.wantBase, typ.EffectiveBase(),
@@ -54,8 +54,8 @@ func TestTypeChainDisplayHintInheritance(t *testing.T) {
 
 	t.Run("direct hint", func(t *testing.T) {
 		// MyString has DISPLAY-HINT "255a"
-		obj := m.FindObject("problemTwoLevelChain")
-		testutil.NotNil(t, obj, "FindObject(problemTwoLevelChain)")
+		obj := m.Object("problemTwoLevelChain")
+		testutil.NotNil(t, obj, "Object(problemTwoLevelChain)")
 		hint := obj.EffectiveDisplayHint()
 		testutil.Equal(t, "255a", hint,
 			"two-level chain should inherit display hint from MyString")
@@ -63,16 +63,16 @@ func TestTypeChainDisplayHintInheritance(t *testing.T) {
 
 	t.Run("inherited through chain", func(t *testing.T) {
 		// MySpecialGauge -> MyFormattedGauge (has "d-2") -> Gauge32
-		obj := m.FindObject("problemInheritedHint")
-		testutil.NotNil(t, obj, "FindObject(problemInheritedHint)")
+		obj := m.Object("problemInheritedHint")
+		testutil.NotNil(t, obj, "Object(problemInheritedHint)")
 		hint := obj.EffectiveDisplayHint()
 		testutil.Equal(t, "d-2", hint,
 			"should inherit display hint from MyFormattedGauge")
 	})
 
 	t.Run("no hint on primitive", func(t *testing.T) {
-		obj := m.FindObject("problemDirectInteger")
-		testutil.NotNil(t, obj, "FindObject(problemDirectInteger)")
+		obj := m.Object("problemDirectInteger")
+		testutil.NotNil(t, obj, "Object(problemDirectInteger)")
 		testutil.Equal(t, "", obj.EffectiveDisplayHint(),
 			"direct Integer32 should have no display hint")
 	})
@@ -83,8 +83,8 @@ func TestTypeChainSizeInheritance(t *testing.T) {
 
 	t.Run("direct size", func(t *testing.T) {
 		// MyString has SIZE (0..64), object uses MyString
-		obj := m.FindObject("problemTwoLevelChain")
-		testutil.NotNil(t, obj, "FindObject(problemTwoLevelChain)")
+		obj := m.Object("problemTwoLevelChain")
+		testutil.NotNil(t, obj, "Object(problemTwoLevelChain)")
 		sizes := obj.EffectiveSizes()
 		testutil.NotEmpty(t, sizes, "EffectiveSizes()")
 		testutil.Equal(t, 1, len(sizes), "should have 1 size range")
@@ -94,8 +94,8 @@ func TestTypeChainSizeInheritance(t *testing.T) {
 
 	t.Run("inherited through chain", func(t *testing.T) {
 		// MySizedLabel -> MySizedString (SIZE 1..100) -> DisplayString
-		obj := m.FindObject("problemInheritedSize")
-		testutil.NotNil(t, obj, "FindObject(problemInheritedSize)")
+		obj := m.Object("problemInheritedSize")
+		testutil.NotNil(t, obj, "Object(problemInheritedSize)")
 		sizes := obj.EffectiveSizes()
 		testutil.NotEmpty(t, sizes, "EffectiveSizes()")
 		testutil.Equal(t, 1, len(sizes), "should have 1 size range")
@@ -109,8 +109,8 @@ func TestTypeChainEnumInheritance(t *testing.T) {
 
 	t.Run("TC enum chain", func(t *testing.T) {
 		// MyFilteredStatus -> MyStatus -> INTEGER { active(1), inactive(2), unknown(3) }
-		obj := m.FindObject("problemEnumChain")
-		testutil.NotNil(t, obj, "FindObject(problemEnumChain)")
+		obj := m.Object("problemEnumChain")
+		testutil.NotNil(t, obj, "Object(problemEnumChain)")
 		enums := obj.EffectiveEnums()
 		testutil.NotEmpty(t, enums, "EffectiveEnums()")
 		enumMap := testutil.NormalizeEnums(enums)
@@ -120,8 +120,8 @@ func TestTypeChainEnumInheritance(t *testing.T) {
 	})
 
 	t.Run("inline enum", func(t *testing.T) {
-		obj := m.FindObject("problemInlineEnum")
-		testutil.NotNil(t, obj, "FindObject(problemInlineEnum)")
+		obj := m.Object("problemInlineEnum")
+		testutil.NotNil(t, obj, "Object(problemInlineEnum)")
 		enums := obj.EffectiveEnums()
 		testutil.NotEmpty(t, enums, "EffectiveEnums()")
 		enumMap := testutil.NormalizeEnums(enums)
@@ -135,8 +135,8 @@ func TestTypeChainApplicationTypePreservation(t *testing.T) {
 
 	t.Run("Counter32 via TC", func(t *testing.T) {
 		// MyCounter -> Counter32
-		obj := m.FindObject("problemAppTypeChain")
-		testutil.NotNil(t, obj, "FindObject(problemAppTypeChain)")
+		obj := m.Object("problemAppTypeChain")
+		testutil.NotNil(t, obj, "Object(problemAppTypeChain)")
 		typ := obj.Type()
 		testutil.NotNil(t, typ, "Type()")
 		// Counter32 is an application type - base should be Counter32, not Integer32
@@ -146,8 +146,8 @@ func TestTypeChainApplicationTypePreservation(t *testing.T) {
 
 	t.Run("Gauge32 via TC chain", func(t *testing.T) {
 		// MySpecialGauge -> MyFormattedGauge -> Gauge32
-		obj := m.FindObject("problemInheritedHint")
-		testutil.NotNil(t, obj, "FindObject(problemInheritedHint)")
+		obj := m.Object("problemInheritedHint")
+		testutil.NotNil(t, obj, "Object(problemInheritedHint)")
 		typ := obj.Type()
 		testutil.NotNil(t, typ, "Type()")
 		testutil.Equal(t, mib.BaseGauge32, typ.EffectiveBase(),
@@ -159,16 +159,16 @@ func TestTypeChainTCFlagPropagation(t *testing.T) {
 	m := loadTypeChainsMIB(t)
 
 	t.Run("TC type has flag", func(t *testing.T) {
-		obj := m.FindObject("problemTwoLevelChain")
-		testutil.NotNil(t, obj, "FindObject(problemTwoLevelChain)")
+		obj := m.Object("problemTwoLevelChain")
+		testutil.NotNil(t, obj, "Object(problemTwoLevelChain)")
 		testutil.NotNil(t, obj.Type(), "Type()")
 		testutil.True(t, obj.Type().IsTextualConvention(),
 			"MyString should be a TC")
 	})
 
 	t.Run("inline enum does not have TC flag", func(t *testing.T) {
-		obj := m.FindObject("problemInlineEnum")
-		testutil.NotNil(t, obj, "FindObject(problemInlineEnum)")
+		obj := m.Object("problemInlineEnum")
+		testutil.NotNil(t, obj, "Object(problemInlineEnum)")
 		testutil.NotNil(t, obj.Type(), "Type()")
 		// Inline INTEGER { ... } resolves to the primitive INTEGER type,
 		// which is not a TC
@@ -200,8 +200,8 @@ func TestKindInferenceTableStructure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obj := m.FindObject(tt.name)
-			testutil.NotNil(t, obj, "FindObject(%s)", tt.name)
+			obj := m.Object(tt.name)
+			testutil.NotNil(t, obj, "Object(%s)", tt.name)
 			kind := testutil.NormalizeKind(obj.Kind())
 			testutil.Equal(t, tt.wantKind, kind,
 				"kind for %s", tt.name)
@@ -223,8 +223,8 @@ func TestKindInferenceAugmentsTable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obj := m.FindObject(tt.name)
-			testutil.NotNil(t, obj, "FindObject(%s)", tt.name)
+			obj := m.Object(tt.name)
+			testutil.NotNil(t, obj, "Object(%s)", tt.name)
 			kind := testutil.NormalizeKind(obj.Kind())
 			testutil.Equal(t, tt.wantKind, kind,
 				"kind for %s", tt.name)
@@ -235,8 +235,8 @@ func TestKindInferenceAugmentsTable(t *testing.T) {
 func TestAugmentsResolution(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
-	entry := m.FindObject("problemAugEntry")
-	testutil.NotNil(t, entry, "FindObject(problemAugEntry)")
+	entry := m.Object("problemAugEntry")
+	testutil.NotNil(t, entry, "Object(problemAugEntry)")
 
 	aug := entry.Augments()
 	testutil.NotNil(t, aug, "Augments() for problemAugEntry")
@@ -248,8 +248,8 @@ func TestAugmentsResolution(t *testing.T) {
 func TestIndexResolution(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
-	entry := m.FindObject("problemSemEntry")
-	testutil.NotNil(t, entry, "FindObject(problemSemEntry)")
+	entry := m.Object("problemSemEntry")
+	testutil.NotNil(t, entry, "Object(problemSemEntry)")
 
 	indexes := testutil.NormalizeIndexes(entry.Index())
 	testutil.NotEmpty(t, indexes, "NormalizeIndexes()")
@@ -263,8 +263,8 @@ func TestNotificationObjectsResolution(t *testing.T) {
 	m := loadSemanticsMIB(t)
 
 	t.Run("normal objects", func(t *testing.T) {
-		notif := m.FindNotification("problemSemNotifNormal")
-		testutil.NotNil(t, notif, "FindNotification(problemSemNotifNormal)")
+		notif := m.Notification("problemSemNotifNormal")
+		testutil.NotNil(t, notif, "Notification(problemSemNotifNormal)")
 		varbinds := testutil.NormalizeVarbinds(notif.Objects())
 		testutil.SliceEqual(t,
 			[]string{"problemSemName", "problemSemValue"},
@@ -272,16 +272,16 @@ func TestNotificationObjectsResolution(t *testing.T) {
 	})
 
 	t.Run("empty objects", func(t *testing.T) {
-		notif := m.FindNotification("problemSemNotifEmpty")
-		testutil.NotNil(t, notif, "FindNotification(problemSemNotifEmpty)")
+		notif := m.Notification("problemSemNotifEmpty")
+		testutil.NotNil(t, notif, "Notification(problemSemNotifEmpty)")
 		varbinds := testutil.NormalizeVarbinds(notif.Objects())
 		testutil.Equal(t, 0, len(varbinds),
 			"empty notification should have no varbinds")
 	})
 
 	t.Run("not-accessible index in objects", func(t *testing.T) {
-		notif := m.FindNotification("problemSemNotifWithIndex")
-		testutil.NotNil(t, notif, "FindNotification(problemSemNotifWithIndex)")
+		notif := m.Notification("problemSemNotifWithIndex")
+		testutil.NotNil(t, notif, "Notification(problemSemNotifWithIndex)")
 		varbinds := testutil.NormalizeVarbinds(notif.Objects())
 		// Both objects should resolve, including the not-accessible index
 		testutil.Len(t, varbinds, 2, "should include not-accessible index")
@@ -291,8 +291,8 @@ func TestNotificationObjectsResolution(t *testing.T) {
 	})
 
 	t.Run("augment column in objects", func(t *testing.T) {
-		notif := m.FindNotification("problemSemNotifAugObj")
-		testutil.NotNil(t, notif, "FindNotification(problemSemNotifAugObj)")
+		notif := m.Notification("problemSemNotifAugObj")
+		testutil.NotNil(t, notif, "Notification(problemSemNotifAugObj)")
 		varbinds := testutil.NormalizeVarbinds(notif.Objects())
 		testutil.Len(t, varbinds, 2, "should include augment column")
 		testutil.SliceEqual(t,
@@ -301,8 +301,8 @@ func TestNotificationObjectsResolution(t *testing.T) {
 	})
 
 	t.Run("scalar in objects", func(t *testing.T) {
-		notif := m.FindNotification("problemSemNotifScalar")
-		testutil.NotNil(t, notif, "FindNotification(problemSemNotifScalar)")
+		notif := m.Notification("problemSemNotifScalar")
+		testutil.NotNil(t, notif, "Notification(problemSemNotifScalar)")
 		varbinds := testutil.NormalizeVarbinds(notif.Objects())
 		testutil.Len(t, varbinds, 1, "should have 1 varbind")
 		testutil.SliceEqual(t, []string{"problemScalar1"}, varbinds,
@@ -326,8 +326,8 @@ func TestNotificationMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			notif := m.FindNotification(tt.name)
-			testutil.NotNil(t, notif, "FindNotification(%s)", tt.name)
+			notif := m.Notification(tt.name)
+			testutil.NotNil(t, notif, "Notification(%s)", tt.name)
 			testutil.Equal(t, tt.wantOID, notif.OID().String(),
 				"OID for %s", tt.name)
 		})
@@ -337,7 +337,7 @@ func TestNotificationMetadata(t *testing.T) {
 func TestModulePreferenceSMIv2OverSMIv1(t *testing.T) {
 	m := loadTestMIB(t)
 
-	obj := m.FindObject("ifIndex")
+	obj := m.Object("ifIndex")
 	if obj == nil {
 		t.Fatal("ifIndex not found")
 	}
@@ -401,7 +401,7 @@ func TestDiagnosticEmissionUnresolvedNotificationObject(t *testing.T) {
 func TestDiagnosticValidObjectNoFalsePositives(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DIAGNOSTICS-MIB")
 
-	obj := m.FindObject("problemValidType")
+	obj := m.Object("problemValidType")
 	testutil.NotNil(t, obj, "valid object should resolve")
 	if obj == nil {
 		return
@@ -416,8 +416,8 @@ func TestDiagnosticValidObjectNoFalsePositives(t *testing.T) {
 func TestDiagnosticNotifPartialResolution(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-DIAGNOSTICS-MIB")
 
-	notif := m.FindNotification("problemDiagNotifBadObj")
-	testutil.NotNil(t, notif, "FindNotification(problemDiagNotifBadObj)")
+	notif := m.Notification("problemDiagNotifBadObj")
+	testutil.NotNil(t, notif, "Notification(problemDiagNotifBadObj)")
 
 	varbinds := testutil.NormalizeVarbinds(notif.Objects())
 
@@ -442,8 +442,8 @@ func loadShadowingMIB(t testing.TB) mib.Mib {
 func TestShadowedTypeLocalDefinitionWins(t *testing.T) {
 	m := loadShadowingMIB(t)
 
-	obj := m.FindObject("problemShadowedTypeObject")
-	testutil.NotNil(t, obj, "FindObject(problemShadowedTypeObject)")
+	obj := m.Object("problemShadowedTypeObject")
+	testutil.NotNil(t, obj, "Object(problemShadowedTypeObject)")
 
 	typ := obj.Type()
 	testutil.NotNil(t, typ, "Type() for problemShadowedTypeObject")
@@ -459,8 +459,8 @@ func TestShadowedTypeLocalDefinitionWins(t *testing.T) {
 func TestShadowedTypeSizeConstraint(t *testing.T) {
 	m := loadShadowingMIB(t)
 
-	obj := m.FindObject("problemShadowedTypeObject")
-	testutil.NotNil(t, obj, "FindObject(problemShadowedTypeObject)")
+	obj := m.Object("problemShadowedTypeObject")
+	testutil.NotNil(t, obj, "Object(problemShadowedTypeObject)")
 
 	sizes := obj.EffectiveSizes()
 	testutil.NotEmpty(t, sizes, "EffectiveSizes()")
@@ -477,8 +477,8 @@ func TestShadowedTypeSizeConstraint(t *testing.T) {
 func TestShadowedTypeBaseType(t *testing.T) {
 	m := loadShadowingMIB(t)
 
-	obj := m.FindObject("problemShadowedTypeObject")
-	testutil.NotNil(t, obj, "FindObject(problemShadowedTypeObject)")
+	obj := m.Object("problemShadowedTypeObject")
+	testutil.NotNil(t, obj, "Object(problemShadowedTypeObject)")
 
 	typ := obj.Type()
 	testutil.NotNil(t, typ, "Type()")
@@ -490,8 +490,8 @@ func TestShadowedTypeBaseType(t *testing.T) {
 func TestNonShadowedImportStillWorks(t *testing.T) {
 	m := loadShadowingMIB(t)
 
-	obj := m.FindObject("problemNonShadowedObject")
-	testutil.NotNil(t, obj, "FindObject(problemNonShadowedObject)")
+	obj := m.Object("problemNonShadowedObject")
+	testutil.NotNil(t, obj, "Object(problemNonShadowedObject)")
 
 	typ := obj.Type()
 	testutil.NotNil(t, typ, "Type() for problemNonShadowedObject")
@@ -508,8 +508,8 @@ func TestNonShadowedImportStillWorks(t *testing.T) {
 func TestBaseModuleTypeNotAffected(t *testing.T) {
 	m := loadShadowingMIB(t)
 
-	obj := m.FindObject("problemBaseTypedObject")
-	testutil.NotNil(t, obj, "FindObject(problemBaseTypedObject)")
+	obj := m.Object("problemBaseTypedObject")
+	testutil.NotNil(t, obj, "Object(problemBaseTypedObject)")
 
 	typ := obj.Type()
 	testutil.NotNil(t, typ, "Type() for problemBaseTypedObject")
@@ -523,8 +523,8 @@ func TestBaseModuleTypeNotAffected(t *testing.T) {
 func TestShadowingModuleScalarResolves(t *testing.T) {
 	m := loadShadowingMIB(t)
 
-	obj := m.FindObject("problemShadowScalar")
-	testutil.NotNil(t, obj, "FindObject(problemShadowScalar)")
+	obj := m.Object("problemShadowScalar")
+	testutil.NotNil(t, obj, "Object(problemShadowScalar)")
 
 	typ := obj.Type()
 	testutil.NotNil(t, typ, "Type()")

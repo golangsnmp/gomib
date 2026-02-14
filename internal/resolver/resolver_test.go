@@ -108,7 +108,7 @@ func TestResolveBaseModuleNodes(t *testing.T) {
 		"experimental",
 	}
 	for _, name := range expectedNodes {
-		nd := m.FindNode(name)
+		nd := m.Node(name)
 		if nd == nil {
 			t.Errorf("base node %q not found", name)
 			continue
@@ -124,19 +124,19 @@ func TestResolveBaseModuleNodeOIDValues(t *testing.T) {
 
 	tests := []struct {
 		name string
-		oid  mib.Oid
+		oid  mib.OID
 	}{
-		{"iso", mib.Oid{1}},
-		{"org", mib.Oid{1, 3}},
-		{"dod", mib.Oid{1, 3, 6}},
-		{"internet", mib.Oid{1, 3, 6, 1}},
-		{"mgmt", mib.Oid{1, 3, 6, 1, 2}},
-		{"mib-2", mib.Oid{1, 3, 6, 1, 2, 1}},
-		{"enterprises", mib.Oid{1, 3, 6, 1, 4, 1}},
+		{"iso", mib.OID{1}},
+		{"org", mib.OID{1, 3}},
+		{"dod", mib.OID{1, 3, 6}},
+		{"internet", mib.OID{1, 3, 6, 1}},
+		{"mgmt", mib.OID{1, 3, 6, 1, 2}},
+		{"mib-2", mib.OID{1, 3, 6, 1, 2, 1}},
+		{"enterprises", mib.OID{1, 3, 6, 1, 4, 1}},
 	}
 
 	for _, tt := range tests {
-		nd := m.FindNode(tt.name)
+		nd := m.Node(tt.name)
 		if nd == nil {
 			t.Errorf("node %q not found", tt.name)
 			continue
@@ -173,7 +173,7 @@ func TestResolveBaseModuleSMITypes(t *testing.T) {
 	}
 
 	for _, tt := range smiTypes {
-		typ := m.FindType(tt.name)
+		typ := m.Type(tt.name)
 		if typ == nil {
 			t.Errorf("SMI type %q not found", tt.name)
 			continue

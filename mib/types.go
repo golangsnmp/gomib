@@ -46,7 +46,7 @@ const (
 	DefValKindBytes                    // []byte (from hex/binary string)
 	DefValKindEnum                     // string (enum label)
 	DefValKindBits                     // []string (bit labels)
-	DefValKindOID                      // Oid
+	DefValKindOID                      // OID
 )
 
 // DefVal represents a default value with both interpreted value and raw MIB syntax.
@@ -87,7 +87,7 @@ func NewDefValBits(labels []string, raw string) DefVal {
 }
 
 // NewDefValOID creates a DefVal for an OID.
-func NewDefValOID(oid Oid, raw string) DefVal {
+func NewDefValOID(oid OID, raw string) DefVal {
 	return DefVal{kind: DefValKindOID, value: oid, raw: raw}
 }
 
