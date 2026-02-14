@@ -23,6 +23,7 @@ import (
     "log"
 
     "github.com/golangsnmp/gomib"
+    "github.com/golangsnmp/gomib/mib"
 )
 
 func main() {
@@ -82,10 +83,10 @@ gomib.Load(ctx,
     gomib.WithSource(src),
     gomib.WithSystemPaths(),                             // discover net-snmp/libsmi paths
     gomib.WithLogger(slog.Default()),                    // enable debug/trace logging
-    gomib.WithStrictness(gomib.StrictnessPermissive),    // strictness preset
-    gomib.WithDiagnosticConfig(gomib.DiagnosticConfig{   // fine-grained control
-        Level:  gomib.StrictnessNormal,
-        FailAt: gomib.SeverityError,
+    gomib.WithStrictness(mib.StrictnessPermissive),    // strictness preset
+    gomib.WithDiagnosticConfig(mib.DiagnosticConfig{   // fine-grained control
+        Level:  mib.StrictnessNormal,
+        FailAt: mib.SeverityError,
         Ignore: []string{"identifier-underscore"},
     }),
 )
@@ -112,7 +113,7 @@ Other lookup methods: `Node`, `Type`, `Notification`, `Group`, `Compliance`, `Ca
 ### OID lookups
 
 ```go
-oid, _ := gomib.ParseOID("1.3.6.1.2.1.2.2.1.1")
+oid, _ := mib.ParseOID("1.3.6.1.2.1.2.2.1.1")
 node := m.NodeByOID(oid)            // exact match
 node  = m.LongestPrefixByOID(oid)   // longest matching prefix
 ```
@@ -275,18 +276,18 @@ Four presets control how strictly MIBs are validated:
 | Silent | `StrictnessSilent` | Accept everything, suppress diagnostics |
 
 ```go
-m, _ := gomib.Load(ctx, gomib.WithSource(src), gomib.WithStrictness(gomib.StrictnessPermissive))
+m, _ := gomib.Load(ctx, gomib.WithSource(src), gomib.WithStrictness(mib.StrictnessPermissive))
 ```
 
 For fine-grained control, use `WithDiagnosticConfig`:
 
 ```go
-gomib.WithDiagnosticConfig(gomib.DiagnosticConfig{
-    Level:  gomib.StrictnessNormal,
-    FailAt: gomib.SeverityError,              // fail on Error or worse
+gomib.WithDiagnosticConfig(mib.DiagnosticConfig{
+    Level:  mib.StrictnessNormal,
+    FailAt: mib.SeverityError,              // fail on Error or worse
     Ignore: []string{"identifier-underscore"}, // suppress specific codes
-    Overrides: map[string]gomib.Severity{
-        "import-not-found": gomib.SeverityWarning, // downgrade to warning
+    Overrides: map[string]mib.Severity{
+        "import-not-found": mib.SeverityWarning, // downgrade to warning
     },
 })
 ```

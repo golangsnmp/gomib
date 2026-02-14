@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 func main() {
@@ -49,7 +50,7 @@ func main() {
 
 	// OID-based lookup via NodeByOID().Object()
 	fmt.Println("\n=== By OID ===")
-	oid, _ := gomib.ParseOID("1.3.6.1.2.1.2.2.1.3")
+	oid, _ := mib.ParseOID("1.3.6.1.2.1.2.2.1.3")
 	node := m.NodeByOID(oid)
 	if node != nil && node.Object() != nil {
 		obj = node.Object()
@@ -58,7 +59,7 @@ func main() {
 
 	// Exact OID lookup
 	fmt.Println("\n=== NodeByOID (exact) ===")
-	oid, _ = gomib.ParseOID("1.3.6.1.2.1.2.2.1.1")
+	oid, _ = mib.ParseOID("1.3.6.1.2.1.2.2.1.1")
 	node = m.NodeByOID(oid)
 	if node != nil {
 		fmt.Printf("%-20s %s  kind=%s\n", node.Name(), node.OID(), node.Kind())
@@ -66,7 +67,7 @@ func main() {
 
 	// Longest prefix match (useful for instance OIDs like ifDescr.1)
 	fmt.Println("\n=== LongestPrefixByOID ===")
-	instanceOID, _ := gomib.ParseOID("1.3.6.1.2.1.2.2.1.2.17")
+	instanceOID, _ := mib.ParseOID("1.3.6.1.2.1.2.2.1.2.17")
 	prefix := m.LongestPrefixByOID(instanceOID)
 	if prefix != nil {
 		fmt.Printf("%-20s %s  (matched from %s)\n", prefix.Name(), prefix.OID(), instanceOID)

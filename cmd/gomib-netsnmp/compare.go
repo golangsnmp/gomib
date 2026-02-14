@@ -111,7 +111,7 @@ Options:
 		return 1
 	}
 
-	fmt.Fprintln(os.Stderr, "Loading MIBs with gomib...")
+	fmt.Fprintln(os.Stderr, "Loading MIBs with mib...")
 	gomibNodes, err := loadGomibNodes(mibPaths, modules)
 	if err != nil {
 		printError("gomib load failed: %v", err)
@@ -282,7 +282,7 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 }
 
 // typesEquivalent checks if two type names are semantically equivalent.
-// Handles differences in naming conventions between net-snmp and gomib.
+// Handles differences in naming conventions between net-snmp and mib.
 func typesEquivalent(a, b string) bool {
 	if a == b {
 		return true

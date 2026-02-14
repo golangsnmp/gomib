@@ -12,6 +12,7 @@ import (
 	"log"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 //go:embed mibs
@@ -25,7 +26,7 @@ func main() {
 		gomib.WithSource(embedded),
 		gomib.WithModules("EXAMPLE-MIB"),
 		gomib.WithSystemPaths(),
-		gomib.WithStrictness(gomib.StrictnessPermissive),
+		gomib.WithStrictness(mib.StrictnessPermissive),
 	)
 	if err != nil {
 		log.Fatal(err)

@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const getUsage = `gomib get - Query OID or name lookups
@@ -98,13 +98,13 @@ func cmdGet(args []string) int {
 		return 1
 	}
 
-	mib, err := loadMib(modules)
+	m, err := loadMib(modules)
 	if err != nil {
 		printError("failed to load: %v", err)
 		return 2
 	}
 
-	node := resolveQuery(mib, query)
+	node := resolveQuery(m, query)
 	if node == nil {
 		printError("not found: %s", query)
 		return 1
@@ -121,7 +121,7 @@ func cmdGet(args []string) int {
 
 // resolveQuery parses a user query string and returns the matching node.
 // Supports: plain name, MODULE::name, numeric OID (with optional leading dot).
-func resolveQuery(m *gomib.Mib, query string) *gomib.Node {
+func resolveQuery(m *mib.Mib, query string) *mib.Node {
 	// Qualified name: MODULE::name
 	if modName, itemName, ok := strings.Cut(query, "::"); ok {
 		mod := m.Module(modName)
@@ -137,7 +137,7 @@ func resolveQuery(m *gomib.Mib, query string) *gomib.Node {
 		q = q[1:]
 	}
 	if len(q) > 0 && q[0] >= '0' && q[0] <= '9' {
-		oid, err := gomib.ParseOID(q)
+		oid, err := mib.ParseOID(q)
 		if err != nil || len(oid) == 0 {
 			return nil
 		}
@@ -148,7 +148,7 @@ func resolveQuery(m *gomib.Mib, query string) *gomib.Node {
 	return m.Node(query)
 }
 
-func printNode(node *gomib.Node) {
+func printNode(node *mib.Node) {
 	label := node.Name()
 	if label == "" {
 		label = fmt.Sprintf("(%d)", node.Arc())
@@ -178,7 +178,7 @@ func printNode(node *gomib.Node) {
 	}
 }
 
-func printObjectDetails(obj *gomib.Object) {
+func printObjectDetails(obj *mib.Object) {
 	if obj.Type() != nil {
 		typ := obj.Type()
 		typeName := typ.Name()
@@ -265,7 +265,7 @@ func printObjectDetails(obj *gomib.Object) {
 	}
 }
 
-func printNotificationDetails(notif *gomib.Notification) {
+func printNotificationDetails(notif *mib.Notification) {
 	fmt.Printf("  status: %s\n", notif.Status().String())
 
 	if len(notif.Objects()) > 0 {
@@ -288,11 +288,11 @@ func normalizeDescription(s string, maxLen int) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-func printNodeTree(node *gomib.Node, maxDepth int) {
+func printNodeTree(node *mib.Node, maxDepth int) {
 	printNodeTreeRecursive(node, 0, maxDepth)
 }
 
-func printNodeTreeRecursive(node *gomib.Node, depth int, maxDepth int) {
+func printNodeTreeRecursive(node *mib.Node, depth int, maxDepth int) {
 	if maxDepth > 0 && depth > maxDepth {
 		return
 	}

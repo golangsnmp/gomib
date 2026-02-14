@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 // SemanticComparison holds the results of comparing gomib and libsmi output.
@@ -128,7 +129,7 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 
 	if source := buildSource(mibPaths); source != nil {
 		ctx := context.Background()
-		var m *gomib.Mib
+		var m *mib.Mib
 		var err error
 
 		loadOpts := []gomib.LoadOption{gomib.WithSource(source)}
@@ -273,23 +274,23 @@ type gomibNode struct {
 	BaseType string
 }
 
-func kindToString(k gomib.Kind) string {
-	if k == gomib.KindUnknown {
+func kindToString(k mib.Kind) string {
+	if k == mib.KindUnknown {
 		return ""
 	}
 	return k.String()
 }
 
-func statusToString(s gomib.Status) string {
+func statusToString(s mib.Status) string {
 	return s.String()
 }
 
-func accessToString(a gomib.Access) string {
+func accessToString(a mib.Access) string {
 	return a.String()
 }
 
-func baseTypeToString(b gomib.BaseType) string {
-	if b == gomib.BaseUnknown {
+func baseTypeToString(b mib.BaseType) string {
+	if b == mib.BaseUnknown {
 		return ""
 	}
 	return b.String()

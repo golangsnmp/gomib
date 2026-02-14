@@ -28,7 +28,7 @@ func loadProblemMIB(t testing.TB, name string) *mib.Mib {
 		t.Fatalf("DirTree problems failed: %v", err)
 	}
 	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus, problems), WithModules(name), WithStrictness(StrictnessPermissive))
+	m, err := Load(ctx, WithSource(corpus, problems), WithModules(name), WithStrictness(mib.StrictnessPermissive))
 	if err != nil {
 		t.Fatalf("Load(%s) failed: %v", name, err)
 	}

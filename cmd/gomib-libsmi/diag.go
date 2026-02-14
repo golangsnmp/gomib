@@ -247,7 +247,7 @@ func printDiagComparison(w io.Writer, result *DiagComparison) {
 	fmt.Fprintln(w)
 }
 
-func severityToString(s gomib.Severity) string {
+func severityToString(s mib.Severity) string {
 	return s.String()
 }
 

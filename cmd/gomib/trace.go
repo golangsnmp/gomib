@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const traceUsage = `gomib trace - Trace symbol resolution for debugging
@@ -73,16 +73,16 @@ func cmdTrace(args []string) int {
 		return 1
 	}
 
-	var mib *gomib.Mib
+	var m *mib.Mib
 	var err error
 	var loadMode string
 
 	if *loadAll {
 		loadMode = "Load - all modules from search path"
-		mib, err = loadMib(nil)
+		m, err = loadMib(nil)
 	} else {
 		loadMode = fmt.Sprintf("Load WithModules(%v)", modules)
-		mib, err = loadMib(modules)
+		m, err = loadMib(modules)
 	}
 
 	if err != nil {
@@ -92,26 +92,26 @@ func cmdTrace(args []string) int {
 
 	fmt.Printf("Load mode: %s\n", loadMode)
 	fmt.Printf("Loaded: %d modules, %d objects, %d types\n\n",
-		len(mib.Modules()), len(mib.Objects()), len(mib.Types()))
+		len(m.Modules()), len(m.Objects()), len(m.Types()))
 
-	traceSymbol(mib, symbol)
+	traceSymbol(m, symbol)
 
 	return 0
 }
 
-func traceSymbol(mib *gomib.Mib, symbol string) {
+func traceSymbol(m *mib.Mib, symbol string) {
 	fmt.Printf("=== Tracing symbol: %s ===\n\n", symbol)
 
 	var definingModules []string
-	for _, mod := range mib.Modules() {
+	for _, mod := range m.Modules() {
 		if mod.Object(symbol) != nil || mod.Type(symbol) != nil || mod.Node(symbol) != nil {
 			definingModules = append(definingModules, mod.Name())
 		}
 	}
 
-	node := mib.Node(symbol)
-	obj := mib.Object(symbol)
-	typ := mib.Type(symbol)
+	node := m.Node(symbol)
+	obj := m.Object(symbol)
+	typ := m.Type(symbol)
 
 	fmt.Println("DEFINITIONS:")
 	if len(definingModules) == 0 {
@@ -119,7 +119,7 @@ func traceSymbol(mib *gomib.Mib, symbol string) {
 	} else {
 		slices.Sort(definingModules)
 		for _, modName := range definingModules {
-			mod := mib.Module(modName)
+			mod := m.Module(modName)
 			var kinds []string
 			if mod.Object(symbol) != nil {
 				kinds = append(kinds, "Object")
@@ -175,12 +175,12 @@ func traceSymbol(mib *gomib.Mib, symbol string) {
 	if len(definingModules) > 1 {
 		fmt.Println("PER-MODULE LOOKUPS:")
 		for _, modName := range definingModules {
-			mod := mib.Module(modName)
+			mod := m.Module(modName)
 			modObj := mod.Object(symbol)
 			if modObj != nil {
 				fmt.Printf("  %s::%s:\n", modName, symbol)
 				fmt.Printf("    OID=%s  Kind=%s\n", modObj.OID(), modObj.Kind())
-				if modObj.Kind() == gomib.KindRow {
+				if modObj.Kind() == mib.KindRow {
 					fmt.Printf("    Index count: %d\n", len(modObj.Index()))
 					for i, idx := range modObj.Index() {
 						name := "(nil!)"
@@ -195,7 +195,7 @@ func traceSymbol(mib *gomib.Mib, symbol string) {
 		fmt.Println()
 	}
 
-	if obj != nil && obj.Kind() == gomib.KindRow {
+	if obj != nil && obj.Kind() == mib.KindRow {
 		fmt.Println("INDEX RESOLUTION (row object):")
 		directIndex := obj.Index()
 		effectiveIndex := obj.EffectiveIndexes()
@@ -243,7 +243,7 @@ func traceSymbol(mib *gomib.Mib, symbol string) {
 		fmt.Println()
 	}
 
-	if obj != nil && obj.Kind() == gomib.KindTable {
+	if obj != nil && obj.Kind() == mib.KindTable {
 		fmt.Println("TABLE STRUCTURE:")
 		if obj.Entry() != nil {
 			entry := obj.Entry()
@@ -258,8 +258,8 @@ func traceSymbol(mib *gomib.Mib, symbol string) {
 		fmt.Println()
 	}
 
-	unresolved := mib.Unresolved()
-	var related []gomib.UnresolvedRef
+	unresolved := m.Unresolved()
+	var related []mib.UnresolvedRef
 	for _, u := range unresolved {
 		if u.Symbol == symbol || strings.Contains(u.Symbol, symbol) {
 			related = append(related, u)
@@ -279,10 +279,10 @@ func traceSymbol(mib *gomib.Mib, symbol string) {
 		fmt.Println("  This can cause resolution ambiguity depending on load order.")
 		fmt.Println("  Modules:", strings.Join(definingModules, ", "))
 
-		var nodes []*gomib.Node
+		var nodes []*mib.Node
 		var nodeInfo []string
 		for _, modName := range definingModules {
-			mod := mib.Module(modName)
+			mod := m.Module(modName)
 			if modObj := mod.Object(symbol); modObj != nil {
 				nodes = append(nodes, modObj.Node())
 				nodeInfo = append(nodeInfo, fmt.Sprintf("%s -> node.Module=%v",

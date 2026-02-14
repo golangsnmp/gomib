@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const loadUsage = `gomib load - Load and resolve MIB modules
@@ -65,34 +66,34 @@ func cmdLoad(args []string) int {
 
 	var opts []gomib.LoadOption
 	if *strict {
-		opts = append(opts, gomib.WithStrictness(gomib.StrictnessStrict))
+		opts = append(opts, gomib.WithStrictness(mib.StrictnessStrict))
 	} else if *permissive {
-		opts = append(opts, gomib.WithStrictness(gomib.StrictnessPermissive))
+		opts = append(opts, gomib.WithStrictness(mib.StrictnessPermissive))
 	} else if *level >= 0 {
-		opts = append(opts, gomib.WithStrictness(gomib.StrictnessLevel(*level)))
+		opts = append(opts, gomib.WithStrictness(mib.StrictnessLevel(*level)))
 	}
 
-	mib, loadErr := loadMibWithOpts(modules, opts...)
-	if loadErr != nil && mib == nil {
+	m, loadErr := loadMibWithOpts(modules, opts...)
+	if loadErr != nil && m == nil {
 		printError("failed to load: %v", loadErr)
 		return 1
 	}
 
 	if *stats {
-		printDetailedStats(mib)
+		printDetailedStats(m)
 	} else {
 		fmt.Printf("Loaded %d modules (%d types, %d objects, %d notifications)\n",
-			len(mib.Modules()), len(mib.Types()), len(mib.Objects()), len(mib.Notifications()))
+			len(m.Modules()), len(m.Types()), len(m.Objects()), len(m.Notifications()))
 	}
 
-	diags := mib.Diagnostics()
+	diags := m.Diagnostics()
 	hasSevere := false
 	hasErrors := false
 	for _, d := range diags {
-		if d.Severity <= gomib.SeveritySevere {
+		if d.Severity <= mib.SeveritySevere {
 			hasSevere = true
 		}
-		if d.Severity <= gomib.SeverityError {
+		if d.Severity <= mib.SeverityError {
 			hasErrors = true
 		}
 	}
@@ -105,7 +106,7 @@ func cmdLoad(args []string) int {
 		}
 	}
 
-	unresolved := mib.Unresolved()
+	unresolved := m.Unresolved()
 	if len(unresolved) > 0 {
 		fmt.Println()
 		fmt.Println("Unresolved references:")
@@ -114,11 +115,11 @@ func cmdLoad(args []string) int {
 		objectCount := 0
 		for _, u := range unresolved {
 			switch u.Kind {
-			case gomib.UnresolvedImport:
+			case mib.UnresolvedImport:
 				importCount++
-			case gomib.UnresolvedType:
+			case mib.UnresolvedType:
 				typeCount++
-			case gomib.UnresolvedOID, gomib.UnresolvedIndex, gomib.UnresolvedNotificationObject:
+			case mib.UnresolvedOID, mib.UnresolvedIndex, mib.UnresolvedNotificationObject:
 				objectCount++
 			}
 		}
@@ -146,7 +147,7 @@ func cmdLoad(args []string) int {
 	return 0
 }
 
-func printDiagnostic(d gomib.Diagnostic) {
+func printDiagnostic(d mib.Diagnostic) {
 	prefix := "  " + d.Severity.String() + ": "
 	if d.Code != "" {
 		prefix += "[" + d.Code + "] "
@@ -162,7 +163,7 @@ func printDiagnostic(d gomib.Diagnostic) {
 	}
 }
 
-func printDetailedStats(m *gomib.Mib) {
+func printDetailedStats(m *mib.Mib) {
 	fmt.Println("Statistics:")
 	fmt.Printf("  Modules:        %d\n", len(m.Modules()))
 	fmt.Printf("  Types:          %d\n", len(m.Types()))
@@ -171,14 +172,14 @@ func printDetailedStats(m *gomib.Mib) {
 	fmt.Printf("  OID nodes:      %d\n", m.NodeCount())
 	fmt.Printf("  Diagnostics:    %d\n", len(m.Diagnostics()))
 
-	kindCounts := make(map[gomib.Kind]int)
+	kindCounts := make(map[mib.Kind]int)
 	for node := range m.Nodes() {
 		kindCounts[node.Kind()]++
 	}
 
 	fmt.Println()
 	fmt.Println("Nodes by kind:")
-	for kind := gomib.KindInternal; kind <= gomib.KindCapability; kind++ {
+	for kind := mib.KindInternal; kind <= mib.KindCapability; kind++ {
 		if count := kindCounts[kind]; count > 0 {
 			fmt.Printf("  %-15s %d\n", kind.String()+":", count)
 		}

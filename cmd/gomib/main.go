@@ -11,6 +11,7 @@ import (
 
 	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const usage = `gomib - MIB parser and query tool
@@ -132,11 +133,11 @@ func setupLogger() *slog.Logger {
 	}))
 }
 
-func loadMib(modules []string) (*gomib.Mib, error) {
+func loadMib(modules []string) (*mib.Mib, error) {
 	return loadMibWithOpts(modules)
 }
 
-func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (*gomib.Mib, error) {
+func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (*mib.Mib, error) {
 	var source gomib.Source
 	var opts []gomib.LoadOption
 

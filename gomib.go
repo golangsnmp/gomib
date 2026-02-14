@@ -97,7 +97,7 @@ func WithModules(names ...string) LoadOption {
 //	)
 //
 //	m, err := gomib.Load(ctx, gomib.WithSystemPaths())
-func Load(ctx context.Context, opts ...LoadOption) (*Mib, error) {
+func Load(ctx context.Context, opts ...LoadOption) (*mib.Mib, error) {
 	cfg := loadConfig{
 		diagConfig: mib.DefaultConfig(),
 	}
@@ -121,7 +121,7 @@ func Load(ctx context.Context, opts ...LoadOption) (*Mib, error) {
 
 // checkLoadResult checks the resolved Mib for diagnostic threshold violations
 // and missing requested modules. Returns nil if no issues found.
-func checkLoadResult(m *Mib, cfg loadConfig, requestedModules []string) error {
+func checkLoadResult(m *mib.Mib, cfg loadConfig, requestedModules []string) error {
 	var errs []error
 
 	// Check for missing requested modules

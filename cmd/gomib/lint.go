@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const lintUsage = `gomib lint - Check MIB modules for issues
@@ -166,13 +167,13 @@ func cmdLint(args []string) int {
 }
 
 func runLint(modules []string, cfg lintConfig) *lintResult {
-	diagCfg := gomib.DiagnosticConfig{
-		Level:  gomib.StrictnessLevel(cfg.level),
-		FailAt: gomib.SeverityFatal, // We handle failure ourselves
+	diagCfg := mib.DiagnosticConfig{
+		Level:  mib.StrictnessLevel(cfg.level),
+		FailAt: mib.SeverityFatal, // We handle failure ourselves
 		Ignore: cfg.ignore,
 	}
 
-	mib, err := loadMibWithOpts(modules, gomib.WithDiagnosticConfig(diagCfg))
+	m, err := loadMibWithOpts(modules, gomib.WithDiagnosticConfig(diagCfg))
 
 	result := &lintResult{
 		Summary: lintSummary{
@@ -194,9 +195,9 @@ func runLint(modules []string, cfg lintConfig) *lintResult {
 		return result
 	}
 
-	result.Summary.Modules = len(mib.Modules())
+	result.Summary.Modules = len(m.Modules())
 
-	for _, d := range mib.Diagnostics() {
+	for _, d := range m.Diagnostics() {
 		if len(cfg.only) > 0 && !matchesAny(d.Code, cfg.only) {
 			continue
 		}

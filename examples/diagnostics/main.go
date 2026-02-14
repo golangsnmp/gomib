@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 func main() {
@@ -25,11 +26,11 @@ func main() {
 
 	levels := []struct {
 		name  string
-		level gomib.StrictnessLevel
+		level mib.StrictnessLevel
 	}{
-		{"Strict", gomib.StrictnessStrict},
-		{"Normal", gomib.StrictnessNormal},
-		{"Permissive", gomib.StrictnessPermissive},
+		{"Strict", mib.StrictnessStrict},
+		{"Normal", mib.StrictnessNormal},
+		{"Permissive", mib.StrictnessPermissive},
 	}
 
 	for _, l := range levels {
@@ -83,9 +84,9 @@ func main() {
 		customOpts = append(customOpts, gomib.WithSource(src))
 	}
 	customOpts = append(customOpts, gomib.WithModules("IF-MIB"), gomib.WithSystemPaths(),
-		gomib.WithDiagnosticConfig(gomib.DiagnosticConfig{
-			Level:  gomib.StrictnessNormal,
-			FailAt: gomib.SeverityFatal,
+		gomib.WithDiagnosticConfig(mib.DiagnosticConfig{
+			Level:  mib.StrictnessNormal,
+			FailAt: mib.SeverityFatal,
 			Ignore: []string{"identifier-*"},
 		}))
 	m, err := gomib.Load(context.Background(), customOpts...)

@@ -87,7 +87,7 @@ Options:
 		return 1
 	}
 
-	fmt.Fprintln(os.Stderr, "Loading MIBs with gomib...")
+	fmt.Fprintln(os.Stderr, "Loading MIBs with mib...")
 	gomibNodes, err := loadGomibNodes(mibPaths, modules)
 	if err != nil {
 		printError("gomib load failed: %v", err)

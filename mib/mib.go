@@ -6,7 +6,6 @@ import (
 )
 
 // Mib is the top-level container for loaded MIB data.
-// It is immutable after construction and safe for concurrent reads.
 type Mib struct {
 	root          *Node
 	modules       []*Module

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 func TestLoadSingleMIB(t *testing.T) {
@@ -15,19 +16,19 @@ func TestLoadSingleMIB(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	mib, err := Load(ctx, WithSource(src), WithModules("IF-MIB"))
+	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB"))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	testutil.NotNil(t, mib, "mib should not be nil")
-	testutil.Greater(t, len(mib.Modules()), 0, "should have loaded modules")
-	testutil.Greater(t, len(mib.Objects()), 0, "should have resolved objects")
+	testutil.NotNil(t, m, "m should not be nil")
+	testutil.Greater(t, len(m.Modules()), 0, "should have loaded modules")
+	testutil.Greater(t, len(m.Objects()), 0, "should have resolved objects")
 
-	ifMIB := mib.Module("IF-MIB")
+	ifMIB := m.Module("IF-MIB")
 	testutil.NotNil(t, ifMIB, "IF-MIB module should be found")
 
-	ifIndex := mib.Object("ifIndex")
+	ifIndex := m.Object("ifIndex")
 	testutil.NotNil(t, ifIndex, "ifIndex object should be found")
 }
 
@@ -42,16 +43,16 @@ func TestLoadAllCorpus(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	mib, err := Load(ctx, WithSource(src))
+	m, err := Load(ctx, WithSource(src))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	testutil.Greater(t, len(mib.Modules()), 50, "should have loaded many modules")
-	testutil.Greater(t, len(mib.Objects()), 1000, "should have resolved many objects")
+	testutil.Greater(t, len(m.Modules()), 50, "should have loaded many modules")
+	testutil.Greater(t, len(m.Objects()), 1000, "should have resolved many objects")
 
 	t.Logf("Loaded %d modules, %d objects, %d types",
-		len(mib.Modules()), len(mib.Objects()), len(mib.Types()))
+		len(m.Modules()), len(m.Objects()), len(m.Types()))
 }
 
 func TestDirSource(t *testing.T) {
@@ -232,12 +233,12 @@ func TestStrictMIBsPassAtStrictLevel(t *testing.T) {
 	for _, name := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
-			mib, err := Load(ctx, WithSource(corpus, strict), WithModules(name), WithStrictness(StrictnessStrict))
+			m, err := Load(ctx, WithSource(corpus, strict), WithModules(name), WithStrictness(mib.StrictnessStrict))
 			if err != nil {
 				t.Fatalf("Load failed: %v", err)
 			}
 
-			diags := mib.Diagnostics()
+			diags := m.Diagnostics()
 			if len(diags) > 0 {
 				for _, d := range diags {
 					t.Errorf("unexpected diagnostic: [%s] %s: %s", d.Code, d.Severity, d.Message)
@@ -259,26 +260,26 @@ func TestUnderscoreViolationEmitsDiagnostic(t *testing.T) {
 
 	ctx := context.Background()
 
-	mib, err := Load(ctx, WithSource(corpus, violations), WithModules("UNDERSCORE-TEST-MIB"), WithStrictness(StrictnessStrict))
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("UNDERSCORE-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
 	var underscoreDiags int
-	for _, d := range mib.Diagnostics() {
+	for _, d := range m.Diagnostics() {
 		if d.Code == "identifier-underscore" {
 			underscoreDiags++
 		}
 	}
 	testutil.Equal(t, 2, underscoreDiags, "expected 2 identifier-underscore diagnostics")
 
-	mib, err = Load(ctx, WithSource(corpus, violations), WithModules("UNDERSCORE-TEST-MIB"), WithStrictness(StrictnessPermissive))
+	m, err = Load(ctx, WithSource(corpus, violations), WithModules("UNDERSCORE-TEST-MIB"), WithStrictness(mib.StrictnessPermissive))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
 	underscoreDiags = 0
-	for _, d := range mib.Diagnostics() {
+	for _, d := range m.Diagnostics() {
 		if d.Code == "identifier-underscore" {
 			underscoreDiags++
 		}
@@ -297,13 +298,13 @@ func TestHyphenEndViolationEmitsDiagnostic(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	mib, err := Load(ctx, WithSource(corpus, violations), WithModules("HYPHEN-END-TEST-MIB"), WithStrictness(StrictnessStrict))
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("HYPHEN-END-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
 	var hyphenDiags int
-	for _, d := range mib.Diagnostics() {
+	for _, d := range m.Diagnostics() {
 		if d.Code == "identifier-hyphen-end" {
 			hyphenDiags++
 		}
@@ -322,13 +323,13 @@ func TestLongIdentifierViolationEmitsDiagnostic(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	mib, err := Load(ctx, WithSource(corpus, violations), WithModules("LONG-IDENT-TEST-MIB"), WithStrictness(StrictnessStrict))
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("LONG-IDENT-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
 	var lengthDiags int
-	for _, d := range mib.Diagnostics() {
+	for _, d := range m.Diagnostics() {
 		if d.Code == "identifier-length-64" {
 			lengthDiags++
 		}
@@ -348,7 +349,7 @@ func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
 
 	ctx := context.Background()
 
-	m, err := Load(ctx, WithSource(corpus, problems), WithModules("PROBLEM-NAMING-MIB"), WithStrictness(StrictnessNormal))
+	m, err := Load(ctx, WithSource(corpus, problems), WithModules("PROBLEM-NAMING-MIB"), WithStrictness(mib.StrictnessNormal))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
@@ -364,7 +365,7 @@ func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
 	node := m.Node("NetEngine8000SysOid")
 	testutil.NotNil(t, node, "uppercase identifier should resolve in normal mode")
 
-	m, err = Load(ctx, WithSource(corpus, problems), WithModules("PROBLEM-NAMING-MIB"), WithStrictness(StrictnessPermissive))
+	m, err = Load(ctx, WithSource(corpus, problems), WithModules("PROBLEM-NAMING-MIB"), WithStrictness(mib.StrictnessPermissive))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
@@ -389,13 +390,13 @@ func TestMissingModuleIdentityEmitsDiagnostic(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	mib, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IDENTITY-MIB"), WithStrictness(StrictnessStrict))
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IDENTITY-MIB"), WithStrictness(mib.StrictnessStrict))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
 	var identityDiags int
-	for _, d := range mib.Diagnostics() {
+	for _, d := range m.Diagnostics() {
 		if d.Code == "missing-module-identity" {
 			identityDiags++
 		}
@@ -415,21 +416,21 @@ func TestMissingImportFailsInStrictMode(t *testing.T) {
 
 	ctx := context.Background()
 
-	mib, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(StrictnessStrict))
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	unresolved := mib.Unresolved()
+	unresolved := m.Unresolved()
 	var oidUnresolved int
 	for _, u := range unresolved {
-		if u.Kind == UnresolvedOID {
+		if u.Kind == mib.UnresolvedOID {
 			oidUnresolved++
 		}
 	}
 	testutil.Greater(t, oidUnresolved, 0, "strict mode should have unresolved OID references")
 
-	testObj := mib.Object("testObject")
+	testObj := m.Object("testObject")
 	testutil.Nil(t, testObj, "testObject should not resolve in strict mode")
 }
 
@@ -445,21 +446,21 @@ func TestMissingImportWorksInPermissiveMode(t *testing.T) {
 
 	ctx := context.Background()
 
-	mib, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(StrictnessPermissive))
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessPermissive))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	unresolved := mib.Unresolved()
+	unresolved := m.Unresolved()
 	var oidUnresolved int
 	for _, u := range unresolved {
-		if u.Kind == UnresolvedOID && u.Module == "MISSING-IMPORT-TEST-MIB" {
+		if u.Kind == mib.UnresolvedOID && u.Module == "MISSING-IMPORT-TEST-MIB" {
 			oidUnresolved++
 		}
 	}
 	testutil.Equal(t, 0, oidUnresolved, "permissive mode should resolve enterprises via fallback")
 
-	testObj := mib.Object("testObject")
+	testObj := m.Object("testObject")
 	testutil.NotNil(t, testObj, "testObject should resolve in permissive mode")
 }
 
@@ -475,15 +476,15 @@ func TestMissingImportFailsInNormalMode(t *testing.T) {
 
 	ctx := context.Background()
 
-	mib, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(StrictnessNormal))
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessNormal))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	unresolved := mib.Unresolved()
+	unresolved := m.Unresolved()
 	var oidUnresolved int
 	for _, u := range unresolved {
-		if u.Kind == UnresolvedOID && u.Module == "MISSING-IMPORT-TEST-MIB" {
+		if u.Kind == mib.UnresolvedOID && u.Module == "MISSING-IMPORT-TEST-MIB" {
 			oidUnresolved++
 		}
 	}
@@ -503,10 +504,10 @@ func TestDiagnosticThresholdEnforced(t *testing.T) {
 	ctx := context.Background()
 
 	// MISSING-IMPORT-TEST-MIB produces Error-level diagnostics for unresolved OIDs.
-	// With FailAt=SeverityError, Load should return the Mib and an error.
-	cfg := DiagnosticConfig{
-		Level:  StrictnessStrict,
-		FailAt: SeverityError,
+	// With FailAt=mib.SeverityError, Load should return the Mib and an error.
+	cfg := mib.DiagnosticConfig{
+		Level:  mib.StrictnessStrict,
+		FailAt: mib.SeverityError,
 	}
 	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithDiagnosticConfig(cfg))
 	testutil.Error(t, err, "Load should error when diagnostics exceed FailAt threshold")
@@ -529,12 +530,12 @@ func TestDiagnosticThresholdNotTriggered(t *testing.T) {
 
 	// Same MIB but with default FailAt=SeveritySevere.
 	// Error-level diagnostics should not trigger failure.
-	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(StrictnessStrict))
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
 	testutil.NoError(t, err, "Load should not error when diagnostics are below FailAt threshold")
 	testutil.NotNil(t, m, "Mib should be returned")
 }
 
-func loadInvalidMIB(t testing.TB, name string, level StrictnessLevel) *Mib {
+func loadInvalidMIB(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
 	t.Helper()
 	corpus, err := DirTree("testdata/corpus/primary")
 	if err != nil {
@@ -552,8 +553,8 @@ func loadInvalidMIB(t testing.TB, name string, level StrictnessLevel) *Mib {
 	return m
 }
 
-func moduleObjects(m *Mib, moduleName string) []*Object {
-	var result []*Object
+func moduleObjects(m *mib.Mib, moduleName string) []*mib.Object {
+	var result []*mib.Object
 	for _, o := range m.Objects() {
 		if o.Module().Name() == moduleName {
 			result = append(result, o)
@@ -562,8 +563,8 @@ func moduleObjects(m *Mib, moduleName string) []*Object {
 	return result
 }
 
-func moduleDiagnostics(m *Mib, moduleName string) []Diagnostic {
-	var result []Diagnostic
+func moduleDiagnostics(m *mib.Mib, moduleName string) []mib.Diagnostic {
+	var result []mib.Diagnostic
 	for _, d := range m.Diagnostics() {
 		if d.Module == moduleName {
 			result = append(result, d)
@@ -575,11 +576,11 @@ func moduleDiagnostics(m *Mib, moduleName string) []Diagnostic {
 func TestInvalidSyntaxMIBProducesNoBrokenObjects(t *testing.T) {
 	levels := []struct {
 		name  string
-		level StrictnessLevel
+		level mib.StrictnessLevel
 	}{
-		{"strict", StrictnessStrict},
-		{"normal", StrictnessNormal},
-		{"permissive", StrictnessPermissive},
+		{"strict", mib.StrictnessStrict},
+		{"normal", mib.StrictnessNormal},
+		{"permissive", mib.StrictnessPermissive},
 	}
 
 	for _, lvl := range levels {
@@ -600,11 +601,11 @@ func TestInvalidSyntaxMIBProducesNoBrokenObjects(t *testing.T) {
 func TestInvalidTruncatedMIBProducesNoObjects(t *testing.T) {
 	levels := []struct {
 		name  string
-		level StrictnessLevel
+		level mib.StrictnessLevel
 	}{
-		{"strict", StrictnessStrict},
-		{"normal", StrictnessNormal},
-		{"permissive", StrictnessPermissive},
+		{"strict", mib.StrictnessStrict},
+		{"normal", mib.StrictnessNormal},
+		{"permissive", mib.StrictnessPermissive},
 	}
 
 	for _, lvl := range levels {
@@ -623,7 +624,7 @@ func TestInvalidTruncatedMIBProducesNoObjects(t *testing.T) {
 }
 
 func TestInvalidDuplicateOIDMIBBothObjectsLoad(t *testing.T) {
-	m := loadInvalidMIB(t, "INVALID-DUPLICATE-OID-MIB", StrictnessPermissive)
+	m := loadInvalidMIB(t, "INVALID-DUPLICATE-OID-MIB", mib.StrictnessPermissive)
 
 	objs := moduleObjects(m, "INVALID-DUPLICATE-OID-MIB")
 	testutil.Equal(t, 2, len(objs),

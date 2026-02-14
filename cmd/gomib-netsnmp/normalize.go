@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const maxNetSnmpDirs = 500 // sanity limit to prevent accidental "/" or similar
@@ -181,21 +182,21 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 	}
 
 	ctx := context.Background()
-	var mib *gomib.Mib
+	var m *mib.Mib
 	var err error
 
 	loadOpts := []gomib.LoadOption{gomib.WithSource(source)}
 	if len(modules) > 0 {
 		loadOpts = append(loadOpts, gomib.WithModules(modules...))
 	}
-	mib, err = gomib.Load(ctx, loadOpts...)
+	m, err = gomib.Load(ctx, loadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("gomib load failed: %w", err)
 	}
 
 	nodes := make(map[string]*NormalizedNode)
 
-	for node := range mib.Nodes() {
+	for node := range m.Nodes() {
 		oid := node.OID().String()
 		if oid == "" {
 			continue
@@ -274,22 +275,22 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 	return nodes, nil
 }
 
-func normalizeGomibType(t *gomib.Type) string {
+func normalizeGomibType(t *mib.Type) string {
 	if t == nil {
 		return ""
 	}
 	return t.EffectiveBase().String()
 }
 
-func normalizeGomibAccess(a gomib.Access) string {
+func normalizeGomibAccess(a mib.Access) string {
 	return a.String()
 }
 
-func normalizeGomibStatus(s gomib.Status) string {
+func normalizeGomibStatus(s mib.Status) string {
 	return s.String()
 }
 
-func normalizeGomibKind(k gomib.Kind) string {
+func normalizeGomibKind(k mib.Kind) string {
 	if k.IsObjectType() {
 		return k.String()
 	}

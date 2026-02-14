@@ -6,7 +6,7 @@ import (
 	"os"
 	"slices"
 
-	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const dumpUsage = `gomib dump - Output modules or subtrees as JSON
@@ -56,7 +56,7 @@ func cmdDump(args []string) int {
 		return 1
 	}
 
-	mib, err := loadMib(modules)
+	m, err := loadMib(modules)
 	if err != nil {
 		printError("failed to load: %v", err)
 		return 2
@@ -66,12 +66,12 @@ func cmdDump(args []string) int {
 		Compact:       *compact,
 		IncludeTree:   !*noTree,
 		IncludeDescr:  !*noDescriptions,
-		IncludeDiags:  len(mib.Diagnostics()) > 0,
+		IncludeDiags:  len(m.Diagnostics()) > 0,
 		RequestedMods: modules,
 		OidFilter:     *oidFilter,
 	}
 
-	output := buildDumpOutput(mib, opts)
+	output := buildDumpOutput(m, opts)
 
 	json, err := marshalJSON(output, !*compact)
 	if err != nil {
@@ -93,7 +93,7 @@ type JSONOptions struct {
 	OidFilter     string
 }
 
-func buildDumpOutput(m *gomib.Mib, opts JSONOptions) *DumpOutput {
+func buildDumpOutput(m *mib.Mib, opts JSONOptions) *DumpOutput {
 	output := &DumpOutput{}
 
 	for _, mod := range m.Modules() {
@@ -166,7 +166,7 @@ func shouldIncludeModule(name string, requested []string) bool {
 	return slices.Contains(requested, name)
 }
 
-func buildModuleJSON(mod *gomib.Module, opts JSONOptions) ModuleJSON {
+func buildModuleJSON(mod *mib.Module, opts JSONOptions) ModuleJSON {
 	m := ModuleJSON{
 		Name:         mod.Name(),
 		Language:     mod.Language().String(),
@@ -189,7 +189,7 @@ func buildModuleJSON(mod *gomib.Module, opts JSONOptions) ModuleJSON {
 	return m
 }
 
-func buildTypeJSON(typ *gomib.Type, opts JSONOptions) TypeJSON {
+func buildTypeJSON(typ *mib.Type, opts JSONOptions) TypeJSON {
 	t := TypeJSON{
 		Name:   typ.Name(),
 		Base:   typ.Base().String(),
@@ -227,7 +227,7 @@ func buildTypeJSON(typ *gomib.Type, opts JSONOptions) TypeJSON {
 	return t
 }
 
-func buildObjectJSON(obj *gomib.Object, opts JSONOptions) ObjectJSON {
+func buildObjectJSON(obj *mib.Object, opts JSONOptions) ObjectJSON {
 	o := ObjectJSON{
 		Name:   obj.Name(),
 		OID:    obj.OID().String(),
@@ -275,7 +275,7 @@ func buildObjectJSON(obj *gomib.Object, opts JSONOptions) ObjectJSON {
 	return o
 }
 
-func buildNotificationJSON(notif *gomib.Notification, opts JSONOptions) NotificationJSON {
+func buildNotificationJSON(notif *mib.Notification, opts JSONOptions) NotificationJSON {
 	n := NotificationJSON{
 		Name:   notif.Name(),
 		OID:    notif.OID().String(),
@@ -297,7 +297,7 @@ func buildNotificationJSON(notif *gomib.Notification, opts JSONOptions) Notifica
 	return n
 }
 
-func buildTreeJSON(node *gomib.Node, opts JSONOptions) *TreeNodeJSON {
+func buildTreeJSON(node *mib.Node, opts JSONOptions) *TreeNodeJSON {
 	t := &TreeNodeJSON{
 		Arc:   node.Arc(),
 		OID:   node.OID().String(),
@@ -316,7 +316,7 @@ func buildTreeJSON(node *gomib.Node, opts JSONOptions) *TreeNodeJSON {
 	return t
 }
 
-func buildDiagnosticJSON(d gomib.Diagnostic) DiagnosticJSON {
+func buildDiagnosticJSON(d mib.Diagnostic) DiagnosticJSON {
 	dj := DiagnosticJSON{
 		Severity: d.Severity.String(),
 		Message:  d.Message,
