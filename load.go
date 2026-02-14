@@ -25,7 +25,7 @@ func componentLogger(logger *slog.Logger, component string) *slog.Logger {
 }
 
 // loadAllModules loads all MIB files from sources in parallel.
-func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (Mib, error) {
+func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*Mib, error) {
 	if len(sources) == 0 {
 		return nil, ErrNoSources
 	}
@@ -150,7 +150,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (Mib,
 	return resolver.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig), nil
 }
 
-func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg loadConfig) (Mib, error) {
+func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg loadConfig) (*Mib, error) {
 	logger := cfg.logger
 
 	heuristic := defaultHeuristic()

@@ -440,10 +440,8 @@ func TestMibFilteredCollections(t *testing.T) {
 func TestMibNotificationCount(t *testing.T) {
 	m := loadTestMIB(t)
 
-	count := m.NotificationCount()
 	notifications := m.Notifications()
-	testutil.Equal(t, count, len(notifications),
-		"NotificationCount() should match Notifications() length")
+	count := len(notifications)
 
 	// The fixture modules include SNMPv2-MIB which has linkDown, linkUp, etc.
 	testutil.Greater(t, count, 0, "should have some notifications")
@@ -562,9 +560,7 @@ func TestTypesCollection(t *testing.T) {
 	m := loadTestMIB(t)
 
 	types := m.Types()
-	count := m.TypeCount()
-	testutil.Equal(t, count, len(types),
-		"TypeCount() should match Types() length")
+	count := len(types)
 	testutil.Greater(t, count, 0, "should have types (DisplayString, etc.)")
 
 	found := false

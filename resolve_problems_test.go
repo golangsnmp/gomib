@@ -17,7 +17,7 @@ import (
 
 // loadProblemMIB loads a problem MIB by name using both the primary corpus
 // (for dependencies like SNMPv2-SMI, SNMPv2-TC) and the problems directory.
-func loadProblemMIB(t testing.TB, name string) mib.Mib {
+func loadProblemMIB(t testing.TB, name string) *mib.Mib {
 	t.Helper()
 	corpus, err := DirTree("testdata/corpus/primary")
 	if err != nil {

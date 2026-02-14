@@ -128,7 +128,7 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 
 	if source := buildSource(mibPaths); source != nil {
 		ctx := context.Background()
-		var m gomib.Mib
+		var m *gomib.Mib
 		var err error
 
 		if len(modules) > 0 {

@@ -14,7 +14,7 @@ func TestResolveNilModulesNilLoggerNilConfig(t *testing.T) {
 		t.Fatal("Resolve returned nil Mib")
 	}
 	// Should have base modules registered even with nil input.
-	if m.ModuleCount() == 0 {
+	if len(m.Modules()) == 0 {
 		t.Error("expected at least base modules, got 0")
 	}
 }
@@ -25,7 +25,7 @@ func TestResolveEmptyModulesNilLoggerNilConfig(t *testing.T) {
 		t.Fatal("Resolve returned nil Mib")
 	}
 	// Empty user modules still gets base modules.
-	if m.ModuleCount() == 0 {
+	if len(m.Modules()) == 0 {
 		t.Error("expected at least base modules, got 0")
 	}
 }
@@ -37,7 +37,7 @@ func TestResolveNilModulesWithCustomConfig(t *testing.T) {
 		t.Fatal("Resolve returned nil Mib")
 	}
 	// With strict config, the pipeline should still complete.
-	if m.ModuleCount() == 0 {
+	if len(m.Modules()) == 0 {
 		t.Error("expected at least base modules, got 0")
 	}
 }
@@ -240,7 +240,7 @@ func TestResolvePermissiveConfig(t *testing.T) {
 		t.Fatal("Resolve returned nil Mib")
 	}
 	// Should still produce base modules.
-	if m.ModuleCount() == 0 {
+	if len(m.Modules()) == 0 {
 		t.Error("expected at least base modules")
 	}
 }
@@ -257,8 +257,8 @@ func TestResolveNoUserModulesNodeCount(t *testing.T) {
 func TestResolveNoUserModulesTypeCount(t *testing.T) {
 	m := Resolve(nil, nil, nil)
 	// At minimum: 4 ASN.1 primitives + SMI types + TCs
-	if m.TypeCount() < 4 {
-		t.Errorf("expected at least 4 types (ASN.1 primitives), got %d", m.TypeCount())
+	if len(m.Types()) < 4 {
+		t.Errorf("expected at least 4 types (ASN.1 primitives), got %d", len(m.Types()))
 	}
 }
 

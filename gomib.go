@@ -73,7 +73,7 @@ func WithStrictness(level mib.StrictnessLevel) LoadOption {
 //	mib, err := gomib.Load(ctx,
 //	    gomib.Multi(gomib.DirTree("/usr/share/snmp/mibs"), gomib.Dir("./custom")),
 //	)
-func Load(ctx context.Context, source Source, opts ...LoadOption) (Mib, error) {
+func Load(ctx context.Context, source Source, opts ...LoadOption) (*Mib, error) {
 	cfg := loadConfig{
 		diagConfig: mib.DefaultConfig(),
 	}
@@ -97,7 +97,7 @@ func Load(ctx context.Context, source Source, opts ...LoadOption) (Mib, error) {
 //	    []string{"IF-MIB", "IP-MIB"},
 //	    gomib.DirTree("/usr/share/snmp/mibs"),
 //	)
-func LoadModules(ctx context.Context, names []string, source Source, opts ...LoadOption) (Mib, error) {
+func LoadModules(ctx context.Context, names []string, source Source, opts ...LoadOption) (*Mib, error) {
 	cfg := loadConfig{
 		diagConfig: mib.DefaultConfig(),
 	}
@@ -114,7 +114,7 @@ func LoadModules(ctx context.Context, names []string, source Source, opts ...Loa
 
 // loadFromSources loads all modules if names is nil, or only named
 // modules (plus dependencies) if names is non-nil.
-func loadFromSources(ctx context.Context, sources []Source, names []string, cfg loadConfig) (Mib, error) {
+func loadFromSources(ctx context.Context, sources []Source, names []string, cfg loadConfig) (*Mib, error) {
 	if cfg.systemPaths {
 		sources = append(sources, discoverSystemSources()...)
 	}

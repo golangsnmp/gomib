@@ -20,7 +20,7 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) mib.Mib {
+func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
 	t.Helper()
 	corpus, err := DirTree("testdata/corpus/primary")
 	if err != nil {
@@ -39,7 +39,7 @@ func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) mib.
 	return m
 }
 
-func unresolvedSymbols(m mib.Mib, module string, kind mib.UnresolvedKind) map[string]bool {
+func unresolvedSymbols(m *mib.Mib, module string, kind mib.UnresolvedKind) map[string]bool {
 	result := make(map[string]bool)
 	for _, u := range m.Unresolved() {
 		if u.Module == module && u.Kind == kind {
@@ -302,7 +302,7 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 	}
 	src := Multi(corpus, violations)
 
-	load := func(t *testing.T, level mib.StrictnessLevel) mib.Mib {
+	load := func(t *testing.T, level mib.StrictnessLevel) *mib.Mib {
 		t.Helper()
 		ctx := context.Background()
 		m, err := LoadModules(ctx, []string{"MISSING-IMPORT-TEST-MIB"}, src, WithStrictness(level))

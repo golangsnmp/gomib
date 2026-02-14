@@ -7,7 +7,7 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-func loadTypeChainsMIB(t testing.TB) mib.Mib {
+func loadTypeChainsMIB(t testing.TB) *mib.Mib {
 	t.Helper()
 	return loadProblemMIB(t, "PROBLEM-TYPECHAINS-MIB")
 }
@@ -177,7 +177,7 @@ func TestTypeChainTCFlagPropagation(t *testing.T) {
 	})
 }
 
-func loadSemanticsMIB(t testing.TB) mib.Mib {
+func loadSemanticsMIB(t testing.TB) *mib.Mib {
 	t.Helper()
 	return loadProblemMIB(t, "PROBLEM-SEMANTICS-MIB")
 }
@@ -434,7 +434,7 @@ func TestDiagnosticNotifPartialResolution(t *testing.T) {
 		"problemDiagCol should be in resolved varbinds")
 }
 
-func loadShadowingMIB(t testing.TB) mib.Mib {
+func loadShadowingMIB(t testing.TB) *mib.Mib {
 	t.Helper()
 	return loadProblemMIB(t, "PROBLEM-SHADOWING-MIB")
 }

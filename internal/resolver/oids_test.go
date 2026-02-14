@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/graph"
-	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
@@ -486,9 +485,9 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 func TestShouldPreferModule(t *testing.T) {
 	t.Run("nil currentMod always prefers new", func(t *testing.T) {
 		srcMod := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv1}
-		newMod := mibimpl.NewModule("NEW-MIB")
+		newMod := mib.NewModule("NEW-MIB")
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{srcMod: newMod}
+		ctx.ModuleToResolved = map[*module.Module]*mib.Module{srcMod: newMod}
 
 		if !shouldPreferModule(ctx, newMod, nil, srcMod) {
 			t.Error("expected true when currentMod is nil")
@@ -497,11 +496,11 @@ func TestShouldPreferModule(t *testing.T) {
 
 	t.Run("nil currentSrcMod prefers new", func(t *testing.T) {
 		srcMod := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv1}
-		newMod := mibimpl.NewModule("NEW-MIB")
-		currentMod := mibimpl.NewModule("OLD-MIB")
+		newMod := mib.NewModule("NEW-MIB")
+		currentMod := mib.NewModule("OLD-MIB")
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{srcMod: newMod}
-		ctx.ResolvedToModule = map[*mibimpl.Module]*module.Module{} // currentMod not mapped
+		ctx.ModuleToResolved = map[*module.Module]*mib.Module{srcMod: newMod}
+		ctx.ResolvedToModule = map[*mib.Module]*module.Module{} // currentMod not mapped
 
 		if !shouldPreferModule(ctx, newMod, currentMod, srcMod) {
 			t.Error("expected true when currentSrcMod lookup returns nil")
@@ -511,12 +510,12 @@ func TestShouldPreferModule(t *testing.T) {
 	t.Run("SMIv2 preferred over SMIv1", func(t *testing.T) {
 		newSrc := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv2}
 		oldSrc := &module.Module{Name: "OLD-MIB", Language: module.LanguageSMIv1}
-		newMod := mibimpl.NewModule("NEW-MIB")
-		oldMod := mibimpl.NewModule("OLD-MIB")
+		newMod := mib.NewModule("NEW-MIB")
+		oldMod := mib.NewModule("OLD-MIB")
 
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{newSrc: newMod, oldSrc: oldMod}
-		ctx.ResolvedToModule = map[*mibimpl.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
+		ctx.ModuleToResolved = map[*module.Module]*mib.Module{newSrc: newMod, oldSrc: oldMod}
+		ctx.ResolvedToModule = map[*mib.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
 		if !shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected SMIv2 to be preferred over SMIv1")
@@ -526,12 +525,12 @@ func TestShouldPreferModule(t *testing.T) {
 	t.Run("SMIv1 not preferred over SMIv2", func(t *testing.T) {
 		newSrc := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv1}
 		oldSrc := &module.Module{Name: "OLD-MIB", Language: module.LanguageSMIv2}
-		newMod := mibimpl.NewModule("NEW-MIB")
-		oldMod := mibimpl.NewModule("OLD-MIB")
+		newMod := mib.NewModule("NEW-MIB")
+		oldMod := mib.NewModule("OLD-MIB")
 
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{newSrc: newMod, oldSrc: oldMod}
-		ctx.ResolvedToModule = map[*mibimpl.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
+		ctx.ModuleToResolved = map[*module.Module]*mib.Module{newSrc: newMod, oldSrc: oldMod}
+		ctx.ResolvedToModule = map[*mib.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
 		if shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected SMIv1 NOT to be preferred over SMIv2")
@@ -553,12 +552,12 @@ func TestShouldPreferModule(t *testing.T) {
 				&module.ModuleIdentity{Name: "oldMIB", LastUpdated: "200001010000Z"},
 			},
 		}
-		newMod := mibimpl.NewModule("NEW-MIB")
-		oldMod := mibimpl.NewModule("OLD-MIB")
+		newMod := mib.NewModule("NEW-MIB")
+		oldMod := mib.NewModule("OLD-MIB")
 
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{newSrc: newMod, oldSrc: oldMod}
-		ctx.ResolvedToModule = map[*mibimpl.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
+		ctx.ModuleToResolved = map[*module.Module]*mib.Module{newSrc: newMod, oldSrc: oldMod}
+		ctx.ResolvedToModule = map[*mib.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
 		if !shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected newer LAST-UPDATED to win")
@@ -580,12 +579,12 @@ func TestShouldPreferModule(t *testing.T) {
 				&module.ModuleIdentity{Name: "newMIB", LastUpdated: "200501010000Z"},
 			},
 		}
-		newMod := mibimpl.NewModule("OLD-MIB")
-		oldMod := mibimpl.NewModule("NEW-MIB")
+		newMod := mib.NewModule("OLD-MIB")
+		oldMod := mib.NewModule("NEW-MIB")
 
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mibimpl.Module{newSrc: newMod, oldSrc: oldMod}
-		ctx.ResolvedToModule = map[*mibimpl.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
+		ctx.ModuleToResolved = map[*module.Module]*mib.Module{newSrc: newMod, oldSrc: oldMod}
+		ctx.ResolvedToModule = map[*mib.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
 		if shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected older LAST-UPDATED to lose")
@@ -613,7 +612,7 @@ func TestFinalizeOidDefinition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srcMod := &module.Module{Name: "TEST-MIB", Language: module.LanguageSMIv2}
-			resolvedMod := mibimpl.NewModule("TEST-MIB")
+			resolvedMod := mib.NewModule("TEST-MIB")
 
 			ctx := newResolverContext([]*module.Module{srcMod}, nil, mib.DefaultConfig())
 			ctx.ModuleToResolved[srcMod] = resolvedMod
@@ -638,7 +637,7 @@ func TestFinalizeOidDefinition(t *testing.T) {
 			if node.Name() != "testNode" {
 				t.Errorf("name = %q, want %q", node.Name(), "testNode")
 			}
-			if node.InternalModule() != resolvedMod {
+			if node.Module() != resolvedMod {
 				t.Error("expected module to be set to resolvedMod")
 			}
 		})
@@ -857,8 +856,8 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 
 	v2Src := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv2}
 	v1Src := &module.Module{Name: "OLD-MIB", Language: module.LanguageSMIv1}
-	v2Mod := mibimpl.NewModule("NEW-MIB")
-	v1Mod := mibimpl.NewModule("OLD-MIB")
+	v2Mod := mib.NewModule("NEW-MIB")
+	v1Mod := mib.NewModule("OLD-MIB")
 
 	ctx := newResolverContext([]*module.Module{v2Src, v1Src}, nil, mib.DefaultConfig())
 	ctx.ModuleToResolved[v2Src] = v2Mod

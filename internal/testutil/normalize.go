@@ -9,7 +9,7 @@ import (
 )
 
 // NormalizeType converts a gomib Type to the normalized string used in fixtures.
-func NormalizeType(t mib.Type) string {
+func NormalizeType(t *mib.Type) string {
 	if t == nil {
 		return ""
 	}
@@ -102,7 +102,7 @@ func NormalizeIndexes(entries []mib.IndexEntry) []IndexInfo {
 }
 
 // NormalizeVarbinds converts gomib Object slice (notification OBJECTS) to name strings.
-func NormalizeVarbinds(objects []mib.Object) []string {
+func NormalizeVarbinds(objects []*mib.Object) []string {
 	if len(objects) == 0 {
 		return nil
 	}

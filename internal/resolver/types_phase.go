@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/golangsnmp/gomib/internal/graph"
-	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -26,7 +25,7 @@ func seedPrimitiveTypes(ctx *resolverContext) {
 
 	seeded := 0
 	seedType := func(name string, base mib.BaseType) {
-		typ := mibimpl.NewType(name)
+		typ := mib.NewType(name)
 		typ.SetModule(resolved)
 		typ.SetBase(base)
 
@@ -74,7 +73,7 @@ func createUserTypes(ctx *resolverContext) {
 				}
 			}
 
-			typ := mibimpl.NewType(td.Name)
+			typ := mib.NewType(td.Name)
 			typ.SetModule(resolved)
 			typ.SetBase(base)
 			typ.SetIsTC(td.IsTextualConvention)
@@ -112,7 +111,7 @@ func createUserTypes(ctx *resolverContext) {
 type typeResolutionEntry struct {
 	mod *module.Module
 	td  *module.TypeDef
-	typ *mibimpl.Type
+	typ *mib.Type
 }
 
 func resolveTypeBases(ctx *resolverContext) {
@@ -292,7 +291,7 @@ func linkPrimitiveSyntaxParents(ctx *resolverContext) {
 			if !ok {
 				continue
 			}
-			if typ.InternalParent() == nil {
+			if typ.Parent() == nil {
 				typ.SetParent(parent)
 			}
 		}
@@ -332,7 +331,7 @@ func linkRFC1213TypesToTCs(ctx *resolverContext) {
 
 func inheritBaseTypes(ctx *resolverContext) {
 	for _, t := range ctx.Builder.Types() {
-		if t.InternalParent() != nil && !isApplicationBaseType(t.Base()) {
+		if t.Parent() != nil && !isApplicationBaseType(t.Base()) {
 			if base, ok := resolveBaseFromChain(t); ok {
 				t.SetBase(base)
 			}
@@ -353,15 +352,15 @@ func isApplicationBaseType(b mib.BaseType) bool {
 	}
 }
 
-func resolveBaseFromChain(t *mibimpl.Type) (mib.BaseType, bool) {
-	visited := make(map[*mibimpl.Type]struct{})
+func resolveBaseFromChain(t *mib.Type) (mib.BaseType, bool) {
+	visited := make(map[*mib.Type]struct{})
 	current := t
 	for current != nil {
 		if _, seen := visited[current]; seen {
 			return 0, false
 		}
 		visited[current] = struct{}{}
-		if current.InternalParent() == nil {
+		if current.Parent() == nil {
 			return current.Base(), true
 		}
 		// Stop at application base types - their base is explicitly set
@@ -369,7 +368,7 @@ func resolveBaseFromChain(t *mibimpl.Type) (mib.BaseType, bool) {
 		if isApplicationBaseType(current.Base()) {
 			return current.Base(), true
 		}
-		current = current.InternalParent()
+		current = current.Parent()
 	}
 	return 0, false
 }

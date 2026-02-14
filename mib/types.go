@@ -32,8 +32,8 @@ type Revision struct {
 
 // IndexEntry describes an index component for a table row.
 type IndexEntry struct {
-	Object  Object // always non-nil in resolved model
-	Implied bool   // IMPLIED keyword present
+	Object  *Object // always non-nil in resolved model
+	Implied bool    // IMPLIED keyword present
 }
 
 // DefValKind identifies the type of default value.

@@ -20,8 +20,8 @@ func TestLoadSingleMIB(t *testing.T) {
 	}
 
 	testutil.NotNil(t, mib, "mib should not be nil")
-	testutil.Greater(t, mib.ModuleCount(), 0, "should have loaded modules")
-	testutil.Greater(t, mib.ObjectCount(), 0, "should have resolved objects")
+	testutil.Greater(t, len(mib.Modules()), 0, "should have loaded modules")
+	testutil.Greater(t, len(mib.Objects()), 0, "should have resolved objects")
 
 	ifMIB := mib.Module("IF-MIB")
 	testutil.NotNil(t, ifMIB, "IF-MIB module should be found")
@@ -46,11 +46,11 @@ func TestLoadAllCorpus(t *testing.T) {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	testutil.Greater(t, mib.ModuleCount(), 50, "should have loaded many modules")
-	testutil.Greater(t, mib.ObjectCount(), 1000, "should have resolved many objects")
+	testutil.Greater(t, len(mib.Modules()), 50, "should have loaded many modules")
+	testutil.Greater(t, len(mib.Objects()), 1000, "should have resolved many objects")
 
 	t.Logf("Loaded %d modules, %d objects, %d types",
-		mib.ModuleCount(), mib.ObjectCount(), mib.TypeCount())
+		len(mib.Modules()), len(mib.Objects()), len(mib.Types()))
 }
 
 func TestDirSource(t *testing.T) {
@@ -222,7 +222,7 @@ func TestObjectsCollection(t *testing.T) {
 	m := loadTestMIB(t)
 
 	objs := m.Objects()
-	testutil.Equal(t, m.ObjectCount(), len(objs), "ObjectCount should match Objects() length")
+	testutil.Equal(t, len(m.Objects()), len(objs), "Objects() should be consistent")
 }
 
 func TestTablesAndScalars(t *testing.T) {
@@ -516,7 +516,7 @@ func TestMissingImportFailsInNormalMode(t *testing.T) {
 	testutil.Greater(t, oidUnresolved, 0, "normal mode should have unresolved OID references")
 }
 
-func loadInvalidMIB(t testing.TB, name string, level StrictnessLevel) Mib {
+func loadInvalidMIB(t testing.TB, name string, level StrictnessLevel) *Mib {
 	t.Helper()
 	corpus, err := DirTree("testdata/corpus/primary")
 	if err != nil {
@@ -535,8 +535,8 @@ func loadInvalidMIB(t testing.TB, name string, level StrictnessLevel) Mib {
 	return m
 }
 
-func moduleObjects(m Mib, moduleName string) []Object {
-	var result []Object
+func moduleObjects(m *Mib, moduleName string) []*Object {
+	var result []*Object
 	for _, o := range m.Objects() {
 		if o.Module().Name() == moduleName {
 			result = append(result, o)
@@ -545,7 +545,7 @@ func moduleObjects(m Mib, moduleName string) []Object {
 	return result
 }
 
-func moduleDiagnostics(m Mib, moduleName string) []Diagnostic {
+func moduleDiagnostics(m *Mib, moduleName string) []Diagnostic {
 	var result []Diagnostic
 	for _, d := range m.Diagnostics() {
 		if d.Module == moduleName {

@@ -181,7 +181,7 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 	}
 
 	ctx := context.Background()
-	var mib gomib.Mib
+	var mib *gomib.Mib
 	var err error
 
 	if len(modules) > 0 {
@@ -274,7 +274,7 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 	return nodes, nil
 }
 
-func normalizeGomibType(t gomib.Type) string {
+func normalizeGomibType(t *gomib.Type) string {
 	if t == nil {
 		return ""
 	}

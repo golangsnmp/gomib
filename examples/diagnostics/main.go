@@ -46,7 +46,7 @@ func main() {
 		}
 
 		diags := m.Diagnostics()
-		fmt.Printf("  modules:     %d\n", m.ModuleCount())
+		fmt.Printf("  modules:     %d\n", len(m.Modules()))
 		fmt.Printf("  diagnostics: %d\n", len(diags))
 		fmt.Printf("  has errors:  %v\n", m.HasErrors())
 

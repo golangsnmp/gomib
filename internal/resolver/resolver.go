@@ -35,7 +35,7 @@ type resolver struct {
 // Resolve transforms parsed modules into a fully resolved Mib.
 // If logger is nil, logging is disabled. If diagConfig is nil,
 // defaults to Normal strictness.
-func Resolve(mods []*module.Module, logger *slog.Logger, diagConfig *mib.DiagnosticConfig) mib.Mib {
+func Resolve(mods []*module.Module, logger *slog.Logger, diagConfig *mib.DiagnosticConfig) *mib.Mib {
 	cfg := mib.DefaultConfig()
 	if diagConfig != nil {
 		cfg = *diagConfig
@@ -44,13 +44,13 @@ func Resolve(mods []*module.Module, logger *slog.Logger, diagConfig *mib.Diagnos
 	return r.resolve(mods)
 }
 
-func (r *resolver) resolve(mods []*module.Module) mib.Mib {
+func (r *resolver) resolve(mods []*module.Module) *mib.Mib {
 	ctx := newResolverContext(mods, r.L, r.diagConfig)
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "register"))
 	registerModules(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "register"),
-		slog.Int("modules", ctx.Builder.ModuleCount()))
+		slog.Int("modules", len(ctx.Builder.Modules())))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "imports"))
 	resolveImports(ctx)
@@ -59,7 +59,7 @@ func (r *resolver) resolve(mods []*module.Module) mib.Mib {
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "types"))
 	resolveTypes(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "types"),
-		slog.Int("types", ctx.Builder.TypeCount()))
+		slog.Int("types", len(ctx.Builder.Types())))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "oids"))
 	resolveOids(ctx)
@@ -68,10 +68,7 @@ func (r *resolver) resolve(mods []*module.Module) mib.Mib {
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "semantics"))
 	analyzeSemantics(ctx)
-	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "semantics"),
-		slog.Int("objects", ctx.Builder.ObjectCount()),
-		slog.Int("notifications", ctx.Builder.NotificationCount()),
-		slog.Int("groups", ctx.Builder.GroupCount()))
+	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "semantics"))
 
 	ctx.DropModules()
 
@@ -94,10 +91,12 @@ func (r *resolver) resolve(mods []*module.Module) mib.Mib {
 			slog.Int("count", len(ctx.unresolvedIndexes)))
 	}
 
-	r.Log(slog.LevelInfo, "resolution complete",
-		slog.Int("modules", ctx.Builder.ModuleCount()),
-		slog.Int("types", ctx.Builder.TypeCount()),
-		slog.Int("nodes", ctx.Builder.NodeCount()))
+	m := ctx.Builder.Mib()
 
-	return ctx.Builder.Mib()
+	r.Log(slog.LevelInfo, "resolution complete",
+		slog.Int("modules", len(m.Modules())),
+		slog.Int("types", len(m.Types())),
+		slog.Int("nodes", m.NodeCount()))
+
+	return m
 }

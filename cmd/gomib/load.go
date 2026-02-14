@@ -82,7 +82,7 @@ func cmdLoad(args []string) int {
 		printDetailedStats(mib)
 	} else {
 		fmt.Printf("Loaded %d modules (%d types, %d objects, %d notifications)\n",
-			mib.ModuleCount(), mib.TypeCount(), mib.ObjectCount(), mib.NotificationCount())
+			len(mib.Modules()), len(mib.Types()), len(mib.Objects()), len(mib.Notifications()))
 	}
 
 	diags := mib.Diagnostics()
@@ -158,12 +158,12 @@ func printDiagnostic(d gomib.Diagnostic) {
 	}
 }
 
-func printDetailedStats(m gomib.Mib) {
+func printDetailedStats(m *gomib.Mib) {
 	fmt.Println("Statistics:")
-	fmt.Printf("  Modules:        %d\n", m.ModuleCount())
-	fmt.Printf("  Types:          %d\n", m.TypeCount())
-	fmt.Printf("  Objects:        %d\n", m.ObjectCount())
-	fmt.Printf("  Notifications:  %d\n", m.NotificationCount())
+	fmt.Printf("  Modules:        %d\n", len(m.Modules()))
+	fmt.Printf("  Types:          %d\n", len(m.Types()))
+	fmt.Printf("  Objects:        %d\n", len(m.Objects()))
+	fmt.Printf("  Notifications:  %d\n", len(m.Notifications()))
 	fmt.Printf("  OID nodes:      %d\n", m.NodeCount())
 	fmt.Printf("  Diagnostics:    %d\n", len(m.Diagnostics()))
 

@@ -404,7 +404,7 @@ func TestLoadEmptyDirProducesEmptyMib(t *testing.T) {
 	m, err := Load(ctx, src)
 	testutil.NoError(t, err, "Load from empty dir should succeed")
 	testutil.NotNil(t, m, "should return non-nil Mib")
-	testutil.Equal(t, 0, m.ObjectCount(), "empty source should have no user objects")
+	testutil.Equal(t, 0, len(m.Objects()), "empty source should have no user objects")
 }
 
 func TestLoadMultipleModules(t *testing.T) {

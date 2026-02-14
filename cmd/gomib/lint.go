@@ -194,7 +194,7 @@ func runLint(modules []string, cfg lintConfig) *lintResult {
 		return result
 	}
 
-	result.Summary.Modules = mib.ModuleCount()
+	result.Summary.Modules = len(mib.Modules())
 
 	for _, d := range mib.Diagnostics() {
 		if len(cfg.only) > 0 && !matchesAny(d.Code, cfg.only) {

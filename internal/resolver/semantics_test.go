@@ -3,7 +3,6 @@ package resolver
 import (
 	"testing"
 
-	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -495,7 +494,7 @@ func TestResolveTypeSyntax(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	ctx.Modules = append(ctx.Modules, mod)
 
-	intType := mibimpl.NewType("Integer32")
+	intType := mib.NewType("Integer32")
 	intType.SetBase(mib.BaseInteger32)
 	ctx.RegisterModuleTypeSymbol(mod, "Integer32", intType)
 
@@ -581,19 +580,19 @@ func TestResolveTypeSyntaxBaseTypes(t *testing.T) {
 	ctx := newResolverContext([]*module.Module{smiMod}, nil, mib.DefaultConfig())
 	ctx.Snmpv2SMIModule = smiMod
 
-	integerType := mibimpl.NewType("INTEGER")
+	integerType := mib.NewType("INTEGER")
 	integerType.SetBase(mib.BaseInteger32)
 	ctx.RegisterModuleTypeSymbol(smiMod, "INTEGER", integerType)
 
-	bitsType := mibimpl.NewType("BITS")
+	bitsType := mib.NewType("BITS")
 	bitsType.SetBase(mib.BaseBits)
 	ctx.RegisterModuleTypeSymbol(smiMod, "BITS", bitsType)
 
-	octetType := mibimpl.NewType("OCTET STRING")
+	octetType := mib.NewType("OCTET STRING")
 	octetType.SetBase(mib.BaseOctetString)
 	ctx.RegisterModuleTypeSymbol(smiMod, "OCTET STRING", octetType)
 
-	oidType := mibimpl.NewType("OBJECT IDENTIFIER")
+	oidType := mib.NewType("OBJECT IDENTIFIER")
 	oidType.SetBase(mib.BaseObjectIdentifier)
 	ctx.RegisterModuleTypeSymbol(smiMod, "OBJECT IDENTIFIER", oidType)
 
@@ -648,16 +647,16 @@ func TestResolveTypeSyntaxBaseTypes(t *testing.T) {
 
 func TestComputeEffectiveValues(t *testing.T) {
 	t.Run("nil type is a no-op", func(t *testing.T) {
-		obj := mibimpl.NewObject("testObj")
+		obj := mib.NewObject("testObj")
 		// No type set, should not panic
 		computeEffectiveValues(obj)
 	})
 
 	t.Run("inherits display hint from type", func(t *testing.T) {
-		typ := mibimpl.NewType("DisplayString")
+		typ := mib.NewType("DisplayString")
 		typ.SetDisplayHint("255a")
 
-		obj := mibimpl.NewObject("testObj")
+		obj := mib.NewObject("testObj")
 		obj.SetType(typ)
 		computeEffectiveValues(obj)
 
@@ -667,10 +666,10 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("object hint takes precedence over type hint", func(t *testing.T) {
-		typ := mibimpl.NewType("DisplayString")
+		typ := mib.NewType("DisplayString")
 		typ.SetDisplayHint("255a")
 
-		obj := mibimpl.NewObject("testObj")
+		obj := mib.NewObject("testObj")
 		obj.SetType(typ)
 		obj.SetEffectiveHint("1d")
 		computeEffectiveValues(obj)
@@ -681,13 +680,13 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("inherits sizes from type chain", func(t *testing.T) {
-		parentType := mibimpl.NewType("OCTET STRING")
+		parentType := mib.NewType("OCTET STRING")
 		parentType.SetSizes([]mib.Range{{Min: 0, Max: 255}})
 
-		childType := mibimpl.NewType("DisplayString")
+		childType := mib.NewType("DisplayString")
 		childType.SetParent(parentType)
 
-		obj := mibimpl.NewObject("testObj")
+		obj := mib.NewObject("testObj")
 		obj.SetType(childType)
 		computeEffectiveValues(obj)
 
@@ -698,10 +697,10 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("object sizes take precedence", func(t *testing.T) {
-		typ := mibimpl.NewType("DisplayString")
+		typ := mib.NewType("DisplayString")
 		typ.SetSizes([]mib.Range{{Min: 0, Max: 255}})
 
-		obj := mibimpl.NewObject("testObj")
+		obj := mib.NewObject("testObj")
 		obj.SetType(typ)
 		obj.SetEffectiveSizes([]mib.Range{{Min: 1, Max: 32}})
 		computeEffectiveValues(obj)
@@ -713,16 +712,16 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("inherits ranges from ancestor", func(t *testing.T) {
-		grandparent := mibimpl.NewType("INTEGER")
+		grandparent := mib.NewType("INTEGER")
 		grandparent.SetRanges([]mib.Range{{Min: -128, Max: 127}})
 
-		parent := mibimpl.NewType("Integer32")
+		parent := mib.NewType("Integer32")
 		parent.SetParent(grandparent)
 
-		child := mibimpl.NewType("MyInt")
+		child := mib.NewType("MyInt")
 		child.SetParent(parent)
 
-		obj := mibimpl.NewObject("testObj")
+		obj := mib.NewObject("testObj")
 		obj.SetType(child)
 		computeEffectiveValues(obj)
 
@@ -733,13 +732,13 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("inherits enums from type", func(t *testing.T) {
-		typ := mibimpl.NewType("StatusType")
+		typ := mib.NewType("StatusType")
 		typ.SetEnums([]mib.NamedValue{
 			{Label: "up", Value: 1},
 			{Label: "down", Value: 2},
 		})
 
-		obj := mibimpl.NewObject("testObj")
+		obj := mib.NewObject("testObj")
 		obj.SetType(typ)
 		computeEffectiveValues(obj)
 
@@ -750,13 +749,13 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("object enums take precedence over type enums", func(t *testing.T) {
-		typ := mibimpl.NewType("StatusType")
+		typ := mib.NewType("StatusType")
 		typ.SetEnums([]mib.NamedValue{
 			{Label: "up", Value: 1},
 			{Label: "down", Value: 2},
 		})
 
-		obj := mibimpl.NewObject("testObj")
+		obj := mib.NewObject("testObj")
 		obj.SetType(typ)
 		obj.SetEffectiveEnums([]mib.NamedValue{
 			{Label: "active", Value: 1},
@@ -770,13 +769,13 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("inherits bits from type", func(t *testing.T) {
-		typ := mibimpl.NewType("Capabilities")
+		typ := mib.NewType("Capabilities")
 		typ.SetBits([]mib.NamedValue{
 			{Label: "feature1", Value: 0},
 			{Label: "feature2", Value: 1},
 		})
 
-		obj := mibimpl.NewObject("testObj")
+		obj := mib.NewObject("testObj")
 		obj.SetType(typ)
 		computeEffectiveValues(obj)
 
@@ -1149,7 +1148,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 
 func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 	// When a notification references an object whose node exists but has no
-	// InternalObject (e.g., an intermediate node), a diagnostic should be
+	// Object (e.g., an intermediate node), a diagnostic should be
 	// emitted rather than silently dropping the reference.
 	mod := &module.Module{
 		Name: "TEST-MIB",
@@ -1163,7 +1162,7 @@ func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 
 	ctx := newResolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
 	ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
-	resolvedMod := mibimpl.NewModule(mod.Name)
+	resolvedMod := mib.NewModule(mod.Name)
 	ctx.ModuleToResolved[mod] = resolvedMod
 	ctx.ResolvedToModule[resolvedMod] = mod
 
@@ -1190,6 +1189,6 @@ func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("expected diagnostic for notification object with nil InternalObject, got none")
+		t.Error("expected diagnostic for notification object with nil Object, got none")
 	}
 }

@@ -3,7 +3,6 @@ package resolver
 import (
 	"log/slog"
 
-	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -29,7 +28,7 @@ func registerModules(ctx *resolverContext) {
 	ctx.Modules = append(baseModules, userModules...)
 
 	for _, mod := range ctx.Modules {
-		resolved := mibimpl.NewModule(mod.Name)
+		resolved := mib.NewModule(mod.Name)
 		resolved.SetLanguage(mod.Language)
 
 		for _, def := range mod.Definitions {

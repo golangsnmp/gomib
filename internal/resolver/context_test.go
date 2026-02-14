@@ -3,7 +3,6 @@ package resolver
 import (
 	"testing"
 
-	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
@@ -11,6 +10,19 @@ import (
 
 func newTestContext() *resolverContext {
 	return newResolverContext(nil, nil, mib.DefaultConfig())
+}
+
+// testNodeArc is a counter for creating unique test nodes.
+var testNodeArc uint32
+
+// newTestNode creates a named *mib.Node for testing. Each call returns
+// a distinct node (unique arc under a shared root).
+func newTestNode(name string) *mib.Node {
+	testNodeArc++
+	m := mib.NewMib()
+	n := m.Root().GetOrCreateChild(testNodeArc)
+	n.SetName(name)
+	return n
 }
 
 func TestRecordUnresolvedSeverityConsistency(t *testing.T) {
@@ -185,16 +197,15 @@ func TestIsSNMPv2TCType(t *testing.T) {
 func TestLookupInModuleScope_Direct(t *testing.T) {
 	// Symbol found directly in the starting module.
 	modA := &module.Module{Name: "A"}
-	nodeX := &mibimpl.Node{}
-	nodeX.SetName("x")
+	nodeX := newTestNode("x")
 
-	symbols := map[*module.Module]map[string]*mibimpl.Node{
+	symbols := map[*module.Module]map[string]*mib.Node{
 		modA: {"x": nodeX},
 	}
 	imports := map[*module.Module]map[string]*module.Module{}
 
 	got, ok := lookupInModuleScope(modA, "x",
-		func(m *module.Module) map[string]*mibimpl.Node { return symbols[m] },
+		func(m *module.Module) map[string]*mib.Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
 	if !ok || got != nodeX {
@@ -206,10 +217,9 @@ func TestLookupInModuleScope_ImportChain(t *testing.T) {
 	// A imports "x" from B, B has "x" registered.
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
-	nodeX := &mibimpl.Node{}
-	nodeX.SetName("x")
+	nodeX := newTestNode("x")
 
-	symbols := map[*module.Module]map[string]*mibimpl.Node{
+	symbols := map[*module.Module]map[string]*mib.Node{
 		modB: {"x": nodeX},
 	}
 	imports := map[*module.Module]map[string]*module.Module{
@@ -217,7 +227,7 @@ func TestLookupInModuleScope_ImportChain(t *testing.T) {
 	}
 
 	got, ok := lookupInModuleScope(modA, "x",
-		func(m *module.Module) map[string]*mibimpl.Node { return symbols[m] },
+		func(m *module.Module) map[string]*mib.Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
 	if !ok || got != nodeX {
@@ -230,10 +240,9 @@ func TestLookupInModuleScope_MultiHopChain(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
 	modC := &module.Module{Name: "C"}
-	nodeX := &mibimpl.Node{}
-	nodeX.SetName("x")
+	nodeX := newTestNode("x")
 
-	symbols := map[*module.Module]map[string]*mibimpl.Node{
+	symbols := map[*module.Module]map[string]*mib.Node{
 		modC: {"x": nodeX},
 	}
 	imports := map[*module.Module]map[string]*module.Module{
@@ -242,7 +251,7 @@ func TestLookupInModuleScope_MultiHopChain(t *testing.T) {
 	}
 
 	got, ok := lookupInModuleScope(modA, "x",
-		func(m *module.Module) map[string]*mibimpl.Node { return symbols[m] },
+		func(m *module.Module) map[string]*mib.Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
 	if !ok || got != nodeX {
@@ -255,14 +264,14 @@ func TestLookupInModuleScope_CycleDetection(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
 
-	symbols := map[*module.Module]map[string]*mibimpl.Node{}
+	symbols := map[*module.Module]map[string]*mib.Node{}
 	imports := map[*module.Module]map[string]*module.Module{
 		modA: {"x": modB},
 		modB: {"x": modA},
 	}
 
 	_, ok := lookupInModuleScope(modA, "x",
-		func(m *module.Module) map[string]*mibimpl.Node { return symbols[m] },
+		func(m *module.Module) map[string]*mib.Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
 	if ok {
@@ -277,11 +286,10 @@ func TestLookupInModuleScope_MaxDepthLimit(t *testing.T) {
 		mods[i] = &module.Module{Name: string(rune('A' + i))}
 	}
 
-	nodeX := &mibimpl.Node{}
-	nodeX.SetName("x")
+	nodeX := newTestNode("x")
 
 	// Only the last module has the symbol.
-	symbols := map[*module.Module]map[string]*mibimpl.Node{
+	symbols := map[*module.Module]map[string]*mib.Node{
 		mods[len(mods)-1]: {"x": nodeX},
 	}
 	imports := map[*module.Module]map[string]*module.Module{}
@@ -290,7 +298,7 @@ func TestLookupInModuleScope_MaxDepthLimit(t *testing.T) {
 	}
 
 	_, ok := lookupInModuleScope(mods[0], "x",
-		func(m *module.Module) map[string]*mibimpl.Node { return symbols[m] },
+		func(m *module.Module) map[string]*mib.Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
 	if ok {
@@ -301,11 +309,11 @@ func TestLookupInModuleScope_MaxDepthLimit(t *testing.T) {
 func TestLookupInModuleScope_NotFound(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 
-	symbols := map[*module.Module]map[string]*mibimpl.Node{}
+	symbols := map[*module.Module]map[string]*mib.Node{}
 	imports := map[*module.Module]map[string]*module.Module{}
 
 	_, ok := lookupInModuleScope(modA, "x",
-		func(m *module.Module) map[string]*mibimpl.Node { return symbols[m] },
+		func(m *module.Module) map[string]*mib.Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
 	if ok {
@@ -317,11 +325,10 @@ func TestLookupNodeForModule(t *testing.T) {
 	ctx := newTestContext()
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
-	nodeX := &mibimpl.Node{}
-	nodeX.SetName("x")
+	nodeX := newTestNode("x")
 
 	// Register node in B, import from A -> B.
-	ctx.ModuleSymbolToNode[modB] = map[string]*mibimpl.Node{"x": nodeX}
+	ctx.ModuleSymbolToNode[modB] = map[string]*mib.Node{"x": nodeX}
 	ctx.ModuleImports[modA] = map[string]*module.Module{"x": modB}
 
 	got, ok := ctx.LookupNodeForModule(modA, "x")
@@ -338,11 +345,10 @@ func TestLookupNodeForModule(t *testing.T) {
 func TestLookupNodeInModule(t *testing.T) {
 	ctx := newTestContext()
 	modA := &module.Module{Name: "MY-MIB"}
-	nodeX := &mibimpl.Node{}
-	nodeX.SetName("x")
+	nodeX := newTestNode("x")
 
 	ctx.ModuleIndex["MY-MIB"] = []*module.Module{modA}
-	ctx.ModuleSymbolToNode[modA] = map[string]*mibimpl.Node{"x": nodeX}
+	ctx.ModuleSymbolToNode[modA] = map[string]*mib.Node{"x": nodeX}
 
 	got, ok := ctx.LookupNodeInModule("MY-MIB", "x")
 	if !ok || got != nodeX {
@@ -359,12 +365,11 @@ func TestLookupNodeInModule_MultipleVersions(t *testing.T) {
 	ctx := newTestContext()
 	modV1 := &module.Module{Name: "MY-MIB"}
 	modV2 := &module.Module{Name: "MY-MIB"}
-	nodeX := &mibimpl.Node{}
-	nodeX.SetName("x")
+	nodeX := newTestNode("x")
 
 	// Only the second version has the symbol.
 	ctx.ModuleIndex["MY-MIB"] = []*module.Module{modV1, modV2}
-	ctx.ModuleSymbolToNode[modV2] = map[string]*mibimpl.Node{"x": nodeX}
+	ctx.ModuleSymbolToNode[modV2] = map[string]*mib.Node{"x": nodeX}
 
 	got, ok := ctx.LookupNodeInModule("MY-MIB", "x")
 	if !ok || got != nodeX {
@@ -375,14 +380,12 @@ func TestLookupNodeInModule_MultipleVersions(t *testing.T) {
 func TestLookupNodeGlobal(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
-	nodeX := &mibimpl.Node{}
-	nodeX.SetName("x")
-	nodeY := &mibimpl.Node{}
-	nodeY.SetName("y")
+	nodeX := newTestNode("x")
+	nodeY := newTestNode("y")
 
 	ctx := newResolverContext([]*module.Module{modA, modB}, nil, mib.DefaultConfig())
-	ctx.ModuleSymbolToNode[modA] = map[string]*mibimpl.Node{"x": nodeX}
-	ctx.ModuleSymbolToNode[modB] = map[string]*mibimpl.Node{"y": nodeY}
+	ctx.ModuleSymbolToNode[modA] = map[string]*mib.Node{"x": nodeX}
+	ctx.ModuleSymbolToNode[modB] = map[string]*mib.Node{"y": nodeY}
 
 	got, ok := ctx.LookupNodeGlobal("x")
 	if !ok || got != nodeX {
@@ -404,14 +407,12 @@ func TestLookupNodeGlobal_DeterministicOrder(t *testing.T) {
 	// When the same name appears in multiple modules, the first module wins.
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
-	nodeA := &mibimpl.Node{}
-	nodeA.SetName("x")
-	nodeB := &mibimpl.Node{}
-	nodeB.SetName("x")
+	nodeA := newTestNode("x")
+	nodeB := newTestNode("x")
 
 	ctx := newResolverContext([]*module.Module{modA, modB}, nil, mib.DefaultConfig())
-	ctx.ModuleSymbolToNode[modA] = map[string]*mibimpl.Node{"x": nodeA}
-	ctx.ModuleSymbolToNode[modB] = map[string]*mibimpl.Node{"x": nodeB}
+	ctx.ModuleSymbolToNode[modA] = map[string]*mib.Node{"x": nodeA}
+	ctx.ModuleSymbolToNode[modB] = map[string]*mib.Node{"x": nodeB}
 
 	got, ok := ctx.LookupNodeGlobal("x")
 	if !ok || got != nodeA {
@@ -424,9 +425,9 @@ func TestLookupTypeForModule(t *testing.T) {
 	ctx := newTestContext()
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
-	typeX := mibimpl.NewType("MyType")
+	typeX := mib.NewType("MyType")
 
-	ctx.ModuleSymbolToType[modB] = map[string]*mibimpl.Type{"MyType": typeX}
+	ctx.ModuleSymbolToType[modB] = map[string]*mib.Type{"MyType": typeX}
 	ctx.ModuleImports[modA] = map[string]*module.Module{"MyType": modB}
 
 	got, ok := ctx.LookupTypeForModule(modA, "MyType")
@@ -440,10 +441,10 @@ func TestLookupTypeForModule_ASN1Fallback(t *testing.T) {
 	ctx := newTestContext()
 	modA := &module.Module{Name: "A"}
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	intType := mibimpl.NewType("INTEGER")
+	intType := mib.NewType("INTEGER")
 
 	ctx.Snmpv2SMIModule = smiMod
-	ctx.ModuleSymbolToType[smiMod] = map[string]*mibimpl.Type{"INTEGER": intType}
+	ctx.ModuleSymbolToType[smiMod] = map[string]*mib.Type{"INTEGER": intType}
 
 	got, ok := ctx.LookupTypeForModule(modA, "INTEGER")
 	if !ok || got != intType {
@@ -460,20 +461,20 @@ func TestLookupTypeForModule_PermissiveFallbacks(t *testing.T) {
 	rfc1155Mod := &module.Module{Name: "RFC1155-SMI"}
 	tcMod := &module.Module{Name: "SNMPv2-TC"}
 
-	counter32 := mibimpl.NewType("Counter32")
-	counter := mibimpl.NewType("Counter")
-	displayString := mibimpl.NewType("DisplayString")
+	counter32 := mib.NewType("Counter32")
+	counter := mib.NewType("Counter")
+	displayString := mib.NewType("DisplayString")
 
 	ctx.Snmpv2SMIModule = smiMod
 	ctx.Rfc1155SMIModule = rfc1155Mod
 	ctx.Snmpv2TCModule = tcMod
-	ctx.ModuleSymbolToType[smiMod] = map[string]*mibimpl.Type{"Counter32": counter32}
-	ctx.ModuleSymbolToType[rfc1155Mod] = map[string]*mibimpl.Type{"Counter": counter}
-	ctx.ModuleSymbolToType[tcMod] = map[string]*mibimpl.Type{"DisplayString": displayString}
+	ctx.ModuleSymbolToType[smiMod] = map[string]*mib.Type{"Counter32": counter32}
+	ctx.ModuleSymbolToType[rfc1155Mod] = map[string]*mib.Type{"Counter": counter}
+	ctx.ModuleSymbolToType[tcMod] = map[string]*mib.Type{"DisplayString": displayString}
 
 	tests := []struct {
 		name string
-		want *mibimpl.Type
+		want *mib.Type
 	}{
 		{"Counter32", counter32},
 		{"Counter", counter},
@@ -493,10 +494,10 @@ func TestLookupTypeForModule_StrictNoFallback(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	counter32 := mibimpl.NewType("Counter32")
+	counter32 := mib.NewType("Counter32")
 
 	ctx.Snmpv2SMIModule = smiMod
-	ctx.ModuleSymbolToType[smiMod] = map[string]*mibimpl.Type{"Counter32": counter32}
+	ctx.ModuleSymbolToType[smiMod] = map[string]*mib.Type{"Counter32": counter32}
 
 	// Counter32 is not an ASN.1 primitive, so strict mode should not find it.
 	_, ok := ctx.LookupTypeForModule(modA, "Counter32")
@@ -505,7 +506,7 @@ func TestLookupTypeForModule_StrictNoFallback(t *testing.T) {
 	}
 
 	// ASN.1 primitives should still resolve in strict mode.
-	intType := mibimpl.NewType("INTEGER")
+	intType := mib.NewType("INTEGER")
 	ctx.ModuleSymbolToType[smiMod]["INTEGER"] = intType
 
 	got, ok := ctx.LookupTypeForModule(modA, "INTEGER")
@@ -522,24 +523,24 @@ func TestLookupType_Permissive(t *testing.T) {
 	rfc1155Mod := &module.Module{Name: "RFC1155-SMI"}
 	tcMod := &module.Module{Name: "SNMPv2-TC"}
 
-	intType := mibimpl.NewType("INTEGER")
-	counter32 := mibimpl.NewType("Counter32")
-	gauge := mibimpl.NewType("Gauge")
-	truthValue := mibimpl.NewType("TruthValue")
+	intType := mib.NewType("INTEGER")
+	counter32 := mib.NewType("Counter32")
+	gauge := mib.NewType("Gauge")
+	truthValue := mib.NewType("TruthValue")
 
 	ctx.Snmpv2SMIModule = smiMod
 	ctx.Rfc1155SMIModule = rfc1155Mod
 	ctx.Snmpv2TCModule = tcMod
-	ctx.ModuleSymbolToType[smiMod] = map[string]*mibimpl.Type{
+	ctx.ModuleSymbolToType[smiMod] = map[string]*mib.Type{
 		"INTEGER":   intType,
 		"Counter32": counter32,
 	}
-	ctx.ModuleSymbolToType[rfc1155Mod] = map[string]*mibimpl.Type{"Gauge": gauge}
-	ctx.ModuleSymbolToType[tcMod] = map[string]*mibimpl.Type{"TruthValue": truthValue}
+	ctx.ModuleSymbolToType[rfc1155Mod] = map[string]*mib.Type{"Gauge": gauge}
+	ctx.ModuleSymbolToType[tcMod] = map[string]*mib.Type{"TruthValue": truthValue}
 
 	tests := []struct {
 		name string
-		want *mibimpl.Type
+		want *mib.Type
 	}{
 		{"INTEGER", intType},
 		{"Counter32", counter32},
@@ -559,11 +560,11 @@ func TestLookupType_StrictOnlyPrimitives(t *testing.T) {
 	ctx := newResolverContext(nil, nil, mib.StrictConfig())
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	intType := mibimpl.NewType("INTEGER")
-	counter32 := mibimpl.NewType("Counter32")
+	intType := mib.NewType("INTEGER")
+	counter32 := mib.NewType("Counter32")
 
 	ctx.Snmpv2SMIModule = smiMod
-	ctx.ModuleSymbolToType[smiMod] = map[string]*mibimpl.Type{
+	ctx.ModuleSymbolToType[smiMod] = map[string]*mib.Type{
 		"INTEGER":   intType,
 		"Counter32": counter32,
 	}
@@ -582,11 +583,11 @@ func TestLookupType_StrictOnlyPrimitives(t *testing.T) {
 func TestLookupType_GlobalModuleScan(t *testing.T) {
 	// In permissive mode, LookupType scans all modules for unknown types.
 	modA := &module.Module{Name: "A"}
-	vendorType := mibimpl.NewType("VendorSpecialType")
+	vendorType := mib.NewType("VendorSpecialType")
 
 	ctx := newResolverContext([]*module.Module{modA}, nil, mib.PermissiveConfig())
 	ctx.Snmpv2SMIModule = &module.Module{Name: "SNMPv2-SMI"}
-	ctx.ModuleSymbolToType[modA] = map[string]*mibimpl.Type{"VendorSpecialType": vendorType}
+	ctx.ModuleSymbolToType[modA] = map[string]*mib.Type{"VendorSpecialType": vendorType}
 
 	got, ok := ctx.LookupType("VendorSpecialType")
 	if !ok || got != vendorType {
@@ -620,8 +621,7 @@ func TestRegisterImport(t *testing.T) {
 func TestRegisterModuleNodeSymbol(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "A"}
-	node := &mibimpl.Node{}
-	node.SetName("sysDescr")
+	node := newTestNode("sysDescr")
 
 	ctx.RegisterModuleNodeSymbol(mod, "sysDescr", node)
 
@@ -634,8 +634,7 @@ func TestRegisterModuleNodeSymbol(t *testing.T) {
 	}
 
 	// Overwrite should succeed.
-	node2 := &mibimpl.Node{}
-	node2.SetName("sysDescr")
+	node2 := newTestNode("sysDescr")
 	ctx.RegisterModuleNodeSymbol(mod, "sysDescr", node2)
 	if ctx.ModuleSymbolToNode[mod]["sysDescr"] != node2 {
 		t.Fatal("expected overwritten node")
@@ -645,7 +644,7 @@ func TestRegisterModuleNodeSymbol(t *testing.T) {
 func TestRegisterModuleTypeSymbol(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "A"}
-	typ := mibimpl.NewType("MyType")
+	typ := mib.NewType("MyType")
 
 	ctx.RegisterModuleTypeSymbol(mod, "MyType", typ)
 

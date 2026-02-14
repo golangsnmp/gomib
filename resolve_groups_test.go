@@ -10,10 +10,8 @@ import (
 func TestGroupCount(t *testing.T) {
 	m := loadTestMIB(t)
 
-	count := m.GroupCount()
 	groups := m.Groups()
-	testutil.Equal(t, count, len(groups),
-		"GroupCount() should match Groups() length")
+	count := len(groups)
 
 	// SNMPv2-MIB alone defines 8 groups, so combined fixture modules should have more
 	testutil.Greater(t, count, 0, "should have groups from fixture MIBs")

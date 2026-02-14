@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/golangsnmp/gomib/internal/graph"
-	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
@@ -294,7 +293,7 @@ func resolveOidDefinition(ctx *resolverContext, def oidDefinition) bool {
 	if len(components) == 0 {
 		return false
 	}
-	var currentNode *mibimpl.Node
+	var currentNode *mib.Node
 	for idx, component := range components {
 		isLast := idx == len(components)-1
 		node, ok := resolveOidComponent(ctx, def, currentNode, component, isLast)
@@ -311,7 +310,7 @@ func resolveOidDefinition(ctx *resolverContext, def oidDefinition) bool {
 	return true
 }
 
-func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *mibimpl.Node, component module.OidComponent, isLast bool) (*mibimpl.Node, bool) {
+func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *mib.Node, component module.OidComponent, isLast bool) (*mib.Node, bool) {
 	switch c := component.(type) {
 	case *module.OidComponentName:
 		return resolveNameComponent(ctx, def, c.NameValue)
@@ -329,7 +328,7 @@ func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *m
 	}
 }
 
-func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) (*mibimpl.Node, bool) {
+func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) (*mib.Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
 		return node, true
 	}
@@ -347,7 +346,7 @@ func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) 
 	return nil, false
 }
 
-func resolveNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *mibimpl.Node, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
+func resolveNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *mib.Node, name string, number uint32, isLast bool) (*mib.Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
 		ctx.RegisterModuleNodeSymbol(def.mod, name, node)
 		return node, true
@@ -355,7 +354,7 @@ func resolveNamedNumberComponent(ctx *resolverContext, def oidDefinition, curren
 	return createNamedChild(ctx, def, currentNode, name, number, isLast)
 }
 
-func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, moduleName, name string) (*mibimpl.Node, bool) {
+func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, moduleName, name string) (*mib.Node, bool) {
 	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
 		return node, true
 	}
@@ -363,7 +362,7 @@ func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, modu
 	return nil, false
 }
 
-func resolveQualifiedNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *mibimpl.Node, moduleName, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
+func resolveQualifiedNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *mib.Node, moduleName, name string, number uint32, isLast bool) (*mib.Node, bool) {
 	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
 		ctx.RegisterModuleNodeSymbol(def.mod, name, node)
 		return node, true
@@ -373,7 +372,7 @@ func resolveQualifiedNamedNumberComponent(ctx *resolverContext, def oidDefinitio
 
 // createNamedChild resolves a numeric component and registers it with a name.
 // Shared by resolveNamedNumberComponent and resolveQualifiedNamedNumberComponent.
-func createNamedChild(ctx *resolverContext, def oidDefinition, currentNode *mibimpl.Node, name string, number uint32, isLast bool) (*mibimpl.Node, bool) {
+func createNamedChild(ctx *resolverContext, def oidDefinition, currentNode *mib.Node, name string, number uint32, isLast bool) (*mib.Node, bool) {
 	child := resolveNumericComponent(ctx, currentNode, number)
 	if child == nil {
 		return nil, false
@@ -390,7 +389,7 @@ func createNamedChild(ctx *resolverContext, def oidDefinition, currentNode *mibi
 	return child, true
 }
 
-func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *mibimpl.Node, label string) {
+func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *mib.Node, label string) {
 	switch def.kind {
 	case defObjectType:
 		node.SetKind(mib.KindScalar)
@@ -409,7 +408,7 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *mibimp
 
 	// Prefer SMIv2 over SMIv1 when multiple modules define the same OID
 	newMod := ctx.ModuleToResolved[def.mod]
-	currentMod := node.InternalModule()
+	currentMod := node.Module()
 	if currentMod != nil && ctx.TraceEnabled() {
 		ctx.Trace("node already has module",
 			slog.String("node", label),
@@ -440,7 +439,7 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *mibimp
 	}
 }
 
-func resolveNumericComponent(ctx *resolverContext, parent *mibimpl.Node, arc uint32) *mibimpl.Node {
+func resolveNumericComponent(ctx *resolverContext, parent *mib.Node, arc uint32) *mib.Node {
 	if parent != nil {
 		return parent.GetOrCreateChild(arc)
 	}
@@ -487,7 +486,7 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 	}
 }
 
-func lookupOrCreateWellKnownRoot(ctx *resolverContext, name string) (*mibimpl.Node, bool) {
+func lookupOrCreateWellKnownRoot(ctx *resolverContext, name string) (*mib.Node, bool) {
 	arc := wellKnownRootArc(name)
 	if arc < 0 {
 		return nil, false
@@ -495,7 +494,7 @@ func lookupOrCreateWellKnownRoot(ctx *resolverContext, name string) (*mibimpl.No
 	return ctx.Builder.GetOrCreateRoot(uint32(arc)), true
 }
 
-func lookupSmiGlobalOidRoot(ctx *resolverContext, name string) (*mibimpl.Node, bool) {
+func lookupSmiGlobalOidRoot(ctx *resolverContext, name string) (*mib.Node, bool) {
 	if _, ok := smiGlobalOidRoots[name]; !ok {
 		return nil, false
 	}
@@ -523,7 +522,7 @@ func wellKnownRootArc(name string) int {
 
 // shouldPreferModule determines if newMod should replace currentMod as the node's module.
 // Preference order: SMIv2 > SMIv1 > Unknown, with newer LAST-UPDATED as tiebreaker.
-func shouldPreferModule(ctx *resolverContext, newMod, currentMod *mibimpl.Module, srcMod *module.Module) bool {
+func shouldPreferModule(ctx *resolverContext, newMod, currentMod *mib.Module, srcMod *module.Module) bool {
 	if currentMod == nil {
 		return true
 	}

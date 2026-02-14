@@ -393,8 +393,8 @@ func TestRegisterModules_BuilderReceivesModules(t *testing.T) {
 
 	baseNames := module.BaseModuleNames()
 	wantCount := len(baseNames) + 1
-	if ctx.Builder.ModuleCount() != wantCount {
-		t.Errorf("Builder.ModuleCount() = %d, want %d", ctx.Builder.ModuleCount(), wantCount)
+	if got := len(ctx.Builder.Modules()); got != wantCount {
+		t.Errorf("len(Builder.Modules()) = %d, want %d", got, wantCount)
 	}
 
 	// Verify the builder can look up each module by name

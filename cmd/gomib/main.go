@@ -132,11 +132,11 @@ func setupLogger() *slog.Logger {
 	}))
 }
 
-func loadMib(modules []string) (gomib.Mib, error) {
+func loadMib(modules []string) (*gomib.Mib, error) {
 	return loadMibWithOpts(modules)
 }
 
-func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (gomib.Mib, error) {
+func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (*gomib.Mib, error) {
 	var source gomib.Source
 	var opts []gomib.LoadOption
 

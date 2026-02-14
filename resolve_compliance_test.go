@@ -10,10 +10,8 @@ import (
 func TestComplianceCount(t *testing.T) {
 	m := loadTestMIB(t)
 
-	count := m.ComplianceCount()
 	compliances := m.Compliances()
-	testutil.Equal(t, count, len(compliances),
-		"ComplianceCount() should match Compliances() length")
+	count := len(compliances)
 
 	// SNMPv2-MIB defines 2, IF-MIB defines 3, etc.
 	testutil.Greater(t, count, 0, "should have compliances from fixture MIBs")

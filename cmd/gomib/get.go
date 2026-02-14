@@ -120,7 +120,7 @@ func cmdGet(args []string) int {
 	return 0
 }
 
-func printNode(node gomib.Node) {
+func printNode(node *gomib.Node) {
 	label := node.Name()
 	if label == "" {
 		label = fmt.Sprintf("(%d)", node.Arc())
@@ -150,7 +150,7 @@ func printNode(node gomib.Node) {
 	}
 }
 
-func printObjectDetails(obj gomib.Object) {
+func printObjectDetails(obj *gomib.Object) {
 	if obj.Type() != nil {
 		typ := obj.Type()
 		typeName := typ.Name()
@@ -237,7 +237,7 @@ func printObjectDetails(obj gomib.Object) {
 	}
 }
 
-func printNotificationDetails(notif gomib.Notification) {
+func printNotificationDetails(notif *gomib.Notification) {
 	fmt.Printf("  status: %s\n", notif.Status().String())
 
 	if len(notif.Objects()) > 0 {
@@ -260,11 +260,11 @@ func normalizeDescription(s string, maxLen int) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-func printNodeTree(node gomib.Node, maxDepth int) {
+func printNodeTree(node *gomib.Node, maxDepth int) {
 	printNodeTreeRecursive(node, 0, maxDepth)
 }
 
-func printNodeTreeRecursive(node gomib.Node, depth int, maxDepth int) {
+func printNodeTreeRecursive(node *gomib.Node, depth int, maxDepth int) {
 	if maxDepth > 0 && depth > maxDepth {
 		return
 	}

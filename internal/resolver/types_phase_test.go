@@ -4,7 +4,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -457,7 +456,7 @@ func TestRangeValueToI64(t *testing.T) {
 
 func TestResolveBaseFromChain(t *testing.T) {
 	t.Run("no parent returns own base", func(t *testing.T) {
-		typ := mibimpl.NewType("MyType")
+		typ := mib.NewType("MyType")
 		typ.SetBase(mib.BaseOctetString)
 
 		got, ok := resolveBaseFromChain(typ)
@@ -470,14 +469,14 @@ func TestResolveBaseFromChain(t *testing.T) {
 	})
 
 	t.Run("walks chain to root", func(t *testing.T) {
-		root := mibimpl.NewType("INTEGER")
+		root := mib.NewType("INTEGER")
 		root.SetBase(mib.BaseInteger32)
 
-		mid := mibimpl.NewType("MyInt")
+		mid := mib.NewType("MyInt")
 		mid.SetBase(mib.BaseInteger32)
 		mid.SetParent(root)
 
-		leaf := mibimpl.NewType("MySpecificInt")
+		leaf := mib.NewType("MySpecificInt")
 		leaf.SetBase(mib.BaseInteger32)
 		leaf.SetParent(mid)
 
@@ -491,14 +490,14 @@ func TestResolveBaseFromChain(t *testing.T) {
 	})
 
 	t.Run("stops at application base type", func(t *testing.T) {
-		root := mibimpl.NewType("INTEGER")
+		root := mib.NewType("INTEGER")
 		root.SetBase(mib.BaseInteger32)
 
-		counter := mibimpl.NewType("Counter32")
+		counter := mib.NewType("Counter32")
 		counter.SetBase(mib.BaseCounter32)
 		counter.SetParent(root)
 
-		myCounter := mibimpl.NewType("MyCounter")
+		myCounter := mib.NewType("MyCounter")
 		myCounter.SetBase(mib.BaseCounter32)
 		myCounter.SetParent(counter)
 
@@ -518,14 +517,14 @@ func TestResolveBaseFromChain(t *testing.T) {
 			mib.BaseUnsigned32, mib.BaseTimeTicks, mib.BaseIpAddress, mib.BaseOpaque,
 		}
 		for _, appBase := range appTypes {
-			root := mibimpl.NewType("root")
+			root := mib.NewType("root")
 			root.SetBase(mib.BaseInteger32)
 
-			appType := mibimpl.NewType("app")
+			appType := mib.NewType("app")
 			appType.SetBase(appBase)
 			appType.SetParent(root)
 
-			child := mibimpl.NewType("child")
+			child := mib.NewType("child")
 			child.SetBase(appBase)
 			child.SetParent(appType)
 
@@ -540,10 +539,10 @@ func TestResolveBaseFromChain(t *testing.T) {
 	})
 
 	t.Run("cycle detection", func(t *testing.T) {
-		a := mibimpl.NewType("A")
+		a := mib.NewType("A")
 		a.SetBase(mib.BaseInteger32)
 
-		b := mibimpl.NewType("B")
+		b := mib.NewType("B")
 		b.SetBase(mib.BaseInteger32)
 
 		// Create cycle: a -> b -> a
@@ -557,7 +556,7 @@ func TestResolveBaseFromChain(t *testing.T) {
 	})
 
 	t.Run("self-referencing cycle", func(t *testing.T) {
-		a := mibimpl.NewType("A")
+		a := mib.NewType("A")
 		a.SetBase(mib.BaseInteger32)
 		a.SetParent(a)
 
@@ -568,12 +567,12 @@ func TestResolveBaseFromChain(t *testing.T) {
 	})
 
 	t.Run("long chain", func(t *testing.T) {
-		root := mibimpl.NewType("root")
+		root := mib.NewType("root")
 		root.SetBase(mib.BaseOctetString)
 
 		prev := root
 		for i := 0; i < 10; i++ {
-			typ := mibimpl.NewType("type")
+			typ := mib.NewType("type")
 			typ.SetBase(mib.BaseOctetString)
 			typ.SetParent(prev)
 			prev = typ
@@ -589,10 +588,10 @@ func TestResolveBaseFromChain(t *testing.T) {
 	})
 
 	t.Run("inherits base from root of chain", func(t *testing.T) {
-		root := mibimpl.NewType("OCTET STRING")
+		root := mib.NewType("OCTET STRING")
 		root.SetBase(mib.BaseOctetString)
 
-		displayString := mibimpl.NewType("DisplayString")
+		displayString := mib.NewType("DisplayString")
 		displayString.SetBase(mib.BaseInteger32) // wrong base, should be overridden
 		displayString.SetParent(root)
 

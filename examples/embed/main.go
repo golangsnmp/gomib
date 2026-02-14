@@ -31,7 +31,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Loaded %d modules\n", m.ModuleCount())
+	fmt.Printf("Loaded %d modules\n", len(m.Modules()))
 	for _, mod := range m.Modules() {
 		fmt.Printf("  %-24s %s  objects=%d\n", mod.Name(), mod.Language(), len(mod.Objects()))
 	}

@@ -73,7 +73,7 @@ func cmdTrace(args []string) int {
 		return 1
 	}
 
-	var mib gomib.Mib
+	var mib *gomib.Mib
 	var err error
 	var loadMode string
 
@@ -92,14 +92,14 @@ func cmdTrace(args []string) int {
 
 	fmt.Printf("Load mode: %s\n", loadMode)
 	fmt.Printf("Loaded: %d modules, %d objects, %d types\n\n",
-		mib.ModuleCount(), mib.ObjectCount(), mib.TypeCount())
+		len(mib.Modules()), len(mib.Objects()), len(mib.Types()))
 
 	traceSymbol(mib, symbol)
 
 	return 0
 }
 
-func traceSymbol(mib gomib.Mib, symbol string) {
+func traceSymbol(mib *gomib.Mib, symbol string) {
 	fmt.Printf("=== Tracing symbol: %s ===\n\n", symbol)
 
 	var definingModules []string
@@ -279,7 +279,7 @@ func traceSymbol(mib gomib.Mib, symbol string) {
 		fmt.Println("  This can cause resolution ambiguity depending on load order.")
 		fmt.Println("  Modules:", strings.Join(definingModules, ", "))
 
-		var nodes []gomib.Node
+		var nodes []*gomib.Node
 		var nodeInfo []string
 		for _, modName := range definingModules {
 			mod := mib.Module(modName)

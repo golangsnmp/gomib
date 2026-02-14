@@ -15,14 +15,14 @@ const fixtureDir = "testdata/fixtures/netsnmp"
 var (
 	fixtureModules = []string{"IF-MIB", "SNMPv2-MIB", "IP-MIB", "ENTITY-MIB", "BRIDGE-MIB"}
 	loadOnce       sync.Once
-	loadedMib      mib.Mib
+	loadedMib      *mib.Mib
 	loadErr        error
 )
 
 // loadTestMIB loads all fixture modules once (via sync.Once) and returns
 // the shared Mib, so that tests sharing the same fixture set avoid
 // redundant parsing.
-func loadTestMIB(t testing.TB) mib.Mib {
+func loadTestMIB(t testing.TB) *mib.Mib {
 	t.Helper()
 	loadOnce.Do(func() {
 		src, err := DirTree("testdata/corpus/primary")
