@@ -184,6 +184,66 @@ func TestDiagnosticConfigAllowBestGuessFallbacks(t *testing.T) {
 	}
 }
 
+func TestDiagnosticString(t *testing.T) {
+	tests := []struct {
+		name string
+		diag Diagnostic
+		want string
+	}{
+		{
+			"full",
+			Diagnostic{
+				Severity: SeverityMinor,
+				Code:     "identifier-underscore",
+				Message:  "underscore in identifier",
+				Module:   "IF-MIB",
+				Line:     42,
+				Column:   5,
+			},
+			"[minor] IF-MIB:42:5: underscore in identifier",
+		},
+		{
+			"line only",
+			Diagnostic{
+				Severity: SeverityError,
+				Code:     "import-not-found",
+				Message:  "module not found",
+				Module:   "MY-MIB",
+				Line:     10,
+			},
+			"[error] MY-MIB:10: module not found",
+		},
+		{
+			"no location",
+			Diagnostic{
+				Severity: SeverityFatal,
+				Code:     "parse-error",
+				Message:  "unexpected EOF",
+				Module:   "BAD-MIB",
+			},
+			"[fatal] BAD-MIB: unexpected EOF",
+		},
+		{
+			"no module",
+			Diagnostic{
+				Severity: SeverityWarning,
+				Code:     "general",
+				Message:  "something happened",
+			},
+			"[warning] something happened",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.diag.String()
+			if got != tt.want {
+				t.Errorf("Diagnostic.String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestMatchGlob(t *testing.T) {
 	tests := []struct {
 		pattern string

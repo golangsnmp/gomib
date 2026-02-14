@@ -224,6 +224,10 @@ type fsSource struct {
 // FS creates a Source backed by an fs.FS (e.g., embed.FS).
 // The name is used in diagnostic paths. The filesystem is lazily
 // indexed on first use.
+//
+// Unlike Dir and DirTree, FS does not return an error at construction time.
+// This is intentional: embed.FS cannot be walked until the program runs,
+// so validation is deferred to the first Find or ListModules call.
 func FS(name string, fsys fs.FS, opts ...SourceOption) Source {
 	cfg := defaultSourceConfig()
 	for _, opt := range opts {

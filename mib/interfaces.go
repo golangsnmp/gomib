@@ -4,12 +4,17 @@ import "iter"
 
 // Mib is the top-level container for loaded MIB data.
 // It is immutable after construction and safe for concurrent reads.
+//
+// Collection methods return slices, except Nodes() and Node.Descendants()
+// which return iter.Seq[Node] because the full node set can be large and
+// callers typically filter or stop early.
 type Mib interface {
 	// Tree access
 	Root() Node
 	Nodes() iter.Seq[Node]
 
-	// Lookups by name, OID string, or qualified name (e.g. "IF-MIB::ifIndex")
+	// Lookups by name, OID string, or qualified name (e.g. "IF-MIB::ifIndex").
+	// All Find* methods return nil if no match is found.
 	FindNode(query string) Node
 	FindObject(query string) Object
 	FindType(query string) Type
@@ -18,11 +23,11 @@ type Mib interface {
 	FindCompliance(query string) Compliance
 	FindCapabilities(query string) Capabilities
 
-	// By OID value
+	// By OID value. Returns nil if no matching node exists.
 	NodeByOID(oid Oid) Node
 	LongestPrefixByOID(oid Oid) Node
 
-	// Module access
+	// Module access. Returns nil if no module with the given name is loaded.
 	Module(name string) Module
 	Modules() []Module
 
@@ -64,20 +69,22 @@ type Node interface {
 	Kind() Kind
 	Module() Module
 
-	// Associated definitions (nil if none)
+	// Associated definitions, nil if none.
 	Object() Object
 	Notification() Notification
 	Group() Group
 	Compliance() Compliance
 	Capabilities() Capabilities
 
-	// Tree navigation
+	// Tree navigation. Parent returns nil for the root node.
 	Parent() Node
+	// Child returns nil if no child with the given arc exists.
 	Child(arc uint32) Node
 	Children() []Node
+	// Descendants returns all nodes in the subtree via lazy iteration.
 	Descendants() iter.Seq[Node]
 
-	// Prefix matching
+	// Prefix matching. Returns nil if no prefix matches.
 	LongestPrefix(oid Oid) Node
 
 	// Predicates
@@ -108,7 +115,7 @@ type Module interface {
 	Columns() []Object
 	Rows() []Object
 
-	// Lookups
+	// Lookups. All return nil if no definition with the given name exists.
 	Node(name string) Node
 	Object(name string) Object
 	Type(name string) Type
@@ -125,7 +132,7 @@ type Object interface {
 	Module() Module
 	OID() Oid
 
-	// Type info
+	// Type info. Type returns nil if the type could not be resolved.
 	Type() Type
 	Kind() Kind
 	Access() Access
@@ -137,13 +144,17 @@ type Object interface {
 	Units() string
 	DefaultValue() DefVal
 
-	// Table structure - navigation
+	// Table structure - navigation.
+	// Table returns the containing table for a row or column, nil otherwise.
 	Table() Object
+	// Row returns the containing row for a column, nil otherwise.
 	Row() Object
+	// Entry returns the row object for a table, nil for non-tables.
 	Entry() Object
 	Columns() []Object
 
-	// Table structure - index
+	// Table structure - index.
+	// Augments returns the augmented row, nil if not an augmenting row.
 	Augments() Object
 	Index() []IndexEntry
 	EffectiveIndexes() []IndexEntry
@@ -171,6 +182,7 @@ type Type interface {
 	Name() string
 	Module() Module
 	Base() BaseType
+	// Parent returns the parent type in the type chain, nil for base types.
 	Parent() Type
 	Status() Status
 

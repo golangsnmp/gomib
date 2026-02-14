@@ -68,6 +68,7 @@ func (o Oid) String() string {
 }
 
 // Parent returns the parent OID (all arcs except the last).
+// Returns nil for single-arc and empty OIDs.
 func (o Oid) Parent() Oid {
 	if len(o) <= 1 {
 		return nil

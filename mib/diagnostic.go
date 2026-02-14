@@ -1,5 +1,10 @@
 package mib
 
+import (
+	"fmt"
+	"strings"
+)
+
 // Diagnostic represents an issue found during parsing or resolution.
 type Diagnostic struct {
 	Severity Severity
@@ -8,6 +13,28 @@ type Diagnostic struct {
 	Module   string // source module name
 	Line     int    // 1-based line number, 0 if not applicable
 	Column   int    // 1-based column, 0 if not applicable
+}
+
+// String returns a human-readable representation of the diagnostic.
+// Format: "[severity] module:line:col: message" with location parts omitted when zero.
+func (d Diagnostic) String() string {
+	var b strings.Builder
+	b.WriteByte('[')
+	b.WriteString(d.Severity.String())
+	b.WriteByte(']')
+	b.WriteByte(' ')
+	if d.Module != "" {
+		b.WriteString(d.Module)
+		if d.Line > 0 {
+			fmt.Fprintf(&b, ":%d", d.Line)
+			if d.Column > 0 {
+				fmt.Fprintf(&b, ":%d", d.Column)
+			}
+		}
+		b.WriteString(": ")
+	}
+	b.WriteString(d.Message)
+	return b.String()
 }
 
 // DiagnosticConfig controls strictness and diagnostic filtering.
