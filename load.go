@@ -103,30 +103,9 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (Mib,
 				return
 			}
 
-			if !heuristic.looksLikeMIBContent(content) {
-				if logEnabled(logger, slog.LevelDebug) {
-					logger.LogAttrs(ctx, slog.LevelDebug, "content rejected by heuristic",
-						slog.String("module", sm.name))
-				}
-				return
-			}
-
-			p := parser.New(content, componentLogger(logger, "parser"), cfg.diagConfig)
-			ast := p.ParseModule()
-			if ast == nil {
-				if logEnabled(logger, slog.LevelDebug) {
-					logger.LogAttrs(ctx, slog.LevelDebug, "parse failed",
-						slog.String("module", sm.name))
-				}
-				return
-			}
-
-			mod := module.Lower(ast, content, componentLogger(logger, "module"), cfg.diagConfig)
+			mod := decodeModule(content, sm.name, heuristic, logger, cfg)
 			if mod != nil {
 				results <- parseResult{mod: mod}
-			} else if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "lowering failed",
-					slog.String("module", sm.name))
 			}
 		}(sm)
 	}
@@ -209,30 +188,8 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			return nil // skip missing modules
 		}
 
-		if !heuristic.looksLikeMIBContent(content) {
-			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "content rejected by heuristic",
-					slog.String("module", name))
-			}
-			return nil
-		}
-
-		p := parser.New(content, componentLogger(logger, "parser"), cfg.diagConfig)
-		ast := p.ParseModule()
-		if ast == nil {
-			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "parse failed",
-					slog.String("module", name))
-			}
-			return nil
-		}
-
-		mod := module.Lower(ast, content, componentLogger(logger, "module"), cfg.diagConfig)
+		mod := decodeModule(content, name, heuristic, logger, cfg)
 		if mod == nil {
-			if logEnabled(logger, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "lowering failed",
-					slog.String("module", name))
-			}
 			return nil
 		}
 
@@ -292,6 +249,37 @@ func findModuleContent(sources []Source, name string) ([]byte, error) {
 		}
 	}
 	return nil, fs.ErrNotExist
+}
+
+// decodeModule runs the heuristic/parse/lower pipeline on raw MIB content.
+// Returns nil if any stage fails (not a MIB, parse error, lowering error).
+func decodeModule(content []byte, name string, heuristic heuristicConfig, logger *slog.Logger, cfg loadConfig) *module.Module {
+	if !heuristic.looksLikeMIBContent(content) {
+		if logEnabled(logger, slog.LevelDebug) {
+			logger.LogAttrs(context.Background(), slog.LevelDebug, "content rejected by heuristic",
+				slog.String("module", name))
+		}
+		return nil
+	}
+
+	p := parser.New(content, componentLogger(logger, "parser"), cfg.diagConfig)
+	ast := p.ParseModule()
+	if ast == nil {
+		if logEnabled(logger, slog.LevelDebug) {
+			logger.LogAttrs(context.Background(), slog.LevelDebug, "parse failed",
+				slog.String("module", name))
+		}
+		return nil
+	}
+
+	mod := module.Lower(ast, content, componentLogger(logger, "module"), cfg.diagConfig)
+	if mod == nil {
+		if logEnabled(logger, slog.LevelDebug) {
+			logger.LogAttrs(context.Background(), slog.LevelDebug, "lowering failed",
+				slog.String("module", name))
+		}
+	}
+	return mod
 }
 
 var (
