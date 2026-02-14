@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"encoding/hex"
 	"log/slog"
 	"slices"
 	"strconv"
@@ -740,24 +741,8 @@ func hexToBytes(s string) []byte {
 	if len(s)%2 != 0 {
 		s = "0" + s
 	}
-	result := make([]byte, len(s)/2)
-	for i := 0; i < len(s); i += 2 {
-		var b byte
-		for j := 0; j < 2; j++ {
-			c := s[i+j]
-			b <<= 4
-			switch {
-			case c >= '0' && c <= '9':
-				b |= c - '0'
-			case c >= 'A' && c <= 'F':
-				b |= c - 'A' + 10
-			case c >= 'a' && c <= 'f':
-				b |= c - 'a' + 10
-			}
-		}
-		result[i/2] = b
-	}
-	return result
+	b, _ := hex.DecodeString(s)
+	return b
 }
 
 // binaryToBytes converts a binary string (e.g., "10101010") to bytes.
@@ -766,9 +751,8 @@ func binaryToBytes(s string) []byte {
 		return []byte{}
 	}
 	// Pad to multiple of 8
-	padding := (8 - len(s)%8) % 8
-	for i := 0; i < padding; i++ {
-		s = "0" + s
+	if padding := (8 - len(s)%8) % 8; padding > 0 {
+		s = strings.Repeat("0", padding) + s
 	}
 	result := make([]byte, len(s)/8)
 	for i := 0; i < len(s); i += 8 {
