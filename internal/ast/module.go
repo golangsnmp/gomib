@@ -1,6 +1,8 @@
 package ast
 
 import (
+	"slices"
+
 	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -31,12 +33,9 @@ func NewModule(name Ident, definitionsKind DefinitionsKind, span types.Span) *Mo
 
 // HasErrors reports whether any diagnostic has error severity or worse.
 func (m *Module) HasErrors() bool {
-	for _, d := range m.Diagnostics {
-		if d.Severity <= mib.SeverityError {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(m.Diagnostics, func(d types.Diagnostic) bool {
+		return d.Severity <= mib.SeverityError
+	})
 }
 
 // DefinitionsKind distinguishes DEFINITIONS from PIB-DEFINITIONS.

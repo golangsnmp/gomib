@@ -57,10 +57,7 @@ func (l *Lexer) traceToken(tok Token) {
 // Tokenize consumes all source text and returns the token stream
 // along with any diagnostics generated during lexing.
 func (l *Lexer) Tokenize() ([]Token, []types.Diagnostic) {
-	estimatedTokens := len(l.source) / 6
-	if estimatedTokens < 64 {
-		estimatedTokens = 64
-	}
+	estimatedTokens := max(len(l.source)/6, 64)
 	tokens := make([]Token, 0, estimatedTokens)
 	for {
 		tok := l.NextToken()
