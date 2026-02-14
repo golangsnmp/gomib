@@ -1,5 +1,7 @@
 package graph
 
+import "slices"
+
 // TopologicalOrder returns symbols ordered so that dependents come before
 // their dependencies (Kahn's algorithm). Symbols involved in cycles are
 // returned separately in the second slice.
@@ -46,9 +48,7 @@ func (g *Graph) TopologicalOrder() (order []Symbol, cyclic []Symbol) {
 // ResolutionOrder returns symbols with dependencies before dependents,
 // the reverse of TopologicalOrder.
 func (g *Graph) ResolutionOrder() (order []Symbol, cyclic []Symbol) {
-	topo, cyc := g.TopologicalOrder()
-	for i := len(topo) - 1; i >= 0; i-- {
-		order = append(order, topo[i])
-	}
-	return order, cyc
+	order, cyclic = g.TopologicalOrder()
+	slices.Reverse(order)
+	return order, cyclic
 }

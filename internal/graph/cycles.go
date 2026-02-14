@@ -23,13 +23,9 @@ func (g *Graph) FindCycles() [][]Symbol {
 		for _, dep := range g.edges[sym] {
 			if _, visited := indices[dep]; !visited {
 				strongConnect(dep)
-				if lowlinks[dep] < lowlinks[sym] {
-					lowlinks[sym] = lowlinks[dep]
-				}
+				lowlinks[sym] = min(lowlinks[sym], lowlinks[dep])
 			} else if onStack[dep] {
-				if indices[dep] < lowlinks[sym] {
-					lowlinks[sym] = indices[dep]
-				}
+				lowlinks[sym] = min(lowlinks[sym], indices[dep])
 			}
 		}
 

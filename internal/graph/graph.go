@@ -1,6 +1,8 @@
 // Package graph provides dependency graph construction and analysis for MIB resolution.
 package graph
 
+import "slices"
+
 // Symbol uniquely identifies a definition in a module.
 type Symbol struct {
 	Module string
@@ -62,10 +64,8 @@ func (g *Graph) AddEdge(from, to Symbol) {
 		g.nodes[to] = &Node{Symbol: to}
 	}
 
-	for _, existing := range g.edges[from] {
-		if existing == to {
-			return
-		}
+	if slices.Contains(g.edges[from], to) {
+		return
 	}
 	g.edges[from] = append(g.edges[from], to)
 }
