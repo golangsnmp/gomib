@@ -156,28 +156,8 @@ func DirTree(root string, opts ...SourceOption) (Source, error) {
 		opt(&cfg)
 	}
 
-	extSet := makeExtensionSet(cfg.extensions)
-	index := make(map[string]string)
-
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if d != nil && d.IsDir() {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if !hasValidExtension(path, extSet) {
-			return nil
-		}
-
-		name := moduleNameFromPath(path)
-		if _, exists := index[name]; !exists {
-			index[name] = path
-		}
-		return nil
+	index, err := buildTreeIndex(cfg.extensions, func(fn fs.WalkDirFunc) error {
+		return filepath.WalkDir(root, fn)
 	})
 	if err != nil {
 		return nil, err
@@ -271,30 +251,9 @@ func (s *fsSource) ListModules() ([]string, error) {
 }
 
 func (s *fsSource) buildIndex() (map[string]string, error) {
-	extSet := makeExtensionSet(s.config.extensions)
-	index := make(map[string]string)
-
-	err := fs.WalkDir(s.fsys, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if d != nil && d.IsDir() {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if !hasValidExtension(path, extSet) {
-			return nil
-		}
-
-		name := moduleNameFromPath(path)
-		if _, exists := index[name]; !exists {
-			index[name] = path
-		}
-		return nil
+	return buildTreeIndex(s.config.extensions, func(fn fs.WalkDirFunc) error {
+		return fs.WalkDir(s.fsys, ".", fn)
 	})
-	return index, err
 }
 
 type multiSource struct {
@@ -356,4 +315,33 @@ func moduleNameFromPath(path string) string {
 	base := filepath.Base(path)
 	ext := filepath.Ext(base)
 	return strings.TrimSuffix(base, ext)
+}
+
+// buildTreeIndex walks a file tree and builds a module name -> path index.
+// First match wins for duplicate names.
+func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error) (map[string]string, error) {
+	extSet := makeExtensionSet(extensions)
+	index := make(map[string]string)
+
+	err := walkFn(func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if d != nil && d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !hasValidExtension(path, extSet) {
+			return nil
+		}
+
+		name := moduleNameFromPath(path)
+		if _, exists := index[name]; !exists {
+			index[name] = path
+		}
+		return nil
+	})
+	return index, err
 }
