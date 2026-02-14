@@ -83,7 +83,7 @@ func TestCollectOidDefinitions(t *testing.T) {
 		&module.TypeDef{Name: "MyType"}, // skipped
 	}
 
-	ctx := newresolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
 	defs := collectOidDefinitions(ctx)
 
 	// All OID-bearing definitions except TypeDef and the empty notification
@@ -101,7 +101,7 @@ func TestCollectOidDefinitions(t *testing.T) {
 }
 
 func TestCollectOidDefinitionsEmpty(t *testing.T) {
-	ctx := newresolverContext(nil, nil, mib.DefaultConfig())
+	ctx := newResolverContext(nil, nil, mib.DefaultConfig())
 	defs := collectOidDefinitions(ctx)
 
 	if len(defs.oidDefs) != 0 {
@@ -114,7 +114,7 @@ func TestCollectOidDefinitionsEmpty(t *testing.T) {
 
 func TestGetOidParentSymbol(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
-	ctx := newresolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
 
 	makeOidDef := func(components []module.OidComponent) oidDefinition {
 		oid := module.NewOidAssignment(components, types.Synthetic)
@@ -177,7 +177,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 				},
 			},
 		}
-		localCtx := newresolverContext([]*module.Module{localMod}, nil, mib.DefaultConfig())
+		localCtx := newResolverContext([]*module.Module{localMod}, nil, mib.DefaultConfig())
 		def := oidDefinition{
 			mod: localMod,
 			def: &module.ValueAssignment{
@@ -210,7 +210,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 				},
 			},
 		}
-		localCtx := newresolverContext([]*module.Module{localMod}, nil, mib.DefaultConfig())
+		localCtx := newResolverContext([]*module.Module{localMod}, nil, mib.DefaultConfig())
 		def := oidDefinition{
 			mod: localMod,
 			def: &module.ValueAssignment{
@@ -288,7 +288,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 		}
 
 		// Use permissive config so SeverityWarning diagnostics are reported.
-		ctx := newresolverContext(nil, nil, mib.PermissiveConfig())
+		ctx := newResolverContext(nil, nil, mib.PermissiveConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		found := false
@@ -317,7 +317,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 			{mod: mod, def: &module.ValueAssignment{Name: "myObject", Oid: oid}, kind: defValueAssignment},
 		}
 
-		ctx := newresolverContext(nil, nil, mib.DefaultConfig())
+		ctx := newResolverContext(nil, nil, mib.DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		if len(ctx.Diagnostics()) != 0 {
@@ -334,7 +334,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 			{mod: mod, def: &module.ValueAssignment{Name: "my-object", Oid: oid}, kind: defValueAssignment},
 		}
 
-		ctx := newresolverContext(nil, nil, mib.DefaultConfig())
+		ctx := newResolverContext(nil, nil, mib.DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		if len(ctx.Diagnostics()) != 0 {
@@ -351,7 +351,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 			{mod: mod, def: &module.ValueAssignment{Name: "mib-2", Oid: oid}, kind: defValueAssignment},
 		}
 
-		ctx := newresolverContext(nil, nil, mib.DefaultConfig())
+		ctx := newResolverContext(nil, nil, mib.DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		if len(ctx.Diagnostics()) != 0 {
@@ -434,7 +434,7 @@ func TestLookupOrCreateWellKnownRoot(t *testing.T) {
 func TestLookupSmiGlobalOidRoot(t *testing.T) {
 	t.Run("returns node when registered in SNMPv2-SMI", func(t *testing.T) {
 		smiMod := &module.Module{Name: "SNMPv2-SMI"}
-		ctx := newresolverContext([]*module.Module{smiMod}, nil, mib.PermissiveConfig())
+		ctx := newResolverContext([]*module.Module{smiMod}, nil, mib.PermissiveConfig())
 		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
 		node := ctx.Builder.GetOrCreateRoot(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1)
@@ -451,7 +451,7 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 
 	t.Run("returns node when registered in RFC1155-SMI", func(t *testing.T) {
 		rfc1155Mod := &module.Module{Name: "RFC1155-SMI"}
-		ctx := newresolverContext([]*module.Module{rfc1155Mod}, nil, mib.PermissiveConfig())
+		ctx := newResolverContext([]*module.Module{rfc1155Mod}, nil, mib.PermissiveConfig())
 		ctx.ModuleIndex["RFC1155-SMI"] = []*module.Module{rfc1155Mod}
 
 		node := ctx.Builder.GetOrCreateRoot(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1)
@@ -615,7 +615,7 @@ func TestFinalizeOidDefinition(t *testing.T) {
 			srcMod := &module.Module{Name: "TEST-MIB", Language: module.LanguageSMIv2}
 			resolvedMod := mibimpl.NewModule("TEST-MIB")
 
-			ctx := newresolverContext([]*module.Module{srcMod}, nil, mib.DefaultConfig())
+			ctx := newResolverContext([]*module.Module{srcMod}, nil, mib.DefaultConfig())
 			ctx.ModuleToResolved[srcMod] = resolvedMod
 			ctx.ResolvedToModule[resolvedMod] = srcMod
 
@@ -717,7 +717,7 @@ func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
 	// In permissive mode, unresolved names that are SMI global OID roots
 	// should reference SNMPv2-SMI.
 	mod := &module.Module{Name: "VENDOR-MIB"}
-	ctx := newresolverContext([]*module.Module{mod}, nil, mib.PermissiveConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, mib.PermissiveConfig())
 
 	oid := module.NewOidAssignment([]module.OidComponent{
 		&module.OidComponentName{NameValue: "enterprises"},
@@ -742,7 +742,7 @@ func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
 func TestGetOidParentSymbolStrictNoSmiGlobal(t *testing.T) {
 	// In strict mode, unresolved SMI global names should not be resolved.
 	mod := &module.Module{Name: "VENDOR-MIB"}
-	ctx := newresolverContext([]*module.Module{mod}, nil, mib.StrictConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, mib.StrictConfig())
 
 	oid := module.NewOidAssignment([]module.OidComponent{
 		&module.OidComponentName{NameValue: "enterprises"},
@@ -781,7 +781,7 @@ func TestCollectOidDefinitionsKindMapping(t *testing.T) {
 		&module.AgentCapabilities{Name: "cap", Oid: oid},
 	}
 
-	ctx := newresolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
 	defs := collectOidDefinitions(ctx)
 
 	expected := []struct {
@@ -860,7 +860,7 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 	v2Mod := mibimpl.NewModule("NEW-MIB")
 	v1Mod := mibimpl.NewModule("OLD-MIB")
 
-	ctx := newresolverContext([]*module.Module{v2Src, v1Src}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{v2Src, v1Src}, nil, mib.DefaultConfig())
 	ctx.ModuleToResolved[v2Src] = v2Mod
 	ctx.ModuleToResolved[v1Src] = v1Mod
 	ctx.ResolvedToModule[v2Mod] = v2Src

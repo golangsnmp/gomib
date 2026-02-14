@@ -102,12 +102,8 @@ type unresolvedNotifObject struct {
 	span         types.Span
 }
 
-func moduleCount(mods []*module.Module) int {
-	return len(mods)
-}
-
-func newresolverContext(mods []*module.Module, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *resolverContext {
-	n := moduleCount(mods)
+func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *resolverContext {
+	n := len(mods)
 	return &resolverContext{
 		Builder:            mibimpl.NewBuilder(),
 		Modules:            mods,

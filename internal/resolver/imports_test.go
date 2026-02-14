@@ -477,7 +477,7 @@ func TestTryImportForwarding(t *testing.T) {
 
 // newTestContextWithConfig creates a resolverContext with a specific DiagnosticConfig.
 func newTestContextWithConfig(config mib.DiagnosticConfig) *resolverContext {
-	return newresolverContext(nil, nil, config)
+	return newResolverContext(nil, nil, config)
 }
 
 func TestResolveImportsFromModule(t *testing.T) {
@@ -741,7 +741,7 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newresolverContext([]*module.Module{importing}, nil, mib.DefaultConfig())
+		ctx := newResolverContext([]*module.Module{importing}, nil, mib.DefaultConfig())
 		ctx.ModuleIndex["SOURCE-MIB"] = []*module.Module{source}
 		ctx.ModuleDefNames[source] = map[string]struct{}{
 			"sysDescr": {},
@@ -773,7 +773,7 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newresolverContext([]*module.Module{importing}, nil, mib.DefaultConfig())
+		ctx := newResolverContext([]*module.Module{importing}, nil, mib.DefaultConfig())
 		ctx.ModuleIndex["MOD-A"] = []*module.Module{sourceA}
 		ctx.ModuleIndex["MOD-B"] = []*module.Module{sourceB}
 		ctx.ModuleDefNames[sourceA] = map[string]struct{}{"alpha": {}}

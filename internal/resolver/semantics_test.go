@@ -607,7 +607,7 @@ func TestResolveTypeSyntaxBaseTypes(t *testing.T) {
 	// global type lookup. Set up a context with an SNMPv2-SMI module
 	// that has the needed base types registered.
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	ctx := newresolverContext([]*module.Module{smiMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{smiMod}, nil, mib.DefaultConfig())
 	ctx.Snmpv2SMIModule = smiMod
 
 	integerType := mibimpl.NewType("INTEGER")
@@ -1133,7 +1133,7 @@ func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 		},
 	}
 
-	ctx := newresolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
 	ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
 	resolvedMod := mibimpl.NewModule(mod.Name)
 	ctx.ModuleToResolved[mod] = resolvedMod
