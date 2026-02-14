@@ -3,13 +3,23 @@ package gomib
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/golangsnmp/gomib/mib"
 )
 
 // ErrNoSources is returned when Load is called with no sources.
 var ErrNoSources = errors.New("no MIB sources provided")
+
+// ErrMissingModules is returned when WithModules names are not found in any source.
+// The Mib is still returned with whatever modules could be loaded.
+var ErrMissingModules = errors.New("requested modules not found")
+
+// ErrDiagnosticThreshold is returned when diagnostics exceed the configured FailAt severity.
+// The Mib is still returned with all resolved data.
+var ErrDiagnosticThreshold = errors.New("diagnostic threshold exceeded")
 
 // LevelTrace is a custom log level more verbose than Debug.
 // Use for per-item iteration logging (tokens, OID nodes, imports).
@@ -107,6 +117,35 @@ func Load(ctx context.Context, opts ...LoadOption) (*Mib, error) {
 		return loadModulesByName(ctx, sources, cfg.modules, cfg)
 	}
 	return loadAllModules(ctx, sources, cfg)
+}
+
+// checkLoadResult checks the resolved Mib for diagnostic threshold violations
+// and missing requested modules. Returns nil if no issues found.
+func checkLoadResult(m *Mib, cfg loadConfig, requestedModules []string) error {
+	var errs []error
+
+	// Check for missing requested modules
+	if len(requestedModules) > 0 {
+		var missing []string
+		for _, name := range requestedModules {
+			if m.Module(name) == nil {
+				missing = append(missing, name)
+			}
+		}
+		if len(missing) > 0 {
+			errs = append(errs, fmt.Errorf("%w: %s", ErrMissingModules, strings.Join(missing, ", ")))
+		}
+	}
+
+	// Check FailAt threshold
+	for _, d := range m.Diagnostics() {
+		if cfg.diagConfig.ShouldFail(d.Severity) {
+			errs = append(errs, fmt.Errorf("%w: %s", ErrDiagnosticThreshold, d))
+			break
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 func logEnabled(logger *slog.Logger, level slog.Level) bool {

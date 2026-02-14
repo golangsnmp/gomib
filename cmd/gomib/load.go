@@ -72,9 +72,9 @@ func cmdLoad(args []string) int {
 		opts = append(opts, gomib.WithStrictness(gomib.StrictnessLevel(*level)))
 	}
 
-	mib, err := loadMibWithOpts(modules, opts...)
-	if err != nil {
-		printError("failed to load: %v", err)
+	mib, loadErr := loadMibWithOpts(modules, opts...)
+	if loadErr != nil && mib == nil {
+		printError("failed to load: %v", loadErr)
 		return 1
 	}
 
@@ -133,6 +133,10 @@ func cmdLoad(args []string) int {
 		}
 	}
 
+	if loadErr != nil {
+		printError("%v", loadErr)
+		return 1
+	}
 	if hasSevere {
 		return 1
 	}

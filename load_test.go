@@ -2,6 +2,7 @@ package gomib
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
@@ -105,11 +106,27 @@ func TestLoadNonexistentModule(t *testing.T) {
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST"))
-	testutil.NoError(t, err, "Load should not error for nonexistent module")
+	testutil.Error(t, err, "Load should error for nonexistent module")
 	testutil.NotNil(t, m, "Load should return a Mib even for nonexistent module")
+	testutil.True(t, errors.Is(err, ErrMissingModules), "error should wrap ErrMissingModules")
 
 	mod := m.Module("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST")
 	testutil.Nil(t, mod, "nonexistent module should not be in the result")
+}
+
+func TestLoadMissingModuleWithValidModule(t *testing.T) {
+	src, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree failed: %v", err)
+	}
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB", "NONEXISTENT-MIB"))
+	testutil.Error(t, err, "Load should error for missing module")
+	testutil.True(t, errors.Is(err, ErrMissingModules), "error should wrap ErrMissingModules")
+	testutil.NotNil(t, m, "Load should return a Mib with partial results")
+	testutil.NotNil(t, m.Module("IF-MIB"), "IF-MIB should still be loaded")
+	testutil.Nil(t, m.Module("NONEXISTENT-MIB"), "NONEXISTENT-MIB should not be found")
 }
 
 func TestLoadNoSources(t *testing.T) {
@@ -471,6 +488,50 @@ func TestMissingImportFailsInNormalMode(t *testing.T) {
 		}
 	}
 	testutil.Greater(t, oidUnresolved, 0, "normal mode should have unresolved OID references")
+}
+
+func TestDiagnosticThresholdEnforced(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// MISSING-IMPORT-TEST-MIB produces Error-level diagnostics for unresolved OIDs.
+	// With FailAt=SeverityError, Load should return the Mib and an error.
+	cfg := DiagnosticConfig{
+		Level:  StrictnessStrict,
+		FailAt: SeverityError,
+	}
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithDiagnosticConfig(cfg))
+	testutil.Error(t, err, "Load should error when diagnostics exceed FailAt threshold")
+	testutil.True(t, errors.Is(err, ErrDiagnosticThreshold), "error should wrap ErrDiagnosticThreshold")
+	testutil.NotNil(t, m, "Load should return non-nil Mib even on threshold failure")
+	testutil.NotNil(t, m.Module("MISSING-IMPORT-TEST-MIB"), "module should still be loaded")
+}
+
+func TestDiagnosticThresholdNotTriggered(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Same MIB but with default FailAt=SeveritySevere.
+	// Error-level diagnostics should not trigger failure.
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(StrictnessStrict))
+	testutil.NoError(t, err, "Load should not error when diagnostics are below FailAt threshold")
+	testutil.NotNil(t, m, "Mib should be returned")
 }
 
 func loadInvalidMIB(t testing.TB, name string, level StrictnessLevel) *Mib {

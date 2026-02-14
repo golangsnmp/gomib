@@ -147,7 +147,8 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*Mib
 			slog.Int("modules", len(mods)))
 	}
 
-	return resolver.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig), nil
+	m := resolver.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig)
+	return m, checkLoadResult(m, cfg, nil)
 }
 
 func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg loadConfig) (*Mib, error) {
@@ -234,7 +235,8 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 		return cmp.Compare(a.Name, b.Name)
 	})
 
-	return resolver.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig), nil
+	m := resolver.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig)
+	return m, checkLoadResult(m, cfg, names)
 }
 
 func findModuleContent(sources []Source, name string) ([]byte, error) {
