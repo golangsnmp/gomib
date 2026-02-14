@@ -101,21 +101,21 @@ func (c DiagnosticConfig) ShouldFail(sev Severity) bool {
 // IsStrict returns true if strict RFC compliance is required.
 // In strict mode, no fallback resolution strategies are used.
 func (c DiagnosticConfig) IsStrict() bool {
-	return c.Level <= 2
+	return c.Level < StrictnessNormal
 }
 
 // AllowSafeFallbacks returns true if safe fallback strategies should be used.
 // Safe fallbacks have high confidence of matching MIB author intent.
 // Enabled at normal strictness (level 3) and above.
 func (c DiagnosticConfig) AllowSafeFallbacks() bool {
-	return c.Level >= 3
+	return c.Level >= StrictnessNormal
 }
 
 // AllowBestGuessFallbacks returns true if best-guess fallback strategies should be used.
 // Best-guess fallbacks may resolve incorrectly but help with broken vendor MIBs.
 // Enabled at permissive strictness (level 5) and above.
 func (c DiagnosticConfig) AllowBestGuessFallbacks() bool {
-	return c.Level >= 5
+	return c.Level >= StrictnessPermissive
 }
 
 // matchGlob performs simple glob matching with * wildcard.

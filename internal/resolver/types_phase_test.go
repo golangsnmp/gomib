@@ -492,14 +492,11 @@ func TestRangeValueToI64(t *testing.T) {
 		{"unsigned small", &module.RangeValueUnsigned{Value: 255}, 255},
 		{"unsigned zero", &module.RangeValueUnsigned{Value: 0}, 0},
 		{"unsigned max safe", &module.RangeValueUnsigned{Value: uint64(math.MaxInt64)}, math.MaxInt64},
-		// Values exceeding max int64 get capped via ^int64(0) >> 1,
-		// which is -1 due to arithmetic right shift on signed int.
-		{"unsigned overflow", &module.RangeValueUnsigned{Value: uint64(math.MaxInt64) + 1}, -1},
-		{"unsigned max uint64", &module.RangeValueUnsigned{Value: math.MaxUint64}, -1},
+		{"unsigned overflow", &module.RangeValueUnsigned{Value: uint64(math.MaxInt64) + 1}, math.MaxInt64},
+		{"unsigned max uint64", &module.RangeValueUnsigned{Value: math.MaxUint64}, math.MaxInt64},
 
 		{"MIN", &module.RangeValueMin{}, math.MinInt64},
-		// MAX uses ^int64(0) >> 1 which is -1 (arithmetic shift), not math.MaxInt64.
-		{"MAX", &module.RangeValueMax{}, -1},
+		{"MAX", &module.RangeValueMax{}, math.MaxInt64},
 
 		{"nil", nil, 0},
 	}

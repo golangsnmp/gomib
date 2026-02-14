@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"log/slog"
+	"math"
 
 	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/mibimpl"
@@ -483,14 +484,14 @@ func rangeValueToI64(value module.RangeValue) int64 {
 	case *module.RangeValueSigned:
 		return v.Value
 	case *module.RangeValueUnsigned:
-		if v.Value > uint64(^uint64(0)>>1) {
-			return ^int64(0) >> 1 // cap at max int64
+		if v.Value > uint64(math.MaxInt64) {
+			return math.MaxInt64
 		}
 		return int64(v.Value)
 	case *module.RangeValueMin:
-		return ^int64(0) << 63
+		return math.MinInt64
 	case *module.RangeValueMax:
-		return ^int64(0) >> 1
+		return math.MaxInt64
 	default:
 		return 0
 	}
