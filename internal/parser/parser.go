@@ -1114,14 +1114,7 @@ func (p *Parser) parseRangeValue() (ast.RangeValue, *types.Diagnostic) {
 		token := p.advance()
 		text := p.text(token.Span)
 		// Parse hex string to unsigned
-		hexPart := text
-		if len(hexPart) >= 3 && hexPart[0] == '\'' {
-			// Strip 'xxx'H format
-			hexPart = hexPart[1:]
-			if idx := len(hexPart) - 2; idx > 0 {
-				hexPart = hexPart[:idx]
-			}
-		}
+		hexPart := stripQuotedLiteral(text)
 		value, err := strconv.ParseUint(hexPart, 16, 64)
 		if err != nil {
 			p.emitDiagnostic("invalid-hex-range", mib.SeverityError, token.Span, "invalid hex value in range")
@@ -1432,24 +1425,27 @@ func (p *Parser) parseDefValString() (ast.DefValContent, *types.Diagnostic) {
 
 func (p *Parser) parseDefValHexString() ast.DefValContent {
 	token := p.advance()
-	text := p.text(token.Span)
-	// Strip 'xxx'H format
-	content := ""
-	if len(text) >= 4 {
-		content = text[1 : len(text)-2]
-	}
+	content := stripQuotedLiteral(p.text(token.Span))
 	return &ast.DefValContentHexString{Content: content, Span: token.Span}
 }
 
 func (p *Parser) parseDefValBinaryString() ast.DefValContent {
 	token := p.advance()
-	text := p.text(token.Span)
-	// Strip 'xxx'B format
-	content := ""
-	if len(text) >= 4 {
-		content = text[1 : len(text)-2]
-	}
+	content := stripQuotedLiteral(p.text(token.Span))
 	return &ast.DefValContentBinaryString{Content: content, Span: token.Span}
+}
+
+// stripQuotedLiteral strips the 'xxx'H or 'xxx'B quoting from a hex or binary
+// string literal, returning just the inner content.
+func stripQuotedLiteral(s string) string {
+	s, _ = strings.CutPrefix(s, "'")
+	if inner, ok := strings.CutSuffix(s, "'H"); ok {
+		return inner
+	}
+	if inner, ok := strings.CutSuffix(s, "'B"); ok {
+		return inner
+	}
+	return s
 }
 
 func (p *Parser) parseDefValBracedContent() (ast.DefValContent, *types.Diagnostic) {
