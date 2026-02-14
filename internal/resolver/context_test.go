@@ -794,7 +794,7 @@ func TestFinalizeUnresolved(t *testing.T) {
 
 	ctx.FinalizeUnresolved()
 
-	result := ctx.Builder.Mib()
+	result := ctx.Mib
 	unresolved := result.Unresolved()
 
 	// We expect 5 unresolved refs.
@@ -837,7 +837,7 @@ func TestFinalizeUnresolved_NilModule(t *testing.T) {
 
 	ctx.FinalizeUnresolved()
 
-	result := ctx.Builder.Mib()
+	result := ctx.Mib
 	for _, u := range result.Unresolved() {
 		if u.Module != "" {
 			t.Errorf("unresolved ref kind=%q has module=%q, want empty string for nil module", u.Kind, u.Module)

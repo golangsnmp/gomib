@@ -375,7 +375,7 @@ func TestConvertDefValEnumOnOIDType(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 
 	// Set up a node so the OID lookup succeeds
-	root := ctx.Builder.Root()
+	root := ctx.Mib.Root()
 	child := root.GetOrCreateChild(1)
 	grandchild := child.GetOrCreateChild(3)
 	grandchild.SetName("myTarget")
@@ -455,7 +455,7 @@ func TestConvertDefValOidRef(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}
 
-	root := ctx.Builder.Root()
+	root := ctx.Mib.Root()
 	child := root.GetOrCreateChild(1)
 	child.SetName("sysName")
 	ctx.RegisterModuleNodeSymbol(mod, "sysName", child)
@@ -1019,7 +1019,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}
 
-	root := ctx.Builder.Root()
+	root := ctx.Mib.Root()
 	child := root.GetOrCreateChild(1)
 	child2 := child.GetOrCreateChild(3)
 	child2.SetName("enterprises")
@@ -1167,7 +1167,7 @@ func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 	ctx.ResolvedToModule[resolvedMod] = mod
 
 	// Create a node for the notification itself
-	root := ctx.Builder.Root()
+	root := ctx.Mib.Root()
 	notifNode := root.GetOrCreateChild(1)
 	notifNode.SetName("testNotif")
 	ctx.RegisterModuleNodeSymbol(mod, "testNotif", notifNode)

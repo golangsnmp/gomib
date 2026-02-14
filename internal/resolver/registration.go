@@ -41,13 +41,13 @@ func registerModules(ctx *resolverContext) {
 			}
 		}
 
-		ctx.Builder.AddModule(resolved)
+		ctx.Mib.AddModule(resolved)
 		ctx.ModuleToResolved[mod] = resolved
 		ctx.ResolvedToModule[resolved] = mod
 
 		// Collect diagnostics from parsing and lowering
 		for _, d := range mod.Diagnostics {
-			ctx.Builder.AddDiagnostic(d)
+			ctx.Mib.AddDiagnostic(d)
 		}
 
 		// Cache pointers to base modules used by the type resolution

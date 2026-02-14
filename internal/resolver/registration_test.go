@@ -393,17 +393,17 @@ func TestRegisterModules_BuilderReceivesModules(t *testing.T) {
 
 	baseNames := module.BaseModuleNames()
 	wantCount := len(baseNames) + 1
-	if got := len(ctx.Builder.Modules()); got != wantCount {
+	if got := len(ctx.Mib.Modules()); got != wantCount {
 		t.Errorf("len(Builder.Modules()) = %d, want %d", got, wantCount)
 	}
 
 	// Verify the builder can look up each module by name
 	for _, name := range baseNames {
-		if ctx.Builder.Module(name) == nil {
+		if ctx.Mib.Module(name) == nil {
 			t.Errorf("Builder.Module(%q) returned nil", name)
 		}
 	}
-	if ctx.Builder.Module("MY-MIB") == nil {
+	if ctx.Mib.Module("MY-MIB") == nil {
 		t.Error("Builder.Module(MY-MIB) returned nil")
 	}
 }
@@ -422,7 +422,7 @@ func TestRegisterModules_DiagnosticsForwarded(t *testing.T) {
 	registerModules(ctx)
 
 	// Build and check diagnostics are present
-	built := ctx.Builder.Mib()
+	built := ctx.Mib
 	diags := built.Diagnostics()
 	found := false
 	for _, d := range diags {

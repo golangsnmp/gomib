@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	"github.com/golangsnmp/gomib/internal/graph"
-	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
@@ -18,7 +17,7 @@ const (
 
 // resolverContext holds indices and working state for all resolution phases.
 type resolverContext struct {
-	Builder *mibimpl.Builder
+	Mib *mib.Mib
 
 	Modules []*module.Module
 
@@ -105,7 +104,7 @@ type unresolvedNotifObject struct {
 func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *resolverContext {
 	n := len(mods)
 	return &resolverContext{
-		Builder:            mibimpl.NewBuilder(),
+		Mib:                mib.NewMib(),
 		Modules:            mods,
 		ModuleIndex:        make(map[string][]*module.Module, n),
 		ModuleToResolved:   make(map[*module.Module]*mib.Module, n),
@@ -445,12 +444,12 @@ func (c *resolverContext) DropModules() {
 	c.ModuleDefNames = nil
 }
 
-func addUnresolved(b *mibimpl.Builder, kind mib.UnresolvedKind, symbol string, mod *module.Module) {
+func addUnresolved(m *mib.Mib, kind mib.UnresolvedKind, symbol string, mod *module.Module) {
 	modName := ""
 	if mod != nil {
 		modName = mod.Name
 	}
-	b.AddUnresolved(mib.UnresolvedRef{
+	m.AddUnresolved(mib.UnresolvedRef{
 		Kind:   kind,
 		Symbol: symbol,
 		Module: modName,
@@ -460,23 +459,23 @@ func addUnresolved(b *mibimpl.Builder, kind mib.UnresolvedKind, symbol string, m
 // FinalizeUnresolved copies collected unresolved references and diagnostics into the Mib builder.
 func (c *resolverContext) FinalizeUnresolved() {
 	for _, u := range c.unresolvedImports {
-		addUnresolved(c.Builder, mib.UnresolvedImport, u.symbol, u.importingModule)
+		addUnresolved(c.Mib, mib.UnresolvedImport, u.symbol, u.importingModule)
 	}
 	for _, u := range c.unresolvedTypes {
-		addUnresolved(c.Builder, mib.UnresolvedType, u.referenced, u.module)
+		addUnresolved(c.Mib, mib.UnresolvedType, u.referenced, u.module)
 	}
 	for _, u := range c.unresolvedOids {
-		addUnresolved(c.Builder, mib.UnresolvedOID, u.component, u.module)
+		addUnresolved(c.Mib, mib.UnresolvedOID, u.component, u.module)
 	}
 	for _, u := range c.unresolvedIndexes {
-		addUnresolved(c.Builder, mib.UnresolvedIndex, u.indexObject, u.module)
+		addUnresolved(c.Mib, mib.UnresolvedIndex, u.indexObject, u.module)
 	}
 	for _, u := range c.unresolvedNotifObjects {
-		addUnresolved(c.Builder, mib.UnresolvedNotificationObject, u.object, u.module)
+		addUnresolved(c.Mib, mib.UnresolvedNotificationObject, u.object, u.module)
 	}
 
 	for _, d := range c.diagnostics {
-		c.Builder.AddDiagnostic(d)
+		c.Mib.AddDiagnostic(d)
 	}
 }
 

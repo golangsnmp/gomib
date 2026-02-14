@@ -173,7 +173,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 
 		computeEffectiveValues(resolved)
 
-		ctx.Builder.AddObject(resolved)
+		ctx.Mib.AddObject(resolved)
 
 		// Prefer SMIv2 modules when multiple modules define the same OID
 		// (e.g., IF-MIB and RFC1213-MIB both define ifEntry).
@@ -312,7 +312,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 			}
 		}
 
-		ctx.Builder.AddNotification(resolved)
+		ctx.Mib.AddNotification(resolved)
 		node.SetNotification(resolved)
 		created++
 
@@ -418,7 +418,7 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 }
 
 func registerGroup(ctx *resolverContext, mod *module.Module, node *mib.Node, resolved *mib.Group) {
-	ctx.Builder.AddGroup(resolved)
+	ctx.Mib.AddGroup(resolved)
 	node.SetGroup(resolved)
 	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
 		resolvedMod.AddGroup(resolved)
@@ -457,7 +457,7 @@ func createResolvedCompliances(ctx *resolverContext) {
 		resolved.SetReference(comp.Reference)
 		resolved.SetModules(convertComplianceModules(comp.Modules))
 
-		ctx.Builder.AddCompliance(resolved)
+		ctx.Mib.AddCompliance(resolved)
 		node.SetCompliance(resolved)
 		created++
 
@@ -528,7 +528,7 @@ func createResolvedCapabilities(ctx *resolverContext) {
 		resolved.SetProductRelease(cap.ProductRelease)
 		resolved.SetSupports(convertSupportsModules(cap.Supports))
 
-		ctx.Builder.AddCapability(resolved)
+		ctx.Mib.AddCapability(resolved)
 		node.SetCapability(resolved)
 		created++
 

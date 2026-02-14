@@ -372,14 +372,14 @@ func TestResolveNumericComponent(t *testing.T) {
 		// The node is a child of the pseudo-root, so its parent is
 		// the pseudo-root (not nil). Verify it's the same node that
 		// Builder.GetOrCreateRoot returns.
-		if node != ctx.Builder.GetOrCreateRoot(1) {
+		if node != ctx.Mib.Root().GetOrCreateChild(1) {
 			t.Error("expected same node as Builder.GetOrCreateRoot(1)")
 		}
 	})
 
 	t.Run("creates child of existing parent", func(t *testing.T) {
 		ctx := newTestContext()
-		parent := ctx.Builder.GetOrCreateRoot(1) // iso
+		parent := ctx.Mib.Root().GetOrCreateChild(1) // iso
 		child := resolveNumericComponent(ctx, parent, 3)
 		if child == nil {
 			t.Fatal("expected non-nil child")
@@ -394,7 +394,7 @@ func TestResolveNumericComponent(t *testing.T) {
 
 	t.Run("returns same node on repeat", func(t *testing.T) {
 		ctx := newTestContext()
-		parent := ctx.Builder.GetOrCreateRoot(1)
+		parent := ctx.Mib.Root().GetOrCreateChild(1)
 		child1 := resolveNumericComponent(ctx, parent, 3)
 		child2 := resolveNumericComponent(ctx, parent, 3)
 		if child1 != child2 {
@@ -436,7 +436,7 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 		ctx := newResolverContext([]*module.Module{smiMod}, nil, mib.PermissiveConfig())
 		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
-		node := ctx.Builder.GetOrCreateRoot(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1)
+		node := ctx.Mib.Root().GetOrCreateChild(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1)
 		ctx.RegisterModuleNodeSymbol(smiMod, "internet", node)
 
 		got, ok := lookupSmiGlobalOidRoot(ctx, "internet")
@@ -453,7 +453,7 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 		ctx := newResolverContext([]*module.Module{rfc1155Mod}, nil, mib.PermissiveConfig())
 		ctx.ModuleIndex["RFC1155-SMI"] = []*module.Module{rfc1155Mod}
 
-		node := ctx.Builder.GetOrCreateRoot(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1)
+		node := ctx.Mib.Root().GetOrCreateChild(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1)
 		ctx.RegisterModuleNodeSymbol(rfc1155Mod, "internet", node)
 
 		got, ok := lookupSmiGlobalOidRoot(ctx, "internet")
@@ -618,7 +618,7 @@ func TestFinalizeOidDefinition(t *testing.T) {
 			ctx.ModuleToResolved[srcMod] = resolvedMod
 			ctx.ResolvedToModule[resolvedMod] = srcMod
 
-			node := ctx.Builder.GetOrCreateRoot(1).GetOrCreateChild(3).GetOrCreateChild(6)
+			node := ctx.Mib.Root().GetOrCreateChild(1).GetOrCreateChild(3).GetOrCreateChild(6)
 
 			oid := module.NewOidAssignment([]module.OidComponent{
 				&module.OidComponentNumber{Value: 1},
@@ -865,7 +865,7 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 	ctx.ResolvedToModule[v2Mod] = v2Src
 	ctx.ResolvedToModule[v1Mod] = v1Src
 
-	node := ctx.Builder.GetOrCreateRoot(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1).GetOrCreateChild(2)
+	node := ctx.Mib.Root().GetOrCreateChild(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1).GetOrCreateChild(2)
 
 	oid := module.NewOidAssignment([]module.OidComponent{
 		&module.OidComponentNumber{Value: 1},

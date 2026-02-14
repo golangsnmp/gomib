@@ -11,10 +11,10 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/golangsnmp/gomib/internal/mibimpl"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/parser"
 	"github.com/golangsnmp/gomib/internal/resolver"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 func componentLogger(logger *slog.Logger, component string) *slog.Logger {
@@ -49,7 +49,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*Mib
 	}
 
 	if len(allModules) == 0 {
-		return mibimpl.EmptyMib(), nil
+		return mib.NewMib(), nil
 	}
 
 	if logEnabled(logger, slog.LevelInfo) {

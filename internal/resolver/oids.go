@@ -381,7 +381,7 @@ func createNamedChild(ctx *resolverContext, def oidDefinition, currentNode *mib.
 	if !isLast {
 		child.SetName(name)
 		child.SetModule(ctx.ModuleToResolved[def.mod])
-		ctx.Builder.RegisterNode(name, child)
+		ctx.Mib.RegisterNode(name, child)
 		if child.Kind() == mib.KindInternal {
 			child.SetKind(mib.KindNode)
 		}
@@ -429,7 +429,7 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *mib.No
 	}
 
 	ctx.RegisterModuleNodeSymbol(def.mod, label, node)
-	ctx.Builder.RegisterNode(label, node)
+	ctx.Mib.RegisterNode(label, node)
 
 	if ctx.TraceEnabled() {
 		ctx.Trace("resolved OID definition",
@@ -443,7 +443,7 @@ func resolveNumericComponent(ctx *resolverContext, parent *mib.Node, arc uint32)
 	if parent != nil {
 		return parent.GetOrCreateChild(arc)
 	}
-	return ctx.Builder.GetOrCreateRoot(arc)
+	return ctx.Mib.Root().GetOrCreateChild(arc)
 }
 
 func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
@@ -475,7 +475,7 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 		trapNode.SetKind(mib.KindNotification)
 		trapNode.SetModule(ctx.ModuleToResolved[def.mod])
 		ctx.RegisterModuleNodeSymbol(def.mod, defName, trapNode)
-		ctx.Builder.RegisterNode(defName, trapNode)
+		ctx.Mib.RegisterNode(defName, trapNode)
 
 		if ctx.TraceEnabled() {
 			ctx.Trace("resolved TRAP-TYPE",
@@ -491,7 +491,7 @@ func lookupOrCreateWellKnownRoot(ctx *resolverContext, name string) (*mib.Node, 
 	if arc < 0 {
 		return nil, false
 	}
-	return ctx.Builder.GetOrCreateRoot(uint32(arc)), true
+	return ctx.Mib.Root().GetOrCreateChild(uint32(arc)), true
 }
 
 func lookupSmiGlobalOidRoot(ctx *resolverContext, name string) (*mib.Node, bool) {
