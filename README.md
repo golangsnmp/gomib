@@ -26,12 +26,15 @@ import (
 )
 
 func main() {
-    m, err := gomib.LoadModules(context.Background(), []string{"IF-MIB"}, nil, gomib.WithSystemPaths())
+    m, err := gomib.Load(context.Background(),
+        gomib.WithSystemPaths(),
+        gomib.WithModules("IF-MIB"),
+    )
     if err != nil {
         log.Fatal(err)
     }
 
-    obj := m.FindObject("ifIndex")
+    obj := m.Object("ifIndex")
     fmt.Printf("%s  %s  %s  %s\n", obj.Name(), obj.OID(), obj.Type().Name(), obj.Access())
     // ifIndex  1.3.6.1.2.1.2.2.1.1  InterfaceIndex  read-only
 }
@@ -39,14 +42,13 @@ func main() {
 
 ## Loading MIBs
 
-Two entry points:
-
 ```go
-// Load all modules from a source
-m, err := gomib.Load(ctx, source)
+// Load everything from a source (parses all files)
+m, err := gomib.Load(ctx, gomib.WithSource(src))
 
-// Load specific modules (plus their dependencies)
-m, err := gomib.LoadModules(ctx, []string{"IF-MIB", "IP-MIB"}, source)
+// Load only specific modules and their transitive dependencies.
+// Faster when the source contains hundreds of MIBs but you only need a few.
+m, err := gomib.Load(ctx, gomib.WithSource(src), gomib.WithModules("IF-MIB", "IP-MIB"))
 ```
 
 ### Sources
@@ -76,7 +78,8 @@ Files are matched by extension: no extension, `.mib`, `.smi`, `.txt`, `.my`. Ove
 ### Options
 
 ```go
-gomib.Load(ctx, src,
+gomib.Load(ctx,
+    gomib.WithSource(src),
     gomib.WithSystemPaths(),                             // discover net-snmp/libsmi paths
     gomib.WithLogger(slog.Default()),                    // enable debug/trace logging
     gomib.WithStrictness(gomib.StrictnessPermissive),    // strictness preset
@@ -90,15 +93,21 @@ gomib.Load(ctx, src,
 
 ## Querying
 
-All `Find*` methods accept unqualified names, qualified names (`MODULE::name`), or numeric OID strings:
+Lookup methods take a plain name and return nil if not found:
 
 ```go
-obj := m.FindObject("ifIndex")
-obj  = m.FindObject("IF-MIB::ifIndex")
-obj  = m.FindObject("1.3.6.1.2.1.2.2.1.1")
+obj := m.Object("ifIndex")
+node := m.Node("ifEntry")
+typ := m.Type("DisplayString")
 ```
 
-Other lookup methods: `FindNode`, `FindType`, `FindNotification`, `FindGroup`, `FindCompliance`, `FindCapabilities`.
+For qualified lookup, scope through the module:
+
+```go
+obj := m.Module("IF-MIB").Object("ifIndex")
+```
+
+Other lookup methods: `Node`, `Type`, `Notification`, `Group`, `Compliance`, `Capability`.
 
 ### OID lookups
 
@@ -137,8 +146,8 @@ for node := range m.Nodes() {
 }
 
 // Subtree iteration
-node := m.FindNode("ifEntry")
-for child := range node.Descendants() {
+node := m.Node("ifEntry")
+for child := range node.Subtree() {
     fmt.Println(child.Name())
 }
 ```
@@ -148,7 +157,7 @@ for child := range node.Descendants() {
 Each `Object` carries its type, access level, status, and position in the OID tree:
 
 ```go
-obj := m.FindObject("ifType")
+obj := m.Object("ifType")
 
 obj.Name()        // "ifType"
 obj.OID()         // 1.3.6.1.2.1.2.2.1.3
@@ -163,7 +172,7 @@ obj.Description() // "The type of interface..."
 ### Tables
 
 ```go
-table := m.FindObject("ifTable")
+table := m.Object("ifTable")
 table.IsTable()  // true
 
 row := table.Entry()           // ifEntry
@@ -194,7 +203,7 @@ obj.EffectiveDisplayHint() // display hint string
 Types form chains: a textual convention references a parent type, which may reference another, down to a base SMI type.
 
 ```go
-typ := m.FindType("DisplayString")
+typ := m.Type("DisplayString")
 
 typ.Name()                // "DisplayString"
 typ.IsTextualConvention() // true
@@ -219,7 +228,7 @@ Classification helpers: `IsCounter()`, `IsGauge()`, `IsString()`, `IsEnumeration
 ## Notifications
 
 ```go
-notif := m.FindNotification("linkDown")
+notif := m.Notification("linkDown")
 
 notif.Name()        // "linkDown"
 notif.OID()         // 1.3.6.1.6.3.1.1.5.3
@@ -236,7 +245,7 @@ for _, obj := range notif.Objects() {
 Loading produces diagnostics for issues found during parsing and resolution.
 
 ```go
-m, err := gomib.Load(ctx, src)
+m, err := gomib.Load(ctx, gomib.WithSource(src))
 
 // Check for errors
 if m.HasErrors() {
@@ -266,7 +275,7 @@ Four presets control how strictly MIBs are validated:
 | Silent | `StrictnessSilent` | Accept everything, suppress diagnostics |
 
 ```go
-m, _ := gomib.Load(ctx, src, gomib.WithStrictness(gomib.StrictnessPermissive))
+m, _ := gomib.Load(ctx, gomib.WithSource(src), gomib.WithStrictness(gomib.StrictnessPermissive))
 ```
 
 For fine-grained control, use `WithDiagnosticConfig`:
