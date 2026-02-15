@@ -65,8 +65,6 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, runtime.NumCPU())
 
-	heuristic := defaultHeuristic()
-
 	for _, sm := range allModules {
 		wg.Add(1)
 		go func(sm sourceModule) {
@@ -109,7 +107,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 				return
 			}
 
-			mod := decodeModule(content, sm.name, heuristic, logger, cfg)
+			mod := decodeModule(content, sm.name, logger, cfg)
 			if mod != nil {
 				results <- parseResult{mod: mod}
 			}
@@ -160,8 +158,6 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg loadConfig) (*mib.Mib, error) {
 	logger := cfg.logger
 
-	heuristic := defaultHeuristic()
-
 	modules := make(map[string]*module.Module)
 	loading := make(map[string]struct{})
 
@@ -198,7 +194,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			return nil // skip missing modules
 		}
 
-		mod := decodeModule(content, name, heuristic, logger, cfg)
+		mod := decodeModule(content, name, logger, cfg)
 		if mod == nil {
 			return nil
 		}
@@ -269,8 +265,8 @@ func findModuleContent(sources []Source, name string) ([]byte, error) {
 
 // decodeModule runs the heuristic/parse/lower pipeline on raw MIB content.
 // Returns nil if any stage fails (not a MIB, parse error, lowering error).
-func decodeModule(content []byte, name string, heuristic heuristicConfig, logger *slog.Logger, cfg loadConfig) *module.Module {
-	if !heuristic.looksLikeMIBContent(content) {
+func decodeModule(content []byte, name string, logger *slog.Logger, cfg loadConfig) *module.Module {
+	if !looksLikeMIBContent(content) {
 		if logEnabled(logger, slog.LevelDebug) {
 			logger.LogAttrs(context.Background(), slog.LevelDebug, "content rejected by heuristic",
 				slog.String("module", name))
@@ -303,29 +299,17 @@ var (
 	sigAssign      = []byte("::=")
 )
 
-type heuristicConfig struct {
-	enabled         bool
-	binaryCheckSize int
-	maxProbeSize    int
-}
+const (
+	heuristicBinaryCheckSize = 1024
+	heuristicMaxProbeSize    = 128 * 1024
+)
 
-func defaultHeuristic() heuristicConfig {
-	return heuristicConfig{
-		enabled:         true,
-		binaryCheckSize: 1024,
-		maxProbeSize:    128 * 1024,
-	}
-}
-
-func (h *heuristicConfig) looksLikeMIBContent(content []byte) bool {
-	if !h.enabled {
-		return true
-	}
+func looksLikeMIBContent(content []byte) bool {
 	if len(content) == 0 {
 		return false
 	}
 
-	checkLen := h.binaryCheckSize
+	checkLen := heuristicBinaryCheckSize
 	if checkLen > len(content) {
 		checkLen = len(content)
 	}
@@ -335,7 +319,7 @@ func (h *heuristicConfig) looksLikeMIBContent(content []byte) bool {
 		}
 	}
 
-	probeLen := h.maxProbeSize
+	probeLen := heuristicMaxProbeSize
 	if probeLen > len(content) {
 		probeLen = len(content)
 	}

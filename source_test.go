@@ -315,9 +315,7 @@ func TestLoadWithModulesContextCancellation(t *testing.T) {
 	testutil.Equal(t, context.Canceled, err, "error should be context.Canceled")
 }
 
-func TestHeuristicLooksLikeMIBContent(t *testing.T) {
-	h := defaultHeuristic()
-
+func TestLooksLikeMIBContent(t *testing.T) {
 	tests := []struct {
 		name    string
 		content string
@@ -335,24 +333,11 @@ func TestHeuristicLooksLikeMIBContent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := h.looksLikeMIBContent([]byte(tt.content))
+			got := looksLikeMIBContent([]byte(tt.content))
 			if got != tt.want {
 				t.Errorf("looksLikeMIBContent(%q) = %v, want %v", tt.content, got, tt.want)
 			}
 		})
-	}
-}
-
-func TestHeuristicDisabled(t *testing.T) {
-	h := defaultHeuristic()
-	h.enabled = false
-
-	if !h.looksLikeMIBContent([]byte("total garbage")) {
-		t.Error("disabled heuristic should accept anything non-empty")
-	}
-	// When disabled, the early return bypasses the length check
-	if !h.looksLikeMIBContent([]byte("")) {
-		t.Error("disabled heuristic should return true even for empty content")
 	}
 }
 
