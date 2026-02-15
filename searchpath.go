@@ -2,6 +2,7 @@ package gomib
 
 import (
 	"bufio"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -222,6 +223,9 @@ func applyConfigFile(path string, current []string, parseLine func(string) (path
 			continue
 		}
 		current = applyOp(op, dirs, current)
+	}
+	if err := scanner.Err(); err != nil {
+		slog.Debug("error reading config file", "path", path, "error", err)
 	}
 	return current
 }
