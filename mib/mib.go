@@ -98,41 +98,16 @@ func (m *Mib) Capability(name string) *Capability {
 }
 
 func (m *Mib) NodeByOID(oid OID) *Node {
-	if len(oid) == 0 {
+	nd, ok := m.root.walkOID(oid)
+	if !ok {
 		return nil
-	}
-	nd := m.root
-	for _, arc := range oid {
-		if nd.children == nil {
-			return nil
-		}
-		child := nd.children[arc]
-		if child == nil {
-			return nil
-		}
-		nd = child
 	}
 	return nd
 }
 
 func (m *Mib) LongestPrefixByOID(oid OID) *Node {
-	if len(oid) == 0 {
-		return nil
-	}
-	var deepest *Node
-	nd := m.root
-	for _, arc := range oid {
-		if nd.children == nil {
-			break
-		}
-		child := nd.children[arc]
-		if child == nil {
-			break
-		}
-		nd = child
-		deepest = nd
-	}
-	return deepest
+	nd, _ := m.root.walkOID(oid)
+	return nd
 }
 
 func (m *Mib) Module(name string) *Module {

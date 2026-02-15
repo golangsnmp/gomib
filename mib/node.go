@@ -118,23 +118,26 @@ func (n *Node) yieldAll(yield func(*Node) bool) bool {
 }
 
 func (n *Node) LongestPrefix(oid OID) *Node {
-	if len(oid) == 0 {
-		return nil
-	}
-	var deepest *Node
+	nd, _ := n.walkOID(oid)
+	return nd
+}
+
+// walkOID walks the OID tree from n, returning the deepest node reached
+// and whether the walk matched all arcs (exact match).
+func (n *Node) walkOID(oid OID) (deepest *Node, exact bool) {
 	current := n
 	for _, arc := range oid {
 		if current.children == nil {
-			break
+			return deepest, false
 		}
 		child := current.children[arc]
 		if child == nil {
-			break
+			return deepest, false
 		}
 		current = child
 		deepest = current
 	}
-	return deepest
+	return deepest, true
 }
 
 // String returns a brief summary: "name (oid)" or just "(oid)" for
