@@ -139,9 +139,9 @@ END
 	for _, d := range mod.Diagnostics {
 		if d.Code == "missing-module-identity" {
 			found = true
-			// Lowering diagnostics have no source span, so line/column should be 0
-			if d.Line != 0 || d.Column != 0 {
-				t.Errorf("expected line=0, column=0 for lowering diagnostic, got line=%d, column=%d", d.Line, d.Column)
+			// Lowering diagnostics now include source location from the module span
+			if d.Line == 0 || d.Column == 0 {
+				t.Errorf("expected non-zero line/column for lowering diagnostic, got line=%d, column=%d", d.Line, d.Column)
 			}
 			break
 		}

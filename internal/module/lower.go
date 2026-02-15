@@ -14,6 +14,7 @@ type LoweringContext struct {
 	Language    types.Language
 	DiagConfig  types.DiagnosticConfig
 	source      []byte // source text for span-to-line/column conversion
+	moduleName  string // current module name for diagnostics
 	types.Logger
 }
 
@@ -46,17 +47,19 @@ func spanToLineCol(source []byte, offset types.ByteOffset) (line, col int) {
 }
 
 // emitDiagnostic records a diagnostic if the current config allows it.
-func (ctx *LoweringContext) emitDiagnostic(code string, severity types.Severity, moduleName string, message string) {
+// The span is converted to line/column using the source text.
+func (ctx *LoweringContext) emitDiagnostic(code string, severity types.Severity, moduleName string, span types.Span, message string) {
 	if !ctx.DiagConfig.ShouldReport(code, severity) {
 		return
 	}
+	line, col := spanToLineCol(ctx.source, span.Start)
 	ctx.Diagnostics = append(ctx.Diagnostics, types.Diagnostic{
 		Severity: severity,
 		Code:     code,
 		Message:  message,
 		Module:   moduleName,
-		Line:     0,
-		Column:   0,
+		Line:     line,
+		Column:   col,
 	})
 }
 
@@ -78,6 +81,7 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 	ctx := newLoweringContext(source, logger, diagConfig)
 
 	module := NewModule(astModule.Name.Name, astModule.Span)
+	ctx.moduleName = module.Name
 
 	ctx.Log(slog.LevelDebug, "lowering module", slog.String("module", module.Name))
 
@@ -108,7 +112,7 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 			}
 		}
 		if !hasModuleIdentity {
-			ctx.emitDiagnostic("missing-module-identity", types.SeverityError, module.Name,
+			ctx.emitDiagnostic("missing-module-identity", types.SeverityError, module.Name, module.Span,
 				fmt.Sprintf("SMIv2 module %s lacks MODULE-IDENTITY", module.Name))
 		}
 	}
@@ -194,8 +198,8 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 		// Non-semantic definitions
 		return nil
 	default:
-		ctx.Log(slog.LevelWarn, "unknown definition type",
-			slog.String("type", fmt.Sprintf("%T", def)))
+		ctx.emitDiagnostic("unknown-definition-type", types.SeverityWarning, ctx.moduleName, def.DefinitionSpan(),
+			fmt.Sprintf("unknown definition type %T", def))
 		return nil
 	}
 }
@@ -281,7 +285,7 @@ func checkRevisionLastUpdated(ctx *LoweringContext, moduleName string, mi *Modul
 			return
 		}
 	}
-	ctx.emitDiagnostic("revision-last-updated", types.SeverityMinor, moduleName,
+	ctx.emitDiagnostic("revision-last-updated", types.SeverityMinor, moduleName, mi.Span,
 		fmt.Sprintf("revision for LAST-UPDATED %s is missing", mi.LastUpdated))
 }
 
@@ -655,8 +659,8 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 		return &TypeSyntaxObjectIdentifier{}
 
 	default:
-		ctx.Log(slog.LevelWarn, "unknown type syntax in lowering, defaulting to OCTET STRING",
-			slog.String("type", fmt.Sprintf("%T", syntax)))
+		ctx.emitDiagnostic("unknown-type-syntax", types.SeverityWarning, ctx.moduleName, syntax.SyntaxSpan(),
+			fmt.Sprintf("unknown type syntax %T, defaulting to OCTET STRING", syntax))
 		return &TypeSyntaxOctetString{}
 	}
 }
@@ -678,8 +682,8 @@ func lowerConstraint(constraint ast.Constraint, ctx *LoweringContext) Constraint
 		return &ConstraintRange{Ranges: ranges}
 
 	default:
-		ctx.Log(slog.LevelWarn, "unknown constraint type in lowering, defaulting to empty range",
-			slog.String("type", fmt.Sprintf("%T", constraint)))
+		ctx.emitDiagnostic("unknown-constraint-type", types.SeverityWarning, ctx.moduleName, constraint.ConstraintSpan(),
+			fmt.Sprintf("unknown constraint type %T, defaulting to empty range", constraint))
 		return &ConstraintRange{}
 	}
 }
@@ -710,14 +714,14 @@ func lowerRangeValue(value ast.RangeValue, ctx *LoweringContext) RangeValue {
 		case "MAX":
 			return &RangeValueMax{}
 		default:
-			ctx.Log(slog.LevelWarn, "unknown range identifier, defaulting to 0",
-				slog.String("name", v.Name.Name))
+			ctx.emitDiagnostic("unknown-range-value", types.SeverityWarning, ctx.moduleName, v.Name.Span,
+				fmt.Sprintf("unknown range identifier %s, defaulting to 0", v.Name.Name))
 			return &RangeValueUnsigned{Value: 0}
 		}
 
 	default:
-		ctx.Log(slog.LevelWarn, "unknown range value type in lowering, defaulting to 0",
-			slog.String("type", fmt.Sprintf("%T", value)))
+		ctx.emitDiagnostic("unknown-range-value", types.SeverityWarning, ctx.moduleName, types.Span{},
+			fmt.Sprintf("unknown range value type %T, defaulting to 0", value))
 		return &RangeValueUnsigned{Value: 0}
 	}
 }
@@ -758,8 +762,8 @@ func lowerOidComponent(comp ast.OidComponent, ctx *LoweringContext) OidComponent
 		}
 
 	default:
-		ctx.Log(slog.LevelWarn, "unknown OID component type in lowering, defaulting to sub-id 0",
-			slog.String("type", fmt.Sprintf("%T", comp)))
+		ctx.emitDiagnostic("unknown-oid-component-type", types.SeverityWarning, ctx.moduleName, comp.ComponentSpan(),
+			fmt.Sprintf("unknown OID component type %T, defaulting to sub-id 0", comp))
 		return &OidComponentNumber{Value: 0}
 	}
 }
@@ -878,8 +882,8 @@ func lowerDefValContent(content ast.DefValContent, ctx *LoweringContext) DefVal 
 		return &DefValOidValue{Components: components}
 
 	default:
-		ctx.Log(slog.LevelWarn, "unknown DEFVAL content type in lowering, defaulting to integer 0",
-			slog.String("type", fmt.Sprintf("%T", content)))
+		ctx.emitDiagnostic("unknown-defval-type", types.SeverityWarning, ctx.moduleName, types.Span{},
+			fmt.Sprintf("unknown DEFVAL content type %T, defaulting to integer 0", content))
 		return &DefValInteger{Value: 0}
 	}
 }

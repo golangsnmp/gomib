@@ -92,33 +92,38 @@ Options:
 	}
 }
 
+// nodeEntry is a node paired with its OID, used for sorted iteration.
+type nodeEntry struct {
+	oid  string
+	node *NormalizedNode
+}
+
+// collectAndSort filters nodes by predicate and returns them sorted by OID.
+func collectAndSort(nodes map[string]*NormalizedNode, include func(*NormalizedNode) bool) []nodeEntry {
+	var entries []nodeEntry
+	for oid, node := range nodes {
+		if include(node) {
+			entries = append(entries, nodeEntry{oid, node})
+		}
+	}
+	slices.SortFunc(entries, func(a, b nodeEntry) int {
+		return cmp.Compare(a.oid, b.oid)
+	})
+	return entries
+}
+
 func generateTableTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
 	if varName == "" {
 		varName = "tableTests"
 	}
 
-	type tableInfo struct {
-		oid     string
-		node    *NormalizedNode
-		tabName string
-	}
-
-	var tables []tableInfo
-	for oid, node := range nodes {
-		if len(node.Indexes) > 0 {
-			tabName := getTableName(node.Name)
-			tables = append(tables, tableInfo{oid, node, tabName})
-		}
-	}
-
-	slices.SortFunc(tables, func(a, b tableInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return len(n.Indexes) > 0 })
 
 	fmt.Fprintf(w, "var %s = []TableTestCase{\n", varName)
-	for _, t := range tables {
+	for _, e := range entries {
+		tabName := getTableName(e.node.Name)
 		hasImplied := false
-		for _, idx := range t.node.Indexes {
+		for _, idx := range e.node.Indexes {
 			if idx.Implied {
 				hasImplied = true
 				break
@@ -126,11 +131,11 @@ func generateTableTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 		}
 
 		var indexNames []string
-		for _, idx := range t.node.Indexes {
+		for _, idx := range e.node.Indexes {
 			indexNames = append(indexNames, fmt.Sprintf("%q", idx.Name))
 		}
 
-		netsnmpStr := indexString(t.node.Indexes)
+		netsnmpStr := indexString(e.node.Indexes)
 		if netsnmpStr == "" {
 			netsnmpStr = "INDEX { }"
 		} else {
@@ -138,7 +143,7 @@ func generateTableTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 		}
 
 		fmt.Fprintf(w, "\t{TableName: %q, RowName: %q, Module: %q,\n",
-			t.tabName, t.node.Name, t.node.Module)
+			tabName, e.node.Name, e.node.Module)
 		fmt.Fprintf(w, "\t\tIndexNames: []string{%s}, HasImplied: %v,\n",
 			strings.Join(indexNames, ", "), hasImplied)
 		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", netsnmpStr)
@@ -153,21 +158,7 @@ func generateOIDTests(w io.Writer, nodes map[string]*NormalizedNode, modules []s
 		varName = "oidTests"
 	}
 
-	type oidInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var oids []oidInfo
-	for oid, node := range nodes {
-		if node.Name != "" {
-			oids = append(oids, oidInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(oids, func(a, b oidInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return n.Name != "" })
 
 	fmt.Fprintf(w, "// OIDTestCase defines a test case for OID resolution.\n")
 	fmt.Fprintf(w, "type OIDTestCase struct {\n")
@@ -178,10 +169,10 @@ func generateOIDTests(w io.Writer, nodes map[string]*NormalizedNode, modules []s
 	fmt.Fprintf(w, "}\n\n")
 
 	fmt.Fprintf(w, "var %s = []OIDTestCase{\n", varName)
-	for _, o := range oids {
-		netsnmpCmd := fmt.Sprintf("snmptranslate -On %s::%s", o.node.Module, o.node.Name)
+	for _, e := range entries {
+		netsnmpCmd := fmt.Sprintf("snmptranslate -On %s::%s", e.node.Module, e.node.Name)
 		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q,\n",
-			o.node.Name, o.node.Module, o.oid)
+			e.node.Name, e.node.Module, e.oid)
 		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", netsnmpCmd)
 	}
 	fmt.Fprintln(w, "}")
@@ -194,21 +185,7 @@ func generateEnumTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 		varName = "enumTests"
 	}
 
-	type enumInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var enums []enumInfo
-	for oid, node := range nodes {
-		if len(node.EnumValues) > 0 {
-			enums = append(enums, enumInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(enums, func(a, b enumInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return len(n.EnumValues) > 0 })
 
 	fmt.Fprintf(w, "// EnumTestCase defines a test case for enumeration values.\n")
 	fmt.Fprintf(w, "type EnumTestCase struct {\n")
@@ -220,8 +197,7 @@ func generateEnumTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 	fmt.Fprintf(w, "}\n\n")
 
 	fmt.Fprintf(w, "var %s = []EnumTestCase{\n", varName)
-	for _, e := range enums {
-		// Sort enum keys for deterministic output
+	for _, e := range entries {
 		var keys []int
 		for k := range e.node.EnumValues {
 			keys = append(keys, k)
@@ -249,21 +225,7 @@ func generateAccessTests(w io.Writer, nodes map[string]*NormalizedNode, modules 
 		varName = "accessTests"
 	}
 
-	type accessInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var objects []accessInfo
-	for oid, node := range nodes {
-		if node.Access != "" {
-			objects = append(objects, accessInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(objects, func(a, b accessInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return n.Access != "" })
 
 	fmt.Fprintf(w, "// AccessTestCase defines a test case for access level.\n")
 	fmt.Fprintf(w, "type AccessTestCase struct {\n")
@@ -275,10 +237,10 @@ func generateAccessTests(w io.Writer, nodes map[string]*NormalizedNode, modules 
 	fmt.Fprintf(w, "}\n\n")
 
 	fmt.Fprintf(w, "var %s = []AccessTestCase{\n", varName)
-	for _, o := range objects {
-		netsnmpCmd := fmt.Sprintf("snmptranslate -Td %s::%s | grep MAX-ACCESS", o.node.Module, o.node.Name)
+	for _, e := range entries {
+		netsnmpCmd := fmt.Sprintf("snmptranslate -Td %s::%s | grep MAX-ACCESS", e.node.Module, e.node.Name)
 		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, Access: %q,\n",
-			o.node.Name, o.node.Module, o.oid, o.node.Access)
+			e.node.Name, e.node.Module, e.oid, e.node.Access)
 		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", netsnmpCmd)
 	}
 	fmt.Fprintln(w, "}")
@@ -291,29 +253,15 @@ func generateAugmentsTests(w io.Writer, nodes map[string]*NormalizedNode, module
 		varName = "augmentsTests"
 	}
 
-	type augInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var augs []augInfo
-	for oid, node := range nodes {
-		if node.Augments != "" {
-			augs = append(augs, augInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(augs, func(a, b augInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return n.Augments != "" })
 
 	fmt.Fprintf(w, "var %s = []AugmentsTestCase{\n", varName)
-	for _, a := range augs {
-		netsnmpStr := fmt.Sprintf("AUGMENTS { %s }", a.node.Augments)
+	for _, e := range entries {
+		netsnmpStr := fmt.Sprintf("AUGMENTS { %s }", e.node.Augments)
 		fmt.Fprintf(w, "\t{RowName: %q, Module: %q,\n",
-			a.node.Name, a.node.Module)
+			e.node.Name, e.node.Module)
 		fmt.Fprintf(w, "\t\tAugmentsRow: %q, AugmentsMod: %q,\n",
-			a.node.Augments, a.node.Module) // augments module might differ
+			e.node.Augments, e.node.Module) // augments module might differ
 		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", netsnmpStr)
 	}
 	fmt.Fprintln(w, "}")
@@ -326,21 +274,7 @@ func generateRangeTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 		varName = "rangeTests"
 	}
 
-	type rangeInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var items []rangeInfo
-	for oid, node := range nodes {
-		if len(node.Ranges) > 0 {
-			items = append(items, rangeInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(items, func(a, b rangeInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return len(n.Ranges) > 0 })
 
 	fmt.Fprintf(w, "// RangeTestCase defines a test case for range constraints.\n")
 	fmt.Fprintf(w, "type RangeTestCase struct {\n")
@@ -356,16 +290,16 @@ func generateRangeTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 	fmt.Fprintf(w, "}\n\n")
 
 	fmt.Fprintf(w, "var %s = []RangeTestCase{\n", varName)
-	for _, item := range items {
+	for _, e := range entries {
 		var rangeParts []string
-		for _, r := range item.node.Ranges {
+		for _, r := range e.node.Ranges {
 			rangeParts = append(rangeParts, fmt.Sprintf("{%d, %d}", r.Low, r.High))
 		}
 
 		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q,\n",
-			item.node.Name, item.node.Module, item.oid)
+			e.node.Name, e.node.Module, e.oid)
 		fmt.Fprintf(w, "\t\tRanges: []Range{%s},\n", strings.Join(rangeParts, ", "))
-		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", rangesString(item.node.Ranges))
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", rangesString(e.node.Ranges))
 	}
 	fmt.Fprintln(w, "}")
 
@@ -377,21 +311,7 @@ func generateBitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 		varName = "bitsTests"
 	}
 
-	type bitsInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var items []bitsInfo
-	for oid, node := range nodes {
-		if len(node.BitValues) > 0 {
-			items = append(items, bitsInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(items, func(a, b bitsInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return len(n.BitValues) > 0 })
 
 	fmt.Fprintf(w, "// BitsTestCase defines a test case for BITS values.\n")
 	fmt.Fprintf(w, "type BitsTestCase struct {\n")
@@ -403,22 +323,22 @@ func generateBitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 	fmt.Fprintf(w, "}\n\n")
 
 	fmt.Fprintf(w, "var %s = []BitsTestCase{\n", varName)
-	for _, item := range items {
+	for _, e := range entries {
 		var keys []int
-		for k := range item.node.BitValues {
+		for k := range e.node.BitValues {
 			keys = append(keys, k)
 		}
 		slices.Sort(keys)
 
 		var bitParts []string
 		for _, k := range keys {
-			bitParts = append(bitParts, fmt.Sprintf("%d: %q", k, item.node.BitValues[k]))
+			bitParts = append(bitParts, fmt.Sprintf("%d: %q", k, e.node.BitValues[k]))
 		}
 
 		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q,\n",
-			item.node.Name, item.node.Module, item.oid)
+			e.node.Name, e.node.Module, e.oid)
 		fmt.Fprintf(w, "\t\tBitValues: map[int]string{%s},\n", strings.Join(bitParts, ", "))
-		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", bitsString(item.node.BitValues))
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", bitsString(e.node.BitValues))
 	}
 	fmt.Fprintln(w, "}")
 
@@ -430,21 +350,7 @@ func generateHintTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 		varName = "hintTests"
 	}
 
-	type hintInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var items []hintInfo
-	for oid, node := range nodes {
-		if node.Hint != "" {
-			items = append(items, hintInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(items, func(a, b hintInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return n.Hint != "" })
 
 	fmt.Fprintf(w, "// HintTestCase defines a test case for display hints.\n")
 	fmt.Fprintf(w, "type HintTestCase struct {\n")
@@ -456,10 +362,10 @@ func generateHintTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 	fmt.Fprintf(w, "}\n\n")
 
 	fmt.Fprintf(w, "var %s = []HintTestCase{\n", varName)
-	for _, item := range items {
+	for _, e := range entries {
 		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, Hint: %q,\n",
-			item.node.Name, item.node.Module, item.oid, item.node.Hint)
-		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", item.node.Hint)
+			e.node.Name, e.node.Module, e.oid, e.node.Hint)
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", e.node.Hint)
 	}
 	fmt.Fprintln(w, "}")
 
@@ -471,21 +377,7 @@ func generateUnitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 		varName = "unitsTests"
 	}
 
-	type unitsInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var items []unitsInfo
-	for oid, node := range nodes {
-		if node.Units != "" {
-			items = append(items, unitsInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(items, func(a, b unitsInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return n.Units != "" })
 
 	fmt.Fprintf(w, "// UnitsTestCase defines a test case for UNITS clause.\n")
 	fmt.Fprintf(w, "type UnitsTestCase struct {\n")
@@ -497,10 +389,10 @@ func generateUnitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 	fmt.Fprintf(w, "}\n\n")
 
 	fmt.Fprintf(w, "var %s = []UnitsTestCase{\n", varName)
-	for _, item := range items {
+	for _, e := range entries {
 		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, Units: %q,\n",
-			item.node.Name, item.node.Module, item.oid, item.node.Units)
-		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", item.node.Units)
+			e.node.Name, e.node.Module, e.oid, e.node.Units)
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", e.node.Units)
 	}
 	fmt.Fprintln(w, "}")
 
@@ -512,21 +404,7 @@ func generateDefvalTests(w io.Writer, nodes map[string]*NormalizedNode, modules 
 		varName = "defvalTests"
 	}
 
-	type defvalInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var items []defvalInfo
-	for oid, node := range nodes {
-		if node.DefaultValue != "" {
-			items = append(items, defvalInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(items, func(a, b defvalInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return n.DefaultValue != "" })
 
 	fmt.Fprintf(w, "// DefvalTestCase defines a test case for DEFVAL clause.\n")
 	fmt.Fprintf(w, "type DefvalTestCase struct {\n")
@@ -538,10 +416,10 @@ func generateDefvalTests(w io.Writer, nodes map[string]*NormalizedNode, modules 
 	fmt.Fprintf(w, "}\n\n")
 
 	fmt.Fprintf(w, "var %s = []DefvalTestCase{\n", varName)
-	for _, item := range items {
+	for _, e := range entries {
 		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, Defval: %q,\n",
-			item.node.Name, item.node.Module, item.oid, item.node.DefaultValue)
-		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", item.node.DefaultValue)
+			e.node.Name, e.node.Module, e.oid, e.node.DefaultValue)
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", e.node.DefaultValue)
 	}
 	fmt.Fprintln(w, "}")
 
@@ -553,20 +431,8 @@ func generateNotificationTests(w io.Writer, nodes map[string]*NormalizedNode, mo
 		varName = "notificationTests"
 	}
 
-	type notifInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var items []notifInfo
-	for oid, node := range nodes {
-		if node.NodeType == "NOTIFICATION-TYPE" || node.NodeType == "TRAP-TYPE" {
-			items = append(items, notifInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(items, func(a, b notifInfo) int {
-		return cmp.Compare(a.oid, b.oid)
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool {
+		return n.NodeType == "NOTIFICATION-TYPE" || n.NodeType == "TRAP-TYPE"
 	})
 
 	fmt.Fprintf(w, "// NotificationTestCase defines a test case for notifications.\n")
@@ -581,17 +447,17 @@ func generateNotificationTests(w io.Writer, nodes map[string]*NormalizedNode, mo
 	fmt.Fprintf(w, "}\n\n")
 
 	fmt.Fprintf(w, "var %s = []NotificationTestCase{\n", varName)
-	for _, item := range items {
+	for _, e := range entries {
 		var objParts []string
-		for _, obj := range item.node.Varbinds {
+		for _, obj := range e.node.Varbinds {
 			objParts = append(objParts, fmt.Sprintf("%q", obj))
 		}
 
 		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, Type: %q,\n",
-			item.node.Name, item.node.Module, item.oid, item.node.NodeType)
+			e.node.Name, e.node.Module, e.oid, e.node.NodeType)
 		fmt.Fprintf(w, "\t\tObjects: []string{%s}, Status: %q,\n",
-			strings.Join(objParts, ", "), item.node.Status)
-		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", varbindsString(item.node.Varbinds))
+			strings.Join(objParts, ", "), e.node.Status)
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", varbindsString(e.node.Varbinds))
 	}
 	fmt.Fprintln(w, "}")
 
@@ -603,21 +469,7 @@ func generateTCTests(w io.Writer, nodes map[string]*NormalizedNode, modules []st
 		varName = "tcTests"
 	}
 
-	type tcInfo struct {
-		oid  string
-		node *NormalizedNode
-	}
-
-	var items []tcInfo
-	for oid, node := range nodes {
-		if node.TCName != "" {
-			items = append(items, tcInfo{oid, node})
-		}
-	}
-
-	slices.SortFunc(items, func(a, b tcInfo) int {
-		return cmp.Compare(a.oid, b.oid)
-	})
+	entries := collectAndSort(nodes, func(n *NormalizedNode) bool { return n.TCName != "" })
 
 	fmt.Fprintf(w, "// TCTestCase defines a test case for textual convention names.\n")
 	fmt.Fprintf(w, "type TCTestCase struct {\n")
@@ -629,10 +481,10 @@ func generateTCTests(w io.Writer, nodes map[string]*NormalizedNode, modules []st
 	fmt.Fprintf(w, "}\n\n")
 
 	fmt.Fprintf(w, "var %s = []TCTestCase{\n", varName)
-	for _, item := range items {
+	for _, e := range entries {
 		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q, TCName: %q,\n",
-			item.node.Name, item.node.Module, item.oid, item.node.TCName)
-		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", item.node.TCName)
+			e.node.Name, e.node.Module, e.oid, e.node.TCName)
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", e.node.TCName)
 	}
 	fmt.Fprintln(w, "}")
 

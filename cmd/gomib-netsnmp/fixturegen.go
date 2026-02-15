@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 )
 
 func cmdFixturegen(args []string) int {
@@ -56,25 +55,7 @@ Options:
 			continue
 		}
 
-		// Sort OIDs for deterministic output
-		type oidNode struct {
-			oid  string
-			node *NormalizedNode
-		}
-		var sorted []oidNode
-		for oid, node := range filtered {
-			sorted = append(sorted, oidNode{oid, node})
-		}
-		slices.SortFunc(sorted, func(a, b oidNode) int {
-			return compareOIDStrings(a.oid, b.oid)
-		})
-
-		ordered := make(map[string]*NormalizedNode, len(sorted))
-		for _, s := range sorted {
-			ordered[s.oid] = s.node
-		}
-
-		data, err := json.MarshalIndent(ordered, "", "  ")
+		data, err := json.MarshalIndent(filtered, "", "  ")
 		if err != nil {
 			printError("json marshal failed for %s: %v", mod, err)
 			return 1
@@ -97,41 +78,4 @@ Options:
 	}
 
 	return 0
-}
-
-// compareOIDStrings compares two dotted OID strings numerically.
-func compareOIDStrings(a, b string) int {
-	aArcs := parseOIDArcs(a)
-	bArcs := parseOIDArcs(b)
-	for i := 0; i < len(aArcs) && i < len(bArcs); i++ {
-		if aArcs[i] < bArcs[i] {
-			return -1
-		}
-		if aArcs[i] > bArcs[i] {
-			return 1
-		}
-	}
-	return len(aArcs) - len(bArcs)
-}
-
-func parseOIDArcs(s string) []int {
-	var arcs []int
-	n := 0
-	hasDigit := false
-	for _, c := range s {
-		if c == '.' {
-			if hasDigit {
-				arcs = append(arcs, n)
-				n = 0
-				hasDigit = false
-			}
-		} else if c >= '0' && c <= '9' {
-			n = n*10 + int(c-'0')
-			hasDigit = true
-		}
-	}
-	if hasDigit {
-		arcs = append(arcs, n)
-	}
-	return arcs
 }

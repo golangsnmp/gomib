@@ -86,17 +86,17 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 					if logEnabled(logger, slog.LevelDebug) {
 						logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
 							slog.String("module", sm.name),
-							slog.String("error", err.Error()))
+							slog.Any("error", err))
 					}
 				} else if logEnabled(logger, slog.LevelWarn) {
 					logger.LogAttrs(ctx, slog.LevelWarn, "module read error",
 						slog.String("module", sm.name),
-						slog.String("error", err.Error()))
+						slog.Any("error", err))
 				}
 				return
 			}
 
-			mod := decodeModule(result.Content, sm.name, logger, cfg)
+			mod := decodeModule(ctx, result.Content, sm.name, logger, cfg)
 			if mod != nil {
 				results <- parseResult{mod: mod}
 			}
@@ -173,7 +173,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			return nil // skip missing modules
 		}
 
-		mod := decodeModule(content, name, logger, cfg)
+		mod := decodeModule(ctx, content, name, logger, cfg)
 		if mod == nil {
 			return nil
 		}
@@ -218,9 +218,6 @@ func findModuleContent(sources []Source, name string) ([]byte, error) {
 	return nil, fs.ErrNotExist
 }
 
-// decodeModule runs the heuristic/parse/lower pipeline on raw MIB content.
-// Returns nil if any stage fails (not a MIB, parse error, lowering error).
-
 // collectModules adds missing base modules to the map, deduplicates,
 // and returns the modules sorted by name.
 func collectModules(modules map[string]*module.Module) []*module.Module {
@@ -245,10 +242,12 @@ func collectModules(modules map[string]*module.Module) []*module.Module {
 	return mods
 }
 
-func decodeModule(content []byte, name string, logger *slog.Logger, cfg loadConfig) *module.Module {
+// decodeModule runs the heuristic/parse/lower pipeline on raw MIB content.
+// Returns nil if the content doesn't look like a MIB.
+func decodeModule(ctx context.Context, content []byte, name string, logger *slog.Logger, cfg loadConfig) *module.Module {
 	if !looksLikeMIBContent(content) {
 		if logEnabled(logger, slog.LevelDebug) {
-			logger.LogAttrs(context.Background(), slog.LevelDebug, "content rejected by heuristic",
+			logger.LogAttrs(ctx, slog.LevelDebug, "content rejected by heuristic",
 				slog.String("module", name))
 		}
 		return nil
@@ -256,22 +255,8 @@ func decodeModule(content []byte, name string, logger *slog.Logger, cfg loadConf
 
 	p := parser.New(content, componentLogger(logger, "parser"), cfg.diagConfig)
 	ast := p.ParseModule()
-	if ast == nil {
-		if logEnabled(logger, slog.LevelDebug) {
-			logger.LogAttrs(context.Background(), slog.LevelDebug, "parse failed",
-				slog.String("module", name))
-		}
-		return nil
-	}
 
-	mod := module.Lower(ast, content, componentLogger(logger, "module"), cfg.diagConfig)
-	if mod == nil {
-		if logEnabled(logger, slog.LevelDebug) {
-			logger.LogAttrs(context.Background(), slog.LevelDebug, "lowering failed",
-				slog.String("module", name))
-		}
-	}
-	return mod
+	return module.Lower(ast, content, componentLogger(logger, "module"), cfg.diagConfig)
 }
 
 var (
