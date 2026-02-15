@@ -39,17 +39,16 @@ func main() {
 
 	// The embedded EXAMPLE-MIB is available alongside standard modules
 	fmt.Println()
-	obj := m.Object("exampleName")
-	if obj != nil {
+	for _, name := range []string{"exampleName", "exampleCount"} {
+		obj := m.Object(name)
+		if obj == nil {
+			continue
+		}
 		fmt.Printf("%s  %s\n", obj.Name(), obj.OID())
-		fmt.Printf("  type:   %s (base: %s)\n", obj.Type().Name(), obj.Type().EffectiveBase())
+		if t := obj.Type(); t != nil {
+			fmt.Printf("  type:   %s (base: %s)\n", t.Name(), t.EffectiveBase())
+		}
 		fmt.Printf("  access: %s\n", obj.Access())
-	}
-
-	obj = m.Object("exampleCount")
-	if obj != nil {
-		fmt.Printf("\n%s  %s\n", obj.Name(), obj.OID())
-		fmt.Printf("  type:   %s (base: %s)\n", obj.Type().Name(), obj.Type().EffectiveBase())
-		fmt.Printf("  access: %s\n", obj.Access())
+		fmt.Println()
 	}
 }

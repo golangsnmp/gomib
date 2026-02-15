@@ -59,13 +59,10 @@ func main() {
 		fmt.Printf("  %-28s %-20s %-16s %s\n", "COLUMN", "TYPE", "BASE", "ACCESS")
 		fmt.Printf("  %-28s %-20s %-16s %s\n", "------", "----", "----", "------")
 		for _, col := range row.Columns() {
-			base := ""
-			if col.Type() != nil {
-				base = col.Type().EffectiveBase().String()
-			}
-			typeName := ""
-			if col.Type() != nil {
-				typeName = col.Type().Name()
+			typeName, base := "", ""
+			if t := col.Type(); t != nil {
+				typeName = t.Name()
+				base = t.EffectiveBase().String()
 			}
 			fmt.Printf("  %-28s %-20s %-16s %s\n",
 				col.Name(), typeName, base, col.Access())

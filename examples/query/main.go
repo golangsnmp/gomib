@@ -43,9 +43,12 @@ func main() {
 
 	// Qualified lookup via Module().Object()
 	fmt.Println("\n=== Module-scoped object ===")
-	obj = m.Module("IF-MIB").Object("ifDescr")
-	if obj != nil {
-		fmt.Printf("%-20s %s\n", obj.Name(), obj.OID())
+	mod := m.Module("IF-MIB")
+	if mod != nil {
+		obj = mod.Object("ifDescr")
+		if obj != nil {
+			fmt.Printf("%-20s %s\n", obj.Name(), obj.OID())
+		}
 	}
 
 	// OID-based lookup via NodeByOID().Object()
@@ -75,10 +78,11 @@ func main() {
 
 	// Module-scoped type lookup
 	fmt.Println("\n=== Module-scoped type ===")
-	mod := m.Module("IF-MIB")
-	typ := mod.Type("InterfaceIndex")
-	if typ != nil {
-		fmt.Printf("type %-16s base=%s  tc=%v\n", typ.Name(), typ.Base(), typ.IsTextualConvention())
+	if mod != nil {
+		typ := mod.Type("InterfaceIndex")
+		if typ != nil {
+			fmt.Printf("type %-16s base=%s  tc=%v\n", typ.Name(), typ.Base(), typ.IsTextualConvention())
+		}
 	}
 
 	// Find different definition kinds
@@ -90,5 +94,14 @@ func main() {
 	grp := m.Group("ifGeneralInformationGroup")
 	if grp != nil {
 		fmt.Printf("group        %-16s %s  members=%d\n", grp.Name(), grp.OID(), len(grp.Members()))
+	}
+
+	// OID tree iteration (Go range-over-func)
+	fmt.Println("\n=== Subtree iteration ===")
+	entry := m.Node("ifEntry")
+	if entry != nil {
+		for nd := range entry.Subtree() {
+			fmt.Printf("  %-24s %s  %s\n", nd.Name(), nd.OID(), nd.Kind())
+		}
 	}
 }

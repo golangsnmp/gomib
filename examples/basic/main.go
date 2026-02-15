@@ -48,7 +48,11 @@ func main() {
 		if !obj.IsScalar() && !obj.IsColumn() {
 			continue
 		}
+		typeName := ""
+		if t := obj.Type(); t != nil {
+			typeName = t.Name()
+		}
 		fmt.Printf("%-24s %-30s %-16s %s\n",
-			obj.Name(), obj.OID(), obj.Type().Name(), obj.Access())
+			obj.Name(), obj.OID(), typeName, obj.Access())
 	}
 }

@@ -60,7 +60,7 @@ func main() {
 	// Enumeration type (ifType -> IANAifType)
 	fmt.Println("\n=== Enum type: ifType ===")
 	obj := m.Object("ifType")
-	if obj != nil {
+	if obj != nil && obj.Type() != nil {
 		fmt.Printf("  object type: %s\n", obj.Type().Name())
 		fmt.Printf("  is enum:     %v\n", obj.Type().IsEnumeration())
 		enums := obj.EffectiveEnums()
