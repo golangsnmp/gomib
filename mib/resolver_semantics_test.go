@@ -1,10 +1,10 @@
-package resolver
+package mib
 
 import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
-	"github.com/golangsnmp/gomib/mib"
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func TestIsBareTypeIndex(t *testing.T) {
@@ -218,10 +218,10 @@ func TestConvertDefValInteger(t *testing.T) {
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindInt {
+	if dv.Kind() != DefValKindInt {
 		t.Errorf("kind = %v, want DefValKindInt", dv.Kind())
 	}
-	if v, ok := mib.DefValAs[int64](*dv); !ok || v != 42 {
+	if v, ok := DefValAs[int64](*dv); !ok || v != 42 {
 		t.Errorf("value = %v (ok=%v), want 42", v, ok)
 	}
 	if dv.Raw() != "42" {
@@ -238,10 +238,10 @@ func TestConvertDefValNegativeInteger(t *testing.T) {
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindInt {
+	if dv.Kind() != DefValKindInt {
 		t.Errorf("kind = %v, want DefValKindInt", dv.Kind())
 	}
-	if v, ok := mib.DefValAs[int64](*dv); !ok || v != -1 {
+	if v, ok := DefValAs[int64](*dv); !ok || v != -1 {
 		t.Errorf("value = %v (ok=%v), want -1", v, ok)
 	}
 	if dv.Raw() != "-1" {
@@ -258,10 +258,10 @@ func TestConvertDefValUnsigned(t *testing.T) {
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindUint {
+	if dv.Kind() != DefValKindUint {
 		t.Errorf("kind = %v, want DefValKindUint", dv.Kind())
 	}
-	if v, ok := mib.DefValAs[uint64](*dv); !ok || v != 12345 {
+	if v, ok := DefValAs[uint64](*dv); !ok || v != 12345 {
 		t.Errorf("value = %v (ok=%v), want 12345", v, ok)
 	}
 	if dv.Raw() != "12345" {
@@ -278,10 +278,10 @@ func TestConvertDefValString(t *testing.T) {
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindString {
+	if dv.Kind() != DefValKindString {
 		t.Errorf("kind = %v, want DefValKindString", dv.Kind())
 	}
-	if v, ok := mib.DefValAs[string](*dv); !ok || v != "public" {
+	if v, ok := DefValAs[string](*dv); !ok || v != "public" {
 		t.Errorf("value = %v (ok=%v), want %q", v, ok, "public")
 	}
 	if dv.Raw() != `"public"` {
@@ -298,10 +298,10 @@ func TestConvertDefValHexString(t *testing.T) {
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindBytes {
+	if dv.Kind() != DefValKindBytes {
 		t.Errorf("kind = %v, want DefValKindBytes", dv.Kind())
 	}
-	bytes, ok := mib.DefValAs[[]byte](*dv)
+	bytes, ok := DefValAs[[]byte](*dv)
 	if !ok {
 		t.Fatal("value is not []byte")
 	}
@@ -328,10 +328,10 @@ func TestConvertDefValBinaryString(t *testing.T) {
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindBytes {
+	if dv.Kind() != DefValKindBytes {
 		t.Errorf("kind = %v, want DefValKindBytes", dv.Kind())
 	}
-	bytes, ok := mib.DefValAs[[]byte](*dv)
+	bytes, ok := DefValAs[[]byte](*dv)
 	if !ok {
 		t.Fatal("value is not []byte")
 	}
@@ -357,10 +357,10 @@ func TestConvertDefValEnum(t *testing.T) {
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindEnum {
+	if dv.Kind() != DefValKindEnum {
 		t.Errorf("kind = %v, want DefValKindEnum", dv.Kind())
 	}
-	if v, ok := mib.DefValAs[string](*dv); !ok || v != "enabled" {
+	if v, ok := DefValAs[string](*dv); !ok || v != "enabled" {
 		t.Errorf("value = %v (ok=%v), want %q", v, ok, "enabled")
 	}
 	if dv.Raw() != "enabled" {
@@ -376,22 +376,22 @@ func TestConvertDefValEnumOnOIDType(t *testing.T) {
 
 	// Set up a node so the OID lookup succeeds
 	root := ctx.Mib.Root()
-	child := root.GetOrCreateChild(1)
-	grandchild := child.GetOrCreateChild(3)
-	grandchild.SetName("myTarget")
-	ctx.RegisterModuleNodeSymbol(mod, "myTarget", grandchild)
+	child := root.getOrCreateChild(1)
+	grandchild := child.getOrCreateChild(3)
+	grandchild.setName("myTarget")
+	ctx.registerModuleNodeSymbol(mod, "myTarget", grandchild)
 
 	syntax := &module.TypeSyntaxObjectIdentifier{}
 	dv := convertDefVal(ctx, &module.DefValEnum{Name: "myTarget"}, mod, syntax)
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindOID {
+	if dv.Kind() != DefValKindOID {
 		t.Errorf("kind = %v, want DefValKindOID", dv.Kind())
 	}
-	oid, ok := mib.DefValAs[mib.OID](*dv)
+	oid, ok := DefValAs[OID](*dv)
 	if !ok {
-		t.Fatal("value is not mib.OID")
+		t.Fatal("value is not OID")
 	}
 	if len(oid) != 2 || oid[0] != 1 || oid[1] != 3 {
 		t.Errorf("oid = %v, want [1 3]", oid)
@@ -408,7 +408,7 @@ func TestConvertDefValEnumOnOIDTypeFallback(t *testing.T) {
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindEnum {
+	if dv.Kind() != DefValKindEnum {
 		t.Errorf("kind = %v, want DefValKindEnum (fallback)", dv.Kind())
 	}
 }
@@ -422,10 +422,10 @@ func TestConvertDefValBits(t *testing.T) {
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindBits {
+	if dv.Kind() != DefValKindBits {
 		t.Errorf("kind = %v, want DefValKindBits", dv.Kind())
 	}
-	labels, ok := mib.DefValAs[[]string](*dv)
+	labels, ok := DefValAs[[]string](*dv)
 	if !ok {
 		t.Fatal("value is not []string")
 	}
@@ -456,15 +456,15 @@ func TestConvertDefValOidRef(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 
 	root := ctx.Mib.Root()
-	child := root.GetOrCreateChild(1)
-	child.SetName("sysName")
-	ctx.RegisterModuleNodeSymbol(mod, "sysName", child)
+	child := root.getOrCreateChild(1)
+	child.setName("sysName")
+	ctx.registerModuleNodeSymbol(mod, "sysName", child)
 
 	dv := convertDefVal(ctx, &module.DefValOidRef{Name: "sysName"}, mod, nil)
 	if dv == nil {
 		t.Fatal("convertDefVal returned nil")
 	}
-	if dv.Kind() != mib.DefValKindOID {
+	if dv.Kind() != DefValKindOID {
 		t.Errorf("kind = %v, want DefValKindOID", dv.Kind())
 	}
 }
@@ -494,9 +494,9 @@ func TestResolveTypeSyntax(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	ctx.Modules = append(ctx.Modules, mod)
 
-	intType := mib.NewType("Integer32")
-	intType.SetBase(mib.BaseInteger32)
-	ctx.RegisterModuleTypeSymbol(mod, "Integer32", intType)
+	intType := newType("Integer32")
+	intType.setBase(BaseInteger32)
+	ctx.registerModuleTypeSymbol(mod, "Integer32", intType)
 
 	t.Run("TypeRef found", func(t *testing.T) {
 		syntax := &module.TypeSyntaxTypeRef{Name: "Integer32"}
@@ -577,24 +577,24 @@ func TestResolveTypeSyntaxBaseTypes(t *testing.T) {
 	// global type lookup. Set up a context with an SNMPv2-SMI module
 	// that has the needed base types registered.
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	ctx := newResolverContext([]*module.Module{smiMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{smiMod}, nil, DefaultConfig())
 	ctx.Snmpv2SMIModule = smiMod
 
-	integerType := mib.NewType("INTEGER")
-	integerType.SetBase(mib.BaseInteger32)
-	ctx.RegisterModuleTypeSymbol(smiMod, "INTEGER", integerType)
+	integerType := newType("INTEGER")
+	integerType.setBase(BaseInteger32)
+	ctx.registerModuleTypeSymbol(smiMod, "INTEGER", integerType)
 
-	bitsType := mib.NewType("BITS")
-	bitsType.SetBase(mib.BaseBits)
-	ctx.RegisterModuleTypeSymbol(smiMod, "BITS", bitsType)
+	bitsType := newType("BITS")
+	bitsType.setBase(BaseBits)
+	ctx.registerModuleTypeSymbol(smiMod, "BITS", bitsType)
 
-	octetType := mib.NewType("OCTET STRING")
-	octetType.SetBase(mib.BaseOctetString)
-	ctx.RegisterModuleTypeSymbol(smiMod, "OCTET STRING", octetType)
+	octetType := newType("OCTET STRING")
+	octetType.setBase(BaseOctetString)
+	ctx.registerModuleTypeSymbol(smiMod, "OCTET STRING", octetType)
 
-	oidType := mib.NewType("OBJECT IDENTIFIER")
-	oidType.SetBase(mib.BaseObjectIdentifier)
-	ctx.RegisterModuleTypeSymbol(smiMod, "OBJECT IDENTIFIER", oidType)
+	oidType := newType("OBJECT IDENTIFIER")
+	oidType.setBase(BaseObjectIdentifier)
+	ctx.registerModuleTypeSymbol(smiMod, "OBJECT IDENTIFIER", oidType)
 
 	mod := &module.Module{Name: "TEST-MIB"}
 
@@ -647,17 +647,17 @@ func TestResolveTypeSyntaxBaseTypes(t *testing.T) {
 
 func TestComputeEffectiveValues(t *testing.T) {
 	t.Run("nil type is a no-op", func(t *testing.T) {
-		obj := mib.NewObject("testObj")
+		obj := newObject("testObj")
 		// No type set, should not panic
 		computeEffectiveValues(obj)
 	})
 
 	t.Run("inherits display hint from type", func(t *testing.T) {
-		typ := mib.NewType("DisplayString")
-		typ.SetDisplayHint("255a")
+		typ := newType("DisplayString")
+		typ.setDisplayHint("255a")
 
-		obj := mib.NewObject("testObj")
-		obj.SetType(typ)
+		obj := newObject("testObj")
+		obj.setType(typ)
 		computeEffectiveValues(obj)
 
 		if obj.EffectiveDisplayHint() != "255a" {
@@ -666,12 +666,12 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("object hint takes precedence over type hint", func(t *testing.T) {
-		typ := mib.NewType("DisplayString")
-		typ.SetDisplayHint("255a")
+		typ := newType("DisplayString")
+		typ.setDisplayHint("255a")
 
-		obj := mib.NewObject("testObj")
-		obj.SetType(typ)
-		obj.SetEffectiveHint("1d")
+		obj := newObject("testObj")
+		obj.setType(typ)
+		obj.setEffectiveHint("1d")
 		computeEffectiveValues(obj)
 
 		if obj.EffectiveDisplayHint() != "1d" {
@@ -680,14 +680,14 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("inherits sizes from type chain", func(t *testing.T) {
-		parentType := mib.NewType("OCTET STRING")
-		parentType.SetSizes([]mib.Range{{Min: 0, Max: 255}})
+		parentType := newType("OCTET STRING")
+		parentType.setSizes([]Range{{Min: 0, Max: 255}})
 
-		childType := mib.NewType("DisplayString")
-		childType.SetParent(parentType)
+		childType := newType("DisplayString")
+		childType.setParent(parentType)
 
-		obj := mib.NewObject("testObj")
-		obj.SetType(childType)
+		obj := newObject("testObj")
+		obj.setType(childType)
 		computeEffectiveValues(obj)
 
 		sizes := obj.EffectiveSizes()
@@ -697,12 +697,12 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("object sizes take precedence", func(t *testing.T) {
-		typ := mib.NewType("DisplayString")
-		typ.SetSizes([]mib.Range{{Min: 0, Max: 255}})
+		typ := newType("DisplayString")
+		typ.setSizes([]Range{{Min: 0, Max: 255}})
 
-		obj := mib.NewObject("testObj")
-		obj.SetType(typ)
-		obj.SetEffectiveSizes([]mib.Range{{Min: 1, Max: 32}})
+		obj := newObject("testObj")
+		obj.setType(typ)
+		obj.setEffectiveSizes([]Range{{Min: 1, Max: 32}})
 		computeEffectiveValues(obj)
 
 		sizes := obj.EffectiveSizes()
@@ -712,17 +712,17 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("inherits ranges from ancestor", func(t *testing.T) {
-		grandparent := mib.NewType("INTEGER")
-		grandparent.SetRanges([]mib.Range{{Min: -128, Max: 127}})
+		grandparent := newType("INTEGER")
+		grandparent.setRanges([]Range{{Min: -128, Max: 127}})
 
-		parent := mib.NewType("Integer32")
-		parent.SetParent(grandparent)
+		parent := newType("Integer32")
+		parent.setParent(grandparent)
 
-		child := mib.NewType("MyInt")
-		child.SetParent(parent)
+		child := newType("MyInt")
+		child.setParent(parent)
 
-		obj := mib.NewObject("testObj")
-		obj.SetType(child)
+		obj := newObject("testObj")
+		obj.setType(child)
 		computeEffectiveValues(obj)
 
 		ranges := obj.EffectiveRanges()
@@ -732,14 +732,14 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("inherits enums from type", func(t *testing.T) {
-		typ := mib.NewType("StatusType")
-		typ.SetEnums([]mib.NamedValue{
+		typ := newType("StatusType")
+		typ.setEnums([]NamedValue{
 			{Label: "up", Value: 1},
 			{Label: "down", Value: 2},
 		})
 
-		obj := mib.NewObject("testObj")
-		obj.SetType(typ)
+		obj := newObject("testObj")
+		obj.setType(typ)
 		computeEffectiveValues(obj)
 
 		enums := obj.EffectiveEnums()
@@ -749,15 +749,15 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("object enums take precedence over type enums", func(t *testing.T) {
-		typ := mib.NewType("StatusType")
-		typ.SetEnums([]mib.NamedValue{
+		typ := newType("StatusType")
+		typ.setEnums([]NamedValue{
 			{Label: "up", Value: 1},
 			{Label: "down", Value: 2},
 		})
 
-		obj := mib.NewObject("testObj")
-		obj.SetType(typ)
-		obj.SetEffectiveEnums([]mib.NamedValue{
+		obj := newObject("testObj")
+		obj.setType(typ)
+		obj.setEffectiveEnums([]NamedValue{
 			{Label: "active", Value: 1},
 		})
 		computeEffectiveValues(obj)
@@ -769,14 +769,14 @@ func TestComputeEffectiveValues(t *testing.T) {
 	})
 
 	t.Run("inherits bits from type", func(t *testing.T) {
-		typ := mib.NewType("Capabilities")
-		typ.SetBits([]mib.NamedValue{
+		typ := newType("Capabilities")
+		typ.setBits([]NamedValue{
 			{Label: "feature1", Value: 0},
 			{Label: "feature2", Value: 1},
 		})
 
-		obj := mib.NewObject("testObj")
-		obj.SetType(typ)
+		obj := newObject("testObj")
+		obj.setType(typ)
 		computeEffectiveValues(obj)
 
 		bits := obj.EffectiveBits()
@@ -835,7 +835,7 @@ func TestConvertComplianceModules(t *testing.T) {
 	})
 
 	t.Run("module with objects and min-access", func(t *testing.T) {
-		readOnly := module.AccessReadOnly
+		readOnly := types.AccessReadOnly
 		input := []module.ComplianceModule{
 			{
 				ModuleName: "IF-MIB",
@@ -853,7 +853,7 @@ func TestConvertComplianceModules(t *testing.T) {
 		if obj0.Object != "ifAdminStatus" {
 			t.Errorf("object = %q", obj0.Object)
 		}
-		if obj0.MinAccess == nil || *obj0.MinAccess != mib.AccessReadOnly {
+		if obj0.MinAccess == nil || *obj0.MinAccess != AccessReadOnly {
 			t.Errorf("min-access = %v, want read-only", obj0.MinAccess)
 		}
 		if obj0.Description != "obj desc" {
@@ -908,7 +908,7 @@ func TestConvertSupportsModules(t *testing.T) {
 	})
 
 	t.Run("object variations with access", func(t *testing.T) {
-		readOnly := module.AccessReadOnly
+		readOnly := types.AccessReadOnly
 		input := []module.SupportsModule{
 			{
 				ModuleName: "IF-MIB",
@@ -926,7 +926,7 @@ func TestConvertSupportsModules(t *testing.T) {
 		if vars[0].Object != "ifAdminStatus" {
 			t.Errorf("object = %q", vars[0].Object)
 		}
-		if vars[0].Access == nil || *vars[0].Access != mib.AccessReadOnly {
+		if vars[0].Access == nil || *vars[0].Access != AccessReadOnly {
 			t.Errorf("access = %v, want read-only", vars[0].Access)
 		}
 		if vars[0].Description != "read only" {
@@ -938,7 +938,7 @@ func TestConvertSupportsModules(t *testing.T) {
 	})
 
 	t.Run("notification variations with access", func(t *testing.T) {
-		readOnly := module.AccessReadOnly
+		readOnly := types.AccessReadOnly
 		input := []module.SupportsModule{
 			{
 				ModuleName: "IF-MIB",
@@ -956,7 +956,7 @@ func TestConvertSupportsModules(t *testing.T) {
 		if vars[0].Notification != "linkDown" {
 			t.Errorf("notification = %q", vars[0].Notification)
 		}
-		if vars[0].Access == nil || *vars[0].Access != mib.AccessReadOnly {
+		if vars[0].Access == nil || *vars[0].Access != AccessReadOnly {
 			t.Errorf("access = %v, want read-only", vars[0].Access)
 		}
 		if vars[0].Description != "not supported" {
@@ -968,7 +968,7 @@ func TestConvertSupportsModules(t *testing.T) {
 	})
 
 	t.Run("SPPI access values preserved in variations", func(t *testing.T) {
-		notImpl := module.AccessNotImplemented
+		notImpl := types.AccessNotImplemented
 		input := []module.SupportsModule{
 			{
 				ModuleName: "TEST-MIB",
@@ -985,14 +985,14 @@ func TestConvertSupportsModules(t *testing.T) {
 		if vars[0].Access == nil {
 			t.Fatal("access is nil, want not-implemented")
 		}
-		if *vars[0].Access != mib.AccessNotImplemented {
-			t.Errorf("access = %v, want not-implemented (%v)", *vars[0].Access, mib.AccessNotImplemented)
+		if *vars[0].Access != AccessNotImplemented {
+			t.Errorf("access = %v, want not-implemented (%v)", *vars[0].Access, AccessNotImplemented)
 		}
 	})
 
 	t.Run("mixed object and notification variations", func(t *testing.T) {
-		readOnly := module.AccessReadOnly
-		readWrite := module.AccessReadWrite
+		readOnly := types.AccessReadOnly
+		readWrite := types.AccessReadWrite
 		input := []module.SupportsModule{
 			{
 				ModuleName: "IF-MIB",
@@ -1020,10 +1020,10 @@ func TestConvertDefValOidValue(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 
 	root := ctx.Mib.Root()
-	child := root.GetOrCreateChild(1)
-	child2 := child.GetOrCreateChild(3)
-	child2.SetName("enterprises")
-	ctx.RegisterModuleNodeSymbol(mod, "enterprises", child2)
+	child := root.getOrCreateChild(1)
+	child2 := child.getOrCreateChild(3)
+	child2.setName("enterprises")
+	ctx.registerModuleNodeSymbol(mod, "enterprises", child2)
 
 	t.Run("resolves name with trailing numeric arcs", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
@@ -1036,14 +1036,14 @@ func TestConvertDefValOidValue(t *testing.T) {
 		if dv == nil {
 			t.Fatal("expected non-nil")
 		}
-		if dv.Kind() != mib.DefValKindOID {
+		if dv.Kind() != DefValKindOID {
 			t.Errorf("kind = %v, want DefValKindOID", dv.Kind())
 		}
-		oid, ok := mib.DefValAs[mib.OID](*dv)
+		oid, ok := DefValAs[OID](*dv)
 		if !ok {
 			t.Fatal("expected OID value")
 		}
-		want := mib.OID{1, 3, 42, 1}
+		want := OID{1, 3, 42, 1}
 		if oid.String() != want.String() {
 			t.Errorf("oid = %v, want %v", oid, want)
 		}
@@ -1058,11 +1058,11 @@ func TestConvertDefValOidValue(t *testing.T) {
 		if dv == nil {
 			t.Fatal("expected non-nil")
 		}
-		oid, ok := mib.DefValAs[mib.OID](*dv)
+		oid, ok := DefValAs[OID](*dv)
 		if !ok {
 			t.Fatal("expected OID value")
 		}
-		want := mib.OID{1, 3}
+		want := OID{1, 3}
 		if oid.String() != want.String() {
 			t.Errorf("oid = %v, want %v", oid, want)
 		}
@@ -1078,11 +1078,11 @@ func TestConvertDefValOidValue(t *testing.T) {
 		if dv == nil {
 			t.Fatal("expected non-nil")
 		}
-		oid, ok := mib.DefValAs[mib.OID](*dv)
+		oid, ok := DefValAs[OID](*dv)
 		if !ok {
 			t.Fatal("expected OID value")
 		}
-		want := mib.OID{1, 3, 5}
+		want := OID{1, 3, 5}
 		if oid.String() != want.String() {
 			t.Errorf("oid = %v, want %v", oid, want)
 		}
@@ -1160,23 +1160,23 @@ func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 		},
 	}
 
-	ctx := newResolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
 	ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
-	resolvedMod := mib.NewModule(mod.Name)
+	resolvedMod := newModule(mod.Name)
 	ctx.ModuleToResolved[mod] = resolvedMod
 	ctx.ResolvedToModule[resolvedMod] = mod
 
 	// Create a node for the notification itself
 	root := ctx.Mib.Root()
-	notifNode := root.GetOrCreateChild(1)
-	notifNode.SetName("testNotif")
-	ctx.RegisterModuleNodeSymbol(mod, "testNotif", notifNode)
+	notifNode := root.getOrCreateChild(1)
+	notifNode.setName("testNotif")
+	ctx.registerModuleNodeSymbol(mod, "testNotif", notifNode)
 
 	// Create a node for the referenced object, but do NOT set an Object on it.
 	// This simulates an intermediate node or non-object definition.
-	objNode := root.GetOrCreateChild(2)
-	objNode.SetName("intermediateNode")
-	ctx.RegisterModuleNodeSymbol(mod, "intermediateNode", objNode)
+	objNode := root.getOrCreateChild(2)
+	objNode.setName("intermediateNode")
+	ctx.registerModuleNodeSymbol(mod, "intermediateNode", objNode)
 
 	createResolvedNotifications(ctx)
 

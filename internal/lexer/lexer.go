@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 type lexerState int
@@ -24,7 +23,7 @@ type Lexer struct {
 	source      []byte
 	pos         int
 	state       lexerState
-	diagnostics []types.Diagnostic
+	diagnostics []types.SpanDiagnostic
 	types.Logger
 }
 
@@ -41,7 +40,7 @@ func New(source []byte, logger *slog.Logger) *Lexer {
 }
 
 // Diagnostics returns a copy of all collected diagnostics.
-func (l *Lexer) Diagnostics() []types.Diagnostic {
+func (l *Lexer) Diagnostics() []types.SpanDiagnostic {
 	return slices.Clone(l.diagnostics)
 }
 
@@ -56,7 +55,7 @@ func (l *Lexer) traceToken(tok Token) {
 
 // Tokenize consumes all source text and returns the token stream
 // along with any diagnostics generated during lexing.
-func (l *Lexer) Tokenize() ([]Token, []types.Diagnostic) {
+func (l *Lexer) Tokenize() ([]Token, []types.SpanDiagnostic) {
 	estimatedTokens := max(len(l.source)/6, 64)
 	tokens := make([]Token, 0, estimatedTokens)
 	for {
@@ -163,8 +162,8 @@ func (l *Lexer) skipToEOL() {
 }
 
 func (l *Lexer) error(span types.Span, message string) {
-	l.diagnostics = append(l.diagnostics, types.Diagnostic{
-		Severity: mib.SeverityError,
+	l.diagnostics = append(l.diagnostics, types.SpanDiagnostic{
+		Severity: types.SeverityError,
 		Span:     span,
 		Message:  message,
 	})

@@ -14,8 +14,8 @@ type Group struct {
 	isNotificationGroup bool
 }
 
-// NewGroup returns a Group initialized with the given name.
-func NewGroup(name string) *Group {
+// newGroup returns a Group initialized with the given name.
+func newGroup(name string) *Group {
 	return &Group{name: name}
 }
 
@@ -44,12 +44,10 @@ func (g *Group) String() string {
 	return g.name + " (" + g.OID().String() + ")"
 }
 
-func (g *Group) SetName(name string)           { g.name = name }
-func (g *Group) SetNode(nd *Node)              { g.node = nd }
-func (g *Group) SetModule(m *Module)           { g.module = m }
-func (g *Group) SetMembers(members []*Node)    { g.members = members }
-func (g *Group) AddMember(nd *Node)            { g.members = append(g.members, nd) }
-func (g *Group) SetStatus(s Status)            { g.status = s }
-func (g *Group) SetDescription(d string)       { g.desc = d }
-func (g *Group) SetReference(r string)         { g.ref = r }
-func (g *Group) SetIsNotificationGroup(v bool) { g.isNotificationGroup = v }
+func (g *Group) setNode(nd *Node)              { g.node = nd }
+func (g *Group) setModule(m *Module)           { g.module = m }
+func (g *Group) addMember(nd *Node)            { g.members = append(g.members, nd) }
+func (g *Group) setStatus(s Status)            { g.status = s }
+func (g *Group) setDescription(d string)       { g.desc = d }
+func (g *Group) setReference(r string)         { g.ref = r }
+func (g *Group) setIsNotificationGroup(v bool) { g.isNotificationGroup = v }

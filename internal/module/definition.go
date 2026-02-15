@@ -4,6 +4,16 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
+// AccessKeyword records which keyword was used (ACCESS, MAX-ACCESS, etc.).
+type AccessKeyword int
+
+const (
+	AccessKeywordAccess    AccessKeyword = iota // SMIv1: ACCESS
+	AccessKeywordMaxAccess                      // SMIv2: MAX-ACCESS
+	AccessKeywordMinAccess                      // SMIv2: MIN-ACCESS (compliance)
+	AccessKeywordPibAccess                      // SPPI: PIB-ACCESS
+)
+
 // Definition is a normalized MIB definition. SMIv1 and SMIv2 forms are
 // unified where appropriate. Use type switches to dispatch on concrete types.
 type Definition interface {
@@ -18,9 +28,9 @@ type ObjectType struct {
 	Name          string
 	Syntax        TypeSyntax
 	Units         string
-	Access        Access
+	Access        types.Access
 	AccessKeyword AccessKeyword
-	Status        Status
+	Status        types.Status
 	Description   string
 	Reference     string
 	Index         []IndexItem
@@ -65,7 +75,7 @@ type Revision struct {
 // ObjectIdentity is an OBJECT-IDENTITY definition.
 type ObjectIdentity struct {
 	Name        string
-	Status      Status
+	Status      types.Status
 	Description string
 	Reference   string
 	Oid         OidAssignment
@@ -80,7 +90,7 @@ func (d *ObjectIdentity) DefinitionOid() *OidAssignment { return &d.Oid }
 type Notification struct {
 	Name        string
 	Objects     []string
-	Status      Status
+	Status      types.Status
 	Description string
 	Reference   string
 	// TrapInfo holds SMIv1 TRAP-TYPE fields. Nil for NOTIFICATION-TYPE.
@@ -111,9 +121,9 @@ type TypeDef struct {
 	// types like IpAddress are syntactically OCTET STRING (SIZE 4) but have
 	// distinct semantic base types (for index encoding, etc.). This field
 	// allows synthetic base modules to specify the correct base type.
-	BaseType            *BaseType
+	BaseType            *types.BaseType
 	DisplayHint         string
-	Status              Status
+	Status              types.Status
 	Description         string
 	Reference           string
 	IsTextualConvention bool
@@ -139,7 +149,7 @@ func (d *ValueAssignment) DefinitionOid() *OidAssignment { return &d.Oid }
 type ObjectGroup struct {
 	Name        string
 	Objects     []string
-	Status      Status
+	Status      types.Status
 	Description string
 	Reference   string
 	Oid         OidAssignment
@@ -154,7 +164,7 @@ func (d *ObjectGroup) DefinitionOid() *OidAssignment { return &d.Oid }
 type NotificationGroup struct {
 	Name          string
 	Notifications []string
-	Status        Status
+	Status        types.Status
 	Description   string
 	Reference     string
 	Oid           OidAssignment
@@ -168,7 +178,7 @@ func (d *NotificationGroup) DefinitionOid() *OidAssignment { return &d.Oid }
 // ModuleCompliance is a MODULE-COMPLIANCE definition.
 type ModuleCompliance struct {
 	Name        string
-	Status      Status
+	Status      types.Status
 	Description string
 	Reference   string
 	Modules     []ComplianceModule
@@ -200,7 +210,7 @@ type ComplianceObject struct {
 	Object      string
 	Syntax      TypeSyntax
 	WriteSyntax TypeSyntax
-	MinAccess   *Access
+	MinAccess   *types.Access
 	Description string
 }
 
@@ -208,7 +218,7 @@ type ComplianceObject struct {
 type AgentCapabilities struct {
 	Name           string
 	ProductRelease string
-	Status         Status
+	Status         types.Status
 	Description    string
 	Reference      string
 	Supports       []SupportsModule
@@ -233,7 +243,7 @@ type ObjectVariation struct {
 	Object           string
 	Syntax           TypeSyntax
 	WriteSyntax      TypeSyntax
-	Access           *Access
+	Access           *types.Access
 	CreationRequires []string
 	DefVal           DefVal
 	Description      string
@@ -243,6 +253,6 @@ type ObjectVariation struct {
 type NotificationVariation struct {
 	Notification string
 	// Access is only "not-implemented" per RFC 2580.
-	Access      *Access
+	Access      *types.Access
 	Description string
 }

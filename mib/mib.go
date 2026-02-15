@@ -25,8 +25,8 @@ type Mib struct {
 	unresolved  []UnresolvedRef
 }
 
-// NewMib returns an empty, initialized Mib.
-func NewMib() *Mib {
+// newMib returns an empty, initialized Mib.
+func newMib() *Mib {
 	return &Mib{
 		root:         &Node{kind: KindInternal},
 		moduleByName: make(map[string]*Module),
@@ -171,54 +171,53 @@ func (m *Mib) HasErrors() bool {
 
 // Construction methods used by the builder/resolver.
 
-func (m *Mib) SetRoot(r *Node)    { m.root = r }
-func (m *Mib) SetNodeCount(n int) { m.nodeCount = n }
+func (m *Mib) setNodeCount(n int) { m.nodeCount = n }
 
-func (m *Mib) AddModule(mod *Module) {
+func (m *Mib) addModule(mod *Module) {
 	m.modules = append(m.modules, mod)
 	if mod.name != "" {
 		m.moduleByName[mod.name] = mod
 	}
 }
 
-func (m *Mib) AddObject(obj *Object) {
+func (m *Mib) addObject(obj *Object) {
 	m.objects = append(m.objects, obj)
 }
 
-func (m *Mib) AddType(t *Type) {
+func (m *Mib) addType(t *Type) {
 	m.types = append(m.types, t)
 	if t.name != "" && m.typeByName[t.name] == nil {
 		m.typeByName[t.name] = t
 	}
 }
 
-func (m *Mib) AddNotification(n *Notification) {
+func (m *Mib) addNotification(n *Notification) {
 	m.notifications = append(m.notifications, n)
 }
 
-func (m *Mib) AddGroup(g *Group) {
+func (m *Mib) addGroup(g *Group) {
 	m.groups = append(m.groups, g)
 }
 
-func (m *Mib) AddCompliance(c *Compliance) {
+func (m *Mib) addCompliance(c *Compliance) {
 	m.compliances = append(m.compliances, c)
 }
 
-func (m *Mib) AddCapability(c *Capability) {
+func (m *Mib) addCapability(c *Capability) {
 	m.capabilities = append(m.capabilities, c)
 }
 
-func (m *Mib) RegisterNode(name string, n *Node) {
+func (m *Mib) registerNode(name string, n *Node) {
 	if name != "" {
 		m.nameToNodes[name] = append(m.nameToNodes[name], n)
 	}
 }
 
-func (m *Mib) AddDiagnostic(d Diagnostic) {
+func (m *Mib) addDiagnostic(d Diagnostic) {
 	m.diagnostics = append(m.diagnostics, d)
 }
 
-func (m *Mib) AddUnresolved(ref UnresolvedRef) {
+func (m *Mib) addUnresolved(ref UnresolvedRef) {
 	m.unresolved = append(m.unresolved, ref)
 }
 

@@ -1,6 +1,6 @@
 -- Module alias import edge cases
 -- Replicates: RADLAN-MIB importing from SNMPv2-SMI-v1 / SNMPv2-TC-v1
--- Tests gomib alias table: internal/resolver/imports.go:298-310
+-- Tests gomib alias table: mib/resolver_imports.go
 -- smilint: "failed to locate module `SNMPv2-SMI-v1'"
 
 PROBLEM-IMPORTS-ALIAS-MIB DEFINITIONS ::= BEGIN

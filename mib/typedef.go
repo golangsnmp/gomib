@@ -19,8 +19,8 @@ type Type struct {
 	isTC   bool
 }
 
-// NewType returns a Type initialized with the given name.
-func NewType(name string) *Type {
+// newType returns a Type initialized with the given name.
+func newType(name string) *Type {
 	return &Type{name: name}
 }
 
@@ -130,16 +130,14 @@ func (t *Type) String() string {
 	return t.name + " (" + t.base.String() + ")"
 }
 
-func (t *Type) SetName(name string)     { t.name = name }
-func (t *Type) SetModule(m *Module)     { t.module = m }
-func (t *Type) SetBase(b BaseType)      { t.base = b }
-func (t *Type) SetParent(p *Type)       { t.parent = p }
-func (t *Type) SetStatus(s Status)      { t.status = s }
-func (t *Type) SetDisplayHint(h string) { t.hint = h }
-func (t *Type) SetDescription(d string) { t.desc = d }
-func (t *Type) SetReference(r string)   { t.ref = r }
-func (t *Type) SetSizes(s []Range)      { t.sizes = s }
-func (t *Type) SetRanges(r []Range)     { t.ranges = r }
-func (t *Type) SetEnums(e []NamedValue) { t.enums = e }
-func (t *Type) SetBits(b []NamedValue)  { t.bits = b }
-func (t *Type) SetIsTC(isTC bool)       { t.isTC = isTC }
+func (t *Type) setModule(m *Module)     { t.module = m }
+func (t *Type) setBase(b BaseType)      { t.base = b }
+func (t *Type) setParent(p *Type)       { t.parent = p }
+func (t *Type) setStatus(s Status)      { t.status = s }
+func (t *Type) setDisplayHint(h string) { t.hint = h }
+func (t *Type) setDescription(d string) { t.desc = d }
+func (t *Type) setSizes(s []Range)      { t.sizes = s }
+func (t *Type) setRanges(r []Range)     { t.ranges = r }
+func (t *Type) setEnums(e []NamedValue) { t.enums = e }
+func (t *Type) setBits(b []NamedValue)  { t.bits = b }
+func (t *Type) setIsTC(isTC bool)       { t.isTC = isTC }

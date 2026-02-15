@@ -184,7 +184,7 @@ func TestTCFallbackStrictness(t *testing.T) {
 				if obj.Type() == nil {
 					return
 				}
-				gotType := testutil.NormalizeType(obj.Type())
+				gotType := normalizeType(obj.Type())
 				testutil.Equal(t, tc.wantType, gotType,
 					"TC base type (matches net-snmp)")
 			})

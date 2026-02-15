@@ -14,8 +14,8 @@ type Capability struct {
 	supports       []CapabilitiesModule
 }
 
-// NewCapability returns a Capability initialized with the given name.
-func NewCapability(name string) *Capability {
+// newCapability returns a Capability initialized with the given name.
+func newCapability(name string) *Capability {
 	return &Capability{name: name}
 }
 
@@ -43,10 +43,10 @@ func (c *Capability) String() string {
 	return c.name + " (" + c.OID().String() + ")"
 }
 
-func (c *Capability) SetNode(nd *Node)                          { c.node = nd }
-func (c *Capability) SetModule(m *Module)                       { c.module = m }
-func (c *Capability) SetStatus(s Status)                        { c.status = s }
-func (c *Capability) SetDescription(d string)                   { c.desc = d }
-func (c *Capability) SetReference(r string)                     { c.ref = r }
-func (c *Capability) SetProductRelease(r string)                { c.productRelease = r }
-func (c *Capability) SetSupports(supports []CapabilitiesModule) { c.supports = supports }
+func (c *Capability) setNode(nd *Node)                          { c.node = nd }
+func (c *Capability) setModule(m *Module)                       { c.module = m }
+func (c *Capability) setStatus(s Status)                        { c.status = s }
+func (c *Capability) setDescription(d string)                   { c.desc = d }
+func (c *Capability) setReference(r string)                     { c.ref = r }
+func (c *Capability) setProductRelease(r string)                { c.productRelease = r }
+func (c *Capability) setSupports(supports []CapabilitiesModule) { c.supports = supports }

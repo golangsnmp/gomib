@@ -1,4 +1,4 @@
-package resolver
+package mib
 
 import (
 	"encoding/hex"
@@ -9,7 +9,6 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 // analyzeSemantics is the semantic analysis phase entry point.
@@ -26,7 +25,7 @@ func analyzeSemantics(ctx *resolverContext) {
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 	tables, rows, scalars := 0, 0, 0
-	var rowNodes []*mib.Node
+	var rowNodes []*Node
 
 	for _, ref := range objRefs {
 		obj := ref.obj
@@ -36,14 +35,14 @@ func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 
 		if _, isSequenceOf := obj.Syntax.(*module.TypeSyntaxSequenceOf); isSequenceOf {
-			node.SetKind(mib.KindTable)
+			node.setKind(KindTable)
 			tables++
 		} else if len(obj.Index) > 0 || obj.Augments != "" {
-			node.SetKind(mib.KindRow)
+			node.setKind(KindRow)
 			rows++
 			rowNodes = append(rowNodes, node)
 		} else {
-			node.SetKind(mib.KindScalar)
+			node.setKind(KindScalar)
 			scalars++
 		}
 	}
@@ -52,8 +51,8 @@ func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 	columns := 0
 	for _, row := range rowNodes {
 		for _, child := range row.Children() {
-			if child.Kind() == mib.KindScalar {
-				child.SetKind(mib.KindColumn)
+			if child.Kind() == KindScalar {
+				child.setKind(KindColumn)
 				columns++
 			}
 		}
@@ -145,51 +144,51 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 			continue
 		}
 
-		resolved := mib.NewObject(obj.Name)
-		resolved.SetNode(node)
-		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetAccess(obj.Access)
-		resolved.SetStatus(obj.Status)
-		resolved.SetDescription(obj.Description)
-		resolved.SetUnits(obj.Units)
-		resolved.SetReference(obj.Reference)
+		resolved := newObject(obj.Name)
+		resolved.setNode(node)
+		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		resolved.setAccess(obj.Access)
+		resolved.setStatus(obj.Status)
+		resolved.setDescription(obj.Description)
+		resolved.setUnits(obj.Units)
+		resolved.setReference(obj.Reference)
 
 		if t, ok := resolveTypeSyntax(ctx, obj.Syntax, ref.mod, obj.Name, obj.Span); ok {
-			resolved.SetType(t)
+			resolved.setType(t)
 		}
 
 		sizes, ranges := extractConstraints(obj.Syntax)
-		resolved.SetEffectiveSizes(sizes)
-		resolved.SetEffectiveRanges(ranges)
+		resolved.setEffectiveSizes(sizes)
+		resolved.setEffectiveRanges(ranges)
 		if _, isBits := obj.Syntax.(*module.TypeSyntaxBits); isBits {
-			resolved.SetEffectiveBits(extractNamedValues(obj.Syntax))
+			resolved.setEffectiveBits(extractNamedValues(obj.Syntax))
 		} else {
-			resolved.SetEffectiveEnums(extractNamedValues(obj.Syntax))
+			resolved.setEffectiveEnums(extractNamedValues(obj.Syntax))
 		}
 
 		if obj.DefVal != nil {
-			resolved.SetDefaultValue(convertDefVal(ctx, obj.DefVal, ref.mod, obj.Syntax))
+			resolved.setDefaultValue(convertDefVal(ctx, obj.DefVal, ref.mod, obj.Syntax))
 		}
 
 		computeEffectiveValues(resolved)
 
-		ctx.Mib.AddObject(resolved)
+		ctx.Mib.addObject(resolved)
 
 		// Prefer SMIv2 modules when multiple modules define the same OID
 		// (e.g., IF-MIB and RFC1213-MIB both define ifEntry).
 		currentObj := node.Object()
-		var currentMod *mib.Module
+		var currentMod *Module
 		if currentObj != nil {
 			currentMod = currentObj.Module()
 		}
 		newMod := ctx.ModuleToResolved[ref.mod]
 		if shouldPreferModule(ctx, newMod, currentMod, ref.mod) {
-			node.SetObject(resolved)
+			node.setObject(resolved)
 		}
 		created++
 
 		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
-			resolvedMod.AddObject(resolved)
+			resolvedMod.addObject(resolved)
 		}
 	}
 
@@ -217,24 +216,24 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 
 		if len(obj.Index) > 0 {
-			var indexEntries []mib.IndexEntry
+			var indexEntries []IndexEntry
 			for _, item := range obj.Index {
 				if indexNode, ok := ctx.LookupNodeForModule(ref.mod, item.Object); ok {
 					if indexNode.Object() != nil {
-						indexEntries = append(indexEntries, mib.IndexEntry{
+						indexEntries = append(indexEntries, IndexEntry{
 							Object:  indexNode.Object(),
 							Implied: item.Implied,
 						})
 					}
 				}
 			}
-			resolvedObj.SetIndex(indexEntries)
+			resolvedObj.setIndex(indexEntries)
 		}
 
 		if obj.Augments != "" {
 			if augNode, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); ok {
 				if augNode.Object() != nil {
-					resolvedObj.SetAugments(augNode.Object())
+					resolvedObj.setAugments(augNode.Object())
 				}
 			}
 		}
@@ -246,7 +245,7 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 // Object-level values (set from the OBJECT-TYPE syntax) take precedence;
 // only missing values are inherited from ancestor types. The first non-empty
 // value found in the chain wins.
-func computeEffectiveValues(obj *mib.Object) {
+func computeEffectiveValues(obj *Object) {
 	t := obj.Type()
 	if t == nil {
 		return
@@ -254,19 +253,19 @@ func computeEffectiveValues(obj *mib.Object) {
 
 	for t != nil {
 		if obj.EffectiveDisplayHint() == "" && t.DisplayHint() != "" {
-			obj.SetEffectiveHint(t.DisplayHint())
+			obj.setEffectiveHint(t.DisplayHint())
 		}
 		if len(obj.EffectiveSizes()) == 0 && len(t.Sizes()) > 0 {
-			obj.SetEffectiveSizes(t.Sizes())
+			obj.setEffectiveSizes(t.Sizes())
 		}
 		if len(obj.EffectiveRanges()) == 0 && len(t.Ranges()) > 0 {
-			obj.SetEffectiveRanges(t.Ranges())
+			obj.setEffectiveRanges(t.Ranges())
 		}
 		if len(obj.EffectiveEnums()) == 0 && len(t.Enums()) > 0 {
-			obj.SetEffectiveEnums(t.Enums())
+			obj.setEffectiveEnums(t.Enums())
 		}
 		if len(obj.EffectiveBits()) == 0 && len(t.Bits()) > 0 {
-			obj.SetEffectiveBits(t.Bits())
+			obj.setEffectiveBits(t.Bits())
 		}
 		t = t.Parent()
 	}
@@ -282,15 +281,15 @@ func createResolvedNotifications(ctx *resolverContext) {
 			continue
 		}
 
-		resolved := mib.NewNotification(notif.Name)
-		resolved.SetNode(node)
-		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetStatus(notif.Status)
-		resolved.SetDescription(notif.Description)
-		resolved.SetReference(notif.Reference)
+		resolved := newNotification(notif.Name)
+		resolved.setNode(node)
+		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		resolved.setStatus(notif.Status)
+		resolved.setDescription(notif.Description)
+		resolved.setReference(notif.Reference)
 
 		for _, objName := range notif.Objects {
-			var objNode *mib.Node
+			var objNode *Node
 			var ok bool
 
 			objNode, ok = ctx.LookupNodeForModule(ref.mod, objName)
@@ -301,23 +300,23 @@ func createResolvedNotifications(ctx *resolverContext) {
 			}
 
 			if ok && objNode.Object() != nil {
-				resolved.AddObject(objNode.Object())
+				resolved.addObject(objNode.Object())
 			} else if !ok {
 				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
 			} else if ok {
 				// Node exists but has no object definition (intermediate node
 				// or non-object definition).
-				ctx.emitUnresolvedDiagnostic(ref.mod, "notification-object-not-object", mib.SeverityMinor,
+				ctx.emitUnresolvedDiagnostic(ref.mod, "notification-object-not-object", SeverityMinor,
 					"notification "+notif.Name+" references "+objName+" which is not an object definition")
 			}
 		}
 
-		ctx.Mib.AddNotification(resolved)
-		node.SetNotification(resolved)
+		ctx.Mib.addNotification(resolved)
+		node.setNotification(resolved)
 		created++
 
 		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
-			resolvedMod.AddNotification(resolved)
+			resolvedMod.addNotification(resolved)
 		}
 	}
 
@@ -359,18 +358,18 @@ func createResolvedObjectGroups(ctx *resolverContext) int {
 			continue
 		}
 
-		resolved := mib.NewGroup(grp.Name)
-		resolved.SetNode(node)
-		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetStatus(grp.Status)
-		resolved.SetDescription(grp.Description)
-		resolved.SetReference(grp.Reference)
+		resolved := newGroup(grp.Name)
+		resolved.setNode(node)
+		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		resolved.setStatus(grp.Status)
+		resolved.setDescription(grp.Description)
+		resolved.setReference(grp.Reference)
 
 		for _, memberName := range grp.Objects {
 			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
-				resolved.AddMember(memberNode)
-				if obj := memberNode.Object(); obj != nil && obj.Access() == mib.AccessNotAccessible {
-					ctx.EmitDiagnostic("group-not-accessible", mib.SeverityMinor,
+				resolved.addMember(memberNode)
+				if obj := memberNode.Object(); obj != nil && obj.Access() == AccessNotAccessible {
+					ctx.EmitDiagnostic("group-not-accessible", SeverityMinor,
 						ref.mod.Name, 0, 0,
 						"object "+memberName+" of group "+grp.Name+" must not be not-accessible")
 				}
@@ -397,17 +396,17 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 			continue
 		}
 
-		resolved := mib.NewGroup(grp.Name)
-		resolved.SetNode(node)
-		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetStatus(grp.Status)
-		resolved.SetDescription(grp.Description)
-		resolved.SetReference(grp.Reference)
-		resolved.SetIsNotificationGroup(true)
+		resolved := newGroup(grp.Name)
+		resolved.setNode(node)
+		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		resolved.setStatus(grp.Status)
+		resolved.setDescription(grp.Description)
+		resolved.setReference(grp.Reference)
+		resolved.setIsNotificationGroup(true)
 
 		for _, memberName := range grp.Notifications {
 			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
-				resolved.AddMember(memberNode)
+				resolved.addMember(memberNode)
 			}
 		}
 
@@ -417,11 +416,11 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 	return created
 }
 
-func registerGroup(ctx *resolverContext, mod *module.Module, node *mib.Node, resolved *mib.Group) {
-	ctx.Mib.AddGroup(resolved)
-	node.SetGroup(resolved)
+func registerGroup(ctx *resolverContext, mod *module.Module, node *Node, resolved *Group) {
+	ctx.Mib.addGroup(resolved)
+	node.setGroup(resolved)
 	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
-		resolvedMod.AddGroup(resolved)
+		resolvedMod.addGroup(resolved)
 	}
 }
 
@@ -449,20 +448,20 @@ func createResolvedCompliances(ctx *resolverContext) {
 			continue
 		}
 
-		resolved := mib.NewCompliance(comp.Name)
-		resolved.SetNode(node)
-		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetStatus(comp.Status)
-		resolved.SetDescription(comp.Description)
-		resolved.SetReference(comp.Reference)
-		resolved.SetModules(convertComplianceModules(comp.Modules))
+		resolved := newCompliance(comp.Name)
+		resolved.setNode(node)
+		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		resolved.setStatus(comp.Status)
+		resolved.setDescription(comp.Description)
+		resolved.setReference(comp.Reference)
+		resolved.setModules(convertComplianceModules(comp.Modules))
 
-		ctx.Mib.AddCompliance(resolved)
-		node.SetCompliance(resolved)
+		ctx.Mib.addCompliance(resolved)
+		node.setCompliance(resolved)
 		created++
 
 		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
-			resolvedMod.AddCompliance(resolved)
+			resolvedMod.addCompliance(resolved)
 		}
 	}
 
@@ -471,17 +470,17 @@ func createResolvedCompliances(ctx *resolverContext) {
 	}
 }
 
-func convertComplianceModules(modules []module.ComplianceModule) []mib.ComplianceModule {
-	result := make([]mib.ComplianceModule, len(modules))
+func convertComplianceModules(modules []module.ComplianceModule) []ComplianceModule {
+	result := make([]ComplianceModule, len(modules))
 	for i, m := range modules {
-		result[i] = mib.ComplianceModule{
+		result[i] = ComplianceModule{
 			ModuleName:      m.ModuleName,
 			MandatoryGroups: m.MandatoryGroups,
 		}
 		if len(m.Groups) > 0 {
-			groups := make([]mib.ComplianceGroup, len(m.Groups))
+			groups := make([]ComplianceGroup, len(m.Groups))
 			for j, g := range m.Groups {
-				groups[j] = mib.ComplianceGroup{
+				groups[j] = ComplianceGroup{
 					Group:       g.Group,
 					Description: g.Description,
 				}
@@ -489,9 +488,9 @@ func convertComplianceModules(modules []module.ComplianceModule) []mib.Complianc
 			result[i].Groups = groups
 		}
 		if len(m.Objects) > 0 {
-			objects := make([]mib.ComplianceObject, len(m.Objects))
+			objects := make([]ComplianceObject, len(m.Objects))
 			for j, o := range m.Objects {
-				objects[j] = mib.ComplianceObject{
+				objects[j] = ComplianceObject{
 					Object:      o.Object,
 					Description: o.Description,
 				}
@@ -519,21 +518,21 @@ func createResolvedCapabilities(ctx *resolverContext) {
 			continue
 		}
 
-		resolved := mib.NewCapability(cap.Name)
-		resolved.SetNode(node)
-		resolved.SetModule(ctx.ModuleToResolved[ref.mod])
-		resolved.SetStatus(cap.Status)
-		resolved.SetDescription(cap.Description)
-		resolved.SetReference(cap.Reference)
-		resolved.SetProductRelease(cap.ProductRelease)
-		resolved.SetSupports(convertSupportsModules(cap.Supports))
+		resolved := newCapability(cap.Name)
+		resolved.setNode(node)
+		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		resolved.setStatus(cap.Status)
+		resolved.setDescription(cap.Description)
+		resolved.setReference(cap.Reference)
+		resolved.setProductRelease(cap.ProductRelease)
+		resolved.setSupports(convertSupportsModules(cap.Supports))
 
-		ctx.Mib.AddCapability(resolved)
-		node.SetCapability(resolved)
+		ctx.Mib.addCapability(resolved)
+		node.setCapability(resolved)
 		created++
 
 		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
-			resolvedMod.AddCapability(resolved)
+			resolvedMod.addCapability(resolved)
 		}
 	}
 
@@ -542,17 +541,17 @@ func createResolvedCapabilities(ctx *resolverContext) {
 	}
 }
 
-func convertSupportsModules(modules []module.SupportsModule) []mib.CapabilitiesModule {
-	result := make([]mib.CapabilitiesModule, len(modules))
+func convertSupportsModules(modules []module.SupportsModule) []CapabilitiesModule {
+	result := make([]CapabilitiesModule, len(modules))
 	for i, m := range modules {
-		result[i] = mib.CapabilitiesModule{
+		result[i] = CapabilitiesModule{
 			ModuleName: m.ModuleName,
 			Includes:   m.Includes,
 		}
 		if len(m.ObjectVariations) > 0 {
-			vars := make([]mib.ObjectVariation, len(m.ObjectVariations))
+			vars := make([]ObjectVariation, len(m.ObjectVariations))
 			for j, v := range m.ObjectVariations {
-				vars[j] = mib.ObjectVariation{
+				vars[j] = ObjectVariation{
 					Object:      v.Object,
 					Description: v.Description,
 				}
@@ -563,9 +562,9 @@ func convertSupportsModules(modules []module.SupportsModule) []mib.CapabilitiesM
 			result[i].ObjectVariations = vars
 		}
 		if len(m.NotificationVariations) > 0 {
-			vars := make([]mib.NotificationVariation, len(m.NotificationVariations))
+			vars := make([]NotificationVariation, len(m.NotificationVariations))
 			for j, v := range m.NotificationVariations {
-				vars[j] = mib.NotificationVariation{
+				vars[j] = NotificationVariation{
 					Notification: v.Notification,
 					Description:  v.Description,
 				}
@@ -579,7 +578,7 @@ func convertSupportsModules(modules []module.SupportsModule) []mib.CapabilitiesM
 	return result
 }
 
-func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*mib.Node, bool) {
+func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*Node, bool) {
 	node, ok := ctx.LookupNodeForModule(mod, name)
 	if ok {
 		return node, true
@@ -590,7 +589,7 @@ func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*m
 	return nil, false
 }
 
-func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, objectName string, span types.Span) (*mib.Type, bool) {
+func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, objectName string, span types.Span) (*Type, bool) {
 	switch s := syntax.(type) {
 	case *module.TypeSyntaxTypeRef:
 		if t, ok := ctx.LookupTypeForModule(mod, s.Name); ok {
@@ -636,53 +635,53 @@ func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *modu
 	}
 }
 
-func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Module, syntax module.TypeSyntax) *mib.DefVal {
+func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Module, syntax module.TypeSyntax) *DefVal {
 	switch v := defval.(type) {
 	case *module.DefValInteger:
 		raw := strconv.FormatInt(v.Value, 10)
-		dv := mib.NewDefValInt(v.Value, raw)
+		dv := newDefValInt(v.Value, raw)
 		return &dv
 	case *module.DefValUnsigned:
 		raw := strconv.FormatUint(v.Value, 10)
-		dv := mib.NewDefValUint(v.Value, raw)
+		dv := newDefValUint(v.Value, raw)
 		return &dv
 	case *module.DefValString:
 		raw := `"` + v.Value + `"`
-		dv := mib.NewDefValString(v.Value, raw)
+		dv := newDefValString(v.Value, raw)
 		return &dv
 	case *module.DefValHexString:
 		raw := "'" + v.Value + "'H"
 		bytes := hexToBytes(v.Value)
-		dv := mib.NewDefValBytes(bytes, raw)
+		dv := newDefValBytes(bytes, raw)
 		return &dv
 	case *module.DefValBinaryString:
 		raw := "'" + v.Value + "'B"
 		bytes := binaryToBytes(v.Value)
-		dv := mib.NewDefValBytes(bytes, raw)
+		dv := newDefValBytes(bytes, raw)
 		return &dv
 	case *module.DefValEnum:
 		// Parser emits bare names as DefValEnum, but for OID-typed objects
 		// the name is actually an OID reference.
 		if isOIDType(syntax) {
 			if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
-				oid := mib.OID(node.OID())
-				dv := mib.NewDefValOID(oid, v.Name)
+				oid := OID(node.OID())
+				dv := newDefValOID(oid, v.Name)
 				return &dv
 			}
 		}
-		dv := mib.NewDefValEnum(v.Name, v.Name)
+		dv := newDefValEnum(v.Name, v.Name)
 		return &dv
 	case *module.DefValBits:
 		raw := "{ " + strings.Join(v.Labels, ", ") + " }"
 		if len(v.Labels) == 0 {
 			raw = "{ }"
 		}
-		dv := mib.NewDefValBits(slices.Clone(v.Labels), raw)
+		dv := newDefValBits(slices.Clone(v.Labels), raw)
 		return &dv
 	case *module.DefValOidRef:
 		if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
-			oid := mib.OID(node.OID())
-			dv := mib.NewDefValOID(oid, v.Name)
+			oid := OID(node.OID())
+			dv := newDefValOID(oid, v.Name)
 			return &dv
 		}
 		return nil
@@ -708,7 +707,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		if !ok {
 			return nil
 		}
-		oid := mib.OID(node.OID())
+		oid := OID(node.OID())
 		for _, comp := range v.Components[1:] {
 			switch c := comp.(type) {
 			case *module.OidComponentNumber:
@@ -719,7 +718,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 				oid = append(oid, c.NumberValue)
 			}
 		}
-		dv := mib.NewDefValOID(oid, name)
+		dv := newDefValOID(oid, name)
 		return &dv
 	default:
 		return nil

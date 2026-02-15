@@ -152,8 +152,8 @@ func (n *Node) String() string {
 	return n.name + " (" + n.OID().String() + ")"
 }
 
-// GetOrCreateChild returns the child at arc, creating it if absent.
-func (n *Node) GetOrCreateChild(arc uint32) *Node {
+// getOrCreateChild returns the child at arc, creating it if absent.
+func (n *Node) getOrCreateChild(arc uint32) *Node {
 	if n.children == nil {
 		n.children = make(map[uint32]*Node)
 	}
@@ -170,11 +170,11 @@ func (n *Node) GetOrCreateChild(arc uint32) *Node {
 	return child
 }
 
-func (n *Node) SetName(name string)                 { n.name = name }
-func (n *Node) SetKind(k Kind)                      { n.kind = k }
-func (n *Node) SetModule(m *Module)                 { n.module = m }
-func (n *Node) SetObject(obj *Object)               { n.obj = obj }
-func (n *Node) SetNotification(notif *Notification) { n.notif = notif }
-func (n *Node) SetGroup(g *Group)                   { n.group = g }
-func (n *Node) SetCompliance(c *Compliance)         { n.compliance = c }
-func (n *Node) SetCapability(c *Capability)         { n.capability = c }
+func (n *Node) setName(name string)                 { n.name = name }
+func (n *Node) setKind(k Kind)                      { n.kind = k }
+func (n *Node) setModule(m *Module)                 { n.module = m }
+func (n *Node) setObject(obj *Object)               { n.obj = obj }
+func (n *Node) setNotification(notif *Notification) { n.notif = notif }
+func (n *Node) setGroup(g *Group)                   { n.group = g }
+func (n *Node) setCompliance(c *Compliance)         { n.compliance = c }
+func (n *Node) setCapability(c *Capability)         { n.capability = c }

@@ -1,4 +1,4 @@
-package resolver
+package mib
 
 import (
 	"log/slog"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/module"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 // resolveTypes is the type resolution phase entry point.
@@ -24,15 +23,15 @@ func seedPrimitiveTypes(ctx *resolverContext) {
 	resolved := ctx.ModuleToResolved[mod]
 
 	seeded := 0
-	seedType := func(name string, base mib.BaseType) {
-		typ := mib.NewType(name)
-		typ.SetModule(resolved)
-		typ.SetBase(base)
+	seedType := func(name string, base BaseType) {
+		typ := newType(name)
+		typ.setModule(resolved)
+		typ.setBase(base)
 
-		ctx.Mib.AddType(typ)
-		ctx.RegisterModuleTypeSymbol(mod, name, typ)
+		ctx.Mib.addType(typ)
+		ctx.registerModuleTypeSymbol(mod, name, typ)
 		if resolved != nil {
-			resolved.AddType(typ)
+			resolved.addType(typ)
 		}
 		seeded++
 		if ctx.TraceEnabled() {
@@ -40,10 +39,10 @@ func seedPrimitiveTypes(ctx *resolverContext) {
 		}
 	}
 
-	seedType("INTEGER", mib.BaseInteger32)
-	seedType("OCTET STRING", mib.BaseOctetString)
-	seedType("OBJECT IDENTIFIER", mib.BaseObjectIdentifier)
-	seedType("BITS", mib.BaseBits)
+	seedType("INTEGER", BaseInteger32)
+	seedType("OCTET STRING", BaseOctetString)
+	seedType("OBJECT IDENTIFIER", BaseObjectIdentifier)
+	seedType("BITS", BaseBits)
 }
 
 func createUserTypes(ctx *resolverContext) {
@@ -65,7 +64,7 @@ func createUserTypes(ctx *resolverContext) {
 				// Type references (e.g., DisplayString) don't have an intrinsic
 				// base type. Default to Integer32 as a placeholder; the real base
 				// is inherited from the parent during resolveTypeBases.
-				base = mib.BaseInteger32
+				base = BaseInteger32
 				if ctx.TraceEnabled() {
 					ctx.Trace("type has no intrinsic base, defaulting to Integer32",
 						slog.String("type", td.Name),
@@ -73,26 +72,26 @@ func createUserTypes(ctx *resolverContext) {
 				}
 			}
 
-			typ := mib.NewType(td.Name)
-			typ.SetModule(resolved)
-			typ.SetBase(base)
-			typ.SetIsTC(td.IsTextualConvention)
-			typ.SetStatus(td.Status)
-			typ.SetDisplayHint(td.DisplayHint)
-			typ.SetDescription(td.Description)
+			typ := newType(td.Name)
+			typ.setModule(resolved)
+			typ.setBase(base)
+			typ.setIsTC(td.IsTextualConvention)
+			typ.setStatus(td.Status)
+			typ.setDisplayHint(td.DisplayHint)
+			typ.setDescription(td.Description)
 
 			namedValues := extractNamedValues(td.Syntax)
-			if base == mib.BaseBits {
-				typ.SetBits(namedValues)
+			if base == BaseBits {
+				typ.setBits(namedValues)
 			} else {
-				typ.SetEnums(namedValues)
+				typ.setEnums(namedValues)
 			}
 			sizes, ranges := extractConstraints(td.Syntax)
-			typ.SetSizes(sizes)
-			typ.SetRanges(ranges)
+			typ.setSizes(sizes)
+			typ.setRanges(ranges)
 
-			ctx.Mib.AddType(typ)
-			ctx.RegisterModuleTypeSymbol(mod, td.Name, typ)
+			ctx.Mib.addType(typ)
+			ctx.registerModuleTypeSymbol(mod, td.Name, typ)
 
 			if ctx.TraceEnabled() {
 				ctx.Trace("created user type",
@@ -101,7 +100,7 @@ func createUserTypes(ctx *resolverContext) {
 			}
 
 			if resolved != nil {
-				resolved.AddType(typ)
+				resolved.addType(typ)
 			}
 		}
 	}
@@ -111,7 +110,7 @@ func createUserTypes(ctx *resolverContext) {
 type typeResolutionEntry struct {
 	mod *module.Module
 	td  *module.TypeDef
-	typ *mib.Type
+	typ *Type
 }
 
 func resolveTypeBases(ctx *resolverContext) {
@@ -234,7 +233,7 @@ func resolveTypeParent(ctx *resolverContext, entry typeResolutionEntry) bool {
 		return false
 	}
 
-	entry.typ.SetParent(parent)
+	entry.typ.setParent(parent)
 	return true
 }
 
@@ -292,7 +291,7 @@ func linkPrimitiveSyntaxParents(ctx *resolverContext) {
 				continue
 			}
 			if typ.Parent() == nil {
-				typ.SetParent(parent)
+				typ.setParent(parent)
 			}
 		}
 	}
@@ -324,7 +323,7 @@ func linkRFC1213TypesToTCs(ctx *resolverContext) {
 			continue
 		}
 		if sourceType != targetType {
-			sourceType.SetParent(targetType)
+			sourceType.setParent(targetType)
 		}
 	}
 }
@@ -333,7 +332,7 @@ func inheritBaseTypes(ctx *resolverContext) {
 	for _, t := range ctx.Mib.Types() {
 		if t.Parent() != nil && !isApplicationBaseType(t.Base()) {
 			if base, ok := resolveBaseFromChain(t); ok {
-				t.SetBase(base)
+				t.setBase(base)
 			}
 		}
 	}
@@ -342,18 +341,18 @@ func inheritBaseTypes(ctx *resolverContext) {
 // isApplicationBaseType returns true for SMI application types that should not
 // have their base type overwritten by inheritance. These types are defined with
 // explicit base types in SNMPv2-SMI and should be preserved.
-func isApplicationBaseType(b mib.BaseType) bool {
+func isApplicationBaseType(b BaseType) bool {
 	switch b {
-	case mib.BaseCounter32, mib.BaseCounter64, mib.BaseGauge32,
-		mib.BaseUnsigned32, mib.BaseTimeTicks, mib.BaseIpAddress, mib.BaseOpaque:
+	case BaseCounter32, BaseCounter64, BaseGauge32,
+		BaseUnsigned32, BaseTimeTicks, BaseIpAddress, BaseOpaque:
 		return true
 	default:
 		return false
 	}
 }
 
-func resolveBaseFromChain(t *mib.Type) (mib.BaseType, bool) {
-	visited := make(map[*mib.Type]struct{})
+func resolveBaseFromChain(t *Type) (BaseType, bool) {
+	visited := make(map[*Type]struct{})
 	current := t
 	for current != nil {
 		if _, seen := visited[current]; seen {
@@ -373,43 +372,43 @@ func resolveBaseFromChain(t *mib.Type) (mib.BaseType, bool) {
 	return 0, false
 }
 
-func syntaxToBaseType(syntax module.TypeSyntax) (mib.BaseType, bool) {
+func syntaxToBaseType(syntax module.TypeSyntax) (BaseType, bool) {
 	switch s := syntax.(type) {
 	case *module.TypeSyntaxTypeRef:
 		switch s.Name {
 		case "Integer32", "INTEGER":
-			return mib.BaseInteger32, true
+			return BaseInteger32, true
 		case "Counter32":
-			return mib.BaseCounter32, true
+			return BaseCounter32, true
 		case "Counter64":
-			return mib.BaseCounter64, true
+			return BaseCounter64, true
 		case "Gauge32":
-			return mib.BaseGauge32, true
+			return BaseGauge32, true
 		case "Unsigned32":
-			return mib.BaseUnsigned32, true
+			return BaseUnsigned32, true
 		case "TimeTicks":
-			return mib.BaseTimeTicks, true
+			return BaseTimeTicks, true
 		case "IpAddress":
-			return mib.BaseIpAddress, true
+			return BaseIpAddress, true
 		case "Opaque":
-			return mib.BaseOpaque, true
+			return BaseOpaque, true
 		case "OCTET STRING":
-			return mib.BaseOctetString, true
+			return BaseOctetString, true
 		case "OBJECT IDENTIFIER":
-			return mib.BaseObjectIdentifier, true
+			return BaseObjectIdentifier, true
 		case "BITS":
-			return mib.BaseBits, true
+			return BaseBits, true
 		default:
 			return 0, false
 		}
 	case *module.TypeSyntaxIntegerEnum:
-		return mib.BaseInteger32, true
+		return BaseInteger32, true
 	case *module.TypeSyntaxBits:
-		return mib.BaseBits, true
+		return BaseBits, true
 	case *module.TypeSyntaxOctetString:
-		return mib.BaseOctetString, true
+		return BaseOctetString, true
 	case *module.TypeSyntaxObjectIdentifier:
-		return mib.BaseObjectIdentifier, true
+		return BaseObjectIdentifier, true
 	case *module.TypeSyntaxConstrained:
 		return syntaxToBaseType(s.Base)
 	default:
@@ -417,15 +416,15 @@ func syntaxToBaseType(syntax module.TypeSyntax) (mib.BaseType, bool) {
 	}
 }
 
-func rangesToConstraint(ranges []module.Range) []mib.Range {
-	out := make([]mib.Range, 0, len(ranges))
+func rangesToConstraint(ranges []module.Range) []Range {
+	out := make([]Range, 0, len(ranges))
 	for _, r := range ranges {
 		min := rangeValueToI64(r.Min)
 		max := min
 		if r.Max != nil {
 			max = rangeValueToI64(r.Max)
 		}
-		out = append(out, mib.Range{Min: min, Max: max})
+		out = append(out, Range{Min: min, Max: max})
 	}
 	return out
 }
@@ -449,18 +448,18 @@ func rangeValueToI64(value module.RangeValue) int64 {
 }
 
 // extractNamedValues extracts named values from IntegerEnum or Bits syntax.
-func extractNamedValues(syntax module.TypeSyntax) []mib.NamedValue {
+func extractNamedValues(syntax module.TypeSyntax) []NamedValue {
 	switch s := syntax.(type) {
 	case *module.TypeSyntaxIntegerEnum:
-		values := make([]mib.NamedValue, 0, len(s.NamedNumbers))
+		values := make([]NamedValue, 0, len(s.NamedNumbers))
 		for _, nn := range s.NamedNumbers {
-			values = append(values, mib.NamedValue{Label: nn.Name, Value: nn.Value})
+			values = append(values, NamedValue{Label: nn.Name, Value: nn.Value})
 		}
 		return values
 	case *module.TypeSyntaxBits:
-		bits := make([]mib.NamedValue, 0, len(s.NamedBits))
+		bits := make([]NamedValue, 0, len(s.NamedBits))
 		for _, nb := range s.NamedBits {
-			bits = append(bits, mib.NamedValue{Label: nb.Name, Value: int64(nb.Position)})
+			bits = append(bits, NamedValue{Label: nb.Name, Value: int64(nb.Position)})
 		}
 		return bits
 	default:
@@ -469,7 +468,7 @@ func extractNamedValues(syntax module.TypeSyntax) []mib.NamedValue {
 }
 
 // extractConstraints extracts size and value range constraints from syntax.
-func extractConstraints(syntax module.TypeSyntax) (size, valueRange []mib.Range) {
+func extractConstraints(syntax module.TypeSyntax) (size, valueRange []Range) {
 	constrained, ok := syntax.(*module.TypeSyntaxConstrained)
 	if !ok {
 		return nil, nil

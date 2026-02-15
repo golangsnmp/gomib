@@ -1,4 +1,4 @@
-package resolver
+package mib
 
 import (
 	"cmp"
@@ -58,7 +58,7 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 				slog.Int("symbols", len(userSymbols)))
 		}
 		for _, sym := range userSymbols {
-			ctx.RegisterImport(importingModule, sym.name, chosen)
+			ctx.registerImport(importingModule, sym.name, chosen)
 		}
 		return
 	}
@@ -75,7 +75,7 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 						slog.Int("symbols", len(userSymbols)))
 				}
 				for _, sym := range userSymbols {
-					ctx.RegisterImport(importingModule, sym.name, chosen)
+					ctx.registerImport(importingModule, sym.name, chosen)
 				}
 				return
 			}
@@ -91,7 +91,7 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 					slog.Int("forwarded", len(forwarded)))
 			}
 			for _, fwd := range forwarded {
-				ctx.RegisterImport(importingModule, fwd.symbol, fwd.source)
+				ctx.registerImport(importingModule, fwd.symbol, fwd.source)
 			}
 			return
 		}
@@ -102,7 +102,7 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 	if ctx.DiagnosticConfig().AllowSafeFallbacks() && len(candidates) > 0 {
 		resolved, unresolved := tryPartialResolution(ctx, candidates, userSymbols)
 		for _, res := range resolved {
-			ctx.RegisterImport(importingModule, res.symbol, res.source)
+			ctx.registerImport(importingModule, res.symbol, res.source)
 		}
 		if ctx.TraceEnabled() && len(resolved) > 0 {
 			ctx.Trace("imports partially resolved",

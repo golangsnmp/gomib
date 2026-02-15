@@ -1,4 +1,4 @@
-// Package resolver provides multi-phase MIB resolution.
+// Package mib contains the resolver which provides multi-phase MIB resolution.
 //
 // Resolution transforms parsed MIB modules into a fully resolved model where all
 // symbolic references are concrete, OIDs are computed, and types are linked.
@@ -12,31 +12,25 @@
 //  3. Types: Build the type graph and compute base types
 //  4. OIDs: Build the OID trie from symbolic references
 //  5. Semantics: Infer node kinds (table, row, column, scalar) and create objects
-//
-// # Usage
-//
-//	resolver := resolver.New(logger)
-//	mib := resolver.Resolve(modules)
-package resolver
+package mib
 
 import (
 	"log/slog"
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 type resolver struct {
 	types.Logger
-	diagConfig mib.DiagnosticConfig
+	diagConfig DiagnosticConfig
 }
 
 // Resolve transforms parsed modules into a fully resolved Mib.
 // If logger is nil, logging is disabled. If diagConfig is nil,
 // defaults to Normal strictness.
-func Resolve(mods []*module.Module, logger *slog.Logger, diagConfig *mib.DiagnosticConfig) *mib.Mib {
-	cfg := mib.DefaultConfig()
+func Resolve(mods []*module.Module, logger *slog.Logger, diagConfig *DiagnosticConfig) *Mib {
+	cfg := DefaultConfig()
 	if diagConfig != nil {
 		cfg = *diagConfig
 	}
@@ -44,7 +38,7 @@ func Resolve(mods []*module.Module, logger *slog.Logger, diagConfig *mib.Diagnos
 	return r.resolve(mods)
 }
 
-func (r *resolver) resolve(mods []*module.Module) *mib.Mib {
+func (r *resolver) resolve(mods []*module.Module) *Mib {
 	ctx := newResolverContext(mods, r.L, r.diagConfig)
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "register"))
@@ -100,7 +94,7 @@ func (r *resolver) resolve(mods []*module.Module) *mib.Mib {
 	for range ctx.Mib.Nodes() {
 		count++
 	}
-	ctx.Mib.SetNodeCount(count)
+	ctx.Mib.setNodeCount(count)
 	m := ctx.Mib
 
 	r.Log(slog.LevelInfo, "resolution complete",

@@ -30,8 +30,8 @@ type Module struct {
 	nodesByName         map[string]*Node
 }
 
-// NewModule returns a Module initialized with the given name.
-func NewModule(name string) *Module {
+// newModule returns a Module initialized with the given name.
+func newModule(name string) *Module {
 	return &Module{
 		name:                name,
 		objectsByName:       make(map[string]*Object),
@@ -92,44 +92,44 @@ func (m *Module) Capability(name string) *Capability {
 	return m.capabilitiesByName[name]
 }
 
-func (m *Module) SetLanguage(l Language)       { m.language = l }
-func (m *Module) SetOID(oid OID)               { m.oid = oid }
-func (m *Module) SetOrganization(org string)   { m.organization = org }
-func (m *Module) SetContactInfo(info string)   { m.contactInfo = info }
-func (m *Module) SetDescription(desc string)   { m.description = desc }
-func (m *Module) SetRevisions(revs []Revision) { m.revisions = revs }
+func (m *Module) setLanguage(l Language)       { m.language = l }
+func (m *Module) setOID(oid OID)               { m.oid = oid }
+func (m *Module) setOrganization(org string)   { m.organization = org }
+func (m *Module) setContactInfo(info string)   { m.contactInfo = info }
+func (m *Module) setDescription(desc string)   { m.description = desc }
+func (m *Module) setRevisions(revs []Revision) { m.revisions = revs }
 
-func (m *Module) AddObject(obj *Object) {
+func (m *Module) addObject(obj *Object) {
 	m.objects = append(m.objects, obj)
 	m.objectsByName[obj.name] = obj
 }
 
-func (m *Module) AddType(t *Type) {
+func (m *Module) addType(t *Type) {
 	m.types = append(m.types, t)
 	m.typesByName[t.name] = t
 }
 
-func (m *Module) AddNotification(n *Notification) {
+func (m *Module) addNotification(n *Notification) {
 	m.notifications = append(m.notifications, n)
 	m.notificationsByName[n.name] = n
 }
 
-func (m *Module) AddGroup(g *Group) {
+func (m *Module) addGroup(g *Group) {
 	m.groups = append(m.groups, g)
 	m.groupsByName[g.name] = g
 }
 
-func (m *Module) AddCompliance(c *Compliance) {
+func (m *Module) addCompliance(c *Compliance) {
 	m.compliances = append(m.compliances, c)
 	m.compliancesByName[c.name] = c
 }
 
-func (m *Module) AddCapability(c *Capability) {
+func (m *Module) addCapability(c *Capability) {
 	m.capabilities = append(m.capabilities, c)
 	m.capabilitiesByName[c.name] = c
 }
 
-func (m *Module) AddNode(n *Node) {
+func (m *Module) addNode(n *Node) {
 	m.nodes = append(m.nodes, n)
 	m.nodesByName[n.name] = n
 }

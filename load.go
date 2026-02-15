@@ -14,7 +14,6 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/parser"
-	"github.com/golangsnmp/gomib/internal/resolver"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -50,7 +49,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 	}
 
 	if len(allModules) == 0 {
-		return mib.NewMib(), nil
+		return mib.Resolve(nil, nil, nil), nil
 	}
 
 	if logEnabled(logger, slog.LevelInfo) {
@@ -154,7 +153,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 			slog.Int("modules", len(mods)))
 	}
 
-	m := resolver.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig)
+	m := mib.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig)
 	return m, checkLoadResult(m, cfg, nil)
 }
 
@@ -245,7 +244,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 		return cmp.Compare(a.Name, b.Name)
 	})
 
-	m := resolver.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig)
+	m := mib.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig)
 	return m, checkLoadResult(m, cfg, names)
 }
 

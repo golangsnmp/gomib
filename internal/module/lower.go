@@ -6,22 +6,21 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/ast"
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 // LoweringContext tracks state accumulated during the lowering pass.
 type LoweringContext struct {
-	Diagnostics []mib.Diagnostic
-	Language    Language
-	DiagConfig  mib.DiagnosticConfig
+	Diagnostics []types.Diagnostic
+	Language    types.Language
+	DiagConfig  types.DiagnosticConfig
 	source      []byte // source text for span-to-line/column conversion
 	types.Logger
 }
 
 // newLoweringContext returns a LoweringContext. A nil logger disables logging.
-func newLoweringContext(source []byte, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *LoweringContext {
+func newLoweringContext(source []byte, logger *slog.Logger, diagConfig types.DiagnosticConfig) *LoweringContext {
 	return &LoweringContext{
-		Language:   LanguageUnknown,
+		Language:   types.LanguageUnknown,
 		DiagConfig: diagConfig,
 		source:     source,
 		Logger:     types.Logger{L: logger},
@@ -47,11 +46,11 @@ func spanToLineCol(source []byte, offset types.ByteOffset) (line, col int) {
 }
 
 // emitDiagnostic records a diagnostic if the current config allows it.
-func (ctx *LoweringContext) emitDiagnostic(code string, severity mib.Severity, moduleName string, message string) {
+func (ctx *LoweringContext) emitDiagnostic(code string, severity types.Severity, moduleName string, message string) {
 	if !ctx.DiagConfig.ShouldReport(code, severity) {
 		return
 	}
-	ctx.Diagnostics = append(ctx.Diagnostics, mib.Diagnostic{
+	ctx.Diagnostics = append(ctx.Diagnostics, types.Diagnostic{
 		Severity: severity,
 		Code:     code,
 		Message:  message,
@@ -62,7 +61,7 @@ func (ctx *LoweringContext) emitDiagnostic(code string, severity mib.Severity, m
 }
 
 // AddDiagnostic appends a diagnostic to the context.
-func (ctx *LoweringContext) AddDiagnostic(d mib.Diagnostic) {
+func (ctx *LoweringContext) AddDiagnostic(d types.Diagnostic) {
 	ctx.Diagnostics = append(ctx.Diagnostics, d)
 }
 
@@ -75,7 +74,7 @@ func isSMIv2Import(name string) bool {
 // Lower transforms an AST module into a normalized Module. The AST is not
 // needed after lowering. Source is the original source text used to compute
 // diagnostic line/column from byte offset spans. A nil logger disables logging.
-func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig mib.DiagnosticConfig) *Module {
+func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig types.DiagnosticConfig) *Module {
 	ctx := newLoweringContext(source, logger, diagConfig)
 
 	module := NewModule(astModule.Name.Name, astModule.Span)
@@ -99,7 +98,7 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 		slog.String("module", module.Name),
 		slog.Int("definitions", len(module.Definitions)))
 
-	if module.Language == LanguageSMIv2 && !IsBaseModule(module.Name) {
+	if module.Language == types.LanguageSMIv2 && !IsBaseModule(module.Name) {
 		hasModuleIdentity := false
 		for _, def := range module.Definitions {
 			if mi, ok := def.(*ModuleIdentity); ok {
@@ -109,14 +108,14 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 			}
 		}
 		if !hasModuleIdentity {
-			ctx.emitDiagnostic("missing-module-identity", mib.SeverityError, module.Name,
+			ctx.emitDiagnostic("missing-module-identity", types.SeverityError, module.Name,
 				fmt.Sprintf("SMIv2 module %s lacks MODULE-IDENTITY", module.Name))
 		}
 	}
 
 	for _, d := range astModule.Diagnostics {
 		line, col := spanToLineCol(ctx.source, d.Span.Start)
-		module.Diagnostics = append(module.Diagnostics, mib.Diagnostic{
+		module.Diagnostics = append(module.Diagnostics, types.Diagnostic{
 			Severity: d.Severity,
 			Code:     d.Code,
 			Message:  d.Message,
@@ -148,7 +147,7 @@ func lowerImports(importClauses []ast.ImportClause, ctx *LoweringContext) []Impo
 		fromModule := clause.FromModule.Name
 
 		if isSMIv2Import(fromModule) {
-			ctx.Language = LanguageSMIv2
+			ctx.Language = types.LanguageSMIv2
 		}
 
 		for _, symbol := range clause.Symbols {
@@ -156,8 +155,8 @@ func lowerImports(importClauses []ast.ImportClause, ctx *LoweringContext) []Impo
 		}
 	}
 
-	if ctx.Language == LanguageUnknown {
-		ctx.Language = LanguageSMIv1
+	if ctx.Language == types.LanguageUnknown {
+		ctx.Language = types.LanguageSMIv1
 	}
 
 	return imports
@@ -202,11 +201,11 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 }
 
 func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
-	var status Status
+	var status types.Status
 	if def.Status != nil {
 		status = lowerStatus(def.Status.Value)
 	} else {
-		status = StatusCurrent
+		status = types.StatusCurrent
 	}
 
 	var units string
@@ -282,7 +281,7 @@ func checkRevisionLastUpdated(ctx *LoweringContext, moduleName string, mi *Modul
 			return
 		}
 	}
-	ctx.emitDiagnostic("revision-last-updated", mib.SeverityMinor, moduleName,
+	ctx.emitDiagnostic("revision-last-updated", types.SeverityMinor, moduleName,
 		fmt.Sprintf("revision for LAST-UPDATED %s is missing", mi.LastUpdated))
 }
 
@@ -336,7 +335,7 @@ func lowerTrapType(def *ast.TrapTypeDef) *Notification {
 	return &Notification{
 		Name:        def.Name.Name,
 		Objects:     identNames(def.Variables),
-		Status:      StatusCurrent, // TRAP-TYPE has no STATUS clause
+		Status:      types.StatusCurrent, // TRAP-TYPE has no STATUS clause
 		Description: description,
 		Reference:   reference,
 		TrapInfo: &TrapInfo{
@@ -378,7 +377,7 @@ func lowerTypeAssignment(def *ast.TypeAssignmentDef, ctx *LoweringContext) *Type
 		Syntax:              lowerTypeSyntax(def.Syntax, ctx),
 		BaseType:            nil,
 		DisplayHint:         "",
-		Status:              StatusCurrent,
+		Status:              types.StatusCurrent,
 		Description:         "",
 		Reference:           "",
 		IsTextualConvention: false,
@@ -490,7 +489,7 @@ func lowerComplianceObject(o *ast.ComplianceObject, ctx *LoweringContext) Compli
 		writeSyntax = lowerTypeSyntax(o.WriteSyntax.Syntax, ctx)
 	}
 
-	var minAccess *Access
+	var minAccess *types.Access
 	if o.MinAccess != nil {
 		a := lowerAccess(o.MinAccess.Value)
 		minAccess = &a
@@ -560,7 +559,7 @@ func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVa
 		writeSyntax = lowerTypeSyntax(v.WriteSyntax.Syntax, ctx)
 	}
 
-	var access *Access
+	var access *types.Access
 	if v.Access != nil {
 		a := lowerAccess(v.Access.Value)
 		access = &a
@@ -588,7 +587,7 @@ func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVa
 }
 
 func lowerNotificationVariation(v *ast.NotificationVariation) NotificationVariation {
-	var access *Access
+	var access *types.Access
 	if v.Access != nil {
 		a := lowerAccess(v.Access.Value)
 		access = &a
@@ -766,30 +765,30 @@ func lowerOidComponent(comp ast.OidComponent, ctx *LoweringContext) OidComponent
 }
 
 // lowerAccess converts AST access values without normalization.
-func lowerAccess(access ast.AccessValue) Access {
+func lowerAccess(access ast.AccessValue) types.Access {
 	switch access {
 	case ast.AccessValueReadOnly:
-		return AccessReadOnly
+		return types.AccessReadOnly
 	case ast.AccessValueReadWrite:
-		return AccessReadWrite
+		return types.AccessReadWrite
 	case ast.AccessValueReadCreate:
-		return AccessReadCreate
+		return types.AccessReadCreate
 	case ast.AccessValueNotAccessible:
-		return AccessNotAccessible
+		return types.AccessNotAccessible
 	case ast.AccessValueAccessibleForNotify:
-		return AccessAccessibleForNotify
+		return types.AccessAccessibleForNotify
 	case ast.AccessValueWriteOnly:
-		return AccessWriteOnly
+		return types.AccessWriteOnly
 	case ast.AccessValueInstall:
-		return AccessInstall
+		return types.AccessInstall
 	case ast.AccessValueInstallNotify:
-		return AccessInstallNotify
+		return types.AccessInstallNotify
 	case ast.AccessValueReportOnly:
-		return AccessReportOnly
+		return types.AccessReportOnly
 	case ast.AccessValueNotImplemented:
-		return AccessNotImplemented
+		return types.AccessNotImplemented
 	default:
-		return AccessNotAccessible
+		return types.AccessNotAccessible
 	}
 }
 
@@ -810,20 +809,20 @@ func lowerAccessKeyword(keyword ast.AccessKeyword) AccessKeyword {
 
 // lowerStatus converts AST status values without normalization. SMIv1
 // mandatory/optional are kept distinct from SMIv2 current/deprecated.
-func lowerStatus(status ast.StatusValue) Status {
+func lowerStatus(status ast.StatusValue) types.Status {
 	switch status {
 	case ast.StatusValueCurrent:
-		return StatusCurrent
+		return types.StatusCurrent
 	case ast.StatusValueDeprecated:
-		return StatusDeprecated
+		return types.StatusDeprecated
 	case ast.StatusValueObsolete:
-		return StatusObsolete
+		return types.StatusObsolete
 	case ast.StatusValueMandatory:
-		return StatusMandatory
+		return types.StatusMandatory
 	case ast.StatusValueOptional:
-		return StatusOptional
+		return types.StatusOptional
 	default:
-		return StatusCurrent
+		return types.StatusCurrent
 	}
 }
 

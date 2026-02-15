@@ -1,11 +1,10 @@
-package resolver
+package mib
 
 import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 func TestResolveNilModulesNilLoggerNilConfig(t *testing.T) {
@@ -31,7 +30,7 @@ func TestResolveEmptyModulesNilLoggerNilConfig(t *testing.T) {
 }
 
 func TestResolveNilModulesWithCustomConfig(t *testing.T) {
-	cfg := mib.StrictConfig()
+	cfg := StrictConfig()
 	m := Resolve(nil, nil, &cfg)
 	if m == nil {
 		t.Fatal("Resolve returned nil Mib")
@@ -67,12 +66,12 @@ func TestResolveBaseModulePrimitiveTypes(t *testing.T) {
 	// The 4 ASN.1 primitives should be seeded in SNMPv2-SMI.
 	primitives := []struct {
 		name string
-		base mib.BaseType
+		base BaseType
 	}{
-		{"INTEGER", mib.BaseInteger32},
-		{"OCTET STRING", mib.BaseOctetString},
-		{"OBJECT IDENTIFIER", mib.BaseObjectIdentifier},
-		{"BITS", mib.BaseBits},
+		{"INTEGER", BaseInteger32},
+		{"OCTET STRING", BaseOctetString},
+		{"OBJECT IDENTIFIER", BaseObjectIdentifier},
+		{"BITS", BaseBits},
 	}
 
 	smiMod := m.Module("SNMPv2-SMI")
@@ -124,15 +123,15 @@ func TestResolveBaseModuleNodeOIDValues(t *testing.T) {
 
 	tests := []struct {
 		name string
-		oid  mib.OID
+		oid  OID
 	}{
-		{"iso", mib.OID{1}},
-		{"org", mib.OID{1, 3}},
-		{"dod", mib.OID{1, 3, 6}},
-		{"internet", mib.OID{1, 3, 6, 1}},
-		{"mgmt", mib.OID{1, 3, 6, 1, 2}},
-		{"mib-2", mib.OID{1, 3, 6, 1, 2, 1}},
-		{"enterprises", mib.OID{1, 3, 6, 1, 4, 1}},
+		{"iso", OID{1}},
+		{"org", OID{1, 3}},
+		{"dod", OID{1, 3, 6}},
+		{"internet", OID{1, 3, 6, 1}},
+		{"mgmt", OID{1, 3, 6, 1, 2}},
+		{"mib-2", OID{1, 3, 6, 1, 2, 1}},
+		{"enterprises", OID{1, 3, 6, 1, 4, 1}},
 	}
 
 	for _, tt := range tests {
@@ -160,16 +159,16 @@ func TestResolveBaseModuleSMITypes(t *testing.T) {
 	// SMI types defined as TypeDefs in SNMPv2-SMI should be resolved.
 	smiTypes := []struct {
 		name string
-		base mib.BaseType
+		base BaseType
 	}{
-		{"Integer32", mib.BaseInteger32},
-		{"Counter32", mib.BaseCounter32},
-		{"Counter64", mib.BaseCounter64},
-		{"Gauge32", mib.BaseGauge32},
-		{"Unsigned32", mib.BaseUnsigned32},
-		{"TimeTicks", mib.BaseTimeTicks},
-		{"IpAddress", mib.BaseIpAddress},
-		{"Opaque", mib.BaseOpaque},
+		{"Integer32", BaseInteger32},
+		{"Counter32", BaseCounter32},
+		{"Counter64", BaseCounter64},
+		{"Gauge32", BaseGauge32},
+		{"Unsigned32", BaseUnsigned32},
+		{"TimeTicks", BaseTimeTicks},
+		{"IpAddress", BaseIpAddress},
+		{"Opaque", BaseOpaque},
 	}
 
 	for _, tt := range smiTypes {
@@ -187,7 +186,7 @@ func TestResolveBaseModuleSMITypes(t *testing.T) {
 func TestResolveUnresolvedImportProducesDiagnostic(t *testing.T) {
 	// Create a module that imports a symbol from a non-existent module.
 	mod := module.NewModule("BAD-IMPORT-MIB", types.Span{})
-	mod.Language = module.LanguageSMIv2
+	mod.Language = types.LanguageSMIv2
 	mod.Imports = []module.Import{
 		module.NewImport("NONEXISTENT-MIB", "fakeObject", types.Span{}),
 	}
@@ -210,7 +209,7 @@ func TestResolveUnresolvedImportProducesDiagnostic(t *testing.T) {
 
 	found := false
 	for _, u := range unresolved {
-		if u.Kind == mib.UnresolvedImport && u.Symbol == "fakeObject" {
+		if u.Kind == UnresolvedImport && u.Symbol == "fakeObject" {
 			found = true
 			break
 		}
@@ -234,7 +233,7 @@ func TestResolveUnresolvedImportProducesDiagnostic(t *testing.T) {
 }
 
 func TestResolvePermissiveConfig(t *testing.T) {
-	cfg := mib.PermissiveConfig()
+	cfg := PermissiveConfig()
 	m := Resolve(nil, nil, &cfg)
 	if m == nil {
 		t.Fatal("Resolve returned nil Mib")
@@ -282,7 +281,7 @@ func TestResolveUserModuleDuplicatingBaseModuleIsDropped(t *testing.T) {
 	// If a user module has the same name as a base module, the base module
 	// takes priority and the user module is dropped.
 	userMod := module.NewModule("SNMPv2-SMI", types.Span{})
-	userMod.Language = module.LanguageSMIv2
+	userMod.Language = types.LanguageSMIv2
 
 	m := Resolve([]*module.Module{userMod}, nil, nil)
 	if m == nil {

@@ -1,27 +1,48 @@
+// Package module provides a normalized representation of MIB modules.
+//
+// This package transforms AST structures into a simplified module representation
+// independent of whether the source was SMIv1 or SMIv2. Key transformations:
+//
+//   - Language detection from imports
+//   - Import flattening (one symbol per import)
+//   - Unified notification type (TRAP-TYPE and NOTIFICATION-TYPE)
+//
+// # What Lowering Does NOT Do (per V2 design)
+//
+// Status and Access values are preserved without normalization:
+//   - STATUS: mandatory, optional preserved (not mapped to current/deprecated)
+//   - ACCESS: SPPI values preserved (install, install-notify, report-only)
+//   - ACCESS keyword preserved (ACCESS vs MAX-ACCESS vs PIB-ACCESS)
+//
+// These are resolver responsibilities:
+//   - OID resolution (keeps OID components as symbols)
+//   - Type resolution (keeps type references as symbols)
+//   - Nodekind inference (requires resolved OID tree)
+//   - Import resolution (just normalize; actual lookup is resolver's job)
+//   - Built-in type injection
 package module
 
 import (
 	"iter"
 
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 // Module is a normalized, language-independent MIB module.
 type Module struct {
 	Name        string
-	Language    Language
+	Language    types.Language
 	Imports     []Import
 	Definitions []Definition
 	Span        types.Span
-	Diagnostics []mib.Diagnostic
+	Diagnostics []types.Diagnostic
 }
 
 // NewModule returns a Module with the given name and no definitions.
 func NewModule(name string, span types.Span) *Module {
 	return &Module{
 		Name:        name,
-		Language:    LanguageUnknown,
+		Language:    types.LanguageUnknown,
 		Imports:     nil,
 		Definitions: nil,
 		Span:        span,
@@ -32,7 +53,7 @@ func NewModule(name string, span types.Span) *Module {
 // HasErrors reports whether this module has any error-level diagnostics.
 func (m *Module) HasErrors() bool {
 	for _, d := range m.Diagnostics {
-		if d.Severity <= mib.SeverityError {
+		if d.Severity <= types.SeverityError {
 			return true
 		}
 	}

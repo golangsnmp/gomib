@@ -4,8 +4,6 @@ package types
 import (
 	"context"
 	"log/slog"
-
-	"github.com/golangsnmp/gomib/mib"
 )
 
 // LevelTrace is a custom log level more verbose than Debug.
@@ -60,11 +58,11 @@ func NewSpan(start, end ByteOffset) Span {
 	return Span{Start: start, End: end}
 }
 
-// Diagnostic is an internal diagnostic from the lexer or parser.
-// Converted to mib.Diagnostic during lowering with module name and
+// SpanDiagnostic is an internal diagnostic from the lexer or parser.
+// Converted to Diagnostic during lowering with module name and
 // line/column info.
-type Diagnostic struct {
-	Severity mib.Severity
+type SpanDiagnostic struct {
+	Severity Severity
 	Code     string // Diagnostic code (e.g., "identifier-underscore")
 	Span     Span
 	Message  string

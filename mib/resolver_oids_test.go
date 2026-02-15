@@ -1,4 +1,4 @@
-package resolver
+package mib
 
 import (
 	"testing"
@@ -6,7 +6,6 @@ import (
 	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 func TestWellKnownRootArc(t *testing.T) {
@@ -35,13 +34,13 @@ func TestWellKnownRootArc(t *testing.T) {
 
 func TestLanguageRank(t *testing.T) {
 	tests := []struct {
-		lang module.Language
+		lang types.Language
 		want int
 	}{
-		{module.LanguageSMIv2, 2},
-		{module.LanguageSMIv1, 1},
-		{module.LanguageUnknown, 0},
-		{module.LanguageSPPI, 0},
+		{types.LanguageSMIv2, 2},
+		{types.LanguageSMIv1, 1},
+		{types.LanguageUnknown, 0},
+		{types.LanguageSPPI, 0},
 	}
 
 	for _, tt := range tests {
@@ -82,7 +81,7 @@ func TestCollectOidDefinitions(t *testing.T) {
 		&module.TypeDef{Name: "MyType"}, // skipped
 	}
 
-	ctx := newResolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
 	defs := collectOidDefinitions(ctx)
 
 	// All OID-bearing definitions except TypeDef and the empty notification
@@ -100,7 +99,7 @@ func TestCollectOidDefinitions(t *testing.T) {
 }
 
 func TestCollectOidDefinitionsEmpty(t *testing.T) {
-	ctx := newResolverContext(nil, nil, mib.DefaultConfig())
+	ctx := newResolverContext(nil, nil, DefaultConfig())
 	defs := collectOidDefinitions(ctx)
 
 	if len(defs.oidDefs) != 0 {
@@ -113,7 +112,7 @@ func TestCollectOidDefinitionsEmpty(t *testing.T) {
 
 func TestGetOidParentSymbol(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
 
 	makeOidDef := func(components []module.OidComponent) oidDefinition {
 		oid := module.NewOidAssignment(components, types.Synthetic)
@@ -176,7 +175,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 				},
 			},
 		}
-		localCtx := newResolverContext([]*module.Module{localMod}, nil, mib.DefaultConfig())
+		localCtx := newResolverContext([]*module.Module{localMod}, nil, DefaultConfig())
 		def := oidDefinition{
 			mod: localMod,
 			def: &module.ValueAssignment{
@@ -209,7 +208,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 				},
 			},
 		}
-		localCtx := newResolverContext([]*module.Module{localMod}, nil, mib.DefaultConfig())
+		localCtx := newResolverContext([]*module.Module{localMod}, nil, DefaultConfig())
 		def := oidDefinition{
 			mod: localMod,
 			def: &module.ValueAssignment{
@@ -278,7 +277,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 
 func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 	t.Run("SMIv2 with hyphen emits diagnostic", func(t *testing.T) {
-		mod := &module.Module{Name: "MY-MIB", Language: module.LanguageSMIv2}
+		mod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv2}
 		oid := module.NewOidAssignment([]module.OidComponent{
 			&module.OidComponentNumber{Value: 1},
 		}, types.Synthetic)
@@ -287,14 +286,14 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 		}
 
 		// Use permissive config so SeverityWarning diagnostics are reported.
-		ctx := newResolverContext(nil, nil, mib.PermissiveConfig())
+		ctx := newResolverContext(nil, nil, PermissiveConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		found := false
 		for _, d := range ctx.Diagnostics() {
 			if d.Code == "identifier-hyphen-smiv2" {
 				found = true
-				if d.Severity != mib.SeverityWarning {
+				if d.Severity != SeverityWarning {
 					t.Errorf("severity = %v, want SeverityWarning", d.Severity)
 				}
 				if d.Module != "MY-MIB" {
@@ -308,7 +307,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 	})
 
 	t.Run("SMIv2 without hyphen emits nothing", func(t *testing.T) {
-		mod := &module.Module{Name: "MY-MIB", Language: module.LanguageSMIv2}
+		mod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv2}
 		oid := module.NewOidAssignment([]module.OidComponent{
 			&module.OidComponentNumber{Value: 1},
 		}, types.Synthetic)
@@ -316,7 +315,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 			{mod: mod, def: &module.ValueAssignment{Name: "myObject", Oid: oid}, kind: defValueAssignment},
 		}
 
-		ctx := newResolverContext(nil, nil, mib.DefaultConfig())
+		ctx := newResolverContext(nil, nil, DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		if len(ctx.Diagnostics()) != 0 {
@@ -325,7 +324,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 	})
 
 	t.Run("SMIv1 with hyphen emits nothing", func(t *testing.T) {
-		mod := &module.Module{Name: "MY-MIB", Language: module.LanguageSMIv1}
+		mod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv1}
 		oid := module.NewOidAssignment([]module.OidComponent{
 			&module.OidComponentNumber{Value: 1},
 		}, types.Synthetic)
@@ -333,7 +332,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 			{mod: mod, def: &module.ValueAssignment{Name: "my-object", Oid: oid}, kind: defValueAssignment},
 		}
 
-		ctx := newResolverContext(nil, nil, mib.DefaultConfig())
+		ctx := newResolverContext(nil, nil, DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		if len(ctx.Diagnostics()) != 0 {
@@ -342,7 +341,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 	})
 
 	t.Run("base module skipped", func(t *testing.T) {
-		mod := &module.Module{Name: "SNMPv2-SMI", Language: module.LanguageSMIv2}
+		mod := &module.Module{Name: "SNMPv2-SMI", Language: types.LanguageSMIv2}
 		oid := module.NewOidAssignment([]module.OidComponent{
 			&module.OidComponentNumber{Value: 1},
 		}, types.Synthetic)
@@ -350,7 +349,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 			{mod: mod, def: &module.ValueAssignment{Name: "mib-2", Oid: oid}, kind: defValueAssignment},
 		}
 
-		ctx := newResolverContext(nil, nil, mib.DefaultConfig())
+		ctx := newResolverContext(nil, nil, DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		if len(ctx.Diagnostics()) != 0 {
@@ -372,14 +371,14 @@ func TestResolveNumericComponent(t *testing.T) {
 		// The node is a child of the pseudo-root, so its parent is
 		// the pseudo-root (not nil). Verify it's the same node that
 		// Builder.GetOrCreateRoot returns.
-		if node != ctx.Mib.Root().GetOrCreateChild(1) {
+		if node != ctx.Mib.Root().getOrCreateChild(1) {
 			t.Error("expected same node as Builder.GetOrCreateRoot(1)")
 		}
 	})
 
 	t.Run("creates child of existing parent", func(t *testing.T) {
 		ctx := newTestContext()
-		parent := ctx.Mib.Root().GetOrCreateChild(1) // iso
+		parent := ctx.Mib.Root().getOrCreateChild(1) // iso
 		child := resolveNumericComponent(ctx, parent, 3)
 		if child == nil {
 			t.Fatal("expected non-nil child")
@@ -394,11 +393,11 @@ func TestResolveNumericComponent(t *testing.T) {
 
 	t.Run("returns same node on repeat", func(t *testing.T) {
 		ctx := newTestContext()
-		parent := ctx.Mib.Root().GetOrCreateChild(1)
+		parent := ctx.Mib.Root().getOrCreateChild(1)
 		child1 := resolveNumericComponent(ctx, parent, 3)
 		child2 := resolveNumericComponent(ctx, parent, 3)
 		if child1 != child2 {
-			t.Error("expected same node on repeated GetOrCreateChild")
+			t.Error("expected same node on repeated getOrCreateChild")
 		}
 	})
 }
@@ -433,11 +432,11 @@ func TestLookupOrCreateWellKnownRoot(t *testing.T) {
 func TestLookupSmiGlobalOidRoot(t *testing.T) {
 	t.Run("returns node when registered in SNMPv2-SMI", func(t *testing.T) {
 		smiMod := &module.Module{Name: "SNMPv2-SMI"}
-		ctx := newResolverContext([]*module.Module{smiMod}, nil, mib.PermissiveConfig())
+		ctx := newResolverContext([]*module.Module{smiMod}, nil, PermissiveConfig())
 		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
-		node := ctx.Mib.Root().GetOrCreateChild(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1)
-		ctx.RegisterModuleNodeSymbol(smiMod, "internet", node)
+		node := ctx.Mib.Root().getOrCreateChild(1).getOrCreateChild(3).getOrCreateChild(6).getOrCreateChild(1)
+		ctx.registerModuleNodeSymbol(smiMod, "internet", node)
 
 		got, ok := lookupSmiGlobalOidRoot(ctx, "internet")
 		if !ok {
@@ -450,11 +449,11 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 
 	t.Run("returns node when registered in RFC1155-SMI", func(t *testing.T) {
 		rfc1155Mod := &module.Module{Name: "RFC1155-SMI"}
-		ctx := newResolverContext([]*module.Module{rfc1155Mod}, nil, mib.PermissiveConfig())
+		ctx := newResolverContext([]*module.Module{rfc1155Mod}, nil, PermissiveConfig())
 		ctx.ModuleIndex["RFC1155-SMI"] = []*module.Module{rfc1155Mod}
 
-		node := ctx.Mib.Root().GetOrCreateChild(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1)
-		ctx.RegisterModuleNodeSymbol(rfc1155Mod, "internet", node)
+		node := ctx.Mib.Root().getOrCreateChild(1).getOrCreateChild(3).getOrCreateChild(6).getOrCreateChild(1)
+		ctx.registerModuleNodeSymbol(rfc1155Mod, "internet", node)
 
 		got, ok := lookupSmiGlobalOidRoot(ctx, "internet")
 		if !ok {
@@ -484,10 +483,10 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 
 func TestShouldPreferModule(t *testing.T) {
 	t.Run("nil currentMod always prefers new", func(t *testing.T) {
-		srcMod := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv1}
-		newMod := mib.NewModule("NEW-MIB")
+		srcMod := &module.Module{Name: "NEW-MIB", Language: types.LanguageSMIv1}
+		newMod := newModule("NEW-MIB")
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mib.Module{srcMod: newMod}
+		ctx.ModuleToResolved = map[*module.Module]*Module{srcMod: newMod}
 
 		if !shouldPreferModule(ctx, newMod, nil, srcMod) {
 			t.Error("expected true when currentMod is nil")
@@ -495,12 +494,12 @@ func TestShouldPreferModule(t *testing.T) {
 	})
 
 	t.Run("nil currentSrcMod prefers new", func(t *testing.T) {
-		srcMod := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv1}
-		newMod := mib.NewModule("NEW-MIB")
-		currentMod := mib.NewModule("OLD-MIB")
+		srcMod := &module.Module{Name: "NEW-MIB", Language: types.LanguageSMIv1}
+		newMod := newModule("NEW-MIB")
+		currentMod := newModule("OLD-MIB")
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mib.Module{srcMod: newMod}
-		ctx.ResolvedToModule = map[*mib.Module]*module.Module{} // currentMod not mapped
+		ctx.ModuleToResolved = map[*module.Module]*Module{srcMod: newMod}
+		ctx.ResolvedToModule = map[*Module]*module.Module{} // currentMod not mapped
 
 		if !shouldPreferModule(ctx, newMod, currentMod, srcMod) {
 			t.Error("expected true when currentSrcMod lookup returns nil")
@@ -508,14 +507,14 @@ func TestShouldPreferModule(t *testing.T) {
 	})
 
 	t.Run("SMIv2 preferred over SMIv1", func(t *testing.T) {
-		newSrc := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv2}
-		oldSrc := &module.Module{Name: "OLD-MIB", Language: module.LanguageSMIv1}
-		newMod := mib.NewModule("NEW-MIB")
-		oldMod := mib.NewModule("OLD-MIB")
+		newSrc := &module.Module{Name: "NEW-MIB", Language: types.LanguageSMIv2}
+		oldSrc := &module.Module{Name: "OLD-MIB", Language: types.LanguageSMIv1}
+		newMod := newModule("NEW-MIB")
+		oldMod := newModule("OLD-MIB")
 
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mib.Module{newSrc: newMod, oldSrc: oldMod}
-		ctx.ResolvedToModule = map[*mib.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
+		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
+		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
 		if !shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected SMIv2 to be preferred over SMIv1")
@@ -523,14 +522,14 @@ func TestShouldPreferModule(t *testing.T) {
 	})
 
 	t.Run("SMIv1 not preferred over SMIv2", func(t *testing.T) {
-		newSrc := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv1}
-		oldSrc := &module.Module{Name: "OLD-MIB", Language: module.LanguageSMIv2}
-		newMod := mib.NewModule("NEW-MIB")
-		oldMod := mib.NewModule("OLD-MIB")
+		newSrc := &module.Module{Name: "NEW-MIB", Language: types.LanguageSMIv1}
+		oldSrc := &module.Module{Name: "OLD-MIB", Language: types.LanguageSMIv2}
+		newMod := newModule("NEW-MIB")
+		oldMod := newModule("OLD-MIB")
 
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mib.Module{newSrc: newMod, oldSrc: oldMod}
-		ctx.ResolvedToModule = map[*mib.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
+		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
+		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
 		if shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected SMIv1 NOT to be preferred over SMIv2")
@@ -540,24 +539,24 @@ func TestShouldPreferModule(t *testing.T) {
 	t.Run("same language uses LAST-UPDATED tiebreaker", func(t *testing.T) {
 		newSrc := &module.Module{
 			Name:     "NEW-MIB",
-			Language: module.LanguageSMIv2,
+			Language: types.LanguageSMIv2,
 			Definitions: []module.Definition{
 				&module.ModuleIdentity{Name: "newMIB", LastUpdated: "200501010000Z"},
 			},
 		}
 		oldSrc := &module.Module{
 			Name:     "OLD-MIB",
-			Language: module.LanguageSMIv2,
+			Language: types.LanguageSMIv2,
 			Definitions: []module.Definition{
 				&module.ModuleIdentity{Name: "oldMIB", LastUpdated: "200001010000Z"},
 			},
 		}
-		newMod := mib.NewModule("NEW-MIB")
-		oldMod := mib.NewModule("OLD-MIB")
+		newMod := newModule("NEW-MIB")
+		oldMod := newModule("OLD-MIB")
 
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mib.Module{newSrc: newMod, oldSrc: oldMod}
-		ctx.ResolvedToModule = map[*mib.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
+		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
+		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
 		if !shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected newer LAST-UPDATED to win")
@@ -567,24 +566,24 @@ func TestShouldPreferModule(t *testing.T) {
 	t.Run("same language older LAST-UPDATED loses", func(t *testing.T) {
 		newSrc := &module.Module{
 			Name:     "OLD-MIB",
-			Language: module.LanguageSMIv2,
+			Language: types.LanguageSMIv2,
 			Definitions: []module.Definition{
 				&module.ModuleIdentity{Name: "oldMIB", LastUpdated: "199901010000Z"},
 			},
 		}
 		oldSrc := &module.Module{
 			Name:     "NEW-MIB",
-			Language: module.LanguageSMIv2,
+			Language: types.LanguageSMIv2,
 			Definitions: []module.Definition{
 				&module.ModuleIdentity{Name: "newMIB", LastUpdated: "200501010000Z"},
 			},
 		}
-		newMod := mib.NewModule("OLD-MIB")
-		oldMod := mib.NewModule("NEW-MIB")
+		newMod := newModule("OLD-MIB")
+		oldMod := newModule("NEW-MIB")
 
 		ctx := newTestContext()
-		ctx.ModuleToResolved = map[*module.Module]*mib.Module{newSrc: newMod, oldSrc: oldMod}
-		ctx.ResolvedToModule = map[*mib.Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
+		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
+		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
 		if shouldPreferModule(ctx, newMod, oldMod, newSrc) {
 			t.Error("expected older LAST-UPDATED to lose")
@@ -596,29 +595,29 @@ func TestFinalizeOidDefinition(t *testing.T) {
 	tests := []struct {
 		name     string
 		kind     definitionKind
-		wantKind mib.Kind
+		wantKind Kind
 	}{
-		{"ObjectType", defObjectType, mib.KindScalar},
-		{"ModuleIdentity", defModuleIdentity, mib.KindNode},
-		{"ObjectIdentity", defObjectIdentity, mib.KindNode},
-		{"ValueAssignment", defValueAssignment, mib.KindNode},
-		{"Notification", defNotification, mib.KindNotification},
-		{"ObjectGroup", defObjectGroup, mib.KindGroup},
-		{"NotificationGroup", defNotificationGroup, mib.KindGroup},
-		{"ModuleCompliance", defModuleCompliance, mib.KindCompliance},
-		{"AgentCapabilities", defAgentCapabilities, mib.KindCapability},
+		{"ObjectType", defObjectType, KindScalar},
+		{"ModuleIdentity", defModuleIdentity, KindNode},
+		{"ObjectIdentity", defObjectIdentity, KindNode},
+		{"ValueAssignment", defValueAssignment, KindNode},
+		{"Notification", defNotification, KindNotification},
+		{"ObjectGroup", defObjectGroup, KindGroup},
+		{"NotificationGroup", defNotificationGroup, KindGroup},
+		{"ModuleCompliance", defModuleCompliance, KindCompliance},
+		{"AgentCapabilities", defAgentCapabilities, KindCapability},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srcMod := &module.Module{Name: "TEST-MIB", Language: module.LanguageSMIv2}
-			resolvedMod := mib.NewModule("TEST-MIB")
+			srcMod := &module.Module{Name: "TEST-MIB", Language: types.LanguageSMIv2}
+			resolvedMod := newModule("TEST-MIB")
 
-			ctx := newResolverContext([]*module.Module{srcMod}, nil, mib.DefaultConfig())
+			ctx := newResolverContext([]*module.Module{srcMod}, nil, DefaultConfig())
 			ctx.ModuleToResolved[srcMod] = resolvedMod
 			ctx.ResolvedToModule[resolvedMod] = srcMod
 
-			node := ctx.Mib.Root().GetOrCreateChild(1).GetOrCreateChild(3).GetOrCreateChild(6)
+			node := ctx.Mib.Root().getOrCreateChild(1).getOrCreateChild(3).getOrCreateChild(6)
 
 			oid := module.NewOidAssignment([]module.OidComponent{
 				&module.OidComponentNumber{Value: 1},
@@ -716,7 +715,7 @@ func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
 	// In permissive mode, unresolved names that are SMI global OID roots
 	// should reference SNMPv2-SMI.
 	mod := &module.Module{Name: "VENDOR-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, mib.PermissiveConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, PermissiveConfig())
 
 	oid := module.NewOidAssignment([]module.OidComponent{
 		&module.OidComponentName{NameValue: "enterprises"},
@@ -741,7 +740,7 @@ func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
 func TestGetOidParentSymbolStrictNoSmiGlobal(t *testing.T) {
 	// In strict mode, unresolved SMI global names should not be resolved.
 	mod := &module.Module{Name: "VENDOR-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, mib.StrictConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
 
 	oid := module.NewOidAssignment([]module.OidComponent{
 		&module.OidComponentName{NameValue: "enterprises"},
@@ -780,7 +779,7 @@ func TestCollectOidDefinitionsKindMapping(t *testing.T) {
 		&module.AgentCapabilities{Name: "cap", Oid: oid},
 	}
 
-	ctx := newResolverContext([]*module.Module{mod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
 	defs := collectOidDefinitions(ctx)
 
 	expected := []struct {
@@ -854,18 +853,18 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 	// When two modules define MODULE-IDENTITY at the same OID node,
 	// only the preferred module should have SetOID called.
 
-	v2Src := &module.Module{Name: "NEW-MIB", Language: module.LanguageSMIv2}
-	v1Src := &module.Module{Name: "OLD-MIB", Language: module.LanguageSMIv1}
-	v2Mod := mib.NewModule("NEW-MIB")
-	v1Mod := mib.NewModule("OLD-MIB")
+	v2Src := &module.Module{Name: "NEW-MIB", Language: types.LanguageSMIv2}
+	v1Src := &module.Module{Name: "OLD-MIB", Language: types.LanguageSMIv1}
+	v2Mod := newModule("NEW-MIB")
+	v1Mod := newModule("OLD-MIB")
 
-	ctx := newResolverContext([]*module.Module{v2Src, v1Src}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{v2Src, v1Src}, nil, DefaultConfig())
 	ctx.ModuleToResolved[v2Src] = v2Mod
 	ctx.ModuleToResolved[v1Src] = v1Mod
 	ctx.ResolvedToModule[v2Mod] = v2Src
 	ctx.ResolvedToModule[v1Mod] = v1Src
 
-	node := ctx.Mib.Root().GetOrCreateChild(1).GetOrCreateChild(3).GetOrCreateChild(6).GetOrCreateChild(1).GetOrCreateChild(2)
+	node := ctx.Mib.Root().getOrCreateChild(1).getOrCreateChild(3).getOrCreateChild(6).getOrCreateChild(1).getOrCreateChild(2)
 
 	oid := module.NewOidAssignment([]module.OidComponent{
 		&module.OidComponentNumber{Value: 1},

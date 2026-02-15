@@ -1,11 +1,10 @@
-package resolver
+package mib
 
 import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 func TestIsMacroSymbol(t *testing.T) {
@@ -476,7 +475,7 @@ func TestTryImportForwarding(t *testing.T) {
 }
 
 // newTestContextWithConfig creates a resolverContext with a specific DiagnosticConfig.
-func newTestContextWithConfig(config mib.DiagnosticConfig) *resolverContext {
+func newTestContextWithConfig(config DiagnosticConfig) *resolverContext {
 	return newResolverContext(nil, nil, config)
 }
 
@@ -543,7 +542,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 	})
 
 	t.Run("alias resolution", func(t *testing.T) {
-		ctx := newTestContextWithConfig(mib.DefaultConfig())
+		ctx := newTestContextWithConfig(DefaultConfig())
 		// Source module is under the canonical name
 		source := makeTestModule(ctx, "SNMPv2-SMI", []string{"enterprises", "Counter32"})
 		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{source}
@@ -563,7 +562,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 	})
 
 	t.Run("alias disabled in strict mode", func(t *testing.T) {
-		ctx := newTestContextWithConfig(mib.StrictConfig())
+		ctx := newTestContextWithConfig(StrictConfig())
 		source := makeTestModule(ctx, "SNMPv2-SMI", []string{"enterprises"})
 		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{source}
 
@@ -580,7 +579,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 	})
 
 	t.Run("forwarding resolution", func(t *testing.T) {
-		ctx := newTestContextWithConfig(mib.DefaultConfig())
+		ctx := newTestContextWithConfig(DefaultConfig())
 
 		// Ultimate source
 		realSource := &module.Module{Name: "REAL-SOURCE"}
@@ -615,7 +614,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 	})
 
 	t.Run("partial resolution", func(t *testing.T) {
-		ctx := newTestContextWithConfig(mib.DefaultConfig())
+		ctx := newTestContextWithConfig(DefaultConfig())
 
 		// Candidate module only has some of the symbols
 		source := makeTestModule(ctx, "PARTIAL-MIB", []string{"found1", "found2"})
@@ -684,7 +683,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 	})
 
 	t.Run("module not found in strict mode", func(t *testing.T) {
-		ctx := newTestContextWithConfig(mib.StrictConfig())
+		ctx := newTestContextWithConfig(StrictConfig())
 		// Candidate exists but doesn't have the symbol
 		source := makeTestModule(ctx, "SRC", []string{"other"})
 		ctx.ModuleIndex["SRC"] = []*module.Module{source}
@@ -706,7 +705,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 	})
 
 	t.Run("forwarding disabled in strict mode", func(t *testing.T) {
-		ctx := newTestContextWithConfig(mib.StrictConfig())
+		ctx := newTestContextWithConfig(StrictConfig())
 
 		realSource := &module.Module{Name: "REAL"}
 		ctx.ModuleIndex["REAL"] = []*module.Module{realSource}
@@ -736,7 +735,7 @@ func TestResolveTransitiveImports(t *testing.T) {
 		modB := &module.Module{Name: "B"}
 
 		ctx.ModuleDefNames[modB] = map[string]struct{}{"x": {}}
-		ctx.RegisterImport(modA, "x", modB)
+		ctx.registerImport(modA, "x", modB)
 
 		resolveTransitiveImports(ctx)
 
@@ -754,8 +753,8 @@ func TestResolveTransitiveImports(t *testing.T) {
 		// B re-exports x from C; C defines x.
 		ctx.ModuleDefNames[modB] = map[string]struct{}{}
 		ctx.ModuleDefNames[modC] = map[string]struct{}{"x": {}}
-		ctx.RegisterImport(modA, "x", modB)
-		ctx.RegisterImport(modB, "x", modC)
+		ctx.registerImport(modA, "x", modB)
+		ctx.registerImport(modB, "x", modC)
 
 		resolveTransitiveImports(ctx)
 
@@ -774,9 +773,9 @@ func TestResolveTransitiveImports(t *testing.T) {
 		ctx.ModuleDefNames[modB] = map[string]struct{}{}
 		ctx.ModuleDefNames[modC] = map[string]struct{}{}
 		ctx.ModuleDefNames[modD] = map[string]struct{}{"x": {}}
-		ctx.RegisterImport(modA, "x", modB)
-		ctx.RegisterImport(modB, "x", modC)
-		ctx.RegisterImport(modC, "x", modD)
+		ctx.registerImport(modA, "x", modB)
+		ctx.registerImport(modB, "x", modC)
+		ctx.registerImport(modC, "x", modD)
 
 		resolveTransitiveImports(ctx)
 
@@ -798,8 +797,8 @@ func TestResolveTransitiveImports(t *testing.T) {
 
 		ctx.ModuleDefNames[modA] = map[string]struct{}{}
 		ctx.ModuleDefNames[modB] = map[string]struct{}{}
-		ctx.RegisterImport(modA, "x", modB)
-		ctx.RegisterImport(modB, "x", modA)
+		ctx.registerImport(modA, "x", modB)
+		ctx.registerImport(modB, "x", modA)
 
 		// Should not panic or infinite loop.
 		resolveTransitiveImports(ctx)
@@ -812,7 +811,7 @@ func TestResolveTransitiveImports(t *testing.T) {
 
 		// B neither defines x nor imports it.
 		ctx.ModuleDefNames[modB] = map[string]struct{}{}
-		ctx.RegisterImport(modA, "x", modB)
+		ctx.registerImport(modA, "x", modB)
 
 		resolveTransitiveImports(ctx)
 
@@ -830,9 +829,9 @@ func TestResolveTransitiveImports(t *testing.T) {
 		// B defines "y" but re-exports "x" from C.
 		ctx.ModuleDefNames[modB] = map[string]struct{}{"y": {}}
 		ctx.ModuleDefNames[modC] = map[string]struct{}{"x": {}}
-		ctx.RegisterImport(modA, "x", modB)
-		ctx.RegisterImport(modA, "y", modB)
-		ctx.RegisterImport(modB, "x", modC)
+		ctx.registerImport(modA, "x", modB)
+		ctx.registerImport(modA, "y", modB)
+		ctx.registerImport(modB, "x", modC)
 
 		resolveTransitiveImports(ctx)
 
@@ -857,7 +856,7 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{importing}, nil, mib.DefaultConfig())
+		ctx := newResolverContext([]*module.Module{importing}, nil, DefaultConfig())
 		ctx.ModuleIndex["SOURCE-MIB"] = []*module.Module{source}
 		ctx.ModuleDefNames[source] = map[string]struct{}{
 			"sysDescr": {},
@@ -889,7 +888,7 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{importing}, nil, mib.DefaultConfig())
+		ctx := newResolverContext([]*module.Module{importing}, nil, DefaultConfig())
 		ctx.ModuleIndex["MOD-A"] = []*module.Module{sourceA}
 		ctx.ModuleIndex["MOD-B"] = []*module.Module{sourceB}
 		ctx.ModuleDefNames[sourceA] = map[string]struct{}{"alpha": {}}

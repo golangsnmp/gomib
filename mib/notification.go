@@ -13,8 +13,8 @@ type Notification struct {
 	ref     string
 }
 
-// NewNotification returns a Notification initialized with the given name.
-func NewNotification(name string) *Notification {
+// newNotification returns a Notification initialized with the given name.
+func newNotification(name string) *Notification {
 	return &Notification{name: name}
 }
 
@@ -41,11 +41,9 @@ func (n *Notification) String() string {
 	return n.name + " (" + n.OID().String() + ")"
 }
 
-func (n *Notification) SetName(name string)       { n.name = name }
-func (n *Notification) SetNode(nd *Node)          { n.node = nd }
-func (n *Notification) SetModule(m *Module)       { n.module = m }
-func (n *Notification) SetObjects(objs []*Object) { n.objects = objs }
-func (n *Notification) AddObject(obj *Object)     { n.objects = append(n.objects, obj) }
-func (n *Notification) SetStatus(s Status)        { n.status = s }
-func (n *Notification) SetDescription(d string)   { n.desc = d }
-func (n *Notification) SetReference(r string)     { n.ref = r }
+func (n *Notification) setNode(nd *Node)        { n.node = nd }
+func (n *Notification) setModule(m *Module)     { n.module = m }
+func (n *Notification) addObject(obj *Object)   { n.objects = append(n.objects, obj) }
+func (n *Notification) setStatus(s Status)      { n.status = s }
+func (n *Notification) setDescription(d string) { n.desc = d }
+func (n *Notification) setReference(r string)   { n.ref = r }

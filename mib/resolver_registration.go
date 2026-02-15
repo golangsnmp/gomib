@@ -1,10 +1,9 @@
-package resolver
+package mib
 
 import (
 	"log/slog"
 
 	"github.com/golangsnmp/gomib/internal/module"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 // registerModules indexes all modules and seeds the resolver context.
@@ -28,26 +27,26 @@ func registerModules(ctx *resolverContext) {
 	ctx.Modules = append(baseModules, userModules...)
 
 	for _, mod := range ctx.Modules {
-		resolved := mib.NewModule(mod.Name)
-		resolved.SetLanguage(mod.Language)
+		resolved := newModule(mod.Name)
+		resolved.setLanguage(mod.Language)
 
 		for _, def := range mod.Definitions {
 			if mi, ok := def.(*module.ModuleIdentity); ok {
-				resolved.SetOrganization(mi.Organization)
-				resolved.SetContactInfo(mi.ContactInfo)
-				resolved.SetDescription(mi.Description)
-				resolved.SetRevisions(convertRevisions(mi.Revisions))
+				resolved.setOrganization(mi.Organization)
+				resolved.setContactInfo(mi.ContactInfo)
+				resolved.setDescription(mi.Description)
+				resolved.setRevisions(convertRevisions(mi.Revisions))
 				break
 			}
 		}
 
-		ctx.Mib.AddModule(resolved)
+		ctx.Mib.addModule(resolved)
 		ctx.ModuleToResolved[mod] = resolved
 		ctx.ResolvedToModule[resolved] = mod
 
 		// Collect diagnostics from parsing and lowering
 		for _, d := range mod.Diagnostics {
-			ctx.Mib.AddDiagnostic(d)
+			ctx.Mib.addDiagnostic(d)
 		}
 
 		// Cache pointers to base modules used by the type resolution
@@ -81,10 +80,10 @@ func registerModules(ctx *resolverContext) {
 	}
 }
 
-func convertRevisions(revs []module.Revision) []mib.Revision {
-	result := make([]mib.Revision, len(revs))
+func convertRevisions(revs []module.Revision) []Revision {
+	result := make([]Revision, len(revs))
 	for i, r := range revs {
-		result[i] = mib.Revision{
+		result[i] = Revision{
 			Date:        r.Date,
 			Description: r.Description,
 		}

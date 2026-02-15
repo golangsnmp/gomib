@@ -1,11 +1,10 @@
-package resolver
+package mib
 
 import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 func TestConvertRevisions(t *testing.T) {
@@ -63,12 +62,12 @@ func TestConvertRevisions(t *testing.T) {
 func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 	userMod := &module.Module{
 		Name:     "MY-MIB",
-		Language: module.LanguageSMIv2,
+		Language: types.LanguageSMIv2,
 		Definitions: []module.Definition{
 			&module.ObjectType{Name: "myObject", Span: types.Synthetic},
 		},
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -93,13 +92,13 @@ func TestRegisterModules_UserModulesWithBaseNamesFiltered(t *testing.T) {
 	// If a user provides a module with a base module name, it should be dropped.
 	userSNMP := &module.Module{
 		Name:     "SNMPv2-SMI",
-		Language: module.LanguageSMIv2,
+		Language: types.LanguageSMIv2,
 	}
 	userMod := &module.Module{
 		Name:     "MY-MIB",
-		Language: module.LanguageSMIv2,
+		Language: types.LanguageSMIv2,
 	}
-	ctx := newResolverContext([]*module.Module{userSNMP, userMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{userSNMP, userMod}, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -131,9 +130,9 @@ func TestRegisterModules_UserModulesWithBaseNamesFiltered(t *testing.T) {
 func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
 	userMod := &module.Module{
 		Name:     "MY-MIB",
-		Language: module.LanguageSMIv2,
+		Language: types.LanguageSMIv2,
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -158,7 +157,7 @@ func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
 }
 
 func TestRegisterModules_BaseModulePointersCached(t *testing.T) {
-	ctx := newResolverContext(nil, nil, mib.DefaultConfig())
+	ctx := newResolverContext(nil, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -184,13 +183,13 @@ func TestRegisterModules_BaseModulePointersCached(t *testing.T) {
 func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 	userMod := &module.Module{
 		Name:     "MY-MIB",
-		Language: module.LanguageSMIv2,
+		Language: types.LanguageSMIv2,
 		Definitions: []module.Definition{
 			&module.ObjectType{Name: "fooObject", Span: types.Synthetic},
 			&module.TypeDef{Name: "BarType", Span: types.Synthetic},
 		},
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -224,9 +223,9 @@ func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 func TestRegisterModules_ModuleToResolvedMapping(t *testing.T) {
 	userMod := &module.Module{
 		Name:     "MY-MIB",
-		Language: module.LanguageSMIv2,
+		Language: types.LanguageSMIv2,
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -254,9 +253,9 @@ func TestRegisterModules_ModuleToResolvedMapping(t *testing.T) {
 func TestRegisterModules_LanguageSetOnResolved(t *testing.T) {
 	userMod := &module.Module{
 		Name:     "MY-MIB",
-		Language: module.LanguageSMIv1,
+		Language: types.LanguageSMIv1,
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -275,7 +274,7 @@ func TestRegisterModules_LanguageSetOnResolved(t *testing.T) {
 	if resolved == nil {
 		t.Fatal("no resolved module for MY-MIB")
 	}
-	if resolved.Language() != mib.LanguageSMIv1 {
+	if resolved.Language() != LanguageSMIv1 {
 		t.Errorf("resolved language = %v, want SMIv1", resolved.Language())
 	}
 }
@@ -295,14 +294,14 @@ func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
 	}
 	userMod := &module.Module{
 		Name:     "MY-MIB",
-		Language: module.LanguageSMIv2,
+		Language: types.LanguageSMIv2,
 		Definitions: []module.Definition{
 			// Some other definition before MODULE-IDENTITY
 			&module.ObjectType{Name: "someObj", Span: types.Synthetic},
 			mi,
 		},
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -347,12 +346,12 @@ func TestRegisterModules_NoModuleIdentity(t *testing.T) {
 	// A module without MODULE-IDENTITY should have empty metadata on the resolved module.
 	userMod := &module.Module{
 		Name:     "MY-MIB",
-		Language: module.LanguageSMIv1,
+		Language: types.LanguageSMIv1,
 		Definitions: []module.Definition{
 			&module.ObjectType{Name: "someObj", Span: types.Synthetic},
 		},
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -385,9 +384,9 @@ func TestRegisterModules_NoModuleIdentity(t *testing.T) {
 func TestRegisterModules_BuilderReceivesModules(t *testing.T) {
 	userMod := &module.Module{
 		Name:     "MY-MIB",
-		Language: module.LanguageSMIv2,
+		Language: types.LanguageSMIv2,
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -412,12 +411,12 @@ func TestRegisterModules_DiagnosticsForwarded(t *testing.T) {
 	// Module-level diagnostics from parsing should be forwarded to the builder.
 	userMod := &module.Module{
 		Name:     "MY-MIB",
-		Language: module.LanguageSMIv2,
-		Diagnostics: []mib.Diagnostic{
-			{Severity: mib.SeverityWarning, Code: "test-warning", Message: "test", Module: "MY-MIB"},
+		Language: types.LanguageSMIv2,
+		Diagnostics: []Diagnostic{
+			{Severity: SeverityWarning, Code: "test-warning", Message: "test", Module: "MY-MIB"},
 		},
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, mib.DefaultConfig())
+	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -443,15 +442,15 @@ func TestRegisterModules_AllBaseModulesFiltered(t *testing.T) {
 	for _, name := range baseNames {
 		userMods = append(userMods, &module.Module{
 			Name:     name,
-			Language: module.LanguageSMIv2,
+			Language: types.LanguageSMIv2,
 		})
 	}
 	userMods = append(userMods, &module.Module{
 		Name:     "REAL-MIB",
-		Language: module.LanguageSMIv2,
+		Language: types.LanguageSMIv2,
 	})
 
-	ctx := newResolverContext(userMods, nil, mib.DefaultConfig())
+	ctx := newResolverContext(userMods, nil, DefaultConfig())
 	registerModules(ctx)
 
 	// Each base name should appear exactly once (from base, not user)
@@ -471,7 +470,7 @@ func TestRegisterModules_AllBaseModulesFiltered(t *testing.T) {
 
 func TestRegisterModules_EmptyModuleList(t *testing.T) {
 	// No user modules - should still register all base modules.
-	ctx := newResolverContext(nil, nil, mib.DefaultConfig())
+	ctx := newResolverContext(nil, nil, DefaultConfig())
 
 	registerModules(ctx)
 
@@ -488,7 +487,7 @@ func TestRegisterModules_EmptyModuleList(t *testing.T) {
 
 func TestRegisterModules_BaseModuleDefinitionNamesCached(t *testing.T) {
 	// Verify that base modules have their definition names cached too.
-	ctx := newResolverContext(nil, nil, mib.DefaultConfig())
+	ctx := newResolverContext(nil, nil, DefaultConfig())
 
 	registerModules(ctx)
 

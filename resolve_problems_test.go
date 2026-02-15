@@ -217,7 +217,7 @@ func TestProblemNotifications(t *testing.T) {
 			return
 		}
 
-		varbinds := testutil.NormalizeVarbinds(notif.Objects())
+		varbinds := normalizeVarbinds(notif.Objects())
 		testutil.Len(t, varbinds, 2, "normal notification should have 2 varbinds")
 		testutil.SliceEqual(t,
 			[]string{"problemNotifStatus", "problemNotifDescription"},
@@ -234,7 +234,7 @@ func TestProblemNotifications(t *testing.T) {
 			return
 		}
 
-		varbinds := testutil.NormalizeVarbinds(notif.Objects())
+		varbinds := normalizeVarbinds(notif.Objects())
 		wantVarbinds := []string{"problemNotifIndex", "problemNotifStatus"}
 		if !varbindsEquivalent(varbinds, wantVarbinds) {
 			t.Errorf("varbinds: got %v, want %v (net-snmp ground truth)", varbinds, wantVarbinds)
@@ -250,7 +250,7 @@ func TestProblemNotifications(t *testing.T) {
 			return
 		}
 
-		varbinds := testutil.NormalizeVarbinds(notif.Objects())
+		varbinds := normalizeVarbinds(notif.Objects())
 		// gomib excludes unresolved references, so we expect only problemNotifStatus
 		// (or possibly neither if the entire notification fails).
 		// This is a known divergence from net-snmp which preserves the string.
@@ -396,7 +396,7 @@ func TestProblemAccess(t *testing.T) {
 		if obj == nil {
 			return
 		}
-		access := testutil.NormalizeAccess(obj.Access())
+		access := normalizeAccess(obj.Access())
 		testutil.Equal(t, "read-create", access,
 			"scalar read-create should preserve access value (matches net-snmp)")
 	})
@@ -409,7 +409,7 @@ func TestProblemAccess(t *testing.T) {
 		if obj == nil {
 			return
 		}
-		access := testutil.NormalizeAccess(obj.Access())
+		access := normalizeAccess(obj.Access())
 		testutil.Equal(t, "write-only", access,
 			"write-only should be preserved (matches net-snmp)")
 	})
@@ -422,7 +422,7 @@ func TestProblemAccess(t *testing.T) {
 		if rwObj == nil {
 			return
 		}
-		rwAccess := testutil.NormalizeAccess(rwObj.Access())
+		rwAccess := normalizeAccess(rwObj.Access())
 		testutil.Equal(t, "read-write", rwAccess,
 			"column read-write should be preserved")
 
@@ -433,7 +433,7 @@ func TestProblemAccess(t *testing.T) {
 		if rcObj == nil {
 			return
 		}
-		rcAccess := testutil.NormalizeAccess(rcObj.Access())
+		rcAccess := normalizeAccess(rcObj.Access())
 		testutil.Equal(t, "read-create", rcAccess,
 			"column read-create should be preserved")
 	})
@@ -463,7 +463,7 @@ func TestProblemImports(t *testing.T) {
 				return
 			}
 
-			gotType := testutil.NormalizeType(obj.Type())
+			gotType := normalizeType(obj.Type())
 			testutil.Equal(t, tt.wantType, gotType,
 				"base type for %s", tt.name)
 		})
@@ -487,7 +487,7 @@ func TestProblemImports(t *testing.T) {
 				return
 			}
 
-			gotType := testutil.NormalizeType(obj.Type())
+			gotType := normalizeType(obj.Type())
 			testutil.Equal(t, tt.wantType, gotType,
 				"TC base type for %s (matches net-snmp)", tt.name)
 		})
@@ -508,7 +508,7 @@ func TestProblemSMIv1v2AccessKeyword(t *testing.T) {
 
 	obj := m.Object("problemV1AccessObject")
 	testutil.NotNil(t, obj, "Object(problemV1AccessObject)")
-	access := testutil.NormalizeAccess(obj.Access())
+	access := normalizeAccess(obj.Access())
 	testutil.Equal(t, "read-only", access,
 		"ACCESS read-only in SMIv2 module should resolve (matches net-snmp)")
 }
@@ -523,7 +523,7 @@ func TestProblemSMIv1v2MandatoryStatus(t *testing.T) {
 	t.Run("mandatory", func(t *testing.T) {
 		obj := m.Object("problemMandatoryStatus")
 		testutil.NotNil(t, obj, "Object(problemMandatoryStatus)")
-		status := testutil.NormalizeStatus(obj.Status())
+		status := normalizeStatus(obj.Status())
 		// gomib preserves mandatory as StatusMandatory; net-snmp maps to current
 		if status != "mandatory" && status != "current" {
 			t.Errorf("status: got %q, want mandatory or current", status)
@@ -533,7 +533,7 @@ func TestProblemSMIv1v2MandatoryStatus(t *testing.T) {
 	t.Run("optional", func(t *testing.T) {
 		obj := m.Object("problemOptionalStatus")
 		testutil.NotNil(t, obj, "Object(problemOptionalStatus)")
-		status := testutil.NormalizeStatus(obj.Status())
+		status := normalizeStatus(obj.Status())
 		if status != "optional" && status != "obsolete" {
 			t.Errorf("status: got %q, want optional or obsolete", status)
 		}
@@ -608,7 +608,7 @@ func TestProblemIndexBareType(t *testing.T) {
 	entry := m.Object("problemBareTypeEntry")
 	testutil.NotNil(t, entry, "Object(problemBareTypeEntry)")
 
-	kind := testutil.NormalizeKind(entry.Kind())
+	kind := normalizeKind(entry.Kind())
 	testutil.Equal(t, "row", kind, "entry should be a row")
 
 	val := m.Object("problemBareTypeValue")
@@ -625,10 +625,10 @@ func TestProblemIndexMacAddress(t *testing.T) {
 	entry := m.Object("problemMacIndexEntry")
 	testutil.NotNil(t, entry, "Object(problemMacIndexEntry)")
 
-	kind := testutil.NormalizeKind(entry.Kind())
+	kind := normalizeKind(entry.Kind())
 	testutil.Equal(t, "row", kind, "entry should be a row")
 
-	indexes := testutil.NormalizeIndexes(entry.Index())
+	indexes := normalizeIndexes(entry.Index())
 	testutil.NotEmpty(t, indexes, "indexes for MacAddress index table")
 	testutil.Equal(t, "problemMacIndexAddress", indexes[0].Name,
 		"MacAddress index should resolve")
@@ -647,10 +647,10 @@ func TestProblemIndexNoRange(t *testing.T) {
 	entry := m.Object("problemNoRangeEntry")
 	testutil.NotNil(t, entry, "Object(problemNoRangeEntry)")
 
-	kind := testutil.NormalizeKind(entry.Kind())
+	kind := normalizeKind(entry.Kind())
 	testutil.Equal(t, "row", kind, "entry should be a row")
 
-	indexes := testutil.NormalizeIndexes(entry.Index())
+	indexes := normalizeIndexes(entry.Index())
 	testutil.Len(t, indexes, 2, "indexes count")
 	testutil.Equal(t, "problemNoRangeIndex1", indexes[0].Name, "first index")
 	testutil.Equal(t, "problemNoRangeIndex2", indexes[1].Name, "second index")
@@ -666,10 +666,10 @@ func TestProblemIndexDisplayString(t *testing.T) {
 	entry := m.Object("problemStringIndexEntry")
 	testutil.NotNil(t, entry, "Object(problemStringIndexEntry)")
 
-	kind := testutil.NormalizeKind(entry.Kind())
+	kind := normalizeKind(entry.Kind())
 	testutil.Equal(t, "row", kind, "entry should be a row")
 
-	indexes := testutil.NormalizeIndexes(entry.Index())
+	indexes := normalizeIndexes(entry.Index())
 	testutil.NotEmpty(t, indexes, "indexes for DisplayString index table")
 	testutil.Equal(t, "problemStringIndexName", indexes[0].Name,
 		"DisplayString index should resolve")
@@ -697,15 +697,15 @@ func TestProblemIndexTableKinds(t *testing.T) {
 		t.Run(tt.table, func(t *testing.T) {
 			tbl := m.Object(tt.table)
 			testutil.NotNil(t, tbl, "Object(%s)", tt.table)
-			testutil.Equal(t, "table", testutil.NormalizeKind(tbl.Kind()), "table kind")
+			testutil.Equal(t, "table", normalizeKind(tbl.Kind()), "table kind")
 
 			ent := m.Object(tt.entry)
 			testutil.NotNil(t, ent, "Object(%s)", tt.entry)
-			testutil.Equal(t, "row", testutil.NormalizeKind(ent.Kind()), "entry kind")
+			testutil.Equal(t, "row", normalizeKind(ent.Kind()), "entry kind")
 
 			col := m.Object(tt.column)
 			testutil.NotNil(t, col, "Object(%s)", tt.column)
-			testutil.Equal(t, "column", testutil.NormalizeKind(col.Kind()), "column kind")
+			testutil.Equal(t, "column", normalizeKind(col.Kind()), "column kind")
 		})
 	}
 }

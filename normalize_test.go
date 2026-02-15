@@ -1,15 +1,16 @@
-package testutil
+package gomib
 
 import (
 	"fmt"
 	"slices"
 	"strings"
 
+	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// NormalizeType converts a gomib Type to the normalized string used in fixtures.
-func NormalizeType(t *mib.Type) string {
+// normalizeType converts a gomib Type to the normalized string used in fixtures.
+func normalizeType(t *mib.Type) string {
 	if t == nil {
 		return ""
 	}
@@ -42,23 +43,23 @@ func NormalizeType(t *mib.Type) string {
 	}
 }
 
-// NormalizeAccess converts a gomib Access to the normalized string used in fixtures.
-func NormalizeAccess(a mib.Access) string {
+// normalizeAccess converts a gomib Access to the normalized string used in fixtures.
+func normalizeAccess(a mib.Access) string {
 	return a.String()
 }
 
-// NormalizeStatus converts a gomib Status to the normalized string used in fixtures.
-func NormalizeStatus(s mib.Status) string {
+// normalizeStatus converts a gomib Status to the normalized string used in fixtures.
+func normalizeStatus(s mib.Status) string {
 	return s.String()
 }
 
-// NormalizeKind converts a gomib Kind to the normalized string used in fixtures.
-func NormalizeKind(k mib.Kind) string {
+// normalizeKind converts a gomib Kind to the normalized string used in fixtures.
+func normalizeKind(k mib.Kind) string {
 	return k.String()
 }
 
-// NormalizeEnums converts gomib NamedValue slice to the map[int]string format used in fixtures.
-func NormalizeEnums(nvs []mib.NamedValue) map[int]string {
+// normalizeEnums converts gomib NamedValue slice to the map[int]string format used in fixtures.
+func normalizeEnums(nvs []mib.NamedValue) map[int]string {
 	if len(nvs) == 0 {
 		return nil
 	}
@@ -69,27 +70,27 @@ func NormalizeEnums(nvs []mib.NamedValue) map[int]string {
 	return m
 }
 
-// NormalizeRanges converts gomib Range slice to the RangeInfo format used in fixtures.
-func NormalizeRanges(rs []mib.Range) []RangeInfo {
+// normalizeRanges converts gomib Range slice to the RangeInfo format used in fixtures.
+func normalizeRanges(rs []mib.Range) []testutil.RangeInfo {
 	if len(rs) == 0 {
 		return nil
 	}
-	result := make([]RangeInfo, len(rs))
+	result := make([]testutil.RangeInfo, len(rs))
 	for i, r := range rs {
-		result[i] = RangeInfo{Low: r.Min, High: r.Max}
+		result[i] = testutil.RangeInfo{Low: r.Min, High: r.Max}
 	}
 	return result
 }
 
-// NormalizeIndexes converts gomib IndexEntry slice to the IndexInfo format used in fixtures.
-func NormalizeIndexes(entries []mib.IndexEntry) []IndexInfo {
+// normalizeIndexes converts gomib IndexEntry slice to the IndexInfo format used in fixtures.
+func normalizeIndexes(entries []mib.IndexEntry) []testutil.IndexInfo {
 	if len(entries) == 0 {
 		return nil
 	}
-	result := make([]IndexInfo, 0, len(entries))
+	result := make([]testutil.IndexInfo, 0, len(entries))
 	for _, e := range entries {
 		if e.Object != nil {
-			result = append(result, IndexInfo{
+			result = append(result, testutil.IndexInfo{
 				Name:    e.Object.Name(),
 				Implied: e.Implied,
 			})
@@ -101,8 +102,8 @@ func NormalizeIndexes(entries []mib.IndexEntry) []IndexInfo {
 	return result
 }
 
-// NormalizeVarbinds converts gomib Object slice (notification OBJECTS) to name strings.
-func NormalizeVarbinds(objects []*mib.Object) []string {
+// normalizeVarbinds converts gomib Object slice (notification OBJECTS) to name strings.
+func normalizeVarbinds(objects []*mib.Object) []string {
 	if len(objects) == 0 {
 		return nil
 	}
@@ -113,8 +114,8 @@ func NormalizeVarbinds(objects []*mib.Object) []string {
 	return result
 }
 
-// FormatEnums formats an enum map as a human-readable string for error messages.
-func FormatEnums(enums map[int]string) string {
+// formatEnums formats an enum map as a human-readable string for error messages.
+func formatEnums(enums map[int]string) string {
 	if len(enums) == 0 {
 		return "{}"
 	}
@@ -130,8 +131,8 @@ func FormatEnums(enums map[int]string) string {
 	return "{ " + strings.Join(parts, ", ") + " }"
 }
 
-// FormatRanges formats a range list as a human-readable string for error messages.
-func FormatRanges(ranges []RangeInfo) string {
+// formatRanges formats a range list as a human-readable string for error messages.
+func formatRanges(ranges []testutil.RangeInfo) string {
 	if len(ranges) == 0 {
 		return "()"
 	}
@@ -146,8 +147,8 @@ func FormatRanges(ranges []RangeInfo) string {
 	return "(" + strings.Join(parts, " | ") + ")"
 }
 
-// FormatIndexes formats an index list as a human-readable string for error messages.
-func FormatIndexes(indexes []IndexInfo) string {
+// formatIndexes formats an index list as a human-readable string for error messages.
+func formatIndexes(indexes []testutil.IndexInfo) string {
 	if len(indexes) == 0 {
 		return ""
 	}

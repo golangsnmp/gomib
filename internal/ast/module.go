@@ -4,7 +4,6 @@ import (
 	"slices"
 
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 // Module is the top-level AST node for a parsed MIB module.
@@ -15,7 +14,7 @@ type Module struct {
 	Exports         *ExportsClause
 	Body            []Definition
 	Span            types.Span
-	Diagnostics     []types.Diagnostic
+	Diagnostics     []types.SpanDiagnostic
 }
 
 // NewModule creates a Module with nil imports, body, and diagnostics.
@@ -33,8 +32,8 @@ func NewModule(name Ident, definitionsKind DefinitionsKind, span types.Span) *Mo
 
 // HasErrors reports whether any diagnostic has error severity or worse.
 func (m *Module) HasErrors() bool {
-	return slices.ContainsFunc(m.Diagnostics, func(d types.Diagnostic) bool {
-		return d.Severity <= mib.SeverityError
+	return slices.ContainsFunc(m.Diagnostics, func(d types.SpanDiagnostic) bool {
+		return d.Severity <= types.SeverityError
 	})
 }
 

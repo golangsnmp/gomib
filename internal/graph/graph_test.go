@@ -2,8 +2,6 @@ package graph
 
 import (
 	"testing"
-
-	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 func TestGraphBasic(t *testing.T) {
@@ -16,9 +14,15 @@ func TestGraphBasic(t *testing.T) {
 	g.AddNode(b, NodeKindType)
 	g.AddEdge(a, b) // a depends on b
 
-	testutil.Equal(t, 2, len(g.Nodes()), "node count")
-	testutil.Len(t, g.Dependencies(a), 1, "a dependencies")
-	testutil.Equal(t, b, g.Dependencies(a)[0], "a depends on b")
+	if len(g.Nodes()) != 2 {
+		t.Errorf("node count = %d, want 2", len(g.Nodes()))
+	}
+	if len(g.Dependencies(a)) != 1 {
+		t.Errorf("a dependencies = %d, want 1", len(g.Dependencies(a)))
+	}
+	if g.Dependencies(a)[0] != b {
+		t.Errorf("a depends on %v, want %v", g.Dependencies(a)[0], b)
+	}
 }
 
 func TestFindCyclesNoCycle(t *testing.T) {
@@ -35,7 +39,9 @@ func TestFindCyclesNoCycle(t *testing.T) {
 	g.AddEdge(b, c) // b -> c
 
 	cycles := g.FindCycles()
-	testutil.Len(t, cycles, 0, "no cycles expected")
+	if len(cycles) != 0 {
+		t.Errorf("cycles = %d, want 0", len(cycles))
+	}
 }
 
 func TestFindCyclesSimple(t *testing.T) {
@@ -50,8 +56,12 @@ func TestFindCyclesSimple(t *testing.T) {
 	g.AddEdge(b, a) // b -> a (cycle!)
 
 	cycles := g.FindCycles()
-	testutil.Len(t, cycles, 1, "one cycle expected")
-	testutil.Len(t, cycles[0], 2, "cycle should have 2 nodes")
+	if len(cycles) != 1 {
+		t.Fatalf("cycles = %d, want 1", len(cycles))
+	}
+	if len(cycles[0]) != 2 {
+		t.Errorf("cycle length = %d, want 2", len(cycles[0]))
+	}
 }
 
 func TestFindCyclesTriangle(t *testing.T) {
@@ -69,8 +79,12 @@ func TestFindCyclesTriangle(t *testing.T) {
 	g.AddEdge(c, a) // c -> a (cycle!)
 
 	cycles := g.FindCycles()
-	testutil.Len(t, cycles, 1, "one cycle expected")
-	testutil.Len(t, cycles[0], 3, "cycle should have 3 nodes")
+	if len(cycles) != 1 {
+		t.Fatalf("cycles = %d, want 1", len(cycles))
+	}
+	if len(cycles[0]) != 3 {
+		t.Errorf("cycle length = %d, want 3", len(cycles[0]))
+	}
 }
 
 func TestTopologicalOrderSimple(t *testing.T) {
@@ -87,8 +101,12 @@ func TestTopologicalOrderSimple(t *testing.T) {
 	g.AddEdge(b, c) // b depends on c
 
 	order, cyclic := g.ResolutionOrder()
-	testutil.Len(t, cyclic, 0, "no cyclic nodes")
-	testutil.Len(t, order, 3, "all nodes in order")
+	if len(cyclic) != 0 {
+		t.Errorf("cyclic = %d, want 0", len(cyclic))
+	}
+	if len(order) != 3 {
+		t.Fatalf("order = %d, want 3", len(order))
+	}
 
 	// c should come before b, b should come before a
 	indexOf := func(s Symbol) int {
@@ -100,8 +118,12 @@ func TestTopologicalOrderSimple(t *testing.T) {
 		return -1
 	}
 
-	testutil.True(t, indexOf(c) < indexOf(b), "c should come before b")
-	testutil.True(t, indexOf(b) < indexOf(a), "b should come before a")
+	if indexOf(c) >= indexOf(b) {
+		t.Error("c should come before b")
+	}
+	if indexOf(b) >= indexOf(a) {
+		t.Error("b should come before a")
+	}
 }
 
 func TestTopologicalOrderWithCycle(t *testing.T) {
@@ -119,7 +141,9 @@ func TestTopologicalOrderWithCycle(t *testing.T) {
 	g.AddEdge(c, a)
 
 	_, cyclic := g.ResolutionOrder()
-	testutil.Greater(t, len(cyclic), 0, "should have cyclic nodes")
+	if len(cyclic) == 0 {
+		t.Error("should have cyclic nodes")
+	}
 }
 
 func TestMarkResolved(t *testing.T) {
@@ -128,10 +152,14 @@ func TestMarkResolved(t *testing.T) {
 	a := Symbol{Module: "M", Name: "a"}
 	g.AddNode(a, NodeKindType)
 
-	testutil.False(t, g.IsResolved(a), "initially not resolved")
+	if g.IsResolved(a) {
+		t.Error("initially should not be resolved")
+	}
 
 	g.MarkResolved(a)
-	testutil.True(t, g.IsResolved(a), "now resolved")
+	if !g.IsResolved(a) {
+		t.Error("should be resolved after MarkResolved")
+	}
 }
 
 func TestSelfLoop(t *testing.T) {
@@ -147,13 +175,21 @@ func TestSelfLoop(t *testing.T) {
 
 	// FindCycles should detect the self-loop.
 	cycles := g.FindCycles()
-	testutil.Len(t, cycles, 1, "one cycle expected")
-	testutil.Len(t, cycles[0], 1, "self-loop is single node")
-	testutil.Equal(t, a, cycles[0][0], "self-loop node")
+	if len(cycles) != 1 {
+		t.Fatalf("cycles = %d, want 1", len(cycles))
+	}
+	if len(cycles[0]) != 1 {
+		t.Errorf("self-loop cycle length = %d, want 1", len(cycles[0]))
+	}
+	if cycles[0][0] != a {
+		t.Errorf("self-loop node = %v, want %v", cycles[0][0], a)
+	}
 
 	// TopologicalOrder should also report it as cyclic.
 	_, cyclic := g.TopologicalOrder()
-	testutil.Greater(t, len(cyclic), 0, "self-loop should be cyclic in topo sort")
+	if len(cyclic) == 0 {
+		t.Error("self-loop should be cyclic in topo sort")
+	}
 }
 
 func TestDuplicateEdges(t *testing.T) {
@@ -169,12 +205,18 @@ func TestDuplicateEdges(t *testing.T) {
 	g.AddEdge(a, b) // duplicate
 
 	// Should only have one edge.
-	testutil.Len(t, g.Dependencies(a), 1, "duplicate edges deduplicated")
+	if len(g.Dependencies(a)) != 1 {
+		t.Errorf("dependencies = %d, want 1 (duplicate edges deduplicated)", len(g.Dependencies(a)))
+	}
 
 	// Topo sort should work correctly.
 	order, cyclic := g.TopologicalOrder()
-	testutil.Len(t, cyclic, 0, "no cyclic nodes")
-	testutil.Len(t, order, 2, "all nodes in order")
+	if len(cyclic) != 0 {
+		t.Errorf("cyclic = %d, want 0", len(cyclic))
+	}
+	if len(order) != 2 {
+		t.Errorf("order = %d, want 2", len(order))
+	}
 }
 
 func TestImplicitNodeKindUpdate(t *testing.T) {
@@ -185,9 +227,13 @@ func TestImplicitNodeKindUpdate(t *testing.T) {
 
 	// b is implicitly created by AddEdge with zero-value kind.
 	g.AddEdge(a, b)
-	testutil.Equal(t, NodeKind(0), g.Node(b).Kind, "implicit node has zero kind")
+	if g.Node(b).Kind != NodeKind(0) {
+		t.Errorf("implicit node kind = %v, want 0", g.Node(b).Kind)
+	}
 
 	// Explicit AddNode should update the kind.
 	g.AddNode(b, NodeKindOID)
-	testutil.Equal(t, NodeKindOID, g.Node(b).Kind, "kind updated after AddNode")
+	if g.Node(b).Kind != NodeKindOID {
+		t.Errorf("kind = %v, want NodeKindOID", g.Node(b).Kind)
+	}
 }

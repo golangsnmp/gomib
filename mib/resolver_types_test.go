@@ -1,33 +1,32 @@
-package resolver
+package mib
 
 import (
 	"math"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 func TestSyntaxToBaseType(t *testing.T) {
 	tests := []struct {
 		name   string
 		syntax module.TypeSyntax
-		want   mib.BaseType
+		want   BaseType
 		wantOK bool
 	}{
 		// TypeRef variants - known base types
-		{"typeref Integer32", &module.TypeSyntaxTypeRef{Name: "Integer32"}, mib.BaseInteger32, true},
-		{"typeref INTEGER", &module.TypeSyntaxTypeRef{Name: "INTEGER"}, mib.BaseInteger32, true},
-		{"typeref Counter32", &module.TypeSyntaxTypeRef{Name: "Counter32"}, mib.BaseCounter32, true},
-		{"typeref Counter64", &module.TypeSyntaxTypeRef{Name: "Counter64"}, mib.BaseCounter64, true},
-		{"typeref Gauge32", &module.TypeSyntaxTypeRef{Name: "Gauge32"}, mib.BaseGauge32, true},
-		{"typeref Unsigned32", &module.TypeSyntaxTypeRef{Name: "Unsigned32"}, mib.BaseUnsigned32, true},
-		{"typeref TimeTicks", &module.TypeSyntaxTypeRef{Name: "TimeTicks"}, mib.BaseTimeTicks, true},
-		{"typeref IpAddress", &module.TypeSyntaxTypeRef{Name: "IpAddress"}, mib.BaseIpAddress, true},
-		{"typeref Opaque", &module.TypeSyntaxTypeRef{Name: "Opaque"}, mib.BaseOpaque, true},
-		{"typeref OCTET STRING", &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}, mib.BaseOctetString, true},
-		{"typeref OBJECT IDENTIFIER", &module.TypeSyntaxTypeRef{Name: "OBJECT IDENTIFIER"}, mib.BaseObjectIdentifier, true},
-		{"typeref BITS", &module.TypeSyntaxTypeRef{Name: "BITS"}, mib.BaseBits, true},
+		{"typeref Integer32", &module.TypeSyntaxTypeRef{Name: "Integer32"}, BaseInteger32, true},
+		{"typeref INTEGER", &module.TypeSyntaxTypeRef{Name: "INTEGER"}, BaseInteger32, true},
+		{"typeref Counter32", &module.TypeSyntaxTypeRef{Name: "Counter32"}, BaseCounter32, true},
+		{"typeref Counter64", &module.TypeSyntaxTypeRef{Name: "Counter64"}, BaseCounter64, true},
+		{"typeref Gauge32", &module.TypeSyntaxTypeRef{Name: "Gauge32"}, BaseGauge32, true},
+		{"typeref Unsigned32", &module.TypeSyntaxTypeRef{Name: "Unsigned32"}, BaseUnsigned32, true},
+		{"typeref TimeTicks", &module.TypeSyntaxTypeRef{Name: "TimeTicks"}, BaseTimeTicks, true},
+		{"typeref IpAddress", &module.TypeSyntaxTypeRef{Name: "IpAddress"}, BaseIpAddress, true},
+		{"typeref Opaque", &module.TypeSyntaxTypeRef{Name: "Opaque"}, BaseOpaque, true},
+		{"typeref OCTET STRING", &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}, BaseOctetString, true},
+		{"typeref OBJECT IDENTIFIER", &module.TypeSyntaxTypeRef{Name: "OBJECT IDENTIFIER"}, BaseObjectIdentifier, true},
+		{"typeref BITS", &module.TypeSyntaxTypeRef{Name: "BITS"}, BaseBits, true},
 
 		// TypeRef - unknown name (user-defined type)
 		{"typeref DisplayString", &module.TypeSyntaxTypeRef{Name: "DisplayString"}, 0, false},
@@ -36,30 +35,30 @@ func TestSyntaxToBaseType(t *testing.T) {
 		// Primitive syntax types
 		{"IntegerEnum", &module.TypeSyntaxIntegerEnum{
 			NamedNumbers: []module.NamedNumber{{Name: "up", Value: 1}},
-		}, mib.BaseInteger32, true},
+		}, BaseInteger32, true},
 		{"Bits", &module.TypeSyntaxBits{
 			NamedBits: []module.NamedBit{{Name: "flag0", Position: 0}},
-		}, mib.BaseBits, true},
-		{"OctetString", &module.TypeSyntaxOctetString{}, mib.BaseOctetString, true},
-		{"ObjectIdentifier", &module.TypeSyntaxObjectIdentifier{}, mib.BaseObjectIdentifier, true},
+		}, BaseBits, true},
+		{"OctetString", &module.TypeSyntaxOctetString{}, BaseOctetString, true},
+		{"ObjectIdentifier", &module.TypeSyntaxObjectIdentifier{}, BaseObjectIdentifier, true},
 
 		// Constrained wrapping - delegates to inner syntax
 		{"constrained Integer32", &module.TypeSyntaxConstrained{
 			Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(0, 100)}},
-		}, mib.BaseInteger32, true},
+		}, BaseInteger32, true},
 		{"constrained OCTET STRING", &module.TypeSyntaxConstrained{
 			Base:       &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
 			Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255)}},
-		}, mib.BaseOctetString, true},
+		}, BaseOctetString, true},
 		{"constrained OctetString primitive", &module.TypeSyntaxConstrained{
 			Base:       &module.TypeSyntaxOctetString{},
 			Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255)}},
-		}, mib.BaseOctetString, true},
+		}, BaseOctetString, true},
 		{"constrained ObjectIdentifier primitive", &module.TypeSyntaxConstrained{
 			Base:       &module.TypeSyntaxObjectIdentifier{},
 			Constraint: &module.ConstraintSize{},
-		}, mib.BaseObjectIdentifier, true},
+		}, BaseObjectIdentifier, true},
 		{"constrained unknown typeref", &module.TypeSyntaxConstrained{
 			Base:       &module.TypeSyntaxTypeRef{Name: "DisplayString"},
 			Constraint: &module.ConstraintSize{},
@@ -157,22 +156,22 @@ func TestGetPrimitiveParentName(t *testing.T) {
 func TestIsApplicationBaseType(t *testing.T) {
 	tests := []struct {
 		name string
-		base mib.BaseType
+		base BaseType
 		want bool
 	}{
-		{"Counter32", mib.BaseCounter32, true},
-		{"Counter64", mib.BaseCounter64, true},
-		{"Gauge32", mib.BaseGauge32, true},
-		{"Unsigned32", mib.BaseUnsigned32, true},
-		{"TimeTicks", mib.BaseTimeTicks, true},
-		{"IpAddress", mib.BaseIpAddress, true},
-		{"Opaque", mib.BaseOpaque, true},
-		{"Integer32", mib.BaseInteger32, false},
-		{"OctetString", mib.BaseOctetString, false},
-		{"ObjectIdentifier", mib.BaseObjectIdentifier, false},
-		{"Bits", mib.BaseBits, false},
-		{"Sequence", mib.BaseSequence, false},
-		{"Unknown", mib.BaseUnknown, false},
+		{"Counter32", BaseCounter32, true},
+		{"Counter64", BaseCounter64, true},
+		{"Gauge32", BaseGauge32, true},
+		{"Unsigned32", BaseUnsigned32, true},
+		{"TimeTicks", BaseTimeTicks, true},
+		{"IpAddress", BaseIpAddress, true},
+		{"Opaque", BaseOpaque, true},
+		{"Integer32", BaseInteger32, false},
+		{"OctetString", BaseOctetString, false},
+		{"ObjectIdentifier", BaseObjectIdentifier, false},
+		{"Bits", BaseBits, false},
+		{"Sequence", BaseSequence, false},
+		{"Unknown", BaseUnknown, false},
 	}
 
 	for _, tt := range tests {
@@ -273,7 +272,7 @@ func TestExtractNamedValues(t *testing.T) {
 	})
 }
 
-func assertNamedValue(t *testing.T, nv mib.NamedValue, wantLabel string, wantValue int64) {
+func assertNamedValue(t *testing.T, nv NamedValue, wantLabel string, wantValue int64) {
 	t.Helper()
 	if nv.Label != wantLabel {
 		t.Errorf("label = %q, want %q", nv.Label, wantLabel)
@@ -456,77 +455,77 @@ func TestRangeValueToI64(t *testing.T) {
 
 func TestResolveBaseFromChain(t *testing.T) {
 	t.Run("no parent returns own base", func(t *testing.T) {
-		typ := mib.NewType("MyType")
-		typ.SetBase(mib.BaseOctetString)
+		typ := newType("MyType")
+		typ.setBase(BaseOctetString)
 
 		got, ok := resolveBaseFromChain(typ)
 		if !ok {
 			t.Fatal("expected ok=true")
 		}
-		if got != mib.BaseOctetString {
-			t.Errorf("got %v, want %v", got, mib.BaseOctetString)
+		if got != BaseOctetString {
+			t.Errorf("got %v, want %v", got, BaseOctetString)
 		}
 	})
 
 	t.Run("walks chain to root", func(t *testing.T) {
-		root := mib.NewType("INTEGER")
-		root.SetBase(mib.BaseInteger32)
+		root := newType("INTEGER")
+		root.setBase(BaseInteger32)
 
-		mid := mib.NewType("MyInt")
-		mid.SetBase(mib.BaseInteger32)
-		mid.SetParent(root)
+		mid := newType("MyInt")
+		mid.setBase(BaseInteger32)
+		mid.setParent(root)
 
-		leaf := mib.NewType("MySpecificInt")
-		leaf.SetBase(mib.BaseInteger32)
-		leaf.SetParent(mid)
+		leaf := newType("MySpecificInt")
+		leaf.setBase(BaseInteger32)
+		leaf.setParent(mid)
 
 		got, ok := resolveBaseFromChain(leaf)
 		if !ok {
 			t.Fatal("expected ok=true")
 		}
-		if got != mib.BaseInteger32 {
-			t.Errorf("got %v, want %v", got, mib.BaseInteger32)
+		if got != BaseInteger32 {
+			t.Errorf("got %v, want %v", got, BaseInteger32)
 		}
 	})
 
 	t.Run("stops at application base type", func(t *testing.T) {
-		root := mib.NewType("INTEGER")
-		root.SetBase(mib.BaseInteger32)
+		root := newType("INTEGER")
+		root.setBase(BaseInteger32)
 
-		counter := mib.NewType("Counter32")
-		counter.SetBase(mib.BaseCounter32)
-		counter.SetParent(root)
+		counter := newType("Counter32")
+		counter.setBase(BaseCounter32)
+		counter.setParent(root)
 
-		myCounter := mib.NewType("MyCounter")
-		myCounter.SetBase(mib.BaseCounter32)
-		myCounter.SetParent(counter)
+		myCounter := newType("MyCounter")
+		myCounter.setBase(BaseCounter32)
+		myCounter.setParent(counter)
 
 		got, ok := resolveBaseFromChain(myCounter)
 		if !ok {
 			t.Fatal("expected ok=true")
 		}
 		// Should stop at Counter32 (application base type), not walk to INTEGER
-		if got != mib.BaseCounter32 {
-			t.Errorf("got %v, want %v", got, mib.BaseCounter32)
+		if got != BaseCounter32 {
+			t.Errorf("got %v, want %v", got, BaseCounter32)
 		}
 	})
 
 	t.Run("stops at each application type", func(t *testing.T) {
-		appTypes := []mib.BaseType{
-			mib.BaseCounter32, mib.BaseCounter64, mib.BaseGauge32,
-			mib.BaseUnsigned32, mib.BaseTimeTicks, mib.BaseIpAddress, mib.BaseOpaque,
+		appTypes := []BaseType{
+			BaseCounter32, BaseCounter64, BaseGauge32,
+			BaseUnsigned32, BaseTimeTicks, BaseIpAddress, BaseOpaque,
 		}
 		for _, appBase := range appTypes {
-			root := mib.NewType("root")
-			root.SetBase(mib.BaseInteger32)
+			root := newType("root")
+			root.setBase(BaseInteger32)
 
-			appType := mib.NewType("app")
-			appType.SetBase(appBase)
-			appType.SetParent(root)
+			appType := newType("app")
+			appType.setBase(appBase)
+			appType.setParent(root)
 
-			child := mib.NewType("child")
-			child.SetBase(appBase)
-			child.SetParent(appType)
+			child := newType("child")
+			child.setBase(appBase)
+			child.setParent(appType)
 
 			got, ok := resolveBaseFromChain(child)
 			if !ok {
@@ -539,15 +538,15 @@ func TestResolveBaseFromChain(t *testing.T) {
 	})
 
 	t.Run("cycle detection", func(t *testing.T) {
-		a := mib.NewType("A")
-		a.SetBase(mib.BaseInteger32)
+		a := newType("A")
+		a.setBase(BaseInteger32)
 
-		b := mib.NewType("B")
-		b.SetBase(mib.BaseInteger32)
+		b := newType("B")
+		b.setBase(BaseInteger32)
 
 		// Create cycle: a -> b -> a
-		a.SetParent(b)
-		b.SetParent(a)
+		a.setParent(b)
+		b.setParent(a)
 
 		_, ok := resolveBaseFromChain(a)
 		if ok {
@@ -556,9 +555,9 @@ func TestResolveBaseFromChain(t *testing.T) {
 	})
 
 	t.Run("self-referencing cycle", func(t *testing.T) {
-		a := mib.NewType("A")
-		a.SetBase(mib.BaseInteger32)
-		a.SetParent(a)
+		a := newType("A")
+		a.setBase(BaseInteger32)
+		a.setParent(a)
 
 		_, ok := resolveBaseFromChain(a)
 		if ok {
@@ -567,14 +566,14 @@ func TestResolveBaseFromChain(t *testing.T) {
 	})
 
 	t.Run("long chain", func(t *testing.T) {
-		root := mib.NewType("root")
-		root.SetBase(mib.BaseOctetString)
+		root := newType("root")
+		root.setBase(BaseOctetString)
 
 		prev := root
 		for i := 0; i < 10; i++ {
-			typ := mib.NewType("type")
-			typ.SetBase(mib.BaseOctetString)
-			typ.SetParent(prev)
+			typ := newType("type")
+			typ.setBase(BaseOctetString)
+			typ.setParent(prev)
 			prev = typ
 		}
 
@@ -582,26 +581,26 @@ func TestResolveBaseFromChain(t *testing.T) {
 		if !ok {
 			t.Fatal("expected ok=true")
 		}
-		if got != mib.BaseOctetString {
-			t.Errorf("got %v, want %v", got, mib.BaseOctetString)
+		if got != BaseOctetString {
+			t.Errorf("got %v, want %v", got, BaseOctetString)
 		}
 	})
 
 	t.Run("inherits base from root of chain", func(t *testing.T) {
-		root := mib.NewType("OCTET STRING")
-		root.SetBase(mib.BaseOctetString)
+		root := newType("OCTET STRING")
+		root.setBase(BaseOctetString)
 
-		displayString := mib.NewType("DisplayString")
-		displayString.SetBase(mib.BaseInteger32) // wrong base, should be overridden
-		displayString.SetParent(root)
+		displayString := newType("DisplayString")
+		displayString.setBase(BaseInteger32) // wrong base, should be overridden
+		displayString.setParent(root)
 
 		got, ok := resolveBaseFromChain(displayString)
 		if !ok {
 			t.Fatal("expected ok=true")
 		}
 		// Should return the root's base type
-		if got != mib.BaseOctetString {
-			t.Errorf("got %v, want %v", got, mib.BaseOctetString)
+		if got != BaseOctetString {
+			t.Errorf("got %v, want %v", got, BaseOctetString)
 		}
 	})
 }

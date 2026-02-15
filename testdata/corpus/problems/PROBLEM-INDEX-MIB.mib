@@ -1,6 +1,6 @@
 -- INDEX clause edge cases: bare types, missing ranges, illegal base types
 -- Replicates: RFC1213-MIB, SIXNET-MIB, CM-FACILITY-MIB, RADLAN-MIB
--- Tests: internal/resolver/semantics.go:526-533 (isBareTypeIndex)
+-- Tests: mib/resolver_semantics.go (isBareTypeIndex)
 
 PROBLEM-INDEX-MIB DEFINITIONS ::= BEGIN
 

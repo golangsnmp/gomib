@@ -50,7 +50,7 @@ func TestResolveTypes(t *testing.T) {
 						return
 					}
 
-					gomibType := testutil.NormalizeType(obj.Type())
+					gomibType := normalizeType(obj.Type())
 					if !typesEquivalent(gomibType, fn.Type) {
 						t.Errorf("divergence: type for %s: gomib=%q fixture=%q",
 							fn.Name, gomibType, fn.Type)
@@ -102,12 +102,12 @@ func TestResolveEnums(t *testing.T) {
 						return
 					}
 
-					gomibEnums := testutil.NormalizeEnums(obj.EffectiveEnums())
+					gomibEnums := normalizeEnums(obj.EffectiveEnums())
 					if !enumsEquivalent(gomibEnums, fn.EnumValues) {
 						t.Errorf("divergence: enums for %s:\n  gomib=%s\n  fixture=%s",
 							fn.Name,
-							testutil.FormatEnums(gomibEnums),
-							testutil.FormatEnums(fn.EnumValues))
+							formatEnums(gomibEnums),
+							formatEnums(fn.EnumValues))
 					}
 				})
 			}
@@ -137,12 +137,12 @@ func TestResolveBits(t *testing.T) {
 						return
 					}
 
-					gomibBits := testutil.NormalizeEnums(obj.EffectiveBits())
+					gomibBits := normalizeEnums(obj.EffectiveBits())
 					if !enumsEquivalent(gomibBits, fn.BitValues) {
 						t.Errorf("divergence: bits for %s:\n  gomib=%s\n  fixture=%s",
 							fn.Name,
-							testutil.FormatEnums(gomibBits),
-							testutil.FormatEnums(fn.BitValues))
+							formatEnums(gomibBits),
+							formatEnums(fn.BitValues))
 					}
 				})
 			}
@@ -171,7 +171,7 @@ func TestResolveTables(t *testing.T) {
 					}
 
 					if fn.Kind != "" {
-						gomibKind := testutil.NormalizeKind(obj.Kind())
+						gomibKind := normalizeKind(obj.Kind())
 						if gomibKind != fn.Kind {
 							t.Errorf("divergence: kind for %s: gomib=%q fixture=%q",
 								fn.Name, gomibKind, fn.Kind)
@@ -179,12 +179,12 @@ func TestResolveTables(t *testing.T) {
 					}
 
 					if len(fn.Indexes) > 0 {
-						gomibIndexes := testutil.NormalizeIndexes(obj.Index())
+						gomibIndexes := normalizeIndexes(obj.Index())
 						if !indexesEquivalent(gomibIndexes, fn.Indexes) {
 							t.Errorf("divergence: indexes for %s:\n  gomib=%s\n  fixture=%s",
 								fn.Name,
-								testutil.FormatIndexes(gomibIndexes),
-								testutil.FormatIndexes(fn.Indexes))
+								formatIndexes(gomibIndexes),
+								formatIndexes(fn.Indexes))
 						}
 					}
 
@@ -223,7 +223,7 @@ func TestResolveAccess(t *testing.T) {
 						return
 					}
 
-					gomibAccess := testutil.NormalizeAccess(obj.Access())
+					gomibAccess := normalizeAccess(obj.Access())
 					isSMIv1 := obj.Module().Language() == mib.LanguageSMIv1
 					if !accessEquivalent(gomibAccess, fn.Access, isSMIv1) {
 						t.Errorf("divergence: access for %s: gomib=%q fixture=%q",
@@ -250,9 +250,9 @@ func TestResolveStatus(t *testing.T) {
 				t.Run(fn.Name, func(t *testing.T) {
 					gomibStatus := ""
 					if obj := m.Object(fn.Name); obj != nil {
-						gomibStatus = testutil.NormalizeStatus(obj.Status())
+						gomibStatus = normalizeStatus(obj.Status())
 					} else if notif := m.Notification(fn.Name); notif != nil {
-						gomibStatus = testutil.NormalizeStatus(notif.Status())
+						gomibStatus = normalizeStatus(notif.Status())
 					} else {
 						t.Errorf("divergence: gomib does not have node %q", fn.Name)
 						return
@@ -291,14 +291,14 @@ func TestResolveRanges(t *testing.T) {
 					}
 
 					var gomibRanges []testutil.RangeInfo
-					gomibRanges = append(gomibRanges, testutil.NormalizeRanges(obj.EffectiveRanges())...)
-					gomibRanges = append(gomibRanges, testutil.NormalizeRanges(obj.EffectiveSizes())...)
+					gomibRanges = append(gomibRanges, normalizeRanges(obj.EffectiveRanges())...)
+					gomibRanges = append(gomibRanges, normalizeRanges(obj.EffectiveSizes())...)
 
 					if !rangesEquivalent(gomibRanges, fn.Ranges) {
 						t.Errorf("divergence: ranges for %s:\n  gomib=%s\n  fixture=%s",
 							fn.Name,
-							testutil.FormatRanges(gomibRanges),
-							testutil.FormatRanges(fn.Ranges))
+							formatRanges(gomibRanges),
+							formatRanges(fn.Ranges))
 					}
 				})
 			}
@@ -332,7 +332,7 @@ func TestResolveNotifications(t *testing.T) {
 					}
 
 					if len(fn.Varbinds) > 0 {
-						gomibVarbinds := testutil.NormalizeVarbinds(notif.Objects())
+						gomibVarbinds := normalizeVarbinds(notif.Objects())
 						if !varbindsEquivalent(gomibVarbinds, fn.Varbinds) {
 							t.Errorf("divergence: varbinds for %s:\n  gomib=%v\n  fixture=%v",
 								fn.Name, gomibVarbinds, fn.Varbinds)
@@ -340,7 +340,7 @@ func TestResolveNotifications(t *testing.T) {
 					}
 
 					if fn.Status != "" {
-						gomibStatus := testutil.NormalizeStatus(notif.Status())
+						gomibStatus := normalizeStatus(notif.Status())
 						if !statusEquivalent(gomibStatus, fn.Status) {
 							t.Errorf("divergence: status for notification %s: gomib=%q fixture=%q",
 								fn.Name, gomibStatus, fn.Status)

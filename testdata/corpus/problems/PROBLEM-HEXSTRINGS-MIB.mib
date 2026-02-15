@@ -1,6 +1,6 @@
 -- Hex and binary string parsing edge cases
 -- Replicates: ECS4510-MIB, RAPID-CITY, ALCATEL-IND1-TIMETRA-PORT-MIB
--- Tests: internal/resolver/semantics.go hexToBytes(), binaryToBytes()
+-- Tests: mib/resolver_semantics.go hexToBytes(), binaryToBytes()
 
 PROBLEM-HEXSTRINGS-MIB DEFINITIONS ::= BEGIN
 

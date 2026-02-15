@@ -56,38 +56,38 @@ type DefVal struct {
 	raw   string
 }
 
-// NewDefValInt creates a DefVal for a signed integer.
-func NewDefValInt(v int64, raw string) DefVal {
+// newDefValInt creates a DefVal for a signed integer.
+func newDefValInt(v int64, raw string) DefVal {
 	return DefVal{kind: DefValKindInt, value: v, raw: raw}
 }
 
-// NewDefValUint creates a DefVal for an unsigned integer.
-func NewDefValUint(v uint64, raw string) DefVal {
+// newDefValUint creates a DefVal for an unsigned integer.
+func newDefValUint(v uint64, raw string) DefVal {
 	return DefVal{kind: DefValKindUint, value: v, raw: raw}
 }
 
-// NewDefValString creates a DefVal for a quoted string.
-func NewDefValString(v string, raw string) DefVal {
+// newDefValString creates a DefVal for a quoted string.
+func newDefValString(v string, raw string) DefVal {
 	return DefVal{kind: DefValKindString, value: v, raw: raw}
 }
 
-// NewDefValBytes creates a DefVal for bytes (from hex/binary string).
-func NewDefValBytes(v []byte, raw string) DefVal {
+// newDefValBytes creates a DefVal for bytes (from hex/binary string).
+func newDefValBytes(v []byte, raw string) DefVal {
 	return DefVal{kind: DefValKindBytes, value: v, raw: raw}
 }
 
-// NewDefValEnum creates a DefVal for an enum label.
-func NewDefValEnum(label string, raw string) DefVal {
+// newDefValEnum creates a DefVal for an enum label.
+func newDefValEnum(label string, raw string) DefVal {
 	return DefVal{kind: DefValKindEnum, value: label, raw: raw}
 }
 
-// NewDefValBits creates a DefVal for BITS (list of bit labels).
-func NewDefValBits(labels []string, raw string) DefVal {
+// newDefValBits creates a DefVal for BITS (list of bit labels).
+func newDefValBits(labels []string, raw string) DefVal {
 	return DefVal{kind: DefValKindBits, value: labels, raw: raw}
 }
 
-// NewDefValOID creates a DefVal for an OID.
-func NewDefValOID(oid OID, raw string) DefVal {
+// newDefValOID creates a DefVal for an OID.
+func newDefValOID(oid OID, raw string) DefVal {
 	return DefVal{kind: DefValKindOID, value: oid, raw: raw}
 }
 

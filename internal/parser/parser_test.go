@@ -5,12 +5,12 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/ast"
 	"github.com/golangsnmp/gomib/internal/testutil"
-	"github.com/golangsnmp/gomib/mib"
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func TestParseEmptyModule(t *testing.T) {
 	source := []byte("TEST-MIB DEFINITIONS ::= BEGIN END")
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name")
@@ -24,7 +24,7 @@ func TestParseModuleWithImports(t *testing.T) {
 			MODULE-IDENTITY, OBJECT-TYPE FROM SNMPv2-SMI
 			DisplayString FROM SNMPv2-TC;
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name")
@@ -38,7 +38,7 @@ func TestParseValueAssignment(t *testing.T) {
 	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
 		testObject OBJECT IDENTIFIER ::= { iso 3 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -57,7 +57,7 @@ func TestParseSimpleObjectType(t *testing.T) {
 			DESCRIPTION "Test description"
 			::= { testEntry 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -80,7 +80,7 @@ func TestParseIntegerEnum(t *testing.T) {
 			DESCRIPTION "Test status"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -102,7 +102,7 @@ func TestParseModuleIdentity(t *testing.T) {
 			DESCRIPTION "Test MIB"
 			::= { enterprises 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -121,7 +121,7 @@ func TestParseTextualConvention(t *testing.T) {
 			DESCRIPTION "Test string type"
 			SYNTAX OCTET STRING (SIZE (0..255))
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -145,7 +145,7 @@ func TestParseObjectGroup(t *testing.T) {
 			DESCRIPTION "Test group"
 			::= { testConformance 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -162,7 +162,7 @@ func TestParseTypeAssignment(t *testing.T) {
 			testName DisplayString
 		}
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -184,7 +184,7 @@ func TestParseDefVal(t *testing.T) {
 			DEFVAL { 42 }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -206,7 +206,7 @@ func TestParseIndex(t *testing.T) {
 			INDEX { testIndex, IMPLIED testName }
 			::= { testTable 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -230,7 +230,7 @@ func TestParseIndexBareOctetString(t *testing.T) {
 			INDEX { OCTET STRING, testOther }
 			::= { testTable 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -260,7 +260,7 @@ func TestParseErrorRecovery(t *testing.T) {
 			DESCRIPTION "Good"
 			::= { test 2 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	// Should have some diagnostics from the error
@@ -281,7 +281,7 @@ func TestParseTrapType(t *testing.T) {
 			REFERENCE "RFC 1215"
 			::= 5
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -307,7 +307,7 @@ func TestParseTrapTypeMinimal(t *testing.T) {
 			ENTERPRISE testEnterprise
 			::= 1
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -333,7 +333,7 @@ func TestParseNotificationType(t *testing.T) {
 			DESCRIPTION "Test notification"
 			::= { testNotifications 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -356,7 +356,7 @@ func TestParseNotificationTypeNoObjects(t *testing.T) {
 			DESCRIPTION "No objects"
 			::= { testNotifications 2 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -380,7 +380,7 @@ func TestParseModuleCompliance(t *testing.T) {
 				MANDATORY-GROUPS { testGroup1 }
 			::= { testConformance 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -408,7 +408,7 @@ func TestParseAgentCapabilities(t *testing.T) {
 				INCLUDES { ifGeneralGroup }
 			::= { testCapabilities 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -432,7 +432,7 @@ func TestParseNotificationGroup(t *testing.T) {
 			DESCRIPTION "Test notification group"
 			::= { testConformance 2 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -454,7 +454,7 @@ func TestParseObjectIdentity(t *testing.T) {
 			DESCRIPTION "Test identity"
 			::= { testObjects 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -478,7 +478,7 @@ func TestParseTruncatedModuleNoEnd(t *testing.T) {
 			STATUS current
 			DESCRIPTION "Test"
 			::= { test 1 }`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	// Should parse something without crashing, even without END
@@ -499,7 +499,7 @@ func TestParseModuleWithMultipleDefinitions(t *testing.T) {
 			DESCRIPTION "A type"
 			SYNTAX Integer32
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Equal(t, 3, len(module.Body), "should have 3 definitions")
@@ -514,7 +514,7 @@ func TestParseSyntaxWithRange(t *testing.T) {
 			DESCRIPTION "Ranged"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -543,7 +543,7 @@ func TestParseAugments(t *testing.T) {
 			AUGMENTS { testEntry }
 			::= { testAugTable 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -566,7 +566,7 @@ func TestParseBitsSyntax(t *testing.T) {
 			DESCRIPTION "Bit field"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -591,7 +591,7 @@ func TestParseDefValString(t *testing.T) {
 			DEFVAL { "default value" }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -617,7 +617,7 @@ func TestParseDefValHex(t *testing.T) {
 			DEFVAL { 'FF00'H }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -638,7 +638,7 @@ func TestParseDefValBits(t *testing.T) {
 			DEFVAL { { a, c } }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -658,7 +658,7 @@ func TestParseSequenceOf(t *testing.T) {
 			DESCRIPTION "Test table"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
@@ -682,7 +682,7 @@ func TestParseSMIv1ObjectType(t *testing.T) {
 			DESCRIPTION "SMIv1 object"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -704,7 +704,7 @@ func TestIdentifierUnderscoreDiagnostic(t *testing.T) {
 	source := []byte(`TEST_MIB DEFINITIONS ::= BEGIN
 		test_object OBJECT IDENTIFIER ::= { iso 3 }
 		END`)
-	p := New(source, nil, mib.StrictConfig())
+	p := New(source, nil, types.StrictConfig())
 	module := p.ParseModule()
 
 	// Should have diagnostics for underscores in both module name and object name
@@ -721,7 +721,7 @@ func TestIdentifierUnderscorePermissive(t *testing.T) {
 	source := []byte(`TEST_MIB DEFINITIONS ::= BEGIN
 		test_object OBJECT IDENTIFIER ::= { iso 3 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	// In permissive mode, underscore diagnostics should be suppressed
@@ -738,7 +738,7 @@ func TestIdentifierLengthDiagnostic(t *testing.T) {
 	// Create an identifier that exceeds 64 characters
 	longName := "thisIsAReallyLongIdentifierNameThatExceedsSixtyFourCharactersTotal"
 	source := []byte(longName + ` DEFINITIONS ::= BEGIN END`)
-	p := New(source, nil, mib.StrictConfig())
+	p := New(source, nil, types.StrictConfig())
 	module := p.ParseModule()
 
 	// Should have diagnostic for identifier exceeding 64 chars
@@ -753,7 +753,7 @@ func TestIdentifierLengthDiagnostic(t *testing.T) {
 
 func TestIdentifierHyphenEndDiagnostic(t *testing.T) {
 	source := []byte(`TEST-MIB- DEFINITIONS ::= BEGIN END`)
-	p := New(source, nil, mib.StrictConfig())
+	p := New(source, nil, types.StrictConfig())
 	module := p.ParseModule()
 
 	// Should have diagnostic for identifier ending with hyphen
@@ -769,7 +769,7 @@ func TestIdentifierHyphenEndDiagnostic(t *testing.T) {
 func TestReservedKeywordDiagnostic(t *testing.T) {
 	// "BOOLEAN" is a reserved ASN.1 keyword
 	source := []byte(`BOOLEAN DEFINITIONS ::= BEGIN END`)
-	p := New(source, nil, mib.StrictConfig())
+	p := New(source, nil, types.StrictConfig())
 	module := p.ParseModule()
 
 	// Should have diagnostic for reserved keyword
@@ -788,7 +788,7 @@ func TestParseUnterminatedStringPreservesContent(t *testing.T) {
 	// (span covers from opening quote to EOF). The parser should
 	// strip only the opening quote, not the last content char.
 	source := []byte(`"hello world`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 
 	qs, err := p.parseQuotedString()
 	testutil.Nil(t, err, "parseQuotedString should not return error for TokQuotedString")
@@ -810,7 +810,7 @@ func TestParseVariationNotification(t *testing.T) {
 					DESCRIPTION "Supported"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -847,7 +847,7 @@ func TestParseVariationObject(t *testing.T) {
 					DESCRIPTION "Restricted range"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
@@ -880,7 +880,7 @@ func TestRecoverToUppercaseObjectType(t *testing.T) {
 			DESCRIPTION "Found after recovery"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	// Should recover and parse FooCount despite the uppercase identifier
@@ -904,7 +904,7 @@ func TestParseTextualConventionWithAssignment(t *testing.T) {
 			REFERENCE "RFC 1213"
 			SYNTAX OCTET STRING (SIZE (0..255))
 		END`)
-	p := New(source, nil, mib.PermissiveConfig())
+	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")

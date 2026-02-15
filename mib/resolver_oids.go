@@ -1,4 +1,4 @@
-package resolver
+package mib
 
 import (
 	"log/slog"
@@ -7,7 +7,6 @@ import (
 	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 const (
@@ -179,12 +178,12 @@ func recordUnresolvedFirstComponent(ctx *resolverContext, def oidDefinition, oid
 // containing hyphens in SMIv2 modules. smilint flags this at level 5.
 func checkSmiv2IdentifierHyphens(ctx *resolverContext, defs []oidDefinition) {
 	for _, def := range defs {
-		if def.mod.Language != module.LanguageSMIv2 || module.IsBaseModule(def.mod.Name) {
+		if def.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(def.mod.Name) {
 			continue
 		}
 		name := def.defName()
 		if strings.Contains(name, "-") {
-			ctx.EmitDiagnostic("identifier-hyphen-smiv2", mib.SeverityWarning,
+			ctx.EmitDiagnostic("identifier-hyphen-smiv2", SeverityWarning,
 				def.mod.Name, 0, 0,
 				"identifier "+name+" should not contain hyphens in SMIv2 MIB")
 		}
@@ -293,7 +292,7 @@ func resolveOidDefinition(ctx *resolverContext, def oidDefinition) bool {
 	if len(components) == 0 {
 		return false
 	}
-	var currentNode *mib.Node
+	var currentNode *Node
 	for idx, component := range components {
 		isLast := idx == len(components)-1
 		node, ok := resolveOidComponent(ctx, def, currentNode, component, isLast)
@@ -310,7 +309,7 @@ func resolveOidDefinition(ctx *resolverContext, def oidDefinition) bool {
 	return true
 }
 
-func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *mib.Node, component module.OidComponent, isLast bool) (*mib.Node, bool) {
+func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *Node, component module.OidComponent, isLast bool) (*Node, bool) {
 	switch c := component.(type) {
 	case *module.OidComponentName:
 		return resolveNameComponent(ctx, def, c.NameValue)
@@ -328,7 +327,7 @@ func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *m
 	}
 }
 
-func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) (*mib.Node, bool) {
+func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) (*Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
 		return node, true
 	}
@@ -346,15 +345,15 @@ func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) 
 	return nil, false
 }
 
-func resolveNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *mib.Node, name string, number uint32, isLast bool) (*mib.Node, bool) {
+func resolveNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *Node, name string, number uint32, isLast bool) (*Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
-		ctx.RegisterModuleNodeSymbol(def.mod, name, node)
+		ctx.registerModuleNodeSymbol(def.mod, name, node)
 		return node, true
 	}
 	return createNamedChild(ctx, def, currentNode, name, number, isLast)
 }
 
-func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, moduleName, name string) (*mib.Node, bool) {
+func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, moduleName, name string) (*Node, bool) {
 	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
 		return node, true
 	}
@@ -362,9 +361,9 @@ func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, modu
 	return nil, false
 }
 
-func resolveQualifiedNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *mib.Node, moduleName, name string, number uint32, isLast bool) (*mib.Node, bool) {
+func resolveQualifiedNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *Node, moduleName, name string, number uint32, isLast bool) (*Node, bool) {
 	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
-		ctx.RegisterModuleNodeSymbol(def.mod, name, node)
+		ctx.registerModuleNodeSymbol(def.mod, name, node)
 		return node, true
 	}
 	return createNamedChild(ctx, def, currentNode, name, number, isLast)
@@ -372,39 +371,39 @@ func resolveQualifiedNamedNumberComponent(ctx *resolverContext, def oidDefinitio
 
 // createNamedChild resolves a numeric component and registers it with a name.
 // Shared by resolveNamedNumberComponent and resolveQualifiedNamedNumberComponent.
-func createNamedChild(ctx *resolverContext, def oidDefinition, currentNode *mib.Node, name string, number uint32, isLast bool) (*mib.Node, bool) {
+func createNamedChild(ctx *resolverContext, def oidDefinition, currentNode *Node, name string, number uint32, isLast bool) (*Node, bool) {
 	child := resolveNumericComponent(ctx, currentNode, number)
 	if child == nil {
 		return nil, false
 	}
-	ctx.RegisterModuleNodeSymbol(def.mod, name, child)
+	ctx.registerModuleNodeSymbol(def.mod, name, child)
 	if !isLast {
-		child.SetName(name)
-		child.SetModule(ctx.ModuleToResolved[def.mod])
-		ctx.Mib.RegisterNode(name, child)
-		if child.Kind() == mib.KindInternal {
-			child.SetKind(mib.KindNode)
+		child.setName(name)
+		child.setModule(ctx.ModuleToResolved[def.mod])
+		ctx.Mib.registerNode(name, child)
+		if child.Kind() == KindInternal {
+			child.setKind(KindNode)
 		}
 	}
 	return child, true
 }
 
-func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *mib.Node, label string) {
+func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, label string) {
 	switch def.kind {
 	case defObjectType:
-		node.SetKind(mib.KindScalar)
+		node.setKind(KindScalar)
 	case defModuleIdentity, defObjectIdentity, defValueAssignment:
-		node.SetKind(mib.KindNode)
+		node.setKind(KindNode)
 	case defNotification:
-		node.SetKind(mib.KindNotification)
+		node.setKind(KindNotification)
 	case defObjectGroup, defNotificationGroup:
-		node.SetKind(mib.KindGroup)
+		node.setKind(KindGroup)
 	case defModuleCompliance:
-		node.SetKind(mib.KindCompliance)
+		node.setKind(KindCompliance)
 	case defAgentCapabilities:
-		node.SetKind(mib.KindCapability)
+		node.setKind(KindCapability)
 	}
-	node.SetName(label)
+	node.setName(label)
 
 	// Prefer SMIv2 over SMIv1 when multiple modules define the same OID
 	newMod := ctx.ModuleToResolved[def.mod]
@@ -416,20 +415,20 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *mib.No
 			slog.String("new", def.mod.Name))
 	}
 	if shouldPreferModule(ctx, newMod, currentMod, def.mod) {
-		node.SetModule(newMod)
+		node.setModule(newMod)
 		// Only register non-semantic definitions here; object types,
 		// notifications, etc. are registered in the semantics phase.
 		switch def.kind {
 		case defValueAssignment, defObjectIdentity, defModuleIdentity:
-			newMod.AddNode(node)
+			newMod.addNode(node)
 		}
 		if def.kind == defModuleIdentity {
-			newMod.SetOID(node.OID())
+			newMod.setOID(node.OID())
 		}
 	}
 
-	ctx.RegisterModuleNodeSymbol(def.mod, label, node)
-	ctx.Mib.RegisterNode(label, node)
+	ctx.registerModuleNodeSymbol(def.mod, label, node)
+	ctx.Mib.registerNode(label, node)
 
 	if ctx.TraceEnabled() {
 		ctx.Trace("resolved OID definition",
@@ -439,11 +438,11 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *mib.No
 	}
 }
 
-func resolveNumericComponent(ctx *resolverContext, parent *mib.Node, arc uint32) *mib.Node {
+func resolveNumericComponent(ctx *resolverContext, parent *Node, arc uint32) *Node {
 	if parent != nil {
-		return parent.GetOrCreateChild(arc)
+		return parent.getOrCreateChild(arc)
 	}
-	return ctx.Mib.Root().GetOrCreateChild(arc)
+	return ctx.Mib.Root().getOrCreateChild(arc)
 }
 
 func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
@@ -468,14 +467,14 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 		}
 
 		// SNMPv1 trap OID convention: enterprise.0.trapNumber
-		zeroNode := enterpriseNode.GetOrCreateChild(0)
-		trapNode := zeroNode.GetOrCreateChild(trapNumber)
+		zeroNode := enterpriseNode.getOrCreateChild(0)
+		trapNode := zeroNode.getOrCreateChild(trapNumber)
 
-		trapNode.SetName(defName)
-		trapNode.SetKind(mib.KindNotification)
-		trapNode.SetModule(ctx.ModuleToResolved[def.mod])
-		ctx.RegisterModuleNodeSymbol(def.mod, defName, trapNode)
-		ctx.Mib.RegisterNode(defName, trapNode)
+		trapNode.setName(defName)
+		trapNode.setKind(KindNotification)
+		trapNode.setModule(ctx.ModuleToResolved[def.mod])
+		ctx.registerModuleNodeSymbol(def.mod, defName, trapNode)
+		ctx.Mib.registerNode(defName, trapNode)
 
 		if ctx.TraceEnabled() {
 			ctx.Trace("resolved TRAP-TYPE",
@@ -486,15 +485,15 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 	}
 }
 
-func lookupOrCreateWellKnownRoot(ctx *resolverContext, name string) (*mib.Node, bool) {
+func lookupOrCreateWellKnownRoot(ctx *resolverContext, name string) (*Node, bool) {
 	arc := wellKnownRootArc(name)
 	if arc < 0 {
 		return nil, false
 	}
-	return ctx.Mib.Root().GetOrCreateChild(uint32(arc)), true
+	return ctx.Mib.Root().getOrCreateChild(uint32(arc)), true
 }
 
-func lookupSmiGlobalOidRoot(ctx *resolverContext, name string) (*mib.Node, bool) {
+func lookupSmiGlobalOidRoot(ctx *resolverContext, name string) (*Node, bool) {
 	if _, ok := smiGlobalOidRoots[name]; !ok {
 		return nil, false
 	}
@@ -522,7 +521,7 @@ func wellKnownRootArc(name string) int {
 
 // shouldPreferModule determines if newMod should replace currentMod as the node's module.
 // Preference order: SMIv2 > SMIv1 > Unknown, with newer LAST-UPDATED as tiebreaker.
-func shouldPreferModule(ctx *resolverContext, newMod, currentMod *mib.Module, srcMod *module.Module) bool {
+func shouldPreferModule(ctx *resolverContext, newMod, currentMod *Module, srcMod *module.Module) bool {
 	if currentMod == nil {
 		return true
 	}
@@ -560,11 +559,11 @@ func shouldPreferModule(ctx *resolverContext, newMod, currentMod *mib.Module, sr
 
 // languageRank returns a numeric rank for language preference.
 // Higher is better: SMIv2(2) > SMIv1(1) > Unknown/SPPI(0)
-func languageRank(lang module.Language) int {
+func languageRank(lang types.Language) int {
 	switch lang {
-	case module.LanguageSMIv2:
+	case types.LanguageSMIv2:
 		return 2
-	case module.LanguageSMIv1:
+	case types.LanguageSMIv1:
 		return 1
 	default:
 		return 0

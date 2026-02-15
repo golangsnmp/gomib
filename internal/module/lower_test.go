@@ -5,7 +5,6 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/parser"
 	"github.com/golangsnmp/gomib/internal/types"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 func TestSpanToLineCol(t *testing.T) {
@@ -76,13 +75,13 @@ test_object OBJECT-TYPE
 END
 `)
 
-	p := parser.New(source, nil, mib.StrictConfig())
+	p := parser.New(source, nil, types.StrictConfig())
 	ast := p.ParseModule()
 	if ast == nil {
 		t.Fatal("parse returned nil")
 	}
 
-	mod := Lower(ast, source, nil, mib.StrictConfig())
+	mod := Lower(ast, source, nil, types.StrictConfig())
 	if mod == nil {
 		t.Fatal("lower returned nil")
 	}
@@ -125,13 +124,13 @@ someObject OBJECT-TYPE
 END
 `)
 
-	p := parser.New(source, nil, mib.DefaultConfig())
+	p := parser.New(source, nil, types.DefaultConfig())
 	ast := p.ParseModule()
 	if ast == nil {
 		t.Fatal("parse returned nil")
 	}
 
-	mod := Lower(ast, source, nil, mib.DefaultConfig())
+	mod := Lower(ast, source, nil, types.DefaultConfig())
 	if mod == nil {
 		t.Fatal("lower returned nil")
 	}
@@ -173,13 +172,13 @@ sysDescr OBJECT-TYPE
 END
 `)
 
-	p := parser.New(source, nil, mib.DefaultConfig())
+	p := parser.New(source, nil, types.DefaultConfig())
 	ast := p.ParseModule()
 	if ast == nil {
 		t.Fatal("parse returned nil")
 	}
 
-	mod := Lower(ast, source, nil, mib.DefaultConfig())
+	mod := Lower(ast, source, nil, types.DefaultConfig())
 	if mod == nil {
 		t.Fatal("lower returned nil")
 	}
@@ -208,13 +207,13 @@ IMPORTS
 END
 `)
 
-	p := parser.New(source, nil, mib.DefaultConfig())
+	p := parser.New(source, nil, types.DefaultConfig())
 	ast := p.ParseModule()
 	if ast == nil {
 		t.Fatal("parse returned nil")
 	}
 
-	mod := Lower(ast, source, nil, mib.DefaultConfig())
+	mod := Lower(ast, source, nil, types.DefaultConfig())
 	if mod == nil {
 		t.Fatal("lower returned nil")
 	}

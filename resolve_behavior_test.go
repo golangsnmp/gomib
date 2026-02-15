@@ -113,7 +113,7 @@ func TestTypeChainEnumInheritance(t *testing.T) {
 		testutil.NotNil(t, obj, "Object(problemEnumChain)")
 		enums := obj.EffectiveEnums()
 		testutil.NotEmpty(t, enums, "EffectiveEnums()")
-		enumMap := testutil.NormalizeEnums(enums)
+		enumMap := normalizeEnums(enums)
 		testutil.Equal(t, "active", enumMap[1], "enum value 1")
 		testutil.Equal(t, "inactive", enumMap[2], "enum value 2")
 		testutil.Equal(t, "unknown", enumMap[3], "enum value 3")
@@ -124,7 +124,7 @@ func TestTypeChainEnumInheritance(t *testing.T) {
 		testutil.NotNil(t, obj, "Object(problemInlineEnum)")
 		enums := obj.EffectiveEnums()
 		testutil.NotEmpty(t, enums, "EffectiveEnums()")
-		enumMap := testutil.NormalizeEnums(enums)
+		enumMap := normalizeEnums(enums)
 		testutil.Equal(t, "up", enumMap[1], "inline enum value 1")
 		testutil.Equal(t, "down", enumMap[2], "inline enum value 2")
 	})
@@ -202,7 +202,7 @@ func TestKindInferenceTableStructure(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			obj := m.Object(tt.name)
 			testutil.NotNil(t, obj, "Object(%s)", tt.name)
-			kind := testutil.NormalizeKind(obj.Kind())
+			kind := normalizeKind(obj.Kind())
 			testutil.Equal(t, tt.wantKind, kind,
 				"kind for %s", tt.name)
 		})
@@ -225,7 +225,7 @@ func TestKindInferenceAugmentsTable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			obj := m.Object(tt.name)
 			testutil.NotNil(t, obj, "Object(%s)", tt.name)
-			kind := testutil.NormalizeKind(obj.Kind())
+			kind := normalizeKind(obj.Kind())
 			testutil.Equal(t, tt.wantKind, kind,
 				"kind for %s", tt.name)
 		})
@@ -251,7 +251,7 @@ func TestIndexResolution(t *testing.T) {
 	entry := m.Object("problemSemEntry")
 	testutil.NotNil(t, entry, "Object(problemSemEntry)")
 
-	indexes := testutil.NormalizeIndexes(entry.Index())
+	indexes := normalizeIndexes(entry.Index())
 	testutil.NotEmpty(t, indexes, "NormalizeIndexes()")
 
 	testutil.Equal(t, 1, len(indexes), "should have 1 index")
@@ -265,7 +265,7 @@ func TestNotificationObjectsResolution(t *testing.T) {
 	t.Run("normal objects", func(t *testing.T) {
 		notif := m.Notification("problemSemNotifNormal")
 		testutil.NotNil(t, notif, "Notification(problemSemNotifNormal)")
-		varbinds := testutil.NormalizeVarbinds(notif.Objects())
+		varbinds := normalizeVarbinds(notif.Objects())
 		testutil.SliceEqual(t,
 			[]string{"problemSemName", "problemSemValue"},
 			varbinds, "normal notification varbinds")
@@ -274,7 +274,7 @@ func TestNotificationObjectsResolution(t *testing.T) {
 	t.Run("empty objects", func(t *testing.T) {
 		notif := m.Notification("problemSemNotifEmpty")
 		testutil.NotNil(t, notif, "Notification(problemSemNotifEmpty)")
-		varbinds := testutil.NormalizeVarbinds(notif.Objects())
+		varbinds := normalizeVarbinds(notif.Objects())
 		testutil.Equal(t, 0, len(varbinds),
 			"empty notification should have no varbinds")
 	})
@@ -282,7 +282,7 @@ func TestNotificationObjectsResolution(t *testing.T) {
 	t.Run("not-accessible index in objects", func(t *testing.T) {
 		notif := m.Notification("problemSemNotifWithIndex")
 		testutil.NotNil(t, notif, "Notification(problemSemNotifWithIndex)")
-		varbinds := testutil.NormalizeVarbinds(notif.Objects())
+		varbinds := normalizeVarbinds(notif.Objects())
 		// Both objects should resolve, including the not-accessible index
 		testutil.Len(t, varbinds, 2, "should include not-accessible index")
 		testutil.SliceEqual(t,
@@ -293,7 +293,7 @@ func TestNotificationObjectsResolution(t *testing.T) {
 	t.Run("augment column in objects", func(t *testing.T) {
 		notif := m.Notification("problemSemNotifAugObj")
 		testutil.NotNil(t, notif, "Notification(problemSemNotifAugObj)")
-		varbinds := testutil.NormalizeVarbinds(notif.Objects())
+		varbinds := normalizeVarbinds(notif.Objects())
 		testutil.Len(t, varbinds, 2, "should include augment column")
 		testutil.SliceEqual(t,
 			[]string{"problemAugExtra", "problemSemValue"},
@@ -303,7 +303,7 @@ func TestNotificationObjectsResolution(t *testing.T) {
 	t.Run("scalar in objects", func(t *testing.T) {
 		notif := m.Notification("problemSemNotifScalar")
 		testutil.NotNil(t, notif, "Notification(problemSemNotifScalar)")
-		varbinds := testutil.NormalizeVarbinds(notif.Objects())
+		varbinds := normalizeVarbinds(notif.Objects())
 		testutil.Len(t, varbinds, 1, "should have 1 varbind")
 		testutil.SliceEqual(t, []string{"problemScalar1"}, varbinds,
 			"scalar notification varbinds")
@@ -419,7 +419,7 @@ func TestDiagnosticNotifPartialResolution(t *testing.T) {
 	notif := m.Notification("problemDiagNotifBadObj")
 	testutil.NotNil(t, notif, "Notification(problemDiagNotifBadObj)")
 
-	varbinds := testutil.NormalizeVarbinds(notif.Objects())
+	varbinds := normalizeVarbinds(notif.Objects())
 
 	hasDiagCol := false
 	for _, v := range varbinds {

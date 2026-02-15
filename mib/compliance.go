@@ -13,8 +13,8 @@ type Compliance struct {
 	modules []ComplianceModule
 }
 
-// NewCompliance returns a Compliance initialized with the given name.
-func NewCompliance(name string) *Compliance {
+// newCompliance returns a Compliance initialized with the given name.
+func newCompliance(name string) *Compliance {
 	return &Compliance{name: name}
 }
 
@@ -41,9 +41,9 @@ func (c *Compliance) String() string {
 	return c.name + " (" + c.OID().String() + ")"
 }
 
-func (c *Compliance) SetNode(nd *Node)                      { c.node = nd }
-func (c *Compliance) SetModule(m *Module)                   { c.module = m }
-func (c *Compliance) SetStatus(s Status)                    { c.status = s }
-func (c *Compliance) SetDescription(d string)               { c.desc = d }
-func (c *Compliance) SetReference(r string)                 { c.ref = r }
-func (c *Compliance) SetModules(modules []ComplianceModule) { c.modules = modules }
+func (c *Compliance) setNode(nd *Node)                      { c.node = nd }
+func (c *Compliance) setModule(m *Module)                   { c.module = m }
+func (c *Compliance) setStatus(s Status)                    { c.status = s }
+func (c *Compliance) setDescription(d string)               { c.desc = d }
+func (c *Compliance) setReference(r string)                 { c.ref = r }
+func (c *Compliance) setModules(modules []ComplianceModule) { c.modules = modules }

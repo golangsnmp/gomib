@@ -1,6 +1,6 @@
 -- DEFVAL syntax mismatches and edge cases
 -- Replicates: TIMETRA-BGP-MIB, TIMETRA-FILTER-MIB, various Alcatel MIBs
--- Tests: internal/resolver/semantics.go:377-505
+-- Tests: mib/resolver_semantics.go
 
 PROBLEM-DEFVAL-MIB DEFINITIONS ::= BEGIN
 

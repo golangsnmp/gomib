@@ -24,8 +24,8 @@ type Object struct {
 	bits   []NamedValue
 }
 
-// NewObject returns an Object initialized with the given name.
-func NewObject(name string) *Object {
+// newObject returns an Object initialized with the given name.
+func newObject(name string) *Object {
 	return &Object{name: name}
 }
 
@@ -194,22 +194,22 @@ func (o *Object) String() string {
 	return o.name + " (" + o.OID().String() + ")"
 }
 
-func (o *Object) SetNode(n *Node)                  { o.node = n }
-func (o *Object) SetModule(m *Module)              { o.module = m }
-func (o *Object) SetType(t *Type)                  { o.typ = t }
-func (o *Object) SetAccess(a Access)               { o.access = a }
-func (o *Object) SetStatus(s Status)               { o.status = s }
-func (o *Object) SetDescription(d string)          { o.desc = d }
-func (o *Object) SetReference(r string)            { o.ref = r }
-func (o *Object) SetUnits(u string)                { o.units = u }
-func (o *Object) SetDefaultValue(d *DefVal)        { o.defVal = d }
-func (o *Object) SetAugments(a *Object)            { o.augments = a }
-func (o *Object) SetIndex(idx []IndexEntry)        { o.index = idx }
-func (o *Object) SetEffectiveHint(h string)        { o.hint = h }
-func (o *Object) SetEffectiveSizes(s []Range)      { o.sizes = s }
-func (o *Object) SetEffectiveRanges(r []Range)     { o.ranges = r }
-func (o *Object) SetEffectiveEnums(e []NamedValue) { o.enums = e }
-func (o *Object) SetEffectiveBits(b []NamedValue)  { o.bits = b }
+func (o *Object) setNode(n *Node)                  { o.node = n }
+func (o *Object) setModule(m *Module)              { o.module = m }
+func (o *Object) setType(t *Type)                  { o.typ = t }
+func (o *Object) setAccess(a Access)               { o.access = a }
+func (o *Object) setStatus(s Status)               { o.status = s }
+func (o *Object) setDescription(d string)          { o.desc = d }
+func (o *Object) setReference(r string)            { o.ref = r }
+func (o *Object) setUnits(u string)                { o.units = u }
+func (o *Object) setDefaultValue(d *DefVal)        { o.defVal = d }
+func (o *Object) setAugments(a *Object)            { o.augments = a }
+func (o *Object) setIndex(idx []IndexEntry)        { o.index = idx }
+func (o *Object) setEffectiveHint(h string)        { o.hint = h }
+func (o *Object) setEffectiveSizes(s []Range)      { o.sizes = s }
+func (o *Object) setEffectiveRanges(r []Range)     { o.ranges = r }
+func (o *Object) setEffectiveEnums(e []NamedValue) { o.enums = e }
+func (o *Object) setEffectiveBits(b []NamedValue)  { o.bits = b }
 
 // objectsByKind returns objects whose node matches the given kind.
 func objectsByKind(objs []*Object, kind Kind) []*Object {
