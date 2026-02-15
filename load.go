@@ -236,6 +236,7 @@ func findModuleContent(sources []Source, name string) ([]byte, error) {
 
 // decodeModule runs the heuristic/parse/lower pipeline on raw MIB content.
 // Returns nil if any stage fails (not a MIB, parse error, lowering error).
+
 // collectModules adds missing base modules to the map, deduplicates,
 // and returns the modules sorted by name.
 func collectModules(modules map[string]*module.Module) []*module.Module {

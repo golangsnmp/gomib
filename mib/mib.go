@@ -133,7 +133,7 @@ func (m *Mib) Diagnostics() []Diagnostic   { return slices.Clone(m.diagnostics) 
 
 func (m *Mib) HasErrors() bool {
 	for _, d := range m.diagnostics {
-		if d.Severity <= SeverityError {
+		if d.Severity.AtLeast(SeverityError) {
 			return true
 		}
 	}

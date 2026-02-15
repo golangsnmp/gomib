@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func TestParseNetSNMPLine(t *testing.T) {
@@ -235,7 +237,7 @@ func TestApplyConfigFileNetSNMP(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := applyConfigFile(confPath, []string{"/original"}, parseNetSNMPLine)
+	got := applyConfigFile(confPath, []string{"/original"}, parseNetSNMPLine, types.Logger{})
 	want := []string{"/base/mibs", "/extra/mibs"}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
@@ -249,7 +251,7 @@ func TestApplyConfigFileNetSNMPPrepend(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := applyConfigFile(confPath, []string{"/default"}, parseNetSNMPLine)
+	got := applyConfigFile(confPath, []string{"/default"}, parseNetSNMPLine, types.Logger{})
 	want := []string{"/first", "/default"}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
@@ -263,7 +265,7 @@ func TestApplyConfigFileLibSMI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := applyConfigFile(confPath, []string{"/original"}, parseLibSMILine)
+	got := applyConfigFile(confPath, []string{"/original"}, parseLibSMILine, types.Logger{})
 	want := []string{"/base/mibs", "/extra/mibs"}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
@@ -272,7 +274,7 @@ func TestApplyConfigFileLibSMI(t *testing.T) {
 
 func TestApplyConfigFileMissing(t *testing.T) {
 	current := []string{"/keep"}
-	got := applyConfigFile("/nonexistent/file", current, parseNetSNMPLine)
+	got := applyConfigFile("/nonexistent/file", current, parseNetSNMPLine, types.Logger{})
 	if !slices.Equal(got, current) {
 		t.Errorf("missing config should return current paths unchanged, got %v", got)
 	}

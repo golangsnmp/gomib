@@ -90,10 +90,10 @@ func (c *cli) cmdLoad(args []string) int {
 	hasSevere := false
 	hasErrors := false
 	for _, d := range diags {
-		if d.Severity <= mib.SeveritySevere {
+		if d.Severity.AtLeast(mib.SeveritySevere) {
 			hasSevere = true
 		}
-		if d.Severity <= mib.SeverityError {
+		if d.Severity.AtLeast(mib.SeverityError) {
 			hasErrors = true
 		}
 	}

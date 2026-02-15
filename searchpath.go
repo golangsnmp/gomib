@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 // WithSystemPaths enables automatic discovery of MIB search paths from
@@ -25,8 +27,8 @@ const (
 )
 
 // discoverSystemSources returns Sources for all discovered system MIB directories.
-func discoverSystemSources() []Source {
-	dirs := discoverSystemPaths()
+func discoverSystemSources(logger types.Logger) []Source {
+	dirs := discoverSystemPaths(logger)
 	var sources []Source
 	for _, d := range dirs {
 		if src, err := Dir(d); err == nil {
@@ -38,17 +40,17 @@ func discoverSystemSources() []Source {
 
 // discoverSystemPaths returns MIB directories from net-snmp and libsmi
 // configuration, deduplicated and filtered to directories that exist.
-func discoverSystemPaths() []string {
+func discoverSystemPaths(logger types.Logger) []string {
 	var all []string
-	all = append(all, discoverNetSNMPPaths()...)
-	all = append(all, discoverLibSMIPaths()...)
+	all = append(all, discoverNetSNMPPaths(logger)...)
+	all = append(all, discoverLibSMIPaths(logger)...)
 	return filterExistingDirs(dedup(all))
 }
 
-func discoverNetSNMPPaths() []string {
+func discoverNetSNMPPaths(logger types.Logger) []string {
 	paths := netsnmpDefaults()
 	for _, cf := range netsnmpConfigFiles() {
-		paths = applyConfigFile(cf, paths, parseNetSNMPLine)
+		paths = applyConfigFile(cf, paths, parseNetSNMPLine, logger)
 	}
 	if v := os.Getenv("MIBDIRS"); v != "" {
 		paths = applyNetSNMPEnv(v, paths)
@@ -56,10 +58,10 @@ func discoverNetSNMPPaths() []string {
 	return paths
 }
 
-func discoverLibSMIPaths() []string {
+func discoverLibSMIPaths(logger types.Logger) []string {
 	paths := libsmiDefaults()
 	for _, cf := range libsmiConfigFiles() {
-		paths = applyConfigFile(cf, paths, parseLibSMILine)
+		paths = applyConfigFile(cf, paths, parseLibSMILine, logger)
 	}
 	if v := os.Getenv("SMIPATH"); v != "" {
 		paths = applyLibSMIEnv(v, paths)
@@ -209,7 +211,7 @@ func applyOp(op pathOp, dirs, current []string) []string {
 	}
 }
 
-func applyConfigFile(path string, current []string, parseLine func(string) (pathOp, []string, bool)) []string {
+func applyConfigFile(path string, current []string, parseLine func(string) (pathOp, []string, bool), logger types.Logger) []string {
 	f, err := os.Open(path)
 	if err != nil {
 		return current
@@ -225,7 +227,7 @@ func applyConfigFile(path string, current []string, parseLine func(string) (path
 		current = applyOp(op, dirs, current)
 	}
 	if err := scanner.Err(); err != nil {
-		slog.Debug("error reading config file", "path", path, "error", err)
+		logger.Log(slog.LevelDebug, "error reading config file", slog.String("path", path), slog.Any("error", err))
 	}
 	return current
 }

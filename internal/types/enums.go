@@ -37,6 +37,12 @@ func (s Severity) String() string {
 	}
 }
 
+// AtLeast reports whether s is at least as severe as other.
+// Lower numeric values are more severe (Fatal=0, Info=6).
+func (s Severity) AtLeast(other Severity) bool {
+	return s <= other
+}
+
 // StrictnessLevel defines preset strictness configurations.
 type StrictnessLevel int
 

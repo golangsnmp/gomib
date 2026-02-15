@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -107,7 +108,7 @@ func Load(ctx context.Context, opts ...LoadOption) (*mib.Mib, error) {
 
 	sources := cfg.sources
 	if cfg.systemPaths {
-		sources = append(sources, discoverSystemSources()...)
+		sources = append(sources, discoverSystemSources(types.Logger{L: cfg.logger})...)
 	}
 	if len(sources) == 0 {
 		return nil, ErrNoSources

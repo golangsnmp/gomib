@@ -53,7 +53,7 @@ func NewModule(name string, span types.Span) *Module {
 // HasErrors reports whether this module has any error-level diagnostics.
 func (m *Module) HasErrors() bool {
 	for _, d := range m.Diagnostics {
-		if d.Severity <= types.SeverityError {
+		if d.Severity.AtLeast(types.SeverityError) {
 			return true
 		}
 	}

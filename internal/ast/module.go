@@ -33,7 +33,7 @@ func NewModule(name Ident, definitionsKind DefinitionsKind, span types.Span) *Mo
 // HasErrors reports whether any diagnostic has error severity or worse.
 func (m *Module) HasErrors() bool {
 	return slices.ContainsFunc(m.Diagnostics, func(d types.SpanDiagnostic) bool {
-		return d.Severity <= types.SeverityError
+		return d.Severity.AtLeast(types.SeverityError)
 	})
 }
 
