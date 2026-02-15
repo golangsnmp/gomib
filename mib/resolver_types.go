@@ -62,11 +62,11 @@ func createUserTypes(ctx *resolverContext) {
 			}
 			if !hasBase {
 				// Type references (e.g., DisplayString) don't have an intrinsic
-				// base type. Default to Integer32 as a placeholder; the real base
+				// base type. Use BaseUnknown as a placeholder; the real base
 				// is inherited from the parent during resolveTypeBases.
-				base = BaseInteger32
+				base = BaseUnknown
 				if ctx.TraceEnabled() {
-					ctx.Trace("type has no intrinsic base, defaulting to Integer32",
+					ctx.Trace("type has no intrinsic base, will inherit from parent",
 						slog.String("type", td.Name),
 						slog.String("module", mod.Name))
 				}
@@ -205,16 +205,26 @@ func findTypeDefiningModule(ctx *resolverContext, fromMod *module.Module, typeNa
 		}
 	}
 
-	if ctx.Snmpv2SMIModule != nil {
-		if isASN1Primitive(typeName) || isSmiGlobalType(typeName) {
-			return ctx.Snmpv2SMIModule.Name
-		}
+	// RFC-compliant: ASN.1 primitives are always available
+	if ctx.Snmpv2SMIModule != nil && isASN1Primitive(typeName) {
+		return ctx.Snmpv2SMIModule.Name
 	}
 
+	if !ctx.diagConfig.AllowBestGuessFallbacks() {
+		return ""
+	}
+
+	// Permissive only: SMI global types from SNMPv2-SMI
+	if ctx.Snmpv2SMIModule != nil && isSmiGlobalType(typeName) {
+		return ctx.Snmpv2SMIModule.Name
+	}
+
+	// Permissive only: SMIv1 types from RFC1155-SMI
 	if ctx.Rfc1155SMIModule != nil && isSmiV1GlobalType(typeName) {
 		return ctx.Rfc1155SMIModule.Name
 	}
 
+	// Permissive only: SNMPv2-TC textual conventions
 	if ctx.Snmpv2TCModule != nil && isSNMPv2TCType(typeName) {
 		return ctx.Snmpv2TCModule.Name
 	}
