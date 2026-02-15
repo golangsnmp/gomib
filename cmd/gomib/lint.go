@@ -236,14 +236,11 @@ func matchesAny(code string, patterns []string) bool {
 
 // matchGlob performs simple glob matching with * wildcard.
 func matchGlob(pattern, s string) bool {
-	if pattern == "*" {
-		return true
+	if prefix, ok := strings.CutSuffix(pattern, "*"); ok {
+		return strings.HasPrefix(s, prefix)
 	}
-	if strings.HasSuffix(pattern, "*") {
-		return strings.HasPrefix(s, pattern[:len(pattern)-1])
-	}
-	if strings.HasPrefix(pattern, "*") {
-		return strings.HasSuffix(s, pattern[1:])
+	if suffix, ok := strings.CutPrefix(pattern, "*"); ok {
+		return strings.HasSuffix(s, suffix)
 	}
 	return pattern == s
 }
