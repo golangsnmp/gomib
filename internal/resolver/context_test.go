@@ -235,39 +235,14 @@ func TestLookupInModuleScope_ImportChain(t *testing.T) {
 	}
 }
 
-func TestLookupInModuleScope_MultiHopChain(t *testing.T) {
-	// A -> B -> C, symbol in C.
-	modA := &module.Module{Name: "A"}
-	modB := &module.Module{Name: "B"}
-	modC := &module.Module{Name: "C"}
-	nodeX := newTestNode("x")
-
-	symbols := map[*module.Module]map[string]*mib.Node{
-		modC: {"x": nodeX},
-	}
-	imports := map[*module.Module]map[string]*module.Module{
-		modA: {"x": modB},
-		modB: {"x": modC},
-	}
-
-	got, ok := lookupInModuleScope(modA, "x",
-		func(m *module.Module) map[string]*mib.Node { return symbols[m] },
-		func(m *module.Module) map[string]*module.Module { return imports[m] },
-	)
-	if !ok || got != nodeX {
-		t.Fatalf("expected to find nodeX via multi-hop chain, got ok=%v", ok)
-	}
-}
-
-func TestLookupInModuleScope_CycleDetection(t *testing.T) {
-	// A -> B -> A (cycle). Symbol not found anywhere.
+func TestLookupInModuleScope_ImportTargetLacksSymbol(t *testing.T) {
+	// Import points to a module that doesn't have the symbol registered.
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
 
 	symbols := map[*module.Module]map[string]*mib.Node{}
 	imports := map[*module.Module]map[string]*module.Module{
 		modA: {"x": modB},
-		modB: {"x": modA},
 	}
 
 	_, ok := lookupInModuleScope(modA, "x",
@@ -275,34 +250,7 @@ func TestLookupInModuleScope_CycleDetection(t *testing.T) {
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
 	if ok {
-		t.Fatal("expected cycle detection to return false")
-	}
-}
-
-func TestLookupInModuleScope_MaxDepthLimit(t *testing.T) {
-	// Build a chain longer than maxImportChainDepth.
-	mods := make([]*module.Module, maxImportChainDepth+2)
-	for i := range mods {
-		mods[i] = &module.Module{Name: string(rune('A' + i))}
-	}
-
-	nodeX := newTestNode("x")
-
-	// Only the last module has the symbol.
-	symbols := map[*module.Module]map[string]*mib.Node{
-		mods[len(mods)-1]: {"x": nodeX},
-	}
-	imports := map[*module.Module]map[string]*module.Module{}
-	for i := 0; i < len(mods)-1; i++ {
-		imports[mods[i]] = map[string]*module.Module{"x": mods[i+1]}
-	}
-
-	_, ok := lookupInModuleScope(mods[0], "x",
-		func(m *module.Module) map[string]*mib.Node { return symbols[m] },
-		func(m *module.Module) map[string]*module.Module { return imports[m] },
-	)
-	if ok {
-		t.Fatal("expected max depth limit to prevent finding symbol")
+		t.Fatal("expected false when import target lacks the symbol")
 	}
 }
 

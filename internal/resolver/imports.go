@@ -312,6 +312,48 @@ func isMacroSymbol(name string) bool {
 	}
 }
 
+// resolveTransitiveImports follows each import entry to the module that
+// actually defines the symbol, collapsing re-export chains. After this,
+// ModuleImports[mod][symbol] points directly to the defining module.
+func resolveTransitiveImports(ctx *resolverContext) {
+	for _, imports := range ctx.ModuleImports {
+		for symbol, sourceMod := range imports {
+			ultimate := resolveUltimateDefiner(ctx, sourceMod, symbol)
+			if ultimate != sourceMod {
+				imports[symbol] = ultimate
+			}
+		}
+	}
+}
+
+// resolveUltimateDefiner follows import chains from mod to find the module
+// that actually defines symbol (has it in ModuleDefNames).
+func resolveUltimateDefiner(ctx *resolverContext, mod *module.Module, symbol string) *module.Module {
+	visited := make(map[*module.Module]struct{}, 4)
+	current := mod
+	for {
+		if _, seen := visited[current]; seen {
+			return current
+		}
+		visited[current] = struct{}{}
+
+		if defNames := ctx.ModuleDefNames[current]; defNames != nil {
+			if _, ok := defNames[symbol]; ok {
+				return current
+			}
+		}
+
+		if nextImports := ctx.ModuleImports[current]; nextImports != nil {
+			if next, ok := nextImports[symbol]; ok {
+				current = next
+				continue
+			}
+		}
+
+		return current
+	}
+}
+
 func baseModuleImportAlias(name string) string {
 	switch name {
 	case "SNMPv2-SMI-v1":

@@ -54,6 +54,7 @@ func (r *resolver) resolve(mods []*module.Module) *mib.Mib {
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "imports"))
 	resolveImports(ctx)
+	resolveTransitiveImports(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "imports"))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "types"))

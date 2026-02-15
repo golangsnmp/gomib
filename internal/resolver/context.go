@@ -229,13 +229,9 @@ func (c *resolverContext) LookupTypeForModule(mod *module.Module, name string) (
 	return c.tryWellKnownTypeFallbacks(name)
 }
 
-// maxImportChainDepth is the maximum depth of import chains to traverse.
-// This is generous for real-world MIBs (typically 2-4 deep) while preventing
-// infinite loops from circular imports.
-const maxImportChainDepth = 8
-
-// lookupInModuleScope traverses module imports to find a symbol, using the
-// provided symbol table getter.
+// lookupInModuleScope looks up a symbol in the module's own symbols, then
+// follows a single import hop. ModuleImports entries are expected to already
+// be transitively resolved to the defining module by resolveTransitiveImports.
 func lookupInModuleScope[T any](
 	mod *module.Module,
 	name string,
@@ -243,37 +239,24 @@ func lookupInModuleScope[T any](
 	getImports func(*module.Module) map[string]*module.Module,
 ) (T, bool) {
 	var zero T
-	var visitedStack [maxImportChainDepth]*module.Module
-	visitedCount := 0
-	current := mod
 
-	for {
-		for i := 0; i < visitedCount; i++ {
-			if visitedStack[i] == current {
-				return zero, false
-			}
+	if symbols := getSymbols(mod); symbols != nil {
+		if val, ok := symbols[name]; ok {
+			return val, true
 		}
-		if visitedCount < len(visitedStack) {
-			visitedStack[visitedCount] = current
-			visitedCount++
-		} else {
-			return zero, false
-		}
-
-		if symbols := getSymbols(current); symbols != nil {
-			if val, ok := symbols[name]; ok {
-				return val, true
-			}
-		}
-
-		if imports := getImports(current); imports != nil {
-			if next, ok := imports[name]; ok {
-				current = next
-				continue
-			}
-		}
-		return zero, false
 	}
+
+	if imports := getImports(mod); imports != nil {
+		if source, ok := imports[name]; ok {
+			if symbols := getSymbols(source); symbols != nil {
+				if val, ok := symbols[name]; ok {
+					return val, true
+				}
+			}
+		}
+	}
+
+	return zero, false
 }
 
 func (c *resolverContext) lookupNodeInModuleScope(mod *module.Module, name string) (*mib.Node, bool) {

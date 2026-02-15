@@ -729,6 +729,122 @@ func TestResolveImportsFromModule(t *testing.T) {
 	})
 }
 
+func TestResolveTransitiveImports(t *testing.T) {
+	t.Run("direct definer unchanged", func(t *testing.T) {
+		ctx := newTestContext()
+		modA := &module.Module{Name: "A"}
+		modB := &module.Module{Name: "B"}
+
+		ctx.ModuleDefNames[modB] = map[string]struct{}{"x": {}}
+		ctx.RegisterImport(modA, "x", modB)
+
+		resolveTransitiveImports(ctx)
+
+		if ctx.ModuleImports[modA]["x"] != modB {
+			t.Error("direct definer should remain unchanged")
+		}
+	})
+
+	t.Run("one-hop re-export resolved", func(t *testing.T) {
+		ctx := newTestContext()
+		modA := &module.Module{Name: "A"}
+		modB := &module.Module{Name: "B"}
+		modC := &module.Module{Name: "C"}
+
+		// B re-exports x from C; C defines x.
+		ctx.ModuleDefNames[modB] = map[string]struct{}{}
+		ctx.ModuleDefNames[modC] = map[string]struct{}{"x": {}}
+		ctx.RegisterImport(modA, "x", modB)
+		ctx.RegisterImport(modB, "x", modC)
+
+		resolveTransitiveImports(ctx)
+
+		if ctx.ModuleImports[modA]["x"] != modC {
+			t.Error("expected A's import of x to resolve transitively to C")
+		}
+	})
+
+	t.Run("multi-hop re-export resolved", func(t *testing.T) {
+		ctx := newTestContext()
+		modA := &module.Module{Name: "A"}
+		modB := &module.Module{Name: "B"}
+		modC := &module.Module{Name: "C"}
+		modD := &module.Module{Name: "D"}
+
+		ctx.ModuleDefNames[modB] = map[string]struct{}{}
+		ctx.ModuleDefNames[modC] = map[string]struct{}{}
+		ctx.ModuleDefNames[modD] = map[string]struct{}{"x": {}}
+		ctx.RegisterImport(modA, "x", modB)
+		ctx.RegisterImport(modB, "x", modC)
+		ctx.RegisterImport(modC, "x", modD)
+
+		resolveTransitiveImports(ctx)
+
+		if ctx.ModuleImports[modA]["x"] != modD {
+			t.Errorf("expected A->D, got A->%s", ctx.ModuleImports[modA]["x"].Name)
+		}
+		if ctx.ModuleImports[modB]["x"] != modD {
+			t.Errorf("expected B->D, got B->%s", ctx.ModuleImports[modB]["x"].Name)
+		}
+		if ctx.ModuleImports[modC]["x"] != modD {
+			t.Errorf("expected C->D, got C->%s", ctx.ModuleImports[modC]["x"].Name)
+		}
+	})
+
+	t.Run("cycle does not panic", func(t *testing.T) {
+		ctx := newTestContext()
+		modA := &module.Module{Name: "A"}
+		modB := &module.Module{Name: "B"}
+
+		ctx.ModuleDefNames[modA] = map[string]struct{}{}
+		ctx.ModuleDefNames[modB] = map[string]struct{}{}
+		ctx.RegisterImport(modA, "x", modB)
+		ctx.RegisterImport(modB, "x", modA)
+
+		// Should not panic or infinite loop.
+		resolveTransitiveImports(ctx)
+	})
+
+	t.Run("dead end preserved", func(t *testing.T) {
+		ctx := newTestContext()
+		modA := &module.Module{Name: "A"}
+		modB := &module.Module{Name: "B"}
+
+		// B neither defines x nor imports it.
+		ctx.ModuleDefNames[modB] = map[string]struct{}{}
+		ctx.RegisterImport(modA, "x", modB)
+
+		resolveTransitiveImports(ctx)
+
+		if ctx.ModuleImports[modA]["x"] != modB {
+			t.Error("dead end should keep the original target")
+		}
+	})
+
+	t.Run("different symbols resolve independently", func(t *testing.T) {
+		ctx := newTestContext()
+		modA := &module.Module{Name: "A"}
+		modB := &module.Module{Name: "B"}
+		modC := &module.Module{Name: "C"}
+
+		// B defines "y" but re-exports "x" from C.
+		ctx.ModuleDefNames[modB] = map[string]struct{}{"y": {}}
+		ctx.ModuleDefNames[modC] = map[string]struct{}{"x": {}}
+		ctx.RegisterImport(modA, "x", modB)
+		ctx.RegisterImport(modA, "y", modB)
+		ctx.RegisterImport(modB, "x", modC)
+
+		resolveTransitiveImports(ctx)
+
+		if ctx.ModuleImports[modA]["x"] != modC {
+			t.Error("x should resolve transitively to C")
+		}
+		if ctx.ModuleImports[modA]["y"] != modB {
+			t.Error("y should stay at B (direct definer)")
+		}
+	})
+}
+
 func TestResolveImports(t *testing.T) {
 	t.Run("full integration through resolveImports", func(t *testing.T) {
 		source := &module.Module{Name: "SOURCE-MIB"}
