@@ -30,7 +30,7 @@ func (g *Group) Members() []*Node    { return slices.Clone(g.members) }
 func (g *Group) IsNotificationGroup() bool { return g.isNotificationGroup }
 
 func (g *Group) OID() OID {
-	if g.node == nil {
+	if g == nil || g.node == nil {
 		return nil
 	}
 	return g.node.OID()

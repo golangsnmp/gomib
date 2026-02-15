@@ -27,7 +27,7 @@ func (n *Notification) Reference() string   { return n.ref }
 func (n *Notification) Objects() []*Object  { return slices.Clone(n.objects) }
 
 func (n *Notification) OID() OID {
-	if n.node == nil {
+	if n == nil || n.node == nil {
 		return nil
 	}
 	return n.node.OID()

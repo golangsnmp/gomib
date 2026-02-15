@@ -49,7 +49,7 @@ func (n *Node) Module() *Module {
 }
 
 func (n *Node) OID() OID {
-	if n.parent == nil {
+	if n == nil || n.parent == nil {
 		return nil
 	}
 	var arcs OID

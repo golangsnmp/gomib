@@ -29,7 +29,7 @@ func (c *Capability) ProductRelease() string         { return c.productRelease }
 func (c *Capability) Supports() []CapabilitiesModule { return slices.Clone(c.supports) }
 
 func (c *Capability) OID() OID {
-	if c.node == nil {
+	if c == nil || c.node == nil {
 		return nil
 	}
 	return c.node.OID()

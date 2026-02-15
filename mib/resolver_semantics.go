@@ -297,6 +297,11 @@ func createResolvedNotifications(ctx *resolverContext) {
 			// Permissive only: global lookup for objects not explicitly imported
 			if !ok && ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
 				objNode, ok = ctx.LookupNodeGlobal(objName)
+				if ok && ctx.TraceEnabled() {
+					ctx.Trace("permissive: resolved notification object via global lookup",
+						slog.String("object", objName),
+						slog.String("notification", notif.Name))
+				}
 			}
 
 			if ok && objNode.Object() != nil {
@@ -588,7 +593,13 @@ func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*N
 		return node, true
 	}
 	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
-		return ctx.LookupNodeGlobal(name)
+		node, ok = ctx.LookupNodeGlobal(name)
+		if ok && ctx.TraceEnabled() {
+			ctx.Trace("permissive: resolved group member via global lookup",
+				slog.String("member", name),
+				slog.String("module", mod.Name))
+		}
+		return node, ok
 	}
 	return nil, false
 }

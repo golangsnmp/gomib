@@ -12,9 +12,7 @@ import (
 func registerModules(ctx *resolverContext) {
 	baseModules := module.CreateBaseModules()
 
-	if ctx.TraceEnabled() {
-		ctx.Trace("loaded base modules", slog.Int("count", len(baseModules)))
-	}
+	ctx.Log(slog.LevelDebug, "loaded base modules", slog.Int("count", len(baseModules)))
 
 	var userModules []*module.Module
 	for _, mod := range ctx.Modules {

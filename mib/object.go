@@ -41,7 +41,7 @@ func (o *Object) Units() string       { return o.units }
 func (o *Object) Augments() *Object   { return o.augments }
 
 func (o *Object) OID() OID {
-	if o.node == nil {
+	if o == nil || o.node == nil {
 		return nil
 	}
 	return o.node.OID()

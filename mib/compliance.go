@@ -27,7 +27,7 @@ func (c *Compliance) Reference() string           { return c.ref }
 func (c *Compliance) Modules() []ComplianceModule { return slices.Clone(c.modules) }
 
 func (c *Compliance) OID() OID {
-	if c.node == nil {
+	if c == nil || c.node == nil {
 		return nil
 	}
 	return c.node.OID()

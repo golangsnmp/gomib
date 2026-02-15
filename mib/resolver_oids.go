@@ -132,6 +132,11 @@ func lookupNamedParentSymbol(ctx *resolverContext, def oidDefinition, name strin
 	}
 	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
 		if _, ok := smiGlobalOidRoots[name]; ok {
+			if ctx.TraceEnabled() {
+				ctx.Trace("permissive: using SMI global root for graph edge",
+					slog.String("name", name),
+					slog.String("module", def.mod.Name))
+			}
 			return graph.Symbol{Module: moduleSNMPv2SMI, Name: name}, true
 		}
 	}
@@ -338,6 +343,11 @@ func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) 
 	// Permissive only: SMI global OID roots without explicit import
 	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
 		if node, ok := lookupSmiGlobalOidRoot(ctx, name); ok {
+			if ctx.TraceEnabled() {
+				ctx.Trace("permissive: resolved OID via SMI global root",
+					slog.String("name", name),
+					slog.String("module", def.mod.Name))
+			}
 			return node, true
 		}
 	}
