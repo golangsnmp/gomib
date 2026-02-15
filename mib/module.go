@@ -32,7 +32,16 @@ type Module struct {
 
 // NewModule returns a Module initialized with the given name.
 func NewModule(name string) *Module {
-	return &Module{name: name}
+	return &Module{
+		name:                name,
+		objectsByName:       make(map[string]*Object),
+		typesByName:         make(map[string]*Type),
+		notificationsByName: make(map[string]*Notification),
+		groupsByName:        make(map[string]*Group),
+		compliancesByName:   make(map[string]*Compliance),
+		capabilitiesByName:  make(map[string]*Capability),
+		nodesByName:         make(map[string]*Node),
+	}
 }
 
 func (m *Module) Name() string          { return m.name }
@@ -92,56 +101,35 @@ func (m *Module) SetRevisions(revs []Revision) { m.revisions = revs }
 
 func (m *Module) AddObject(obj *Object) {
 	m.objects = append(m.objects, obj)
-	if m.objectsByName == nil {
-		m.objectsByName = make(map[string]*Object)
-	}
 	m.objectsByName[obj.name] = obj
 }
 
 func (m *Module) AddType(t *Type) {
 	m.types = append(m.types, t)
-	if m.typesByName == nil {
-		m.typesByName = make(map[string]*Type)
-	}
 	m.typesByName[t.name] = t
 }
 
 func (m *Module) AddNotification(n *Notification) {
 	m.notifications = append(m.notifications, n)
-	if m.notificationsByName == nil {
-		m.notificationsByName = make(map[string]*Notification)
-	}
 	m.notificationsByName[n.name] = n
 }
 
 func (m *Module) AddGroup(g *Group) {
 	m.groups = append(m.groups, g)
-	if m.groupsByName == nil {
-		m.groupsByName = make(map[string]*Group)
-	}
 	m.groupsByName[g.name] = g
 }
 
 func (m *Module) AddCompliance(c *Compliance) {
 	m.compliances = append(m.compliances, c)
-	if m.compliancesByName == nil {
-		m.compliancesByName = make(map[string]*Compliance)
-	}
 	m.compliancesByName[c.name] = c
 }
 
 func (m *Module) AddCapability(c *Capability) {
 	m.capabilities = append(m.capabilities, c)
-	if m.capabilitiesByName == nil {
-		m.capabilitiesByName = make(map[string]*Capability)
-	}
 	m.capabilitiesByName[c.name] = c
 }
 
 func (m *Module) AddNode(n *Node) {
 	m.nodes = append(m.nodes, n)
-	if m.nodesByName == nil {
-		m.nodesByName = make(map[string]*Node)
-	}
 	m.nodesByName[n.name] = n
 }
