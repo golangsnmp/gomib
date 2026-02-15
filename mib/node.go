@@ -8,18 +8,18 @@ import (
 
 // Node is a point in the OID tree.
 type Node struct {
-	arc          uint32
-	name         string
-	kind         Kind
-	module       *Module
-	obj          *Object
-	notif        *Notification
-	group        *Group
-	compliance   *Compliance
-	capabilities *Capability
-	parent       *Node
-	children     map[uint32]*Node
-	sortedCache  []*Node // lazily computed sorted children; nil = invalidated
+	arc         uint32
+	name        string
+	kind        Kind
+	module      *Module
+	obj         *Object
+	notif       *Notification
+	group       *Group
+	compliance  *Compliance
+	capability  *Capability
+	parent      *Node
+	children    map[uint32]*Node
+	sortedCache []*Node // lazily computed sorted children; nil = invalidated
 }
 
 func (n *Node) Arc() uint32  { return n.arc }
@@ -42,8 +42,8 @@ func (n *Node) Module() *Module {
 	if n.compliance != nil {
 		return n.compliance.module
 	}
-	if n.capabilities != nil {
-		return n.capabilities.module
+	if n.capability != nil {
+		return n.capability.module
 	}
 	return n.module
 }
@@ -64,7 +64,7 @@ func (n *Node) Object() *Object             { return n.obj }
 func (n *Node) Notification() *Notification { return n.notif }
 func (n *Node) Group() *Group               { return n.group }
 func (n *Node) Compliance() *Compliance     { return n.compliance }
-func (n *Node) Capability() *Capability     { return n.capabilities }
+func (n *Node) Capability() *Capability     { return n.capability }
 func (n *Node) Parent() *Node               { return n.parent }
 
 func (n *Node) Child(arc uint32) *Node {
@@ -177,4 +177,4 @@ func (n *Node) SetObject(obj *Object)               { n.obj = obj }
 func (n *Node) SetNotification(notif *Notification) { n.notif = notif }
 func (n *Node) SetGroup(g *Group)                   { n.group = g }
 func (n *Node) SetCompliance(c *Compliance)         { n.compliance = c }
-func (n *Node) SetCapability(c *Capability)         { n.capabilities = c }
+func (n *Node) SetCapability(c *Capability)         { n.capability = c }

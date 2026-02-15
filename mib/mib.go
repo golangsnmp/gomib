@@ -94,7 +94,7 @@ func (m *Mib) Compliance(name string) *Compliance {
 
 // Capability returns the capability with the given name, or nil if not found.
 func (m *Mib) Capability(name string) *Capability {
-	return findEntity(m, name, func(nd *Node) *Capability { return nd.capabilities })
+	return findEntity(m, name, func(nd *Node) *Capability { return nd.capability })
 }
 
 func (m *Mib) NodeByOID(oid OID) *Node {
