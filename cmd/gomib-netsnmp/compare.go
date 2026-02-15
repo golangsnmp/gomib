@@ -4,11 +4,15 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"sort"
+	"maps"
+	"os"
+	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -25,12 +29,14 @@ type ComparisonResult struct {
 
 // Mismatch describes a difference between gomib and net-snmp.
 type Mismatch struct {
-	OID     string `json:"oid"`
-	Name    string `json:"name"`
-	Module  string `json:"module"`
-	Field   string `json:"field"`
-	Gomib   string `json:"gomib"`
-	NetSnmp string `json:"netsnmp"`
+	OID           string `json:"oid"`
+	Name          string `json:"name"`
+	Module        string `json:"module"`
+	Field         string `json:"field"`
+	Gomib         string `json:"gomib"`
+	NetSnmp       string `json:"netsnmp"`
+	GomibModule   string `json:"gomib_module,omitempty"`   // Module per gomib (for overlap detection)
+	NetSnmpModule string `json:"netsnmp_module,omitempty"` // Module per net-snmp (for overlap detection)
 }
 
 // FieldCounts tracks match/mismatch counts per field.
@@ -49,14 +55,26 @@ type FieldCounts struct {
 	Varbinds     CountPair `json:"varbinds"`
 }
 
-// CountPair holds match and mismatch counts.
+// CountPair holds match, mismatch, and missing counts.
 type CountPair struct {
 	Match    int `json:"match"`
 	Mismatch int `json:"mismatch"`
+	Missing  int `json:"missing,omitempty"` // one side has value, other doesn't
 }
 
 func cmdCompare(args []string) int {
-	fs := flag.NewFlagSet("compare", flag.ExitOnError)
+	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
+
+	var fieldFilter string
+	var exampleLimit int
+	var categorize bool
+	var investigateOnly bool
+
+	fs.StringVar(&fieldFilter, "field", "", "Show only mismatches for this field (type, access, status, enums, index, hint, tc_name, units, ranges, defval, bits, varbinds)")
+	fs.IntVar(&exampleLimit, "limit", 5, "Number of examples to show per category (0 for all)")
+	fs.BoolVar(&categorize, "categorize", false, "Categorize mismatches by likely cause")
+	fs.BoolVar(&investigateOnly, "investigate", false, "Only show mismatches that need investigation (hide known benign differences)")
+
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(), `Usage: gomib-netsnmp compare [options] [MODULE...]
 
@@ -87,29 +105,38 @@ Options:
 	}
 	defer cleanup()
 
-	fmt.Fprintln(out, "Loading MIBs with net-snmp...")
+	fmt.Fprintln(os.Stderr, "Loading MIBs with net-snmp...")
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, modules)
 	if err != nil {
 		printError("net-snmp load failed: %v", err)
 		return 1
 	}
 
-	fmt.Fprintln(out, "Loading MIBs with gomib...")
+	fmt.Fprintln(os.Stderr, "Loading MIBs with mib...")
 	gomibNodes, err := loadGomibNodes(mibPaths, modules)
 	if err != nil {
 		printError("gomib load failed: %v", err)
 		return 1
 	}
 
-	// Filter by modules if specified
 	if len(modules) > 0 {
 		netsnmpNodes = filterByModules(netsnmpNodes, modules)
 		gomibNodes = filterByModules(gomibNodes, modules)
 	}
 
-	fmt.Fprintf(out, "net-snmp: %d nodes, gomib: %d nodes\n\n", len(netsnmpNodes), len(gomibNodes))
+	fmt.Fprintf(os.Stderr, "net-snmp: %d nodes, gomib: %d nodes\n", len(netsnmpNodes), len(gomibNodes))
 
 	result := compareNodes(netsnmpNodes, gomibNodes)
+
+	if fieldFilter != "" {
+		var filtered []Mismatch
+		for _, m := range result.Mismatches {
+			if m.Field == fieldFilter {
+				filtered = append(filtered, m)
+			}
+		}
+		result.Mismatches = filtered
+	}
 
 	if jsonOutput {
 		enc := json.NewEncoder(out)
@@ -119,10 +146,50 @@ Options:
 			return 1
 		}
 	} else {
-		printComparisonResult(out, result)
+		printComparisonResult(out, result, exampleLimit, categorize, investigateOnly)
 	}
 
 	return 0
+}
+
+// makeMismatch creates a Mismatch, including module diff info if modules differ.
+func makeMismatch(oid, field, gomibVal, netsnmpVal string, gNode, nsNode *NormalizedNode) Mismatch {
+	m := Mismatch{
+		OID:     oid,
+		Name:    nsNode.Name,
+		Module:  nsNode.Module,
+		Field:   field,
+		Gomib:   gomibVal,
+		NetSnmp: netsnmpVal,
+	}
+	if gNode.Module != nsNode.Module {
+		m.GomibModule = gNode.Module
+		m.NetSnmpModule = nsNode.Module
+	}
+	return m
+}
+
+// compareStringField compares a string field, tracking match/mismatch/missing.
+func (r *ComparisonResult) compareStringField(counts *CountPair, oid, field, gVal, nsVal string, eq func(string, string) bool, gNode, nsNode *NormalizedNode) {
+	if eq(gVal, nsVal) {
+		counts.Match++
+	} else if gVal != "" {
+		counts.Mismatch++
+		r.Mismatches = append(r.Mismatches, makeMismatch(oid, field, gVal, nsVal, gNode, nsNode))
+	} else {
+		counts.Missing++
+		r.Mismatches = append(r.Mismatches, makeMismatch(oid, field, "", nsVal, gNode, nsNode))
+	}
+}
+
+// compareCollectionField compares a collection field, tracking match/mismatch.
+func (r *ComparisonResult) compareCollectionField(counts *CountPair, oid, field, gFmt, nsFmt string, equal bool, gNode, nsNode *NormalizedNode) {
+	if equal {
+		counts.Match++
+	} else {
+		counts.Mismatch++
+		r.Mismatches = append(r.Mismatches, makeMismatch(oid, field, gFmt, nsFmt, gNode, nsNode))
+	}
 }
 
 // compareNodes performs a full comparison between net-snmp and gomib nodes.
@@ -132,7 +199,6 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 		TotalGomib:   len(gomib),
 	}
 
-	// Find all OIDs
 	allOIDs := make(map[string]bool)
 	for oid := range netsnmp {
 		allOIDs[oid] = true
@@ -140,6 +206,8 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 	for oid := range gomib {
 		allOIDs[oid] = true
 	}
+
+	eq := func(a, b string) bool { return a == b }
 
 	for oid := range allOIDs {
 		nsNode := netsnmp[oid]
@@ -156,220 +224,66 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 
 		result.MatchedNodes++
 
-		// Compare type (using normalized forms for semantic equivalence)
+		// String fields: match / mismatch / missing
 		if nsNode.Type != "" && nsNode.Type != "OTHER" && nsNode.Type != "UNKNOWN" {
-			if typesEquivalent(gNode.Type, nsNode.Type) {
-				result.Summary.Type.Match++
-			} else if gNode.Type != "" {
-				result.Summary.Type.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "type",
-					Gomib:   gNode.Type,
-					NetSnmp: nsNode.Type,
-				})
-			}
+			result.compareStringField(&result.Summary.Type, oid, "type", gNode.Type, nsNode.Type, typesEquivalent, gNode, nsNode)
 		}
-
-		// Compare access
 		if nsNode.Access != "" {
-			if gNode.Access == nsNode.Access {
-				result.Summary.Access.Match++
-			} else if gNode.Access != "" {
-				result.Summary.Access.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "access",
-					Gomib:   gNode.Access,
-					NetSnmp: nsNode.Access,
-				})
-			}
+			result.compareStringField(&result.Summary.Access, oid, "access", gNode.Access, nsNode.Access, eq, gNode, nsNode)
 		}
-
-		// Compare status
 		if nsNode.Status != "" {
-			if gNode.Status == nsNode.Status {
-				result.Summary.Status.Match++
-			} else if gNode.Status != "" {
-				result.Summary.Status.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "status",
-					Gomib:   gNode.Status,
-					NetSnmp: nsNode.Status,
-				})
-			}
+			result.compareStringField(&result.Summary.Status, oid, "status", gNode.Status, nsNode.Status, eq, gNode, nsNode)
 		}
-
-		// Compare enums
-		if len(nsNode.EnumValues) > 0 {
-			if enumsEqual(nsNode.EnumValues, gNode.EnumValues) {
-				result.Summary.Enums.Match++
-			} else {
-				result.Summary.Enums.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "enums",
-					Gomib:   formatEnums(gNode.EnumValues),
-					NetSnmp: formatEnums(nsNode.EnumValues),
-				})
-			}
-		}
-
-		// Compare indexes
-		if len(nsNode.Indexes) > 0 {
-			if indexesEqual(nsNode.Indexes, gNode.Indexes) {
-				result.Summary.Index.Match++
-			} else {
-				result.Summary.Index.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "index",
-					Gomib:   indexString(gNode.Indexes),
-					NetSnmp: indexString(nsNode.Indexes),
-				})
-			}
-		}
-
-		// Compare display hint
 		if nsNode.Hint != "" {
-			if hintsEquivalent(gNode.Hint, nsNode.Hint) {
-				result.Summary.Hint.Match++
-			} else if gNode.Hint != "" {
-				result.Summary.Hint.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "hint",
-					Gomib:   gNode.Hint,
-					NetSnmp: nsNode.Hint,
-				})
-			}
+			result.compareStringField(&result.Summary.Hint, oid, "hint", gNode.Hint, nsNode.Hint, hintsEquivalent, gNode, nsNode)
 		}
-
-		// Compare TC name
 		if nsNode.TCName != "" {
-			if gNode.TCName == nsNode.TCName {
-				result.Summary.TCName.Match++
-			} else if gNode.TCName != "" {
-				result.Summary.TCName.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "tc_name",
-					Gomib:   gNode.TCName,
-					NetSnmp: nsNode.TCName,
-				})
-			}
+			result.compareStringField(&result.Summary.TCName, oid, "tc_name", gNode.TCName, nsNode.TCName, eq, gNode, nsNode)
 		}
-
-		// Compare units
 		if nsNode.Units != "" {
-			if gNode.Units == nsNode.Units {
-				result.Summary.Units.Match++
-			} else if gNode.Units != "" {
-				result.Summary.Units.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "units",
-					Gomib:   gNode.Units,
-					NetSnmp: nsNode.Units,
-				})
-			}
+			result.compareStringField(&result.Summary.Units, oid, "units", gNode.Units, nsNode.Units, eq, gNode, nsNode)
 		}
-
-		// Compare ranges
-		if len(nsNode.Ranges) > 0 {
-			if rangesEqual(nsNode.Ranges, gNode.Ranges) {
-				result.Summary.Ranges.Match++
-			} else {
-				result.Summary.Ranges.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "ranges",
-					Gomib:   rangesString(gNode.Ranges),
-					NetSnmp: rangesString(nsNode.Ranges),
-				})
-			}
-		}
-
-		// Compare default value
 		if nsNode.DefaultValue != "" {
-			if defaultValuesEquivalent(gNode.DefaultValue, nsNode.DefaultValue) {
-				result.Summary.DefaultValue.Match++
-			} else if gNode.DefaultValue != "" {
-				result.Summary.DefaultValue.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "defval",
-					Gomib:   gNode.DefaultValue,
-					NetSnmp: nsNode.DefaultValue,
-				})
-			}
+			result.compareStringField(&result.Summary.DefaultValue, oid, "defval", gNode.DefaultValue, nsNode.DefaultValue, defaultValuesEquivalent, gNode, nsNode)
 		}
 
-		// Compare BITS values
+		// Collection fields: match / mismatch
+		if len(nsNode.EnumValues) > 0 {
+			result.compareCollectionField(&result.Summary.Enums, oid, "enums",
+				formatEnums(gNode.EnumValues), formatEnums(nsNode.EnumValues),
+				maps.Equal(nsNode.EnumValues, gNode.EnumValues), gNode, nsNode)
+		}
+		if len(nsNode.Indexes) > 0 {
+			result.compareCollectionField(&result.Summary.Index, oid, "index",
+				indexString(gNode.Indexes), indexString(nsNode.Indexes),
+				indexesEqual(nsNode.Indexes, gNode.Indexes), gNode, nsNode)
+		}
+		if len(nsNode.Ranges) > 0 {
+			result.compareCollectionField(&result.Summary.Ranges, oid, "ranges",
+				rangesString(gNode.Ranges), rangesString(nsNode.Ranges),
+				rangesEqual(nsNode.Ranges, gNode.Ranges), gNode, nsNode)
+		}
 		if len(nsNode.BitValues) > 0 {
-			if enumsEqual(nsNode.BitValues, gNode.BitValues) {
-				result.Summary.Bits.Match++
-			} else {
-				result.Summary.Bits.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "bits",
-					Gomib:   bitsString(gNode.BitValues),
-					NetSnmp: bitsString(nsNode.BitValues),
-				})
-			}
+			result.compareCollectionField(&result.Summary.Bits, oid, "bits",
+				bitsString(gNode.BitValues), bitsString(nsNode.BitValues),
+				maps.Equal(nsNode.BitValues, gNode.BitValues), gNode, nsNode)
 		}
-
-		// Compare varbinds (notification OBJECTS)
 		if len(nsNode.Varbinds) > 0 {
-			if varbindsEqual(nsNode.Varbinds, gNode.Varbinds) {
-				result.Summary.Varbinds.Match++
-			} else {
-				result.Summary.Varbinds.Mismatch++
-				result.Mismatches = append(result.Mismatches, Mismatch{
-					OID:     oid,
-					Name:    nsNode.Name,
-					Module:  nsNode.Module,
-					Field:   "varbinds",
-					Gomib:   varbindsString(gNode.Varbinds),
-					NetSnmp: varbindsString(nsNode.Varbinds),
-				})
-			}
+			result.compareCollectionField(&result.Summary.Varbinds, oid, "varbinds",
+				varbindsString(gNode.Varbinds), varbindsString(nsNode.Varbinds),
+				slices.Equal(nsNode.Varbinds, gNode.Varbinds), gNode, nsNode)
 		}
 	}
 
 	// Sort missing lists for deterministic output
-	sort.Strings(result.MissingInGomib)
-	sort.Strings(result.MissingInNetSnmp)
+	slices.Sort(result.MissingInGomib)
+	slices.Sort(result.MissingInNetSnmp)
 
 	return result
 }
 
 // typesEquivalent checks if two type names are semantically equivalent.
-// Handles differences in naming conventions between net-snmp and gomib.
+// Handles differences in naming conventions between net-snmp and mib.
 func typesEquivalent(a, b string) bool {
 	if a == b {
 		return true
@@ -380,54 +294,31 @@ func typesEquivalent(a, b string) bool {
 // normalizeTypeName maps type names to canonical forms for comparison.
 func normalizeTypeName(t string) string {
 	switch t {
-	// INTEGER and Integer32 are semantically equivalent
 	case "INTEGER", "Integer32":
 		return "Integer32"
-	// Counter and Counter32 are equivalent
 	case "COUNTER", "Counter", "Counter32":
 		return "Counter32"
-	// Gauge and Gauge32 are equivalent
 	case "GAUGE", "Gauge", "Gauge32":
 		return "Gauge32"
-	// Unsigned32 variations
 	case "UNSIGNED32", "Unsigned32", "UInteger32":
 		return "Unsigned32"
-	// TimeTicks variations
 	case "TIMETICKS", "TimeTicks":
 		return "TimeTicks"
-	// IpAddress variations
 	case "IPADDR", "IpAddress":
 		return "IpAddress"
-	// OctetString variations
 	case "OCTETSTR", "OCTET STRING", "OctetString":
 		return "OCTET STRING"
-	// ObjectIdentifier variations
 	case "OBJID", "OBJECT IDENTIFIER", "ObjectIdentifier":
 		return "OBJECT IDENTIFIER"
-	// Counter64 variations
 	case "COUNTER64", "Counter64":
 		return "Counter64"
-	// BITS variations
 	case "BITS", "BITSTRING":
 		return "BITS"
-	// Opaque variations
 	case "OPAQUE", "Opaque":
 		return "Opaque"
 	default:
 		return t
 	}
-}
-
-func enumsEqual(a, b map[int]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
 }
 
 func indexesEqual(a, b []IndexInfo) bool {
@@ -447,7 +338,6 @@ func hintsEquivalent(a, b string) bool {
 	if a == b {
 		return true
 	}
-	// Normalize common variations (whitespace, case for hex digits)
 	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
@@ -461,17 +351,17 @@ func rangesEqual(a, b []RangeInfo) bool {
 	bCopy := make([]RangeInfo, len(b))
 	copy(aCopy, a)
 	copy(bCopy, b)
-	sort.Slice(aCopy, func(i, j int) bool {
-		if aCopy[i].Low != aCopy[j].Low {
-			return aCopy[i].Low < aCopy[j].Low
+	slices.SortFunc(aCopy, func(a, b RangeInfo) int {
+		if c := cmp.Compare(a.Low, b.Low); c != 0 {
+			return c
 		}
-		return aCopy[i].High < aCopy[j].High
+		return cmp.Compare(a.High, b.High)
 	})
-	sort.Slice(bCopy, func(i, j int) bool {
-		if bCopy[i].Low != bCopy[j].Low {
-			return bCopy[i].Low < bCopy[j].Low
+	slices.SortFunc(bCopy, func(a, b RangeInfo) int {
+		if c := cmp.Compare(a.Low, b.Low); c != 0 {
+			return c
 		}
-		return bCopy[i].High < bCopy[j].High
+		return cmp.Compare(a.High, b.High)
 	})
 	for i := range aCopy {
 		if aCopy[i].Low != bCopy[i].Low || aCopy[i].High != bCopy[i].High {
@@ -486,23 +376,95 @@ func defaultValuesEquivalent(a, b string) bool {
 	if a == b {
 		return true
 	}
-	// Normalize: strip quotes, whitespace
 	aNorm := strings.Trim(strings.TrimSpace(a), "\"'")
 	bNorm := strings.Trim(strings.TrimSpace(b), "\"'")
-	return aNorm == bNorm
+	if aNorm == bNorm {
+		return true
+	}
+
+	if hexZerosEquivalent(aNorm, bNorm) {
+		return true
+	}
+
+	if hexOnesEquivalent(aNorm, bNorm) {
+		return true
+	}
+
+	if oidSymbolicEquivalent(aNorm, bNorm) {
+		return true
+	}
+
+	return false
 }
 
-// varbindsEqual checks if two varbind lists are equivalent.
-func varbindsEqual(a, b []string) bool {
-	if len(a) != len(b) {
+// hexZerosEquivalent checks if one value is hex zeros and the other is "0".
+func hexZerosEquivalent(a, b string) bool {
+	return (isHexZeros(a) && b == "0") || (isHexZeros(b) && a == "0")
+}
+
+// hexOnesEquivalent checks if one value is hex all-ones (0xFFF...) and the other is "-1".
+func hexOnesEquivalent(a, b string) bool {
+	return (isHexAllOnes(a) && b == "-1") || (isHexAllOnes(b) && a == "-1")
+}
+
+// isHexAllOnes checks if a string is 0x followed by only F's (all bits set).
+func isHexAllOnes(s string) bool {
+	if !strings.HasPrefix(s, "0x") && !strings.HasPrefix(s, "0X") {
 		return false
 	}
-	for i := range a {
-		if a[i] != b[i] {
+	hex := strings.ToUpper(s[2:])
+	if len(hex) == 0 {
+		return false
+	}
+	for _, c := range hex {
+		if c != 'F' {
 			return false
 		}
 	}
 	return true
+}
+
+// isHexZeros checks if a string is 0x followed by only zeros.
+func isHexZeros(s string) bool {
+	if !strings.HasPrefix(s, "0x") && !strings.HasPrefix(s, "0X") {
+		return false
+	}
+	hex := s[2:]
+	if len(hex) == 0 {
+		return false
+	}
+	for _, c := range hex {
+		if c != '0' {
+			return false
+		}
+	}
+	return true
+}
+
+// oidSymbolicEquivalent checks if two OID representations are equivalent
+// using a table of known OID name-to-numeric mappings.
+func oidSymbolicEquivalent(a, b string) bool {
+	knownOIDs := map[string]string{
+		"zeroDotZero":              "0.0",
+		"snmpUDPDomain":            "1.3.6.1.6.1.1",
+		"usmNoAuthProtocol":        "1.3.6.1.6.3.10.1.1.1",
+		"usmNoPrivProtocol":        "1.3.6.1.6.3.10.1.2.1",
+		"usmHMACMD5AuthProtocol":   "1.3.6.1.6.3.10.1.1.2",
+		"usmHMACSHAAuthProtocol":   "1.3.6.1.6.3.10.1.1.3",
+		"usmDESPrivProtocol":       "1.3.6.1.6.3.10.1.2.2",
+		"pingIcmpEcho":             "1.3.6.1.2.1.80.3.1",
+		"traceRouteUsingUdpProbes": "1.3.6.1.2.1.81.3.1",
+		"sysUpTimeInstance":        "1.3.6.1.2.1.1.3.0",
+	}
+
+	if numeric, ok := knownOIDs[a]; ok && numeric == b {
+		return true
+	}
+	if numeric, ok := knownOIDs[b]; ok && numeric == a {
+		return true
+	}
+
+	return false
 }
 
 func formatEnums(enums map[int]string) string {
@@ -514,7 +476,7 @@ func formatEnums(enums map[int]string) string {
 	for k := range enums {
 		keys = append(keys, k)
 	}
-	sort.Ints(keys)
+	slices.Sort(keys)
 
 	var parts []string
 	for _, k := range keys {
@@ -523,7 +485,7 @@ func formatEnums(enums map[int]string) string {
 	return "{ " + strings.Join(parts, ", ") + " }"
 }
 
-func printComparisonResult(w io.Writer, result *ComparisonResult) {
+func printComparisonResult(w io.Writer, result *ComparisonResult, exampleLimit int, categorize bool, investigateOnly bool) {
 	fmt.Fprintln(w, strings.Repeat("=", 70))
 	fmt.Fprintln(w, "GOMIB vs NET-SNMP COMPARISON RESULTS")
 	fmt.Fprintln(w, strings.Repeat("=", 70))
@@ -550,31 +512,58 @@ func printComparisonResult(w io.Writer, result *ComparisonResult) {
 	printFieldAccuracy(w, "varbinds", result.Summary.Varbinds)
 
 	if len(result.Mismatches) > 0 {
-		// Group mismatches by field type
+		benign, investigate := countBenignAndInvestigate(result.Mismatches)
+		fmt.Fprintf(w, "\nMismatch classification:\n")
+		fmt.Fprintf(w, "  total:       %6d\n", len(result.Mismatches))
+		fmt.Fprintf(w, "  benign:      %6d  (known representation differences)\n", benign)
+		fmt.Fprintf(w, "  investigate: %6d  (potential real issues)\n", investigate)
+
 		byField := make(map[string][]Mismatch)
 		for _, m := range result.Mismatches {
 			byField[m.Field] = append(byField[m.Field], m)
 		}
 
-		// Print up to 5 examples per field type
-		fmt.Fprintf(w, "\nMismatches by field (up to 5 each):\n")
 		fieldOrder := []string{"type", "access", "status", "enums", "index", "hint", "tc_name", "units", "ranges", "defval", "bits", "varbinds"}
-		for _, field := range fieldOrder {
-			mismatches, ok := byField[field]
-			if !ok || len(mismatches) == 0 {
-				continue
+
+		if categorize || investigateOnly {
+			if investigateOnly {
+				fmt.Fprintf(w, "\nMismatches needing investigation:\n")
+			} else {
+				fmt.Fprintf(w, "\nMismatches by field and category:\n")
 			}
-			fmt.Fprintf(w, "\n  [%s] (%d total)\n", field, len(mismatches))
-			limit := 5
-			if len(mismatches) < limit {
-				limit = len(mismatches)
+			for _, field := range fieldOrder {
+				mismatches, ok := byField[field]
+				if !ok || len(mismatches) == 0 {
+					continue
+				}
+				printCategorizedMismatches(w, field, mismatches, exampleLimit, investigateOnly)
 			}
-			for _, m := range mismatches[:limit] {
-				fmt.Fprintf(w, "    %s (%s::%s)\n", m.OID, m.Module, m.Name)
-				fmt.Fprintf(w, "      gomib=%q net-snmp=%q\n", m.Gomib, m.NetSnmp)
+		} else {
+			limitStr := fmt.Sprintf("up to %d each", exampleLimit)
+			if exampleLimit == 0 {
+				limitStr = "all"
 			}
-			if len(mismatches) > limit {
-				fmt.Fprintf(w, "    ... and %d more\n", len(mismatches)-limit)
+			fmt.Fprintf(w, "\nMismatches by field (%s):\n", limitStr)
+			for _, field := range fieldOrder {
+				mismatches, ok := byField[field]
+				if !ok || len(mismatches) == 0 {
+					continue
+				}
+				fmt.Fprintf(w, "\n  [%s] (%d total)\n", field, len(mismatches))
+				limit := exampleLimit
+				if limit == 0 || len(mismatches) < limit {
+					limit = len(mismatches)
+				}
+				for _, m := range mismatches[:limit] {
+					fmt.Fprintf(w, "    %s (%s::%s)\n", m.OID, m.Module, m.Name)
+					if m.GomibModule != "" && m.NetSnmpModule != "" {
+						fmt.Fprintf(w, "      modules: gomib=%s net-snmp=%s\n", m.GomibModule, m.NetSnmpModule)
+					}
+					fmt.Fprintf(w, "      gomib=%q net-snmp=%q\n", m.Gomib, m.NetSnmp)
+				}
+				if exampleLimit > 0 && len(mismatches) > limit {
+					fmt.Fprintf(w, "    ... and %d more\n", len(mismatches)-limit)
+				}
 			}
 		}
 	}
@@ -594,12 +583,487 @@ func printComparisonResult(w io.Writer, result *ComparisonResult) {
 	}
 }
 
+// MismatchCategory describes a category of mismatch with likely cause.
+type MismatchCategory struct {
+	Name        string
+	Description string
+	Benign      bool // True if this is a known representation difference, not a real semantic mismatch
+	Mismatches  []Mismatch
+}
+
+func printCategorizedMismatches(w io.Writer, field string, mismatches []Mismatch, limit int, investigateOnly bool) {
+	categories := categorizeMismatches(field, mismatches)
+
+	var totalToShow int
+	for _, cat := range categories {
+		if investigateOnly && cat.Benign {
+			continue
+		}
+		totalToShow += len(cat.Mismatches)
+	}
+
+	if totalToShow == 0 {
+		return
+	}
+
+	if investigateOnly {
+		fmt.Fprintf(w, "\n  [%s] (%d investigate, %d total)\n", field, totalToShow, len(mismatches))
+	} else {
+		fmt.Fprintf(w, "\n  [%s] (%d total)\n", field, len(mismatches))
+	}
+
+	for _, cat := range categories {
+		if len(cat.Mismatches) == 0 {
+			continue
+		}
+		if investigateOnly && cat.Benign {
+			continue
+		}
+
+		benignTag := ""
+		if cat.Benign {
+			benignTag = " [benign]"
+		}
+		fmt.Fprintf(w, "\n    %s (%d)%s - %s\n", cat.Name, len(cat.Mismatches), benignTag, cat.Description)
+
+		showLimit := limit
+		if showLimit == 0 || len(cat.Mismatches) < showLimit {
+			showLimit = len(cat.Mismatches)
+		}
+		for _, m := range cat.Mismatches[:showLimit] {
+			fmt.Fprintf(w, "      %s (%s::%s)\n", m.OID, m.Module, m.Name)
+			if m.GomibModule != "" && m.NetSnmpModule != "" {
+				fmt.Fprintf(w, "        modules: gomib=%s net-snmp=%s\n", m.GomibModule, m.NetSnmpModule)
+			}
+			fmt.Fprintf(w, "        gomib=%q net-snmp=%q\n", m.Gomib, m.NetSnmp)
+		}
+		if limit > 0 && len(cat.Mismatches) > showLimit {
+			fmt.Fprintf(w, "      ... and %d more\n", len(cat.Mismatches)-showLimit)
+		}
+	}
+}
+
+func categorizeMismatches(field string, mismatches []Mismatch) []MismatchCategory {
+	switch field {
+	case "ranges":
+		return categorizeRanges(mismatches)
+	case "defval":
+		return categorizeDefval(mismatches)
+	case "status":
+		return categorizeStatus(mismatches)
+	case "access":
+		return categorizeAccess(mismatches)
+	case "type":
+		return categorizeType(mismatches)
+	case "enums":
+		return categorizeEnums(mismatches)
+	case "varbinds":
+		return categorizeVarbinds(mismatches)
+	case "index":
+		return categorizeIndex(mismatches)
+	default:
+		return []MismatchCategory{{Name: "uncategorized", Description: "all mismatches", Benign: false, Mismatches: mismatches}}
+	}
+}
+
+func countBenignAndInvestigate(mismatches []Mismatch) (benign, investigate int) {
+	byField := make(map[string][]Mismatch)
+	for _, m := range mismatches {
+		byField[m.Field] = append(byField[m.Field], m)
+	}
+
+	for field, fieldMismatches := range byField {
+		categories := categorizeMismatches(field, fieldMismatches)
+		for _, cat := range categories {
+			if cat.Benign {
+				benign += len(cat.Mismatches)
+			} else {
+				investigate += len(cat.Mismatches)
+			}
+		}
+	}
+	return
+}
+
+func categorizeRanges(mismatches []Mismatch) []MismatchCategory {
+	var overlap, signedUnsigned, countDiff, valueDiff, other []Mismatch
+
+	for _, m := range mismatches {
+		if m.GomibModule != "" && m.NetSnmpModule != "" {
+			overlap = append(overlap, m)
+			continue
+		}
+
+		switch {
+		case isSignedUnsignedDiff(m.Gomib, m.NetSnmp):
+			signedUnsigned = append(signedUnsigned, m)
+		case countRanges(m.Gomib) != countRanges(m.NetSnmp):
+			countDiff = append(countDiff, m)
+		case m.Gomib != m.NetSnmp:
+			valueDiff = append(valueDiff, m)
+		default:
+			other = append(other, m)
+		}
+	}
+
+	return []MismatchCategory{
+		{Name: "overlap", Description: "same OID defined in different modules", Benign: true, Mismatches: overlap},
+		{Name: "signed/unsigned", Description: "net-snmp shows signed interpretation of unsigned values", Benign: true, Mismatches: signedUnsigned},
+		{Name: "range-count", Description: "different number of range constraints", Benign: false, Mismatches: countDiff},
+		{Name: "value-diff", Description: "different range values", Benign: false, Mismatches: valueDiff},
+		{Name: "other", Description: "uncategorized", Benign: false, Mismatches: other},
+	}
+}
+
+func categorizeDefval(mismatches []Mismatch) []MismatchCategory {
+	var overlap, quoteDiff, hexZeros, hexDiff, oidSymbolic, enumDiff, emptyVsValue, spaceDiff, other []Mismatch
+
+	for _, m := range mismatches {
+		if m.GomibModule != "" && m.NetSnmpModule != "" {
+			overlap = append(overlap, m)
+			continue
+		}
+
+		gNorm := normalizeDefval(m.Gomib)
+		nNorm := normalizeDefval(m.NetSnmp)
+
+		switch {
+		case gNorm == nNorm:
+			quoteDiff = append(quoteDiff, m)
+		case strings.ReplaceAll(gNorm, " ", "") == strings.ReplaceAll(nNorm, " ", ""):
+			spaceDiff = append(spaceDiff, m)
+		case gNorm == "" && nNorm != "":
+			emptyVsValue = append(emptyVsValue, m)
+		case nNorm == "" && gNorm != "":
+			emptyVsValue = append(emptyVsValue, m)
+		case isHexZeroDiff(gNorm, nNorm):
+			hexZeros = append(hexZeros, m)
+		case strings.HasPrefix(gNorm, "0x") || strings.HasPrefix(nNorm, "0x") ||
+			strings.Contains(gNorm, "'H") || strings.Contains(nNorm, "'H"):
+			hexDiff = append(hexDiff, m)
+		case isOidSymbolicDiff(gNorm, nNorm):
+			oidSymbolic = append(oidSymbolic, m)
+		case strings.Contains(gNorm, "(") || strings.Contains(nNorm, "("):
+			enumDiff = append(enumDiff, m)
+		default:
+			other = append(other, m)
+		}
+	}
+
+	return []MismatchCategory{
+		{Name: "overlap", Description: "same OID defined in different modules", Benign: true, Mismatches: overlap},
+		{Name: "quoting", Description: "only differs in quote/escape style", Benign: true, Mismatches: quoteDiff},
+		{Name: "whitespace", Description: "only differs in whitespace", Benign: true, Mismatches: spaceDiff},
+		{Name: "hex-zeros", Description: "gomib 0x0000... vs net-snmp 0 (same semantic value)", Benign: true, Mismatches: hexZeros},
+		{Name: "hex-format", Description: "hex string format difference", Benign: false, Mismatches: hexDiff},
+		{Name: "oid-symbolic", Description: "gomib numeric OID vs net-snmp symbolic name", Benign: false, Mismatches: oidSymbolic},
+		{Name: "enum-format", Description: "enum name vs numeric value", Benign: false, Mismatches: enumDiff},
+		{Name: "empty-vs-value", Description: "one side has value, other empty", Benign: false, Mismatches: emptyVsValue},
+		{Name: "other", Description: "uncategorized value difference", Benign: false, Mismatches: other},
+	}
+}
+
+// isHexZeroDiff checks if gomib shows 0x0000... and net-snmp shows "0".
+func isHexZeroDiff(gomib, netsnmp string) bool {
+	if !strings.HasPrefix(gomib, "0x") {
+		return false
+	}
+	hexPart := strings.TrimPrefix(gomib, "0x")
+	for _, c := range hexPart {
+		if c != '0' {
+			return false
+		}
+	}
+	return netsnmp == "0"
+}
+
+// isOidSymbolicDiff checks if gomib shows numeric OID and net-snmp shows symbolic name.
+func isOidSymbolicDiff(gomib, netsnmp string) bool {
+	if !strings.Contains(gomib, ".") {
+		return false
+	}
+	isNumericOID := true
+	for _, c := range gomib {
+		if c != '.' && (c < '0' || c > '9') {
+			isNumericOID = false
+			break
+		}
+	}
+	if !isNumericOID {
+		return false
+	}
+	hasLetter := false
+	for _, c := range netsnmp {
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			hasLetter = true
+			break
+		}
+	}
+	return hasLetter && !strings.Contains(netsnmp, ".")
+}
+
+// normalizeDefval removes quoting/escaping to get the semantic value.
+func normalizeDefval(s string) string {
+	s = strings.ReplaceAll(s, "\\\"", "\"")
+	s = strings.ReplaceAll(s, "\\\\", "\\")
+	s = strings.Trim(strings.TrimSpace(s), "\"'")
+	return s
+}
+
+func categorizeStatus(mismatches []Mismatch) []MismatchCategory {
+	var overlap, deprecatedObsolete, currentMandatory, other []Mismatch
+
+	for _, m := range mismatches {
+		if m.GomibModule != "" && m.NetSnmpModule != "" {
+			overlap = append(overlap, m)
+			continue
+		}
+
+		g, n := strings.ToLower(m.Gomib), strings.ToLower(m.NetSnmp)
+		switch {
+		case (g == "deprecated" && n == "obsolete") || (g == "obsolete" && n == "deprecated"):
+			deprecatedObsolete = append(deprecatedObsolete, m)
+		case (g == "current" && n == "mandatory") || (g == "mandatory" && n == "current"):
+			currentMandatory = append(currentMandatory, m)
+		default:
+			other = append(other, m)
+		}
+	}
+
+	return []MismatchCategory{
+		{Name: "overlap", Description: "same OID defined in different modules", Benign: true, Mismatches: overlap},
+		{Name: "deprecated/obsolete", Description: "deprecated vs obsolete (often equivalent)", Benign: false, Mismatches: deprecatedObsolete},
+		{Name: "current/mandatory", Description: "SMIv1 mandatory vs SMIv2 current", Benign: true, Mismatches: currentMandatory},
+		{Name: "other", Description: "other status differences", Benign: false, Mismatches: other},
+	}
+}
+
+func categorizeAccess(mismatches []Mismatch) []MismatchCategory {
+	var overlap, rwCreate, naReadOnly, other []Mismatch
+
+	for _, m := range mismatches {
+		if m.GomibModule != "" && m.NetSnmpModule != "" {
+			overlap = append(overlap, m)
+			continue
+		}
+
+		g, n := strings.ToLower(m.Gomib), strings.ToLower(m.NetSnmp)
+		switch {
+		case (g == "read-create" && n == "read-write") || (g == "read-write" && n == "read-create"):
+			rwCreate = append(rwCreate, m)
+		case (g == "not-accessible" && n == "read-only") || (g == "read-only" && n == "not-accessible"):
+			naReadOnly = append(naReadOnly, m)
+		default:
+			other = append(other, m)
+		}
+	}
+
+	return []MismatchCategory{
+		{Name: "overlap", Description: "same OID defined in different modules", Benign: true, Mismatches: overlap},
+		{Name: "read-write/read-create", Description: "SMIv1 read-write vs SMIv2 read-create", Benign: true, Mismatches: rwCreate},
+		{Name: "access-level", Description: "not-accessible vs read-only", Benign: false, Mismatches: naReadOnly},
+		{Name: "other", Description: "other access differences", Benign: false, Mismatches: other},
+	}
+}
+
+func categorizeType(mismatches []Mismatch) []MismatchCategory {
+	var overlap, networkAddr, intVariants, other []Mismatch
+
+	for _, m := range mismatches {
+		if m.GomibModule != "" && m.NetSnmpModule != "" {
+			overlap = append(overlap, m)
+			continue
+		}
+
+		switch {
+		case strings.Contains(m.Gomib, "Address") || strings.Contains(m.NetSnmp, "Address"):
+			networkAddr = append(networkAddr, m)
+		case strings.Contains(m.Gomib, "Integer") || strings.Contains(m.Gomib, "INTEGER") ||
+			strings.Contains(m.NetSnmp, "Integer") || strings.Contains(m.NetSnmp, "INTEGER"):
+			intVariants = append(intVariants, m)
+		default:
+			other = append(other, m)
+		}
+	}
+
+	return []MismatchCategory{
+		{Name: "overlap", Description: "same OID defined in different modules", Benign: true, Mismatches: overlap},
+		{Name: "address-types", Description: "NetworkAddress vs IpAddress (SMIv1 legacy)", Benign: true, Mismatches: networkAddr},
+		{Name: "integer-variants", Description: "INTEGER vs Integer32 variants", Benign: true, Mismatches: intVariants},
+		{Name: "other", Description: "other type differences", Benign: false, Mismatches: other},
+	}
+}
+
+func categorizeEnums(mismatches []Mismatch) []MismatchCategory {
+	var overlap, gomibMoreValues, netsnmpMoreValues, valueDiff, other []Mismatch
+
+	for _, m := range mismatches {
+		if m.GomibModule != "" && m.NetSnmpModule != "" {
+			overlap = append(overlap, m)
+			continue
+		}
+
+		gCount := strings.Count(m.Gomib, "(")
+		nCount := strings.Count(m.NetSnmp, "(")
+		switch {
+		case gCount > nCount:
+			gomibMoreValues = append(gomibMoreValues, m)
+		case nCount > gCount:
+			netsnmpMoreValues = append(netsnmpMoreValues, m)
+		case gCount != nCount:
+			other = append(other, m)
+		default:
+			valueDiff = append(valueDiff, m)
+		}
+	}
+
+	return []MismatchCategory{
+		{Name: "overlap", Description: "same OID defined in different modules", Benign: true, Mismatches: overlap},
+		{Name: "gomib-more-values", Description: "gomib has more enum values (check MIB source)", Benign: false, Mismatches: gomibMoreValues},
+		{Name: "netsnmp-more-values", Description: "net-snmp has more enum values (check for import shadowing)", Benign: false, Mismatches: netsnmpMoreValues},
+		{Name: "enum-values", Description: "different enum names or numbers", Benign: false, Mismatches: valueDiff},
+		{Name: "other", Description: "uncategorized", Benign: false, Mismatches: other},
+	}
+}
+
+func categorizeVarbinds(mismatches []Mismatch) []MismatchCategory {
+	var netsnmpMore, gomibMore, different, other []Mismatch
+
+	for _, m := range mismatches {
+		gCount := strings.Count(m.Gomib, ",") + 1
+		nCount := strings.Count(m.NetSnmp, ",") + 1
+		if m.Gomib == "" || m.Gomib == "{}" {
+			gCount = 0
+		}
+		if m.NetSnmp == "" || m.NetSnmp == "{}" {
+			nCount = 0
+		}
+
+		switch {
+		case nCount > gCount:
+			netsnmpMore = append(netsnmpMore, m)
+		case gCount > nCount:
+			gomibMore = append(gomibMore, m)
+		case gCount == nCount && gCount > 0:
+			different = append(different, m)
+		default:
+			other = append(other, m)
+		}
+	}
+
+	return []MismatchCategory{
+		{Name: "netsnmp-more-objects", Description: "net-snmp has more OBJECTS (check for unresolved refs)", Benign: false, Mismatches: netsnmpMore},
+		{Name: "gomib-more-objects", Description: "gomib has more OBJECTS", Benign: false, Mismatches: gomibMore},
+		{Name: "different-objects", Description: "same count but different object names", Benign: false, Mismatches: different},
+		{Name: "other", Description: "uncategorized", Benign: false, Mismatches: other},
+	}
+}
+
+func categorizeIndex(mismatches []Mismatch) []MismatchCategory {
+	var netsnmpMore, gomibMore, different, other []Mismatch
+
+	for _, m := range mismatches {
+		gCount := strings.Count(m.Gomib, ",") + 1
+		nCount := strings.Count(m.NetSnmp, ",") + 1
+		if m.Gomib == "" || m.Gomib == "{}" {
+			gCount = 0
+		}
+		if m.NetSnmp == "" || m.NetSnmp == "{}" {
+			nCount = 0
+		}
+
+		switch {
+		case nCount > gCount:
+			netsnmpMore = append(netsnmpMore, m)
+		case gCount > nCount:
+			gomibMore = append(gomibMore, m)
+		case gCount == nCount && gCount > 0:
+			different = append(different, m)
+		default:
+			other = append(other, m)
+		}
+	}
+
+	return []MismatchCategory{
+		{Name: "netsnmp-more-indexes", Description: "net-snmp has more INDEX items (check for unresolved refs)", Benign: false, Mismatches: netsnmpMore},
+		{Name: "gomib-more-indexes", Description: "gomib has more INDEX items", Benign: false, Mismatches: gomibMore},
+		{Name: "different-indexes", Description: "same count but different index names", Benign: false, Mismatches: different},
+		{Name: "other", Description: "uncategorized", Benign: false, Mismatches: other},
+	}
+}
+
+func countRanges(s string) int {
+	return strings.Count(s, "..")
+}
+
+// isSignedUnsignedDiff checks if the range difference is due to signed vs
+// unsigned interpretation. Each value that differs must differ by exactly
+// 2^32, which is the C int overflow that causes net-snmp to display unsigned
+// values as signed (e.g. 4294967295 as -1).
+func isSignedUnsignedDiff(gomib, netsnmp string) bool {
+	gVals := parseRangeValues(gomib)
+	nVals := parseRangeValues(netsnmp)
+	if len(gVals) == 0 || len(gVals) != len(nVals) {
+		return false
+	}
+	hasDiff := false
+	for i := range gVals {
+		if gVals[i] == nVals[i] {
+			continue
+		}
+		diff := gVals[i] - nVals[i]
+		if diff != 1<<32 && diff != -(1<<32) {
+			return false
+		}
+		hasDiff = true
+	}
+	return hasDiff
+}
+
+// parseRangeValues extracts all int64 values from a range string like
+// "(0..255 | 1024..2048)" into a flat slice [0, 255, 1024, 2048].
+func parseRangeValues(s string) []int64 {
+	s = strings.TrimSpace(s)
+	s = strings.Trim(s, "()")
+	var vals []int64
+	for _, part := range strings.Split(s, "|") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if low, high, ok := strings.Cut(part, ".."); ok {
+			if v, err := strconv.ParseInt(strings.TrimSpace(low), 10, 64); err == nil {
+				vals = append(vals, v)
+			} else {
+				return nil
+			}
+			if v, err := strconv.ParseInt(strings.TrimSpace(high), 10, 64); err == nil {
+				vals = append(vals, v)
+			} else {
+				return nil
+			}
+		} else {
+			if v, err := strconv.ParseInt(part, 10, 64); err == nil {
+				vals = append(vals, v)
+			} else {
+				return nil
+			}
+		}
+	}
+	return vals
+}
+
 func printFieldAccuracy(w io.Writer, name string, c CountPair) {
-	total := c.Match + c.Mismatch
+	total := c.Match + c.Mismatch + c.Missing
 	if total == 0 {
 		return
 	}
 	pct := 100.0 * float64(c.Match) / float64(total)
-	fmt.Fprintf(w, "  %-10s %5d match, %5d mismatch (%.1f%% accurate)\n",
-		name+":", c.Match, c.Mismatch, pct)
+	if c.Missing > 0 {
+		fmt.Fprintf(w, "  %-10s %5d match, %5d mismatch, %5d missing (%.1f%% accurate)\n",
+			name+":", c.Match, c.Mismatch, c.Missing, pct)
+	} else {
+		fmt.Fprintf(w, "  %-10s %5d match, %5d mismatch (%.1f%% accurate)\n",
+			name+":", c.Match, c.Mismatch, pct)
+	}
 }

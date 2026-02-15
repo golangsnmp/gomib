@@ -4,28 +4,25 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// SyntaxClause is a SYNTAX clause specifying the type of an object.
+// SyntaxClause wraps a TypeSyntax with its source span.
 type SyntaxClause struct {
-	// Syntax is the type syntax.
 	Syntax TypeSyntax
-	// Span is the source location.
-	Span types.Span
+	Span   types.Span
 }
 
-// NewSyntaxClause creates a new syntax clause.
+// NewSyntaxClause creates a SyntaxClause from a type syntax and span.
 func NewSyntaxClause(syntax TypeSyntax, span types.Span) SyntaxClause {
 	return SyntaxClause{Syntax: syntax, Span: span}
 }
 
-// TypeSyntax is type syntax in a SYNTAX clause or type assignment.
+// TypeSyntax represents a type expression in a SYNTAX clause or
+// type assignment.
 type TypeSyntax interface {
-	// SyntaxSpan returns the source location of this type syntax.
 	SyntaxSpan() types.Span
-	// ensure only this package can implement
 	typeSyntax()
 }
 
-// TypeSyntaxTypeRef is a simple type reference: Integer32, DisplayString, IpAddress
+// TypeSyntaxTypeRef is an unqualified type name reference.
 type TypeSyntaxTypeRef struct {
 	Name Ident
 }
@@ -33,414 +30,294 @@ type TypeSyntaxTypeRef struct {
 func (t *TypeSyntaxTypeRef) SyntaxSpan() types.Span { return t.Name.Span }
 func (*TypeSyntaxTypeRef) typeSyntax()              {}
 
-// TypeSyntaxIntegerEnum is INTEGER with named numbers: INTEGER { up(1), down(2) }
+// TypeSyntaxIntegerEnum is an INTEGER type with enumerated named values.
 type TypeSyntaxIntegerEnum struct {
-	// Base is the base type (usually nil, inferred as INTEGER).
-	Base *Ident
-	// NamedNumbers are the named number values.
+	Base         *Ident
 	NamedNumbers []NamedNumber
-	// Span is the source location.
-	Span types.Span
+	Span         types.Span
 }
 
 func (t *TypeSyntaxIntegerEnum) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxIntegerEnum) typeSyntax()              {}
 
-// TypeSyntaxBits is BITS with named bits: BITS { flag1(0), flag2(1) }
+// TypeSyntaxBits is a BITS type with named bit positions.
 type TypeSyntaxBits struct {
-	// NamedBits are the named bit positions.
 	NamedBits []NamedNumber
-	// Span is the source location.
-	Span types.Span
+	Span      types.Span
 }
 
 func (t *TypeSyntaxBits) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxBits) typeSyntax()              {}
 
-// TypeSyntaxConstrained is a constrained type: OCTET STRING (SIZE (0..255))
+// TypeSyntaxConstrained is a type with a SIZE or range constraint.
 type TypeSyntaxConstrained struct {
-	// Base is the base type.
-	Base TypeSyntax
-	// Constraint is the constraint.
+	Base       TypeSyntax
 	Constraint Constraint
-	// Span is the source location.
-	Span types.Span
+	Span       types.Span
 }
 
 func (t *TypeSyntaxConstrained) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxConstrained) typeSyntax()              {}
 
-// TypeSyntaxSequenceOf is SEQUENCE OF: SEQUENCE OF IfEntry
+// TypeSyntaxSequenceOf is a SEQUENCE OF entry-type reference.
 type TypeSyntaxSequenceOf struct {
-	// EntryType is the entry type name.
 	EntryType Ident
-	// Span is the source location.
-	Span types.Span
+	Span      types.Span
 }
 
 func (t *TypeSyntaxSequenceOf) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxSequenceOf) typeSyntax()              {}
 
-// TypeSyntaxSequence is SEQUENCE (row definition): SEQUENCE { ifIndex INTEGER, ... }
+// TypeSyntaxSequence is a SEQUENCE with named fields (table row definition).
 type TypeSyntaxSequence struct {
-	// Fields are the sequence fields.
 	Fields []SequenceField
-	// Span is the source location.
-	Span types.Span
+	Span   types.Span
 }
 
 func (t *TypeSyntaxSequence) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxSequence) typeSyntax()              {}
 
-// TypeSyntaxChoice is a CHOICE type: CHOICE { simple SimpleSyntax, application ApplicationSyntax }
+// TypeSyntaxChoice is a CHOICE type with named alternatives.
 type TypeSyntaxChoice struct {
-	// Alternatives are the choice alternatives.
 	Alternatives []ChoiceAlternative
-	// Span is the source location.
-	Span types.Span
+	Span         types.Span
 }
 
 func (t *TypeSyntaxChoice) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxChoice) typeSyntax()              {}
 
-// TypeSyntaxOctetString is OCTET STRING (explicit form).
+// TypeSyntaxOctetString is the explicit OCTET STRING type.
 type TypeSyntaxOctetString struct {
-	// Span is the source location.
 	Span types.Span
 }
 
 func (t *TypeSyntaxOctetString) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxOctetString) typeSyntax()              {}
 
-// TypeSyntaxObjectIdentifier is OBJECT IDENTIFIER type.
+// TypeSyntaxObjectIdentifier is the OBJECT IDENTIFIER type.
 type TypeSyntaxObjectIdentifier struct {
-	// Span is the source location.
 	Span types.Span
 }
 
 func (t *TypeSyntaxObjectIdentifier) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxObjectIdentifier) typeSyntax()              {}
 
-// SequenceField is a field in a SEQUENCE definition.
+// SequenceField is a named field within a SEQUENCE definition.
 type SequenceField struct {
-	// Name is the field name.
-	Name Ident
-	// Syntax is the field type.
+	Name   Ident
 	Syntax TypeSyntax
-	// Span is the source location.
-	Span types.Span
+	Span   types.Span
 }
 
-// ChoiceAlternative is an alternative in a CHOICE type.
+// ChoiceAlternative is a named alternative within a CHOICE type.
 type ChoiceAlternative struct {
-	// Name is the alternative name.
-	Name Ident
-	// Syntax is the alternative type.
+	Name   Ident
 	Syntax TypeSyntax
-	// Span is the source location.
-	Span types.Span
+	Span   types.Span
 }
 
-// Constraint is a type constraint (SIZE or range).
+// Constraint represents a type sub-typing constraint (SIZE or range).
 type Constraint interface {
-	// ConstraintSpan returns the source location.
 	ConstraintSpan() types.Span
-	// constraint marker
 	constraint()
 }
 
-// ConstraintSize is a SIZE constraint: (SIZE (0..255))
+// ConstraintSize is a SIZE(...) constraint on length.
 type ConstraintSize struct {
-	// Ranges are the allowed ranges.
 	Ranges []Range
-	// Span is the source location.
-	Span types.Span
+	Span   types.Span
 }
 
 func (c *ConstraintSize) ConstraintSpan() types.Span { return c.Span }
 func (*ConstraintSize) constraint()                  {}
 
-// ConstraintRange is a value range constraint: (0..65535)
+// ConstraintRange is a value range constraint, e.g. (0..65535).
 type ConstraintRange struct {
-	// Ranges are the allowed ranges.
 	Ranges []Range
-	// Span is the source location.
-	Span types.Span
+	Span   types.Span
 }
 
 func (c *ConstraintRange) ConstraintSpan() types.Span { return c.Span }
 func (*ConstraintRange) constraint()                  {}
 
-// Range is a range in a constraint.
+// Range is a single range element within a constraint (min..max).
 type Range struct {
-	// Min is the minimum value.
-	Min RangeValue
-	// Max is the maximum value (nil for single value).
-	Max RangeValue
-	// Span is the source location.
+	Min  RangeValue
+	Max  RangeValue
 	Span types.Span
 }
 
-// RangeValue is a value in a range constraint.
+// RangeValue is an endpoint in a range (numeric literal or MIN/MAX).
 type RangeValue interface {
-	// rangeValue marker
 	rangeValue()
 }
 
-// RangeValueSigned is a signed numeric value (for Integer32 ranges, can be negative).
+// RangeValueSigned is a signed integer range endpoint.
 type RangeValueSigned struct {
 	Value int64
 }
 
 func (*RangeValueSigned) rangeValue() {}
 
-// RangeValueUnsigned is an unsigned numeric value (for Counter64 ranges, large positive values).
+// RangeValueUnsigned is an unsigned integer range endpoint.
 type RangeValueUnsigned struct {
 	Value uint64
 }
 
 func (*RangeValueUnsigned) rangeValue() {}
 
-// RangeValueIdent is a named value (MIN, MAX).
+// RangeValueIdent is a symbolic range endpoint (MIN or MAX).
 type RangeValueIdent struct {
 	Name Ident
 }
 
 func (*RangeValueIdent) rangeValue() {}
 
-// === Access clause ===
-
-// AccessClause is an access clause (MAX-ACCESS or ACCESS).
+// AccessClause holds a parsed ACCESS, MAX-ACCESS, or MIN-ACCESS clause.
 type AccessClause struct {
-	// Keyword is the keyword used (MAX-ACCESS vs ACCESS).
 	Keyword AccessKeyword
-	// Value is the access value.
-	Value AccessValue
-	// Span is the source location.
-	Span types.Span
+	Value   types.Access
+	Span    types.Span
 }
 
-// AccessKeyword is the access keyword type.
+// AccessKeyword distinguishes ACCESS, MAX-ACCESS, and MIN-ACCESS.
 type AccessKeyword int
 
 const (
-	// AccessKeywordAccess is SMIv1: ACCESS
 	AccessKeywordAccess AccessKeyword = iota
-	// AccessKeywordMaxAccess is SMIv2: MAX-ACCESS
 	AccessKeywordMaxAccess
-	// AccessKeywordMinAccess is SMIv2: MIN-ACCESS (in MODULE-COMPLIANCE)
 	AccessKeywordMinAccess
-	// AccessKeywordPibAccess is SPPI: PIB-ACCESS
 	AccessKeywordPibAccess
 )
 
-// AccessValue is an access value.
-type AccessValue int
-
-const (
-	// AccessValueReadOnly is read-only
-	AccessValueReadOnly AccessValue = iota
-	// AccessValueReadWrite is read-write
-	AccessValueReadWrite
-	// AccessValueReadCreate is read-create
-	AccessValueReadCreate
-	// AccessValueNotAccessible is not-accessible
-	AccessValueNotAccessible
-	// AccessValueAccessibleForNotify is accessible-for-notify
-	AccessValueAccessibleForNotify
-	// AccessValueWriteOnly is write-only (deprecated)
-	AccessValueWriteOnly
-	// AccessValueNotImplemented is not-implemented (AGENT-CAPABILITIES)
-	AccessValueNotImplemented
-	// SPPI-specific
-	// AccessValueInstall is install
-	AccessValueInstall
-	// AccessValueInstallNotify is install-notify
-	AccessValueInstallNotify
-	// AccessValueReportOnly is report-only
-	AccessValueReportOnly
-)
-
-// === Status clause ===
-
-// StatusClause is a status clause.
+// StatusClause holds a parsed STATUS clause value and span.
 type StatusClause struct {
-	// Value is the status value.
-	Value StatusValue
-	// Span is the source location.
-	Span types.Span
+	Value types.Status
+	Span  types.Span
 }
 
-// StatusValue is a status value.
-type StatusValue int
-
-const (
-	// StatusValueCurrent is current
-	StatusValueCurrent StatusValue = iota
-	// StatusValueDeprecated is deprecated
-	StatusValueDeprecated
-	// StatusValueObsolete is obsolete
-	StatusValueObsolete
-	// StatusValueMandatory is mandatory (SMIv1)
-	StatusValueMandatory
-	// StatusValueOptional is optional (SMIv1)
-	StatusValueOptional
-)
-
-// === Index clause ===
-
-// IndexClause is an index clause (INDEX or PIB-INDEX).
+// IndexClause represents an INDEX or PIB-INDEX clause in OBJECT-TYPE.
 type IndexClause interface {
-	// IndexClauseSpan returns the source location.
 	IndexClauseSpan() types.Span
-	// Indexes returns the index items.
 	Indexes() []IndexItem
-	// indexClause marker
 	indexClause()
 }
 
-// IndexClauseIndex is INDEX { ifIndex, ipAddr IMPLIED }
+// IndexClauseIndex is an INDEX { ... } clause.
 type IndexClauseIndex struct {
-	// Items are the index items.
 	Items []IndexItem
-	// Span is the source location.
-	Span types.Span
+	Span  types.Span
 }
 
 func (c *IndexClauseIndex) IndexClauseSpan() types.Span { return c.Span }
 func (c *IndexClauseIndex) Indexes() []IndexItem        { return c.Items }
 func (*IndexClauseIndex) indexClause()                  {}
 
-// IndexClausePibIndex is PIB-INDEX { ... } (SPPI)
+// IndexClausePibIndex is a PIB-INDEX { ... } clause (SPPI).
 type IndexClausePibIndex struct {
-	// Items are the index items.
 	Items []IndexItem
-	// Span is the source location.
-	Span types.Span
+	Span  types.Span
 }
 
 func (c *IndexClausePibIndex) IndexClauseSpan() types.Span { return c.Span }
 func (c *IndexClausePibIndex) Indexes() []IndexItem        { return c.Items }
 func (*IndexClausePibIndex) indexClause()                  {}
 
-// IndexItem is an item in an INDEX clause.
+// IndexItem is a single entry in an INDEX clause, possibly IMPLIED.
 type IndexItem struct {
-	// Implied indicates whether this index is IMPLIED.
 	Implied bool
-	// Object is the object reference.
-	Object Ident
-	// Span is the source location.
-	Span types.Span
+	Object  Ident
+	Span    types.Span
 }
 
-// AugmentsClause is an AUGMENTS clause.
+// AugmentsClause holds the target row referenced by AUGMENTS.
 type AugmentsClause struct {
-	// Target is the target row to augment.
 	Target Ident
-	// Span is the source location.
-	Span types.Span
+	Span   types.Span
 }
 
-// === DEFVAL clause ===
-
-// DefValClause is a DEFVAL clause.
+// DefValClause holds the default value for an OBJECT-TYPE.
 type DefValClause struct {
-	// Value is the default value content.
 	Value DefValContent
-	// Span is the source location (includes DEFVAL keyword and braces).
-	Span types.Span
+	Span  types.Span
 }
 
-// DefValContent is the content of a DEFVAL clause.
-//
-// Per RFC 2578, DEFVAL can contain:
-//   - Integer literals
-//   - String literals (quoted)
-//   - Enumeration labels (identifiers)
-//   - BITS values (set of bit labels in braces)
-//   - OID references (identifiers)
-//   - Hex or binary strings
+// DefValContent represents the typed content within a DEFVAL { ... } clause.
 type DefValContent interface {
-	// defValContent marker
 	defValContent()
 }
 
-// DefValContentInteger is an integer value: DEFVAL { 0 }, DEFVAL { -1 }
+// DefValContentInteger is a signed integer default value.
 type DefValContentInteger struct {
 	Value int64
 }
 
 func (*DefValContentInteger) defValContent() {}
 
-// DefValContentUnsigned is an unsigned integer (for Counter64 etc): DEFVAL { 4294967296 }
+// DefValContentUnsigned is an unsigned integer default value.
 type DefValContentUnsigned struct {
 	Value uint64
 }
 
 func (*DefValContentUnsigned) defValContent() {}
 
-// DefValContentString is a quoted string: DEFVAL { "public" }, DEFVAL { "" }
+// DefValContentString is a quoted string default value.
 type DefValContentString struct {
 	Value QuotedString
 }
 
 func (*DefValContentString) defValContent() {}
 
-// DefValContentIdentifier is an identifier (enum label or OID reference): DEFVAL { enabled }, DEFVAL { sysName }
+// DefValContentIdentifier is a named default (enum label or OID reference).
 type DefValContentIdentifier struct {
 	Name Ident
 }
 
 func (*DefValContentIdentifier) defValContent() {}
 
-// DefValContentBits is a BITS value (set of bit labels): DEFVAL { { flag1, flag2 } }, DEFVAL { {} }
+// DefValContentBits is a BITS default value with named bit labels.
 type DefValContentBits struct {
-	// Labels are the bit labels (identifiers).
 	Labels []Ident
-	// Span is the source location.
-	Span types.Span
+	Span   types.Span
 }
 
 func (*DefValContentBits) defValContent() {}
 
-// DefValContentHexString is a hex string: DEFVAL { 'FF00'H }
+// DefValContentHexString is a hex string default value ('...'H).
 type DefValContentHexString struct {
-	// Content is the hex content (without quotes and 'H' suffix).
 	Content string
-	// Span is the source location.
-	Span types.Span
+	Span    types.Span
 }
 
 func (*DefValContentHexString) defValContent() {}
 
-// DefValContentBinaryString is a binary string: DEFVAL { '1010'B }
+// DefValContentBinaryString is a binary string default value ('...'B).
 type DefValContentBinaryString struct {
-	// Content is the binary content (without quotes and 'B' suffix).
 	Content string
-	// Span is the source location.
-	Span types.Span
+	Span    types.Span
 }
 
 func (*DefValContentBinaryString) defValContent() {}
 
-// DefValContentObjectIdentifier is an object identifier value: DEFVAL { { iso 3 6 1 } }
+// DefValContentObjectIdentifier is an OID default value.
 type DefValContentObjectIdentifier struct {
-	// Components are the OID components.
 	Components []OidComponent
-	// Span is the source location.
-	Span types.Span
+	Span       types.Span
 }
 
 func (*DefValContentObjectIdentifier) defValContent() {}
 
-// === REVISION clause ===
-
-// RevisionClause is a REVISION clause in MODULE-IDENTITY.
-type RevisionClause struct {
-	// Date is the revision date.
-	Date QuotedString
-	// Description is the revision description.
-	Description QuotedString
-	// Span is the source location.
+// DefValContentUnparsed represents DEFVAL content that could not be parsed.
+// Used by error recovery when the parser skips over unrecognized content.
+type DefValContentUnparsed struct {
 	Span types.Span
+}
+
+func (*DefValContentUnparsed) defValContent() {}
+
+// RevisionClause represents a REVISION clause within MODULE-IDENTITY.
+type RevisionClause struct {
+	Date        QuotedString
+	Description QuotedString
+	Span        types.Span
 }

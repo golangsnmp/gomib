@@ -8,57 +8,91 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// LoweringContext tracks state during the lowering process.
+// LoweringContext tracks state accumulated during the lowering pass.
 type LoweringContext struct {
-	// Diagnostics collected during lowering.
 	Diagnostics []types.Diagnostic
-	// Language detected from imports (may be updated as imports are processed).
-	Language SmiLanguage
+	Language    types.Language
+	DiagConfig  types.DiagnosticConfig
+	source      []byte // source text for span-to-line/column conversion
+	moduleName  string // current module name for diagnostics
 	types.Logger
 }
 
-// newLoweringContext creates a new lowering context with an optional logger.
-// If logger is nil, logging is disabled (zero overhead).
-func newLoweringContext(logger *slog.Logger) *LoweringContext {
+// newLoweringContext returns a LoweringContext. A nil logger disables logging.
+func newLoweringContext(source []byte, logger *slog.Logger, diagConfig types.DiagnosticConfig) *LoweringContext {
 	return &LoweringContext{
-		Language: SmiLanguageUnknown,
-		Logger:   types.Logger{L: logger},
+		Language:   types.LanguageUnknown,
+		DiagConfig: diagConfig,
+		source:     source,
+		Logger:     types.Logger{L: logger},
 	}
 }
 
-// AddDiagnostic adds a diagnostic.
+// spanToLineCol converts a byte offset to 1-based line and column numbers.
+// Returns (0, 0) if the source is nil or the offset is out of range.
+func spanToLineCol(source []byte, offset types.ByteOffset) (line, col int) {
+	if source == nil || int(offset) > len(source) {
+		return 0, 0
+	}
+	line = 1
+	lastNewline := -1
+	for i := 0; i < int(offset); i++ {
+		if source[i] == '\n' {
+			line++
+			lastNewline = i
+		}
+	}
+	col = int(offset) - lastNewline
+	return line, col
+}
+
+// LineColFromLineTable converts a span to line/col using a module's precomputed
+// line table. This is the public entry point for code outside the lowering pass
+// (e.g., the resolver) that no longer has access to source bytes.
+func LineColFromLineTable(lineTable []int, span types.Span) (line, col int) {
+	return types.LineColFromTable(lineTable, span.Start)
+}
+
+// emitDiagnostic records a diagnostic if the current config allows it.
+// The span is converted to line/column using the source text.
+func (ctx *LoweringContext) emitDiagnostic(code string, severity types.Severity, moduleName string, span types.Span, message string) {
+	if !ctx.DiagConfig.ShouldReport(code, severity) {
+		return
+	}
+	line, col := spanToLineCol(ctx.source, span.Start)
+	ctx.Diagnostics = append(ctx.Diagnostics, types.Diagnostic{
+		Severity: severity,
+		Code:     code,
+		Message:  message,
+		Module:   moduleName,
+		Line:     line,
+		Column:   col,
+	})
+}
+
+// AddDiagnostic appends a diagnostic to the context.
 func (ctx *LoweringContext) AddDiagnostic(d types.Diagnostic) {
 	ctx.Diagnostics = append(ctx.Diagnostics, d)
 }
 
-// isSMIv2BaseModule returns true if the module name is an SMIv2 base module.
-func isSMIv2BaseModule(module string) bool {
-	switch module {
-	case "SNMPv2-SMI", "SNMPv2-TC", "SNMPv2-CONF", "SNMPv2-MIB":
-		return true
-	default:
-		return false
-	}
+// isSMIv2Import reports whether importing from this module indicates SMIv2.
+func isSMIv2Import(name string) bool {
+	bm, ok := BaseModuleFromName(name)
+	return ok && bm.IsSMIv2()
 }
 
-// Lower transforms an AST module into a normalized Module.
-//
-// This is the main entry point for lowering. It:
-//  1. Detects the SMI language from imports
-//  2. Lowers imports
-//  3. Lowers each definition
-//
-// The AST is not needed after lowering.
-// If logger is nil, logging is disabled (zero overhead).
-func Lower(astModule *ast.Module, logger *slog.Logger) *Module {
-	ctx := newLoweringContext(logger)
+// Lower transforms an AST module into a normalized Module. The AST is not
+// needed after lowering. Source is the original source text used to compute
+// diagnostic line/column from byte offset spans. A nil logger disables logging.
+func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig types.DiagnosticConfig) *Module {
+	ctx := newLoweringContext(source, logger, diagConfig)
 
-	// Create module
 	module := NewModule(astModule.Name.Name, astModule.Span)
+	module.LineTable = types.BuildLineTable(source)
+	ctx.moduleName = module.Name
 
 	ctx.Log(slog.LevelDebug, "lowering module", slog.String("module", module.Name))
 
-	// Lower imports and detect language
 	module.Imports = lowerImports(astModule.Imports, ctx)
 	module.Language = ctx.Language
 
@@ -66,7 +100,6 @@ func Lower(astModule *ast.Module, logger *slog.Logger) *Module {
 		slog.String("module", module.Name),
 		slog.String("language", module.Language.String()))
 
-	// Lower definitions
 	for _, def := range astModule.Body {
 		if lowered := lowerDefinition(def, ctx); lowered != nil {
 			module.Definitions = append(module.Definitions, lowered)
@@ -77,83 +110,112 @@ func Lower(astModule *ast.Module, logger *slog.Logger) *Module {
 		slog.String("module", module.Name),
 		slog.Int("definitions", len(module.Definitions)))
 
-	// Move diagnostics from AST and add lowering diagnostics
-	module.Diagnostics = append(module.Diagnostics, astModule.Diagnostics...)
+	if module.Language == types.LanguageSMIv2 && !IsBaseModule(module.Name) {
+		hasModuleIdentity := false
+		for _, def := range module.Definitions {
+			if mi, ok := def.(*ModuleIdentity); ok {
+				hasModuleIdentity = true
+				checkRevisionLastUpdated(ctx, module.Name, mi)
+				break
+			}
+		}
+		if !hasModuleIdentity {
+			ctx.emitDiagnostic(types.DiagMissingModuleIdentity, types.SeverityError, module.Name, module.Span,
+				fmt.Sprintf("SMIv2 module %s lacks MODULE-IDENTITY", module.Name))
+		}
+	}
+
+	for _, d := range astModule.Diagnostics {
+		line, col := spanToLineCol(ctx.source, d.Span.Start)
+		module.Diagnostics = append(module.Diagnostics, types.Diagnostic{
+			Severity: d.Severity,
+			Code:     d.Code,
+			Message:  d.Message,
+			Module:   module.Name,
+			Line:     line,
+			Column:   col,
+		})
+	}
+
 	module.Diagnostics = append(module.Diagnostics, ctx.Diagnostics...)
 
 	return module
 }
 
-// lowerImports lowers import clauses and detects SMI language.
+// identNames extracts the Name field from each Ident.
+func identNames(idents []ast.Ident) []string {
+	names := make([]string, len(idents))
+	for i, id := range idents {
+		names[i] = id.Name
+	}
+	return names
+}
+
+// lowerImports flattens import clauses and detects the SMI language.
 func lowerImports(importClauses []ast.ImportClause, ctx *LoweringContext) []Import {
 	var imports []Import
 
 	for _, clause := range importClauses {
 		fromModule := clause.FromModule.Name
 
-		// Detect language from imports
-		if isSMIv2BaseModule(fromModule) {
-			ctx.Language = SmiLanguageSMIv2
+		if isSMIv2Import(fromModule) {
+			ctx.Language = types.LanguageSMIv2
 		}
 
-		// Flatten each symbol
 		for _, symbol := range clause.Symbols {
 			imports = append(imports, NewImport(fromModule, symbol.Name, clause.Span))
 		}
 	}
 
-	// Default to SMIv1 if no SMIv2 imports detected
-	if ctx.Language == SmiLanguageUnknown {
-		ctx.Language = SmiLanguageSMIv1
+	if ctx.Language == types.LanguageUnknown {
+		ctx.Language = types.LanguageSMIv1
 	}
 
 	return imports
 }
 
-// lowerDefinition lowers a single definition.
-// Returns nil for definitions that are filtered out (MACRO, Error).
+// lowerDefinition converts an AST definition into a normalized Definition.
+// Returns nil for non-semantic definitions (MACROs, errors).
 func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 	switch d := def.(type) {
 	case *ast.ObjectTypeDef:
 		return lowerObjectType(d, ctx)
 	case *ast.ModuleIdentityDef:
-		return lowerModuleIdentity(d)
+		return lowerModuleIdentity(d, ctx)
 	case *ast.ObjectIdentityDef:
-		return lowerObjectIdentity(d)
+		return lowerObjectIdentity(d, ctx)
 	case *ast.NotificationTypeDef:
-		return lowerNotificationType(d)
+		return lowerNotificationType(d, ctx)
 	case *ast.TrapTypeDef:
 		return lowerTrapType(d)
 	case *ast.TextualConventionDef:
-		return lowerTextualConvention(d)
+		return lowerTextualConvention(d, ctx)
 	case *ast.TypeAssignmentDef:
-		return lowerTypeAssignment(d)
+		return lowerTypeAssignment(d, ctx)
 	case *ast.ValueAssignmentDef:
-		return lowerValueAssignment(d)
+		return lowerValueAssignment(d, ctx)
 	case *ast.ObjectGroupDef:
-		return lowerObjectGroup(d)
+		return lowerObjectGroup(d, ctx)
 	case *ast.NotificationGroupDef:
-		return lowerNotificationGroup(d)
+		return lowerNotificationGroup(d, ctx)
 	case *ast.ModuleComplianceDef:
-		return lowerModuleCompliance(d)
+		return lowerModuleCompliance(d, ctx)
 	case *ast.AgentCapabilitiesDef:
-		return lowerAgentCapabilities(d)
+		return lowerAgentCapabilities(d, ctx)
 	case *ast.MacroDefinitionDef, *ast.ErrorDef:
-		// Filter out non-semantic definitions
+		// Non-semantic definitions
 		return nil
 	default:
-		ctx.Log(slog.LevelWarn, "unknown definition type",
-			slog.String("type", fmt.Sprintf("%T", def)))
+		ctx.emitDiagnostic(types.DiagUnknownDefinitionType, types.SeverityWarning, ctx.moduleName, def.DefinitionSpan(),
+			fmt.Sprintf("unknown definition type %T", def))
 		return nil
 	}
 }
 
-// === Definition lowering functions ===
-
-func lowerObjectType(def *ast.ObjectTypeDef, _ *LoweringContext) *ObjectType {
+func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 	var status types.Status
 	if def.Status != nil {
-		status = lowerStatus(def.Status.Value)
+		status = def.Status.Value
 	} else {
 		status = types.StatusCurrent
 	}
@@ -180,26 +242,27 @@ func lowerObjectType(def *ast.ObjectTypeDef, _ *LoweringContext) *ObjectType {
 
 	var defval DefVal
 	if def.DefVal != nil {
-		defval = lowerDefVal(def.DefVal)
+		defval = lowerDefVal(def.DefVal, ctx)
 	}
 
 	return &ObjectType{
-		Name:        def.Name.Name,
-		Syntax:      lowerTypeSyntax(def.Syntax.Syntax),
-		Units:       units,
-		Access:      lowerAccess(def.Access.Value),
-		Status:      status,
-		Description: description,
-		Reference:   reference,
-		Index:       lowerIndexClause(def.Index),
-		Augments:    augments,
-		DefVal:      defval,
-		Oid:         lowerOidAssignment(def.OidAssignment),
-		Span:        def.Span,
+		Name:          def.Name.Name,
+		Syntax:        lowerTypeSyntax(def.Syntax.Syntax, ctx),
+		Units:         units,
+		Access:        def.Access.Value,
+		AccessKeyword: lowerAccessKeyword(def.Access.Keyword),
+		Status:        status,
+		Description:   description,
+		Reference:     reference,
+		Index:         lowerIndexClause(def.Index),
+		Augments:      augments,
+		DefVal:        defval,
+		Oid:           lowerOidAssignment(def.OidAssignment, ctx),
+		Span:          def.Span,
 	}
 }
 
-func lowerModuleIdentity(def *ast.ModuleIdentityDef) *ModuleIdentity {
+func lowerModuleIdentity(def *ast.ModuleIdentityDef, ctx *LoweringContext) *ModuleIdentity {
 	revisions := make([]Revision, len(def.Revisions))
 	for i, r := range def.Revisions {
 		revisions[i] = Revision{
@@ -215,12 +278,26 @@ func lowerModuleIdentity(def *ast.ModuleIdentityDef) *ModuleIdentity {
 		ContactInfo:  def.ContactInfo.Value,
 		Description:  def.Description.Value,
 		Revisions:    revisions,
-		Oid:          lowerOidAssignment(def.OidAssignment),
+		Oid:          lowerOidAssignment(def.OidAssignment, ctx),
 		Span:         def.Span,
 	}
 }
 
-func lowerObjectIdentity(def *ast.ObjectIdentityDef) *ObjectIdentity {
+// checkRevisionLastUpdated warns if LAST-UPDATED has no matching REVISION.
+func checkRevisionLastUpdated(ctx *LoweringContext, moduleName string, mi *ModuleIdentity) {
+	if mi.LastUpdated == "" {
+		return
+	}
+	for _, r := range mi.Revisions {
+		if r.Date == mi.LastUpdated {
+			return
+		}
+	}
+	ctx.emitDiagnostic(types.DiagRevisionLastUpdated, types.SeverityMinor, moduleName, mi.Span,
+		fmt.Sprintf("revision for LAST-UPDATED %s is missing", mi.LastUpdated))
+}
+
+func lowerObjectIdentity(def *ast.ObjectIdentityDef, ctx *LoweringContext) *ObjectIdentity {
 	var reference string
 	if def.Reference != nil {
 		reference = def.Reference.Value
@@ -228,31 +305,26 @@ func lowerObjectIdentity(def *ast.ObjectIdentityDef) *ObjectIdentity {
 
 	return &ObjectIdentity{
 		Name:        def.Name.Name,
-		Status:      lowerStatus(def.Status.Value),
+		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   reference,
-		Oid:         lowerOidAssignment(def.OidAssignment),
+		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
 		Span:        def.Span,
 	}
 }
 
-func lowerNotificationType(def *ast.NotificationTypeDef) *Notification {
-	objects := make([]string, len(def.Objects))
-	for i, o := range def.Objects {
-		objects[i] = o.Name
-	}
-
+func lowerNotificationType(def *ast.NotificationTypeDef, ctx *LoweringContext) *Notification {
 	var reference string
 	if def.Reference != nil {
 		reference = def.Reference.Value
 	}
 
-	oid := lowerOidAssignment(def.OidAssignment)
+	oid := lowerOidAssignment(def.OidAssignment, ctx)
 
 	return &Notification{
 		Name:        def.Name.Name,
-		Objects:     objects,
-		Status:      lowerStatus(def.Status.Value),
+		Objects:     identNames(def.Objects),
+		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   reference,
 		TrapInfo:    nil,
@@ -262,11 +334,6 @@ func lowerNotificationType(def *ast.NotificationTypeDef) *Notification {
 }
 
 func lowerTrapType(def *ast.TrapTypeDef) *Notification {
-	variables := make([]string, len(def.Variables))
-	for i, v := range def.Variables {
-		variables[i] = v.Name
-	}
-
 	var description string
 	if def.Description != nil {
 		description = def.Description.Value
@@ -279,20 +346,20 @@ func lowerTrapType(def *ast.TrapTypeDef) *Notification {
 
 	return &Notification{
 		Name:        def.Name.Name,
-		Objects:     variables,
-		Status:      types.StatusCurrent, // TRAP-TYPE doesn't have STATUS
+		Objects:     identNames(def.Variables),
+		Status:      types.StatusCurrent, // TRAP-TYPE has no STATUS clause
 		Description: description,
 		Reference:   reference,
 		TrapInfo: &TrapInfo{
 			Enterprise: def.Enterprise.Name,
 			TrapNumber: def.TrapNumber,
 		},
-		Oid:  nil, // TRAP-TYPE OID is derived from enterprise + trap_number
+		Oid:  nil, // derived from enterprise + trap number
 		Span: def.Span,
 	}
 }
 
-func lowerTextualConvention(def *ast.TextualConventionDef) *TypeDef {
+func lowerTextualConvention(def *ast.TextualConventionDef, ctx *LoweringContext) *TypeDef {
 	var displayHint string
 	if def.DisplayHint != nil {
 		displayHint = def.DisplayHint.Value
@@ -305,10 +372,10 @@ func lowerTextualConvention(def *ast.TextualConventionDef) *TypeDef {
 
 	return &TypeDef{
 		Name:                def.Name.Name,
-		Syntax:              lowerTypeSyntax(def.Syntax.Syntax),
-		BaseType:            nil, // Derived from syntax during resolution
+		Syntax:              lowerTypeSyntax(def.Syntax.Syntax, ctx),
+		BaseType:            nil,
 		DisplayHint:         displayHint,
-		Status:              lowerStatus(def.Status.Value),
+		Status:              def.Status.Value,
 		Description:         def.Description.Value,
 		Reference:           reference,
 		IsTextualConvention: true,
@@ -316,11 +383,11 @@ func lowerTextualConvention(def *ast.TextualConventionDef) *TypeDef {
 	}
 }
 
-func lowerTypeAssignment(def *ast.TypeAssignmentDef) *TypeDef {
+func lowerTypeAssignment(def *ast.TypeAssignmentDef, ctx *LoweringContext) *TypeDef {
 	return &TypeDef{
 		Name:                def.Name.Name,
-		Syntax:              lowerTypeSyntax(def.Syntax),
-		BaseType:            nil, // Derived from syntax during resolution
+		Syntax:              lowerTypeSyntax(def.Syntax, ctx),
+		BaseType:            nil,
 		DisplayHint:         "",
 		Status:              types.StatusCurrent,
 		Description:         "",
@@ -330,20 +397,15 @@ func lowerTypeAssignment(def *ast.TypeAssignmentDef) *TypeDef {
 	}
 }
 
-func lowerValueAssignment(def *ast.ValueAssignmentDef) *ValueAssignment {
+func lowerValueAssignment(def *ast.ValueAssignmentDef, ctx *LoweringContext) *ValueAssignment {
 	return &ValueAssignment{
 		Name: def.Name.Name,
-		Oid:  lowerOidAssignment(def.OidAssignment),
+		Oid:  lowerOidAssignment(def.OidAssignment, ctx),
 		Span: def.Span,
 	}
 }
 
-func lowerObjectGroup(def *ast.ObjectGroupDef) *ObjectGroup {
-	objects := make([]string, len(def.Objects))
-	for i, o := range def.Objects {
-		objects[i] = o.Name
-	}
-
+func lowerObjectGroup(def *ast.ObjectGroupDef, ctx *LoweringContext) *ObjectGroup {
 	var reference string
 	if def.Reference != nil {
 		reference = def.Reference.Value
@@ -351,21 +413,16 @@ func lowerObjectGroup(def *ast.ObjectGroupDef) *ObjectGroup {
 
 	return &ObjectGroup{
 		Name:        def.Name.Name,
-		Objects:     objects,
-		Status:      lowerStatus(def.Status.Value),
+		Objects:     identNames(def.Objects),
+		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   reference,
-		Oid:         lowerOidAssignment(def.OidAssignment),
+		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
 		Span:        def.Span,
 	}
 }
 
-func lowerNotificationGroup(def *ast.NotificationGroupDef) *NotificationGroup {
-	notifications := make([]string, len(def.Notifications))
-	for i, n := range def.Notifications {
-		notifications[i] = n.Name
-	}
-
+func lowerNotificationGroup(def *ast.NotificationGroupDef, ctx *LoweringContext) *NotificationGroup {
 	var reference string
 	if def.Reference != nil {
 		reference = def.Reference.Value
@@ -373,19 +430,19 @@ func lowerNotificationGroup(def *ast.NotificationGroupDef) *NotificationGroup {
 
 	return &NotificationGroup{
 		Name:          def.Name.Name,
-		Notifications: notifications,
-		Status:        lowerStatus(def.Status.Value),
+		Notifications: identNames(def.Notifications),
+		Status:        def.Status.Value,
 		Description:   def.Description.Value,
 		Reference:     reference,
-		Oid:           lowerOidAssignment(def.OidAssignment),
+		Oid:           lowerOidAssignment(def.OidAssignment, ctx),
 		Span:          def.Span,
 	}
 }
 
-func lowerModuleCompliance(def *ast.ModuleComplianceDef) *ModuleCompliance {
+func lowerModuleCompliance(def *ast.ModuleComplianceDef, ctx *LoweringContext) *ModuleCompliance {
 	modules := make([]ComplianceModule, len(def.Modules))
 	for i, m := range def.Modules {
-		modules[i] = lowerComplianceModule(m)
+		modules[i] = lowerComplianceModule(m, ctx)
 	}
 
 	var reference string
@@ -395,16 +452,16 @@ func lowerModuleCompliance(def *ast.ModuleComplianceDef) *ModuleCompliance {
 
 	return &ModuleCompliance{
 		Name:        def.Name.Name,
-		Status:      lowerStatus(def.Status.Value),
+		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   reference,
 		Modules:     modules,
-		Oid:         lowerOidAssignment(def.OidAssignment),
+		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
 		Span:        def.Span,
 	}
 }
 
-func lowerComplianceModule(m ast.ComplianceModule) ComplianceModule {
+func lowerComplianceModule(m ast.ComplianceModule, ctx *LoweringContext) ComplianceModule {
 	var groups []ComplianceGroup
 	var objects []ComplianceObject
 
@@ -416,13 +473,8 @@ func lowerComplianceModule(m ast.ComplianceModule) ComplianceModule {
 				Description: comp.Description.Value,
 			})
 		case *ast.ComplianceObject:
-			objects = append(objects, lowerComplianceObject(comp))
+			objects = append(objects, lowerComplianceObject(comp, ctx))
 		}
-	}
-
-	mandatoryGroups := make([]string, len(m.MandatoryGroups))
-	for i, g := range m.MandatoryGroups {
-		mandatoryGroups[i] = g.Name
 	}
 
 	var moduleName string
@@ -432,26 +484,26 @@ func lowerComplianceModule(m ast.ComplianceModule) ComplianceModule {
 
 	return ComplianceModule{
 		ModuleName:      moduleName,
-		MandatoryGroups: mandatoryGroups,
+		MandatoryGroups: identNames(m.MandatoryGroups),
 		Groups:          groups,
 		Objects:         objects,
 	}
 }
 
-func lowerComplianceObject(o *ast.ComplianceObject) ComplianceObject {
+func lowerComplianceObject(o *ast.ComplianceObject, ctx *LoweringContext) ComplianceObject {
 	var syntax TypeSyntax
 	if o.Syntax != nil {
-		syntax = lowerTypeSyntax(o.Syntax.Syntax)
+		syntax = lowerTypeSyntax(o.Syntax.Syntax, ctx)
 	}
 
 	var writeSyntax TypeSyntax
 	if o.WriteSyntax != nil {
-		writeSyntax = lowerTypeSyntax(o.WriteSyntax.Syntax)
+		writeSyntax = lowerTypeSyntax(o.WriteSyntax.Syntax, ctx)
 	}
 
 	var minAccess *types.Access
 	if o.MinAccess != nil {
-		a := lowerAccess(o.MinAccess.Value)
+		a := o.MinAccess.Value
 		minAccess = &a
 	}
 
@@ -464,10 +516,10 @@ func lowerComplianceObject(o *ast.ComplianceObject) ComplianceObject {
 	}
 }
 
-func lowerAgentCapabilities(def *ast.AgentCapabilitiesDef) *AgentCapabilities {
+func lowerAgentCapabilities(def *ast.AgentCapabilitiesDef, ctx *LoweringContext) *AgentCapabilities {
 	supports := make([]SupportsModule, len(def.Supports))
 	for i, s := range def.Supports {
-		supports[i] = lowerSupportsModule(s)
+		supports[i] = lowerSupportsModule(s, ctx)
 	}
 
 	var reference string
@@ -478,69 +530,61 @@ func lowerAgentCapabilities(def *ast.AgentCapabilitiesDef) *AgentCapabilities {
 	return &AgentCapabilities{
 		Name:           def.Name.Name,
 		ProductRelease: def.ProductRelease.Value,
-		Status:         lowerStatus(def.Status.Value),
+		Status:         def.Status.Value,
 		Description:    def.Description.Value,
 		Reference:      reference,
 		Supports:       supports,
-		Oid:            lowerOidAssignment(def.OidAssignment),
+		Oid:            lowerOidAssignment(def.OidAssignment, ctx),
 		Span:           def.Span,
 	}
 }
 
-func lowerSupportsModule(s ast.SupportsModule) SupportsModule {
+func lowerSupportsModule(s ast.SupportsModule, ctx *LoweringContext) SupportsModule {
 	var objectVariations []ObjectVariation
 	var notificationVariations []NotificationVariation
 
 	for _, v := range s.Variations {
 		switch variation := v.(type) {
 		case *ast.ObjectVariation:
-			objectVariations = append(objectVariations, lowerObjectVariation(variation))
+			objectVariations = append(objectVariations, lowerObjectVariation(variation, ctx))
 		case *ast.NotificationVariation:
 			notificationVariations = append(notificationVariations, lowerNotificationVariation(variation))
 		}
 	}
 
-	includes := make([]string, len(s.Includes))
-	for i, inc := range s.Includes {
-		includes[i] = inc.Name
-	}
-
 	return SupportsModule{
 		ModuleName:             s.ModuleName.Name,
-		Includes:               includes,
+		Includes:               identNames(s.Includes),
 		ObjectVariations:       objectVariations,
 		NotificationVariations: notificationVariations,
 	}
 }
 
-func lowerObjectVariation(v *ast.ObjectVariation) ObjectVariation {
+func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVariation {
 	var syntax TypeSyntax
 	if v.Syntax != nil {
-		syntax = lowerTypeSyntax(v.Syntax.Syntax)
+		syntax = lowerTypeSyntax(v.Syntax.Syntax, ctx)
 	}
 
 	var writeSyntax TypeSyntax
 	if v.WriteSyntax != nil {
-		writeSyntax = lowerTypeSyntax(v.WriteSyntax.Syntax)
+		writeSyntax = lowerTypeSyntax(v.WriteSyntax.Syntax, ctx)
 	}
 
 	var access *types.Access
 	if v.Access != nil {
-		a := lowerAccess(v.Access.Value)
+		a := v.Access.Value
 		access = &a
 	}
 
 	var creationRequires []string
 	if len(v.CreationRequires) > 0 {
-		creationRequires = make([]string, len(v.CreationRequires))
-		for i, cr := range v.CreationRequires {
-			creationRequires[i] = cr.Name
-		}
+		creationRequires = identNames(v.CreationRequires)
 	}
 
 	var defval DefVal
 	if v.DefVal != nil {
-		defval = lowerDefVal(v.DefVal)
+		defval = lowerDefVal(v.DefVal, ctx)
 	}
 
 	return ObjectVariation{
@@ -557,7 +601,7 @@ func lowerObjectVariation(v *ast.ObjectVariation) ObjectVariation {
 func lowerNotificationVariation(v *ast.NotificationVariation) NotificationVariation {
 	var access *types.Access
 	if v.Access != nil {
-		a := lowerAccess(v.Access.Value)
+		a := v.Access.Value
 		access = &a
 	}
 
@@ -568,9 +612,7 @@ func lowerNotificationVariation(v *ast.NotificationVariation) NotificationVariat
 	}
 }
 
-// === Helper lowering functions ===
-
-func lowerTypeSyntax(syntax ast.TypeSyntax) TypeSyntax {
+func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 	switch s := syntax.(type) {
 	case *ast.TypeSyntaxTypeRef:
 		return &TypeSyntaxTypeRef{Name: s.Name.Name}
@@ -596,8 +638,8 @@ func lowerTypeSyntax(syntax ast.TypeSyntax) TypeSyntax {
 
 	case *ast.TypeSyntaxConstrained:
 		return &TypeSyntaxConstrained{
-			Base:       lowerTypeSyntax(s.Base),
-			Constraint: lowerConstraint(s.Constraint),
+			Base:       lowerTypeSyntax(s.Base, ctx),
+			Constraint: lowerConstraint(s.Constraint, ctx),
 		}
 
 	case *ast.TypeSyntaxSequenceOf:
@@ -606,18 +648,16 @@ func lowerTypeSyntax(syntax ast.TypeSyntax) TypeSyntax {
 	case *ast.TypeSyntaxSequence:
 		fields := make([]SequenceField, len(s.Fields))
 		for i, f := range s.Fields {
-			fields[i] = NewSequenceField(f.Name.Name, lowerTypeSyntax(f.Syntax))
+			fields[i] = NewSequenceField(f.Name.Name, lowerTypeSyntax(f.Syntax, ctx))
 		}
 		return &TypeSyntaxSequence{Fields: fields}
 
 	case *ast.TypeSyntaxChoice:
-		// CHOICE is normalized to its first alternative's type.
-		// CHOICE only appears in SMI base modules (not user MIBs), and the only
-		// CHOICE usable as OBJECT-TYPE SYNTAX is NetworkAddress which has one alternative.
+		// CHOICE only appears in SMI base modules; normalize to the first alternative.
 		if len(s.Alternatives) > 0 {
-			return lowerTypeSyntax(s.Alternatives[0].Syntax)
+			return lowerTypeSyntax(s.Alternatives[0].Syntax, ctx)
 		}
-		// Empty CHOICE (shouldn't happen) - fall back to OCTET STRING
+		// Empty CHOICE fallback
 		return &TypeSyntaxOctetString{}
 
 	case *ast.TypeSyntaxOctetString:
@@ -627,40 +667,43 @@ func lowerTypeSyntax(syntax ast.TypeSyntax) TypeSyntax {
 		return &TypeSyntaxObjectIdentifier{}
 
 	default:
-		// Unknown type - fall back to type ref
+		ctx.emitDiagnostic(types.DiagUnknownTypeSyntax, types.SeverityWarning, ctx.moduleName, syntax.SyntaxSpan(),
+			fmt.Sprintf("unknown type syntax %T, defaulting to OCTET STRING", syntax))
 		return &TypeSyntaxOctetString{}
 	}
 }
 
-func lowerConstraint(constraint ast.Constraint) Constraint {
+func lowerConstraint(constraint ast.Constraint, ctx *LoweringContext) Constraint {
 	switch c := constraint.(type) {
 	case *ast.ConstraintSize:
 		ranges := make([]Range, len(c.Ranges))
 		for i, r := range c.Ranges {
-			ranges[i] = lowerRange(r)
+			ranges[i] = lowerRange(r, ctx)
 		}
 		return &ConstraintSize{Ranges: ranges}
 
 	case *ast.ConstraintRange:
 		ranges := make([]Range, len(c.Ranges))
 		for i, r := range c.Ranges {
-			ranges[i] = lowerRange(r)
+			ranges[i] = lowerRange(r, ctx)
 		}
 		return &ConstraintRange{Ranges: ranges}
 
 	default:
+		ctx.emitDiagnostic(types.DiagUnknownConstraintType, types.SeverityWarning, ctx.moduleName, constraint.ConstraintSpan(),
+			fmt.Sprintf("unknown constraint type %T, defaulting to empty range", constraint))
 		return &ConstraintRange{}
 	}
 }
 
-func lowerRange(r ast.Range) Range {
+func lowerRange(r ast.Range, ctx *LoweringContext) Range {
 	return Range{
-		Min: lowerRangeValue(r.Min),
-		Max: lowerRangeValue(r.Max),
+		Min: lowerRangeValue(r.Min, ctx),
+		Max: lowerRangeValue(r.Max, ctx),
 	}
 }
 
-func lowerRangeValue(value ast.RangeValue) RangeValue {
+func lowerRangeValue(value ast.RangeValue, ctx *LoweringContext) RangeValue {
 	if value == nil {
 		return nil
 	}
@@ -673,31 +716,33 @@ func lowerRangeValue(value ast.RangeValue) RangeValue {
 		return &RangeValueUnsigned{Value: v.Value}
 
 	case *ast.RangeValueIdent:
-		// Handle MIN/MAX keywords
 		switch v.Name.Name {
 		case "MIN":
 			return &RangeValueMin{}
 		case "MAX":
 			return &RangeValueMax{}
 		default:
-			// Shouldn't happen, but fallback to unsigned 0
+			ctx.emitDiagnostic(types.DiagUnknownRangeValue, types.SeverityWarning, ctx.moduleName, v.Name.Span,
+				fmt.Sprintf("unknown range identifier %s, defaulting to 0", v.Name.Name))
 			return &RangeValueUnsigned{Value: 0}
 		}
 
 	default:
+		ctx.emitDiagnostic(types.DiagUnknownRangeValue, types.SeverityWarning, ctx.moduleName, types.Span{},
+			fmt.Sprintf("unknown range value type %T, defaulting to 0", value))
 		return &RangeValueUnsigned{Value: 0}
 	}
 }
 
-func lowerOidAssignment(oid ast.OidAssignment) OidAssignment {
+func lowerOidAssignment(oid ast.OidAssignment, ctx *LoweringContext) OidAssignment {
 	components := make([]OidComponent, len(oid.Components))
 	for i, c := range oid.Components {
-		components[i] = lowerOidComponent(c)
+		components[i] = lowerOidComponent(c, ctx)
 	}
 	return NewOidAssignment(components, oid.Span)
 }
 
-func lowerOidComponent(comp ast.OidComponent) OidComponent {
+func lowerOidComponent(comp ast.OidComponent, ctx *LoweringContext) OidComponent {
 	switch c := comp.(type) {
 	case *ast.OidComponentName:
 		return &OidComponentName{NameValue: c.Name.Name}
@@ -725,39 +770,24 @@ func lowerOidComponent(comp ast.OidComponent) OidComponent {
 		}
 
 	default:
+		ctx.emitDiagnostic(types.DiagUnknownOidComponent, types.SeverityWarning, ctx.moduleName, comp.ComponentSpan(),
+			fmt.Sprintf("unknown OID component type %T, defaulting to sub-id 0", comp))
 		return &OidComponentNumber{Value: 0}
 	}
 }
 
-func lowerAccess(access ast.AccessValue) types.Access {
-	switch access {
-	case ast.AccessValueReadOnly, ast.AccessValueReportOnly:
-		return types.AccessReadOnly
-	case ast.AccessValueReadWrite, ast.AccessValueInstall, ast.AccessValueInstallNotify:
-		return types.AccessReadWrite
-	case ast.AccessValueReadCreate:
-		return types.AccessReadCreate
-	case ast.AccessValueNotAccessible, ast.AccessValueNotImplemented:
-		return types.AccessNotAccessible
-	case ast.AccessValueAccessibleForNotify:
-		return types.AccessAccessibleForNotify
-	case ast.AccessValueWriteOnly:
-		return types.AccessWriteOnly
+func lowerAccessKeyword(keyword ast.AccessKeyword) AccessKeyword {
+	switch keyword {
+	case ast.AccessKeywordAccess:
+		return AccessKeywordAccess
+	case ast.AccessKeywordMaxAccess:
+		return AccessKeywordMaxAccess
+	case ast.AccessKeywordMinAccess:
+		return AccessKeywordMinAccess
+	case ast.AccessKeywordPibAccess:
+		return AccessKeywordPibAccess
 	default:
-		return types.AccessNotAccessible
-	}
-}
-
-func lowerStatus(status ast.StatusValue) types.Status {
-	switch status {
-	case ast.StatusValueCurrent, ast.StatusValueMandatory:
-		return types.StatusCurrent
-	case ast.StatusValueDeprecated, ast.StatusValueOptional:
-		return types.StatusDeprecated
-	case ast.StatusValueObsolete:
-		return types.StatusObsolete
-	default:
-		return types.StatusCurrent
+		return AccessKeywordAccess
 	}
 }
 
@@ -774,11 +804,11 @@ func lowerIndexClause(clause ast.IndexClause) []IndexItem {
 	return items
 }
 
-func lowerDefVal(clause *ast.DefValClause) DefVal {
-	return lowerDefValContent(clause.Value)
+func lowerDefVal(clause *ast.DefValClause, ctx *LoweringContext) DefVal {
+	return lowerDefValContent(clause.Value, ctx)
 }
 
-func lowerDefValContent(content ast.DefValContent) DefVal {
+func lowerDefValContent(content ast.DefValContent, ctx *LoweringContext) DefVal {
 	switch c := content.(type) {
 	case *ast.DefValContentInteger:
 		return &DefValInteger{Value: c.Value}
@@ -790,16 +820,14 @@ func lowerDefValContent(content ast.DefValContent) DefVal {
 		return &DefValString{Value: c.Value.Value}
 
 	case *ast.DefValContentIdentifier:
-		// Could be enum label or OID reference - we can't distinguish
-		// until semantic analysis, so treat as Enum (most common case)
+		// Could be enum label or OID reference; treat as enum until semantic analysis.
 		return &DefValEnum{Name: c.Name.Name}
 
 	case *ast.DefValContentBits:
-		labels := make([]string, len(c.Labels))
-		for i, l := range c.Labels {
-			labels[i] = l.Name
-		}
-		return &DefValBits{Labels: labels}
+		return &DefValBits{Labels: identNames(c.Labels)}
+
+	case *ast.DefValContentUnparsed:
+		return &DefValUnparsed{}
 
 	case *ast.DefValContentHexString:
 		return &DefValHexString{Value: c.Content}
@@ -810,11 +838,13 @@ func lowerDefValContent(content ast.DefValContent) DefVal {
 	case *ast.DefValContentObjectIdentifier:
 		components := make([]OidComponent, len(c.Components))
 		for i, comp := range c.Components {
-			components[i] = lowerOidComponent(comp)
+			components[i] = lowerOidComponent(comp, ctx)
 		}
 		return &DefValOidValue{Components: components}
 
 	default:
+		ctx.emitDiagnostic(types.DiagUnknownDefvalType, types.SeverityWarning, ctx.moduleName, types.Span{},
+			fmt.Sprintf("unknown DEFVAL content type %T, defaulting to integer 0", content))
 		return &DefValInteger{Value: 0}
 	}
 }

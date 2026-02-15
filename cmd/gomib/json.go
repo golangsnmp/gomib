@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 )
 
-// DumpOutput is the top-level JSON structure for the dump command.
+// DumpOutput is the top-level JSON output for the dump command.
 type DumpOutput struct {
 	Modules       []ModuleJSON       `json:"modules,omitempty"`
 	Types         []TypeJSON         `json:"types,omitempty"`
@@ -14,7 +14,7 @@ type DumpOutput struct {
 	Diagnostics   []DiagnosticJSON   `json:"diagnostics,omitempty"`
 }
 
-// ModuleJSON represents a resolved module in JSON.
+// ModuleJSON holds the JSON-serializable form of a resolved module.
 type ModuleJSON struct {
 	Name         string         `json:"name"`
 	Language     string         `json:"language,omitempty"`
@@ -25,13 +25,13 @@ type ModuleJSON struct {
 	Revisions    []RevisionJSON `json:"revisions,omitempty"`
 }
 
-// RevisionJSON represents a module revision.
+// RevisionJSON holds a module revision entry.
 type RevisionJSON struct {
 	Date        string `json:"date"`
 	Description string `json:"description,omitempty"`
 }
 
-// TypeJSON represents a resolved type in JSON.
+// TypeJSON holds the JSON-serializable form of a resolved type.
 type TypeJSON struct {
 	Name        string      `json:"name"`
 	Module      string      `json:"module,omitempty"`
@@ -47,25 +47,25 @@ type TypeJSON struct {
 	IsTC        bool        `json:"isTextualConvention,omitempty"`
 }
 
-// RangeJSON represents a size or value range.
+// RangeJSON holds a size or value constraint range.
 type RangeJSON struct {
 	Min int64 `json:"min"`
 	Max int64 `json:"max"`
 }
 
-// EnumJSON represents an enumeration value.
+// EnumJSON holds a named enumeration value.
 type EnumJSON struct {
 	Label string `json:"label"`
 	Value int64  `json:"value"`
 }
 
-// BitJSON represents a BITS position.
+// BitJSON holds a named BITS position.
 type BitJSON struct {
 	Label    string `json:"label"`
 	Position int    `json:"position"`
 }
 
-// ObjectJSON represents a resolved object in JSON.
+// ObjectJSON holds the JSON-serializable form of a resolved object.
 type ObjectJSON struct {
 	Name        string      `json:"name"`
 	Module      string      `json:"module,omitempty"`
@@ -83,13 +83,13 @@ type ObjectJSON struct {
 	Bits        []BitJSON   `json:"bits,omitempty"`
 }
 
-// IndexJSON represents an INDEX item.
+// IndexJSON holds an INDEX entry with its implied flag.
 type IndexJSON struct {
 	Object  string `json:"object"`
 	Implied bool   `json:"implied,omitempty"`
 }
 
-// NotificationJSON represents a resolved notification in JSON.
+// NotificationJSON holds the JSON-serializable form of a notification.
 type NotificationJSON struct {
 	Name        string   `json:"name"`
 	Module      string   `json:"module,omitempty"`
@@ -99,7 +99,7 @@ type NotificationJSON struct {
 	Objects     []string `json:"objects,omitempty"`
 }
 
-// TreeNodeJSON represents a node in the OID tree.
+// TreeNodeJSON holds a node in the OID tree hierarchy.
 type TreeNodeJSON struct {
 	Arc      uint32          `json:"arc"`
 	Label    string          `json:"label,omitempty"`
@@ -109,7 +109,7 @@ type TreeNodeJSON struct {
 	Children []*TreeNodeJSON `json:"children,omitempty"`
 }
 
-// DiagnosticJSON represents a diagnostic message.
+// DiagnosticJSON holds a parser or resolver diagnostic.
 type DiagnosticJSON struct {
 	Severity string `json:"severity,omitempty"`
 	Module   string `json:"module,omitempty"`
@@ -117,7 +117,6 @@ type DiagnosticJSON struct {
 	Message  string `json:"message"`
 }
 
-// marshalJSON serializes the output to JSON.
 func marshalJSON(v any, indent bool) ([]byte, error) {
 	if indent {
 		return json.MarshalIndent(v, "", "  ")

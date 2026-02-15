@@ -1,54 +1,47 @@
-// Package types provides shared types used across the gomib packages.
+// Package types provides internal types shared across gomib packages.
 package types
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"slices"
 )
 
 // LevelTrace is a custom log level more verbose than Debug.
 // Use for per-item iteration logging (tokens, OID nodes, imports).
-// Users enable with: &slog.HandlerOptions{Level: slog.Level(-8)}
+// Enable with: &slog.HandlerOptions{Level: slog.Level(-8)}
 const LevelTrace = slog.Level(-8)
 
-// ctx is a package-level context for logging (avoids repeated allocations).
-var ctx = context.Background()
+// noCtx is a background context used for slog calls that don't need cancellation.
+var noCtx = context.Background() //nolint:gochecknoglobals
 
-// Logger wraps slog.Logger with nil-safe helpers.
-// Embed this in components that need logging.
+// Logger wraps slog.Logger with nil-safe convenience methods.
 type Logger struct {
 	L *slog.Logger
 }
 
-// Enabled returns true if logging is enabled at the given level.
-// Use this to guard expensive attribute computation.
+// Enabled reports whether logging is active at the given level.
 func (l *Logger) Enabled(level slog.Level) bool {
-	return l.L != nil && l.L.Enabled(ctx, level)
+	return l.L != nil && l.L.Enabled(noCtx, level)
 }
 
-// Log emits a log message if logging is enabled.
-// WARNING: Arguments are evaluated even if logging is disabled.
-// Only use with cheap attributes, or guard with Enabled().
+// Log emits a structured log message at the given level. No-op if nil.
 func (l *Logger) Log(level slog.Level, msg string, attrs ...slog.Attr) {
-	if l.L != nil && l.L.Enabled(ctx, level) {
-		l.L.LogAttrs(ctx, level, msg, attrs...)
+	if l.L != nil && l.L.Enabled(noCtx, level) {
+		l.L.LogAttrs(noCtx, level, msg, attrs...)
 	}
 }
 
-// TraceEnabled returns true if trace-level logging is enabled.
+// TraceEnabled reports whether trace-level logging is active.
 func (l *Logger) TraceEnabled() bool {
 	return l.Enabled(LevelTrace)
 }
 
-// Trace emits a trace-level log. Only use with cheap attributes.
+// Trace emits a log message at the custom trace level.
 func (l *Logger) Trace(msg string, attrs ...slog.Attr) {
 	l.Log(LevelTrace, msg, attrs...)
 }
 
 // ByteOffset is a byte position in source text.
-// Uses uint32 to match Rust implementation (sources limited to ~4GB).
 type ByteOffset uint32
 
 // Span represents a range in source text.
@@ -57,230 +50,62 @@ type Span struct {
 	End   ByteOffset // exclusive
 }
 
-// Synthetic is a span for compiler-generated constructs that don't come from source.
+// Synthetic is a span for compiler-generated constructs.
 var Synthetic = Span{Start: 0, End: 0}
 
-// NewSpan creates a new span.
+// NewSpan creates a Span from start and end byte offsets.
 func NewSpan(start, end ByteOffset) Span {
 	return Span{Start: start, End: end}
 }
 
-// Len returns the length of the span in bytes.
-func (s Span) Len() ByteOffset {
-	return s.End - s.Start
-}
-
-// IsEmpty returns true if the span is empty.
-func (s Span) IsEmpty() bool {
-	return s.Start == s.End
-}
-
-// Severity is a diagnostic severity level.
-type Severity int
-
-const (
-	// SeverityError blocks progress; the input may be malformed.
-	SeverityError Severity = iota
-	// SeverityWarning is informational; parsing continues.
-	SeverityWarning
-)
-
-func (s Severity) String() string {
-	switch s {
-	case SeverityError:
-		return "error"
-	case SeverityWarning:
-		return "warning"
-	default:
-		return fmt.Sprintf("Severity(%d)", s)
-	}
-}
-
-// Diagnostic is a message from the lexer or parser.
-type Diagnostic struct {
+// SpanDiagnostic is an internal diagnostic from the lexer or parser.
+// Converted to Diagnostic during lowering with module name and
+// line/column info.
+type SpanDiagnostic struct {
 	Severity Severity
+	Code     string // Diagnostic code (e.g., "identifier-underscore")
 	Span     Span
 	Message  string
 }
 
-// NewError creates an error diagnostic.
-func NewError(span Span, message string) Diagnostic {
-	return Diagnostic{Severity: SeverityError, Span: span, Message: message}
-}
-
-// NewWarning creates a warning diagnostic.
-func NewWarning(span Span, message string) Diagnostic {
-	return Diagnostic{Severity: SeverityWarning, Span: span, Message: message}
-}
-
-// DiagnosticCollector accumulates diagnostics during parsing/resolution.
-type DiagnosticCollector struct {
-	diagnostics []Diagnostic
-}
-
-// Add adds a diagnostic with the given severity, span, and message.
-func (c *DiagnosticCollector) Add(sev Severity, span Span, msg string) {
-	c.diagnostics = append(c.diagnostics, Diagnostic{
-		Severity: sev,
-		Span:     span,
-		Message:  msg,
-	})
-}
-
-// Error adds an error diagnostic.
-func (c *DiagnosticCollector) Error(span Span, msg string) {
-	c.Add(SeverityError, span, msg)
-}
-
-// Warning adds a warning diagnostic.
-func (c *DiagnosticCollector) Warning(span Span, msg string) {
-	c.Add(SeverityWarning, span, msg)
-}
-
-// Diagnostics returns a copy of all collected diagnostics.
-// The returned slice is owned by the caller.
-func (c *DiagnosticCollector) Diagnostics() []Diagnostic {
-	return slices.Clone(c.diagnostics)
-}
-
-// HasErrors returns true if any error diagnostics were collected.
-func (c *DiagnosticCollector) HasErrors() bool {
-	return slices.ContainsFunc(c.diagnostics, func(d Diagnostic) bool {
-		return d.Severity == SeverityError
-	})
-}
-
-// Status represents the status of a MIB definition.
-type Status int
-
-const (
-	StatusCurrent Status = iota
-	StatusDeprecated
-	StatusObsolete
-)
-
-func (s Status) String() string {
-	switch s {
-	case StatusCurrent:
-		return "current"
-	case StatusDeprecated:
-		return "deprecated"
-	case StatusObsolete:
-		return "obsolete"
-	default:
-		return fmt.Sprintf("Status(%d)", s)
+// BuildLineTable scans source bytes and returns a table mapping line numbers
+// to byte offsets. Entry i is the byte offset where line i+1 starts.
+// Line 1 always starts at offset 0.
+func BuildLineTable(source []byte) []int {
+	// Pre-count newlines for a single allocation.
+	n := 1
+	for _, b := range source {
+		if b == '\n' {
+			n++
+		}
 	}
+	table := make([]int, 0, n)
+	table = append(table, 0) // line 1 starts at offset 0
+	for i, b := range source {
+		if b == '\n' {
+			table = append(table, i+1)
+		}
+	}
+	return table
 }
 
-// Access represents the access level of a MIB object.
-type Access int
-
-const (
-	AccessNotAccessible Access = iota
-	AccessAccessibleForNotify
-	AccessReadOnly
-	AccessReadWrite
-	AccessReadCreate
-	AccessWriteOnly
-)
-
-func (a Access) String() string {
-	switch a {
-	case AccessNotAccessible:
-		return "not-accessible"
-	case AccessAccessibleForNotify:
-		return "accessible-for-notify"
-	case AccessReadOnly:
-		return "read-only"
-	case AccessReadWrite:
-		return "read-write"
-	case AccessReadCreate:
-		return "read-create"
-	case AccessWriteOnly:
-		return "write-only"
-	default:
-		return fmt.Sprintf("Access(%d)", a)
+// LineColFromTable converts a byte offset to 1-based line and column numbers
+// using a precomputed line table. Returns (0, 0) if the table is nil or the
+// offset cannot be resolved.
+func LineColFromTable(table []int, offset ByteOffset) (line, col int) {
+	if len(table) == 0 || offset == 0 {
+		return 0, 0
 	}
-}
-
-// SmiLanguage represents the SMI language version.
-//
-// Detected from imports during lowering:
-//   - SMIv2 if imports from SNMPv2-SMI, SNMPv2-TC, or SNMPv2-CONF
-//   - SMIv1 otherwise (default)
-type SmiLanguage int
-
-const (
-	// SmiLanguageUnknown indicates language not yet determined.
-	SmiLanguageUnknown SmiLanguage = iota
-	// SmiLanguageSMIv1 is SMIv1 (RFC 1155, 1212, 1215).
-	SmiLanguageSMIv1
-	// SmiLanguageSMIv2 is SMIv2 (RFC 2578, 2579, 2580).
-	SmiLanguageSMIv2
-	// SmiLanguageSPPI is SPPI Policy Information Base (RFC 3159).
-	SmiLanguageSPPI
-)
-
-func (l SmiLanguage) String() string {
-	switch l {
-	case SmiLanguageUnknown:
-		return "Unknown"
-	case SmiLanguageSMIv1:
-		return "SMIv1"
-	case SmiLanguageSMIv2:
-		return "SMIv2"
-	case SmiLanguageSPPI:
-		return "SPPI"
-	default:
-		return fmt.Sprintf("SmiLanguage(%d)", l)
+	off := int(offset)
+	// Binary search for the last line start <= offset.
+	lo, hi := 0, len(table)-1
+	for lo < hi {
+		mid := (lo + hi + 1) / 2
+		if table[mid] <= off {
+			lo = mid
+		} else {
+			hi = mid - 1
+		}
 	}
-}
-
-// BaseType represents the base SMI type.
-type BaseType int
-
-const (
-	BaseInteger32 BaseType = iota
-	BaseUnsigned32
-	BaseCounter32
-	BaseCounter64
-	BaseGauge32
-	BaseTimeTicks
-	BaseIpAddress
-	BaseOctetString
-	BaseObjectIdentifier
-	BaseOpaque
-	BaseBits
-	BaseSequence
-)
-
-func (b BaseType) String() string {
-	switch b {
-	case BaseInteger32:
-		return "Integer32"
-	case BaseUnsigned32:
-		return "Unsigned32"
-	case BaseCounter32:
-		return "Counter32"
-	case BaseCounter64:
-		return "Counter64"
-	case BaseGauge32:
-		return "Gauge32"
-	case BaseTimeTicks:
-		return "TimeTicks"
-	case BaseIpAddress:
-		return "IpAddress"
-	case BaseOctetString:
-		return "OCTET STRING"
-	case BaseObjectIdentifier:
-		return "OBJECT IDENTIFIER"
-	case BaseOpaque:
-		return "Opaque"
-	case BaseBits:
-		return "BITS"
-	case BaseSequence:
-		return "SEQUENCE"
-	default:
-		return fmt.Sprintf("BaseType(%d)", b)
-	}
+	return lo + 1, off - table[lo] + 1
 }

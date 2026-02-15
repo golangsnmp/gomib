@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const loadUsage = `gomib load - Load and resolve MIB modules
@@ -14,23 +15,35 @@ Usage:
   gomib load [options] MODULE...
 
 Options:
-  --strict      Exit non-zero if any unresolved references
+  --strict      Use strict RFC compliance mode
+  --permissive  Use permissive mode for vendor MIBs
+  --level N     Set strictness level (0-6, lower is stricter)
   --stats       Show detailed statistics
   -h, --help    Show help
+
+Strictness Levels:
+  0 (strict)     - RFC compliance checking
+  3 (normal)     - Default, balanced
+  5 (permissive) - Accept most real-world MIBs
+  6 (silent)     - Maximum compatibility
 
 Examples:
   gomib load IF-MIB
   gomib load IF-MIB SNMPv2-MIB
   gomib load -v IF-MIB                 # Debug logging
   gomib load -vv IF-MIB                # Trace logging
+  gomib load --strict IF-MIB           # RFC compliance mode
+  gomib load --permissive IF-MIB       # Vendor MIB mode
   gomib load --stats IF-MIB            # Show detailed stats
 `
 
-func cmdLoad(args []string) int {
+func (c *cli) cmdLoad(args []string) int {
 	fs := flag.NewFlagSet("load", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, loadUsage) }
 
-	strict := fs.Bool("strict", false, "exit non-zero if unresolved references")
+	strict := fs.Bool("strict", false, "use strict RFC compliance mode")
+	permissive := fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
+	level := fs.Int("level", -1, "set strictness level (0-6)")
 	stats := fs.Bool("stats", false, "show detailed statistics")
 	help := fs.Bool("h", false, "show help")
 	fs.BoolVar(help, "help", false, "show help")
@@ -39,7 +52,7 @@ func cmdLoad(args []string) int {
 		return 1
 	}
 
-	if *help || helpFlag {
+	if *help || c.helpFlag {
 		_, _ = fmt.Fprint(os.Stdout, loadUsage)
 		return 0
 	}
@@ -51,34 +64,41 @@ func cmdLoad(args []string) int {
 		return 1
 	}
 
-	mib, err := loadMib(modules)
-	if err != nil {
-		printError("failed to load: %v", err)
+	var opts []gomib.LoadOption
+	if *strict {
+		opts = append(opts, gomib.WithStrictness(mib.StrictnessStrict))
+	} else if *permissive {
+		opts = append(opts, gomib.WithStrictness(mib.StrictnessPermissive))
+	} else if *level >= 0 {
+		opts = append(opts, gomib.WithStrictness(mib.StrictnessLevel(*level)))
+	}
+
+	m, loadErr := c.loadMibWithOpts(modules, opts...)
+	if loadErr != nil && m == nil {
+		printError("failed to load: %v", loadErr)
 		return 1
 	}
 
-	// Print summary
 	if *stats {
-		printDetailedStats(mib)
+		printDetailedStats(m)
 	} else {
 		fmt.Printf("Loaded %d modules (%d types, %d objects, %d notifications)\n",
-			mib.ModuleCount(), mib.TypeCount(), mib.ObjectCount(), mib.NotificationCount())
+			len(m.Modules()), len(m.Types()), len(m.Objects()), len(m.Notifications()))
 	}
 
-	// Print diagnostics
-	diags := mib.Diagnostics()
-	hasWarnings := false
+	diags := m.Diagnostics()
+	hasSevere := false
 	hasErrors := false
 	for _, d := range diags {
-		switch d.Severity {
-		case gomib.SeverityWarning:
-			hasWarnings = true
-		case gomib.SeverityError:
+		if d.Severity.AtLeast(mib.SeveritySevere) {
+			hasSevere = true
+		}
+		if d.Severity.AtLeast(mib.SeverityError) {
 			hasErrors = true
 		}
 	}
 
-	if hasWarnings || hasErrors {
+	if len(diags) > 0 {
 		fmt.Println()
 		fmt.Println("Diagnostics:")
 		for _, d := range diags {
@@ -86,8 +106,7 @@ func cmdLoad(args []string) int {
 		}
 	}
 
-	// Print unresolved references summary
-	unresolved := mib.Unresolved()
+	unresolved := m.Unresolved()
 	if len(unresolved) > 0 {
 		fmt.Println()
 		fmt.Println("Unresolved references:")
@@ -96,11 +115,11 @@ func cmdLoad(args []string) int {
 		objectCount := 0
 		for _, u := range unresolved {
 			switch u.Kind {
-			case "import":
+			case mib.UnresolvedImport:
 				importCount++
-			case "type":
+			case mib.UnresolvedType:
 				typeCount++
-			case "object", "oid", "index", "notification":
+			case mib.UnresolvedOID, mib.UnresolvedIndex, mib.UnresolvedNotificationObject:
 				objectCount++
 			}
 		}
@@ -115,25 +134,23 @@ func cmdLoad(args []string) int {
 		}
 	}
 
-	// Exit code
-	if hasErrors {
-		return 1
+	if loadErr != nil {
+		printError("%v", loadErr)
+		return exitError
 	}
-	if *strict && len(unresolved) > 0 {
-		return 2
+	if hasSevere {
+		return exitError
 	}
-	return 0
+	if *strict && (hasErrors || len(unresolved) > 0) {
+		return exitStrictViolation
+	}
+	return exitOK
 }
 
-func printDiagnostic(d gomib.Diagnostic) {
-	var prefix string
-	switch d.Severity {
-	case gomib.SeverityError:
-		prefix = "  error: "
-	case gomib.SeverityWarning:
-		prefix = "  warning: "
-	default:
-		prefix = "  "
+func printDiagnostic(d mib.Diagnostic) {
+	prefix := "  " + d.Severity.String() + ": "
+	if d.Code != "" {
+		prefix += "[" + d.Code + "] "
 	}
 	if d.Module != "" {
 		if d.Line > 0 {
@@ -146,24 +163,23 @@ func printDiagnostic(d gomib.Diagnostic) {
 	}
 }
 
-func printDetailedStats(m gomib.Mib) {
+func printDetailedStats(m *mib.Mib) {
 	fmt.Println("Statistics:")
-	fmt.Printf("  Modules:        %d\n", m.ModuleCount())
-	fmt.Printf("  Types:          %d\n", m.TypeCount())
-	fmt.Printf("  Objects:        %d\n", m.ObjectCount())
-	fmt.Printf("  Notifications:  %d\n", m.NotificationCount())
+	fmt.Printf("  Modules:        %d\n", len(m.Modules()))
+	fmt.Printf("  Types:          %d\n", len(m.Types()))
+	fmt.Printf("  Objects:        %d\n", len(m.Objects()))
+	fmt.Printf("  Notifications:  %d\n", len(m.Notifications()))
 	fmt.Printf("  OID nodes:      %d\n", m.NodeCount())
 	fmt.Printf("  Diagnostics:    %d\n", len(m.Diagnostics()))
 
-	// Count nodes by kind
-	kindCounts := make(map[gomib.Kind]int)
+	kindCounts := make(map[mib.Kind]int)
 	for node := range m.Nodes() {
 		kindCounts[node.Kind()]++
 	}
 
 	fmt.Println()
 	fmt.Println("Nodes by kind:")
-	for kind := gomib.KindInternal; kind <= gomib.KindCapabilities; kind++ {
+	for kind := mib.KindInternal; kind <= mib.KindCapability; kind++ {
 		if count := kindCounts[kind]; count > 0 {
 			fmt.Printf("  %-15s %d\n", kind.String()+":", count)
 		}

@@ -1,210 +1,103 @@
-// Package gomib provides MIB parsing and querying for SNMP management.
+// Package mib defines the public types and interfaces for MIB data.
 package mib
 
-import "fmt"
+import "github.com/golangsnmp/gomib/internal/types"
+
+// Severity indicates how serious a diagnostic issue is (libsmi-compatible).
+// Lower values are more severe.
+type Severity = types.Severity
+
+const (
+	SeverityFatal   = types.SeverityFatal
+	SeveritySevere  = types.SeveritySevere
+	SeverityError   = types.SeverityError
+	SeverityMinor   = types.SeverityMinor
+	SeverityStyle   = types.SeverityStyle
+	SeverityWarning = types.SeverityWarning
+	SeverityInfo    = types.SeverityInfo
+)
+
+// StrictnessLevel defines preset strictness configurations.
+type StrictnessLevel = types.StrictnessLevel
+
+const (
+	StrictnessStrict     = types.StrictnessStrict
+	StrictnessNormal     = types.StrictnessNormal
+	StrictnessPermissive = types.StrictnessPermissive
+	StrictnessSilent     = types.StrictnessSilent
+)
 
 // Kind identifies what an OID node represents.
-type Kind int
+type Kind = types.Kind
 
 const (
-	KindUnknown      Kind = iota
-	KindInternal          // internal node without a definition
-	KindNode              // OBJECT-IDENTITY, MODULE-IDENTITY, value assignment
-	KindScalar            // scalar OBJECT-TYPE
-	KindTable             // table (SEQUENCE OF)
-	KindRow               // row (has INDEX or AUGMENTS)
-	KindColumn            // column (child of row)
-	KindNotification      // NOTIFICATION-TYPE or TRAP-TYPE
-	KindGroup             // OBJECT-GROUP or NOTIFICATION-GROUP
-	KindCompliance        // MODULE-COMPLIANCE
-	KindCapabilities      // AGENT-CAPABILITIES
+	KindUnknown      = types.KindUnknown
+	KindInternal     = types.KindInternal
+	KindNode         = types.KindNode
+	KindScalar       = types.KindScalar
+	KindTable        = types.KindTable
+	KindRow          = types.KindRow
+	KindColumn       = types.KindColumn
+	KindNotification = types.KindNotification
+	KindGroup        = types.KindGroup
+	KindCompliance   = types.KindCompliance
+	KindCapability   = types.KindCapability
 )
 
-func (k Kind) String() string {
-	switch k {
-	case KindUnknown:
-		return "unknown"
-	case KindInternal:
-		return "internal"
-	case KindNode:
-		return "node"
-	case KindScalar:
-		return "scalar"
-	case KindTable:
-		return "table"
-	case KindRow:
-		return "row"
-	case KindColumn:
-		return "column"
-	case KindNotification:
-		return "notification"
-	case KindGroup:
-		return "group"
-	case KindCompliance:
-		return "compliance"
-	case KindCapabilities:
-		return "capabilities"
-	default:
-		return fmt.Sprintf("Kind(%d)", k)
-	}
-}
-
-// IsObjectType reports whether this is a scalar/table/row/column.
-func (k Kind) IsObjectType() bool {
-	switch k {
-	case KindScalar, KindTable, KindRow, KindColumn:
-		return true
-	default:
-		return false
-	}
-}
-
-// IsConformance reports whether this is a group/compliance/capabilities node.
-func (k Kind) IsConformance() bool {
-	switch k {
-	case KindGroup, KindCompliance, KindCapabilities:
-		return true
-	default:
-		return false
-	}
-}
-
-// Access levels for OBJECT-TYPE definitions.
-type Access int
+// Access represents the access level for OBJECT-TYPE definitions.
+// Includes SMIv1, SMIv2, SPPI (RFC 3159), and AGENT-CAPABILITIES values.
+type Access = types.Access
 
 const (
-	AccessNotAccessible Access = iota
-	AccessAccessibleForNotify
-	AccessReadOnly
-	AccessReadWrite
-	AccessReadCreate
-	AccessWriteOnly
+	AccessNotAccessible       = types.AccessNotAccessible
+	AccessAccessibleForNotify = types.AccessAccessibleForNotify
+	AccessReadOnly            = types.AccessReadOnly
+	AccessReadWrite           = types.AccessReadWrite
+	AccessReadCreate          = types.AccessReadCreate
+	AccessWriteOnly           = types.AccessWriteOnly
+	AccessInstall             = types.AccessInstall
+	AccessInstallNotify       = types.AccessInstallNotify
+	AccessReportOnly          = types.AccessReportOnly
+	AccessNotImplemented      = types.AccessNotImplemented
 )
 
-func (a Access) String() string {
-	switch a {
-	case AccessNotAccessible:
-		return "not-accessible"
-	case AccessAccessibleForNotify:
-		return "accessible-for-notify"
-	case AccessReadOnly:
-		return "read-only"
-	case AccessReadWrite:
-		return "read-write"
-	case AccessReadCreate:
-		return "read-create"
-	case AccessWriteOnly:
-		return "write-only"
-	default:
-		return fmt.Sprintf("Access(%d)", a)
-	}
-}
-
-// Status values for MIB definitions.
-type Status int
+// Status represents the lifecycle state of a MIB definition.
+// Preserves SMIv1-specific values (mandatory, optional) without normalizing.
+type Status = types.Status
 
 const (
-	StatusCurrent Status = iota
-	StatusDeprecated
-	StatusObsolete
+	StatusCurrent    = types.StatusCurrent
+	StatusDeprecated = types.StatusDeprecated
+	StatusObsolete   = types.StatusObsolete
+	StatusMandatory  = types.StatusMandatory
+	StatusOptional   = types.StatusOptional
 )
-
-func (s Status) String() string {
-	switch s {
-	case StatusCurrent:
-		return "current"
-	case StatusDeprecated:
-		return "deprecated"
-	case StatusObsolete:
-		return "obsolete"
-	default:
-		return fmt.Sprintf("Status(%d)", s)
-	}
-}
 
 // Language identifies the SMI version of a module.
-type Language int
+type Language = types.Language
 
 const (
-	LanguageSMIv1 Language = iota
-	LanguageSMIv2
+	LanguageUnknown = types.LanguageUnknown
+	LanguageSMIv1   = types.LanguageSMIv1
+	LanguageSMIv2   = types.LanguageSMIv2
+	LanguageSPPI    = types.LanguageSPPI
 )
-
-func (l Language) String() string {
-	switch l {
-	case LanguageSMIv1:
-		return "SMIv1"
-	case LanguageSMIv2:
-		return "SMIv2"
-	default:
-		return fmt.Sprintf("Language(%d)", l)
-	}
-}
 
 // BaseType identifies the fundamental SMI type.
-type BaseType int
+type BaseType = types.BaseType
 
 const (
-	BaseInteger32 BaseType = iota
-	BaseUnsigned32
-	BaseCounter32
-	BaseCounter64
-	BaseGauge32
-	BaseTimeTicks
-	BaseIpAddress
-	BaseOctetString
-	BaseObjectIdentifier
-	BaseBits
-	BaseOpaque
+	BaseUnknown          = types.BaseUnknown
+	BaseInteger32        = types.BaseInteger32
+	BaseUnsigned32       = types.BaseUnsigned32
+	BaseCounter32        = types.BaseCounter32
+	BaseCounter64        = types.BaseCounter64
+	BaseGauge32          = types.BaseGauge32
+	BaseTimeTicks        = types.BaseTimeTicks
+	BaseIpAddress        = types.BaseIpAddress
+	BaseOctetString      = types.BaseOctetString
+	BaseObjectIdentifier = types.BaseObjectIdentifier
+	BaseBits             = types.BaseBits
+	BaseOpaque           = types.BaseOpaque
+	BaseSequence         = types.BaseSequence
 )
-
-func (b BaseType) String() string {
-	switch b {
-	case BaseInteger32:
-		return "Integer32"
-	case BaseUnsigned32:
-		return "Unsigned32"
-	case BaseCounter32:
-		return "Counter32"
-	case BaseCounter64:
-		return "Counter64"
-	case BaseGauge32:
-		return "Gauge32"
-	case BaseTimeTicks:
-		return "TimeTicks"
-	case BaseIpAddress:
-		return "IpAddress"
-	case BaseOctetString:
-		return "OCTET STRING"
-	case BaseObjectIdentifier:
-		return "OBJECT IDENTIFIER"
-	case BaseBits:
-		return "BITS"
-	case BaseOpaque:
-		return "Opaque"
-	default:
-		return fmt.Sprintf("BaseType(%d)", b)
-	}
-}
-
-// Severity for diagnostics.
-type Severity int
-
-const (
-	SeverityInfo Severity = iota
-	SeverityWarning
-	SeverityError
-)
-
-func (s Severity) String() string {
-	switch s {
-	case SeverityInfo:
-		return "info"
-	case SeverityWarning:
-		return "warning"
-	case SeverityError:
-		return "error"
-	default:
-		return fmt.Sprintf("Severity(%d)", s)
-	}
-}

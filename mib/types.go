@@ -1,17 +1,12 @@
 package mib
 
 import (
+	"encoding/hex"
 	"strconv"
 	"strings"
 )
 
-// IndexEntry describes an index component for a table row.
-type IndexEntry struct {
-	Object  Object // always non-nil in resolved model
-	Implied bool   // IMPLIED keyword present
-}
-
-// Range for size/value constraints.
+// Range represents a min..max constraint for sizes or values.
 type Range struct {
 	Min, Max int64
 }
@@ -25,11 +20,30 @@ func (r Range) String() string {
 }
 
 // NamedValue represents a labeled integer from an enum or BITS definition.
-// For INTEGER enums, Value is the enum constant.
-// For BITS, Value is the bit position (0-based).
 type NamedValue struct {
 	Label string
 	Value int64
+}
+
+func findNamedValue(values []NamedValue, label string) (NamedValue, bool) {
+	for _, nv := range values {
+		if nv.Label == label {
+			return nv, true
+		}
+	}
+	return NamedValue{}, false
+}
+
+// Revision describes a module revision.
+type Revision struct {
+	Date        string // "YYYY-MM-DD" or original format
+	Description string
+}
+
+// IndexEntry describes an index component for a table row.
+type IndexEntry struct {
+	Object  *Object // always non-nil in resolved model
+	Implied bool    // IMPLIED keyword present
 }
 
 // DefValKind identifies the type of default value.
@@ -42,49 +56,48 @@ const (
 	DefValKindBytes                    // []byte (from hex/binary string)
 	DefValKindEnum                     // string (enum label)
 	DefValKindBits                     // []string (bit labels)
-	DefValKindOID                      // Oid
+	DefValKindOID                      // OID
 )
 
 // DefVal represents a default value with both interpreted value and raw MIB syntax.
-// Use Value() to get the interpreted value, Raw() for original MIB syntax.
 type DefVal struct {
 	kind  DefValKind
-	value any    // int64, uint64, string, []byte, []string, Oid
-	raw   string // original MIB syntax
+	value any
+	raw   string
 }
 
-// NewDefValInt creates a DefVal for a signed integer.
-func NewDefValInt(v int64, raw string) DefVal {
+// newDefValInt creates a DefVal for a signed integer.
+func newDefValInt(v int64, raw string) DefVal {
 	return DefVal{kind: DefValKindInt, value: v, raw: raw}
 }
 
-// NewDefValUint creates a DefVal for an unsigned integer.
-func NewDefValUint(v uint64, raw string) DefVal {
+// newDefValUint creates a DefVal for an unsigned integer.
+func newDefValUint(v uint64, raw string) DefVal {
 	return DefVal{kind: DefValKindUint, value: v, raw: raw}
 }
 
-// NewDefValString creates a DefVal for a quoted string.
-func NewDefValString(v string, raw string) DefVal {
+// newDefValString creates a DefVal for a quoted string.
+func newDefValString(v string, raw string) DefVal {
 	return DefVal{kind: DefValKindString, value: v, raw: raw}
 }
 
-// NewDefValBytes creates a DefVal for bytes (from hex/binary string).
-func NewDefValBytes(v []byte, raw string) DefVal {
+// newDefValBytes creates a DefVal for bytes (from hex/binary string).
+func newDefValBytes(v []byte, raw string) DefVal {
 	return DefVal{kind: DefValKindBytes, value: v, raw: raw}
 }
 
-// NewDefValEnum creates a DefVal for an enum label.
-func NewDefValEnum(label string, raw string) DefVal {
+// newDefValEnum creates a DefVal for an enum label.
+func newDefValEnum(label string, raw string) DefVal {
 	return DefVal{kind: DefValKindEnum, value: label, raw: raw}
 }
 
-// NewDefValBits creates a DefVal for BITS (list of bit labels).
-func NewDefValBits(labels []string, raw string) DefVal {
+// newDefValBits creates a DefVal for BITS (list of bit labels).
+func newDefValBits(labels []string, raw string) DefVal {
 	return DefVal{kind: DefValKindBits, value: labels, raw: raw}
 }
 
-// NewDefValOID creates a DefVal for an OID.
-func NewDefValOID(oid Oid, raw string) DefVal {
+// newDefValOID creates a DefVal for an OID.
+func newDefValOID(oid OID, raw string) DefVal {
 	return DefVal{kind: DefValKindOID, value: oid, raw: raw}
 }
 
@@ -92,14 +105,16 @@ func NewDefValOID(oid Oid, raw string) DefVal {
 func (d DefVal) Kind() DefValKind { return d.kind }
 
 // Value returns the interpreted value.
-// Type depends on Kind: int64, uint64, string, []byte, []string, or Oid.
 func (d DefVal) Value() any { return d.value }
 
-// Raw returns the original MIB syntax (e.g., "'00000000'H", "42", "{ bit1, bit2 }").
+// Raw returns the original MIB syntax.
 func (d DefVal) Raw() string { return d.raw }
 
-// String returns a user-friendly representation of the value.
+// String returns a user-friendly representation.
 func (d DefVal) String() string {
+	if d.value == nil {
+		return ""
+	}
 	switch d.kind {
 	case DefValKindInt:
 		return strconv.FormatInt(d.value.(int64), 10)
@@ -112,8 +127,6 @@ func (d DefVal) String() string {
 		if len(b) == 0 {
 			return "0"
 		}
-		// For small byte arrays, interpret as big-endian integer
-		// This matches net-snmp behavior for hex DEFVALs
 		if len(b) <= 8 {
 			var n uint64
 			for _, v := range b {
@@ -121,7 +134,6 @@ func (d DefVal) String() string {
 			}
 			return strconv.FormatUint(n, 10)
 		}
-		// For larger byte arrays, show as hex
 		return "0x" + bytesToHex(b)
 	case DefValKindEnum:
 		return d.value.(string)
@@ -132,7 +144,7 @@ func (d DefVal) String() string {
 		}
 		return "{ " + strings.Join(labels, ", ") + " }"
 	case DefValKindOID:
-		return d.value.(Oid).String()
+		return d.raw
 	default:
 		return d.raw
 	}
@@ -143,40 +155,90 @@ func (d DefVal) IsZero() bool {
 	return d.value == nil
 }
 
-// DefValAs returns the value as type T if compatible, or zero value and false.
+// DefValAs returns the value as type T if compatible.
 func DefValAs[T any](d DefVal) (T, bool) {
 	v, ok := d.value.(T)
 	return v, ok
 }
 
-// bytesToHex converts bytes to uppercase hex string.
 func bytesToHex(b []byte) string {
-	const hex = "0123456789ABCDEF"
-	result := make([]byte, len(b)*2)
-	for i, v := range b {
-		result[i*2] = hex[v>>4]
-		result[i*2+1] = hex[v&0x0f]
-	}
-	return string(result)
+	return strings.ToUpper(hex.EncodeToString(b))
 }
 
-// Revision describes a module revision.
-type Revision struct {
-	Date        string // "YYYY-MM-DD" or original format
+// ComplianceModule is a MODULE clause within a MODULE-COMPLIANCE definition.
+type ComplianceModule struct {
+	ModuleName      string             // module name (empty = current module)
+	MandatoryGroups []string           // MANDATORY-GROUPS references
+	Groups          []ComplianceGroup  // GROUP refinements
+	Objects         []ComplianceObject // OBJECT refinements
+}
+
+// ComplianceGroup is a GROUP clause within MODULE-COMPLIANCE.
+type ComplianceGroup struct {
+	Group       string // group reference name
 	Description string
 }
 
-// Diagnostic represents a parse or resolution issue.
-type Diagnostic struct {
-	Severity Severity
-	Module   string // source module name
-	Message  string
-	Line     int // 0 if not applicable
+// ComplianceObject is an OBJECT refinement within MODULE-COMPLIANCE.
+type ComplianceObject struct {
+	Object      string  // object reference name
+	MinAccess   *Access // MIN-ACCESS restriction (nil if not specified)
+	Description string
+}
+
+// CapabilitiesModule is a SUPPORTS clause within an AGENT-CAPABILITIES definition.
+type CapabilitiesModule struct {
+	ModuleName             string                  // supported module name
+	Includes               []string                // INCLUDES group references
+	ObjectVariations       []ObjectVariation       // object VARIATION clauses
+	NotificationVariations []NotificationVariation // notification VARIATION clauses
+}
+
+// ObjectVariation is an object VARIATION within AGENT-CAPABILITIES.
+type ObjectVariation struct {
+	Object      string  // object reference name
+	Access      *Access // ACCESS restriction (nil if not specified)
+	Description string
+}
+
+// NotificationVariation is a notification VARIATION within AGENT-CAPABILITIES.
+type NotificationVariation struct {
+	Notification string  // notification reference name
+	Access       *Access // ACCESS restriction (nil if not specified)
+	Description  string
+}
+
+// UnresolvedKind identifies the category of an unresolved reference.
+type UnresolvedKind int
+
+const (
+	UnresolvedImport             UnresolvedKind = iota // cross-module import
+	UnresolvedType                                     // type reference
+	UnresolvedOID                                      // OID component
+	UnresolvedIndex                                    // INDEX object reference
+	UnresolvedNotificationObject                       // OBJECTS entry in notification
+)
+
+func (k UnresolvedKind) String() string {
+	switch k {
+	case UnresolvedImport:
+		return "import"
+	case UnresolvedType:
+		return "type"
+	case UnresolvedOID:
+		return "oid"
+	case UnresolvedIndex:
+		return "index"
+	case UnresolvedNotificationObject:
+		return "notification-object"
+	default:
+		return "unknown"
+	}
 }
 
 // UnresolvedRef describes a symbol that could not be resolved.
 type UnresolvedRef struct {
-	Kind   string // "type", "object", "import"
-	Symbol string // the unresolved symbol
-	Module string // where it was referenced
+	Kind   UnresolvedKind
+	Symbol string
+	Module string
 }

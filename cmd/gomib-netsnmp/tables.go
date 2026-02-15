@@ -4,15 +4,17 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"sort"
+	"os"
+	"slices"
 	"strings"
 )
 
-// TableComparisonResult holds results of table-focused comparison.
+// TableComparisonResult holds INDEX and AUGMENTS comparison results.
 type TableComparisonResult struct {
 	TotalTables     int               `json:"total_tables"`
 	MatchedTables   int               `json:"matched_tables"`
@@ -23,7 +25,7 @@ type TableComparisonResult struct {
 	Tables          []TableComparison `json:"tables,omitempty"`
 }
 
-// TableMismatch describes a table-specific difference.
+// TableMismatch describes an INDEX or AUGMENTS difference for one row.
 type TableMismatch struct {
 	RowName string `json:"row_name"`
 	Module  string `json:"module"`
@@ -33,7 +35,7 @@ type TableMismatch struct {
 	NetSnmp string `json:"netsnmp"`
 }
 
-// TableComparison holds per-table comparison data.
+// TableComparison holds per-row comparison data for detailed output.
 type TableComparison struct {
 	TableName     string      `json:"table_name"`
 	RowName       string      `json:"row_name"`
@@ -48,7 +50,7 @@ type TableComparison struct {
 }
 
 func cmdTables(args []string) int {
-	fs := flag.NewFlagSet("tables", flag.ExitOnError)
+	fs := flag.NewFlagSet("tables", flag.ContinueOnError)
 	detailed := fs.Bool("detailed", false, "Show detailed per-table comparison")
 
 	fs.Usage = func() {
@@ -78,14 +80,14 @@ Options:
 	}
 	defer cleanup()
 
-	fmt.Fprintln(out, "Loading MIBs with net-snmp...")
+	fmt.Fprintln(os.Stderr, "Loading MIBs with net-snmp...")
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, modules)
 	if err != nil {
 		printError("net-snmp load failed: %v", err)
 		return 1
 	}
 
-	fmt.Fprintln(out, "Loading MIBs with gomib...")
+	fmt.Fprintln(os.Stderr, "Loading MIBs with mib...")
 	gomibNodes, err := loadGomibNodes(mibPaths, modules)
 	if err != nil {
 		printError("gomib load failed: %v", err)
@@ -113,11 +115,9 @@ Options:
 	return 0
 }
 
-// compareTables compares table structures between net-snmp and gomib.
 func compareTables(netsnmp, gomib map[string]*NormalizedNode, detailed bool) *TableComparisonResult {
 	result := &TableComparisonResult{}
 
-	// Find nodes with indexes (row entries)
 	type rowEntry struct {
 		oid   string
 		node  *NormalizedNode
@@ -135,9 +135,8 @@ func compareTables(netsnmp, gomib map[string]*NormalizedNode, detailed bool) *Ta
 		}
 	}
 
-	// Sort by OID for deterministic output
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i].oid < rows[j].oid
+	slices.SortFunc(rows, func(a, b rowEntry) int {
+		return cmp.Compare(a.oid, b.oid)
 	})
 
 	result.TotalTables = len(rows)
@@ -159,7 +158,6 @@ func compareTables(netsnmp, gomib map[string]*NormalizedNode, detailed bool) *Ta
 			tc.GomibIndex = g.Indexes
 			tc.GomibAug = g.Augments
 
-			// Compare indexes
 			if indexesEqual(ns.Indexes, g.Indexes) {
 				result.IndexMatches++
 				tc.IndexMatch = true
@@ -174,7 +172,6 @@ func compareTables(netsnmp, gomib map[string]*NormalizedNode, detailed bool) *Ta
 				})
 			}
 
-			// Compare augments
 			if ns.Augments != "" || g.Augments != "" {
 				if ns.Augments == g.Augments {
 					result.AugmentMatches++
@@ -209,7 +206,6 @@ func compareTables(netsnmp, gomib map[string]*NormalizedNode, detailed bool) *Ta
 	return result
 }
 
-// getTableName attempts to derive table name from row name.
 func getTableName(rowName string) string {
 	if strings.HasSuffix(rowName, "Entry") {
 		return strings.TrimSuffix(rowName, "Entry") + "Table"

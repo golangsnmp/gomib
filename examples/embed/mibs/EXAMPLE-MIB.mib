@@ -1,0 +1,34 @@
+EXAMPLE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI
+    DisplayString
+        FROM SNMPv2-TC;
+
+exampleMIB MODULE-IDENTITY
+    LAST-UPDATED "200901010000Z"
+    ORGANIZATION "Example Inc."
+    CONTACT-INFO "support@example.com"
+    DESCRIPTION  "A minimal MIB for demonstrating embedded loading."
+    REVISION     "200901010000Z"
+    DESCRIPTION  "Initial version."
+    ::= { enterprises 99999 }
+
+exampleObjects OBJECT IDENTIFIER ::= { exampleMIB 1 }
+
+exampleName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "An example name string."
+    ::= { exampleObjects 1 }
+
+exampleCount OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "An example counter value."
+    ::= { exampleObjects 2 }
+
+END

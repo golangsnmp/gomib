@@ -1,0 +1,247 @@
+package gomib
+
+import (
+	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/mib"
+)
+
+func TestGroupCount(t *testing.T) {
+	m := loadTestMIB(t)
+
+	groups := m.Groups()
+	count := len(groups)
+
+	// SNMPv2-MIB alone defines 8 groups, so combined fixture modules should have more
+	testutil.Greater(t, count, 0, "should have groups from fixture MIBs")
+}
+
+func TestModuleGroups(t *testing.T) {
+	m := loadTestMIB(t)
+
+	snmpMIB := m.Module("SNMPv2-MIB")
+	if snmpMIB == nil {
+		t.Fatal("SNMPv2-MIB not found")
+	}
+
+	groups := snmpMIB.Groups()
+	testutil.Greater(t, len(groups), 0,
+		"SNMPv2-MIB should have groups")
+
+	names := make(map[string]bool)
+	for _, g := range groups {
+		names[g.Name()] = true
+	}
+
+	// SNMPv2-MIB defines: snmpGroup, snmpCommunityGroup, snmpSetGroup,
+	// systemGroup, snmpBasicNotificationsGroup, snmpWarmStartNotificationGroup,
+	// snmpNotificationGroup, snmpObsoleteGroup
+	testutil.True(t, names["snmpGroup"],
+		"SNMPv2-MIB should contain snmpGroup")
+	testutil.True(t, names["systemGroup"],
+		"SNMPv2-MIB should contain systemGroup")
+	testutil.True(t, names["snmpBasicNotificationsGroup"],
+		"SNMPv2-MIB should contain snmpBasicNotificationsGroup")
+}
+
+func TestModuleGroupLookup(t *testing.T) {
+	m := loadTestMIB(t)
+
+	snmpMIB := m.Module("SNMPv2-MIB")
+	if snmpMIB == nil {
+		t.Fatal("SNMPv2-MIB not found")
+	}
+
+	g := snmpMIB.Group("snmpGroup")
+	testutil.NotNil(t, g, "Module.Group(snmpGroup) should not be nil")
+	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
+
+	testutil.Nil(t, snmpMIB.Group("noSuchGroup"),
+		"non-existent group should return nil")
+}
+
+func TestGroupByName(t *testing.T) {
+	m := loadTestMIB(t)
+
+	g := m.Group("snmpGroup")
+	testutil.NotNil(t, g, "Group(snmpGroup) should not be nil")
+	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
+}
+
+func TestGroupQualifiedLookup(t *testing.T) {
+	m := loadTestMIB(t)
+
+	// Qualified lookup via Module().Group()
+	g := m.Module("SNMPv2-MIB").Group("snmpGroup")
+	testutil.NotNil(t, g, "Module(SNMPv2-MIB).Group(snmpGroup) should not be nil")
+	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
+
+	testutil.Nil(t, m.Module("IF-MIB").Group("snmpGroup"),
+		"snmpGroup should not be in IF-MIB")
+}
+
+func TestGroupByOID(t *testing.T) {
+	m := loadTestMIB(t)
+
+	g := m.Group("snmpGroup")
+	testutil.NotNil(t, g, "Group(snmpGroup)")
+
+	// OID-based lookup via NodeByOID().Group()
+	nd := m.NodeByOID(g.OID())
+	testutil.NotNil(t, nd, "NodeByOID should find group node")
+	testutil.NotNil(t, nd.Group(), "node should have Group()")
+	testutil.Equal(t, "snmpGroup", nd.Group().Name(), "group found by OID")
+}
+
+func TestGroupNotFound(t *testing.T) {
+	m := loadTestMIB(t)
+
+	testutil.Nil(t, m.Group("noSuchGroup"),
+		"non-existent group name should return nil")
+}
+
+func TestGroupMetadata(t *testing.T) {
+	m := loadTestMIB(t)
+
+	g := m.Group("snmpGroup")
+	if g == nil {
+		t.Fatal("snmpGroup not found")
+	}
+
+	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
+
+	node := g.Node()
+	testutil.NotNil(t, node, "Group.Node() should not be nil")
+	testutil.Equal(t, "snmpGroup", node.Name(), "node name matches group")
+	testutil.Equal(t, mib.KindGroup, node.Kind(), "node kind should be KindGroup")
+
+	mod := g.Module()
+	testutil.NotNil(t, mod, "Group.Module() should not be nil")
+	testutil.Equal(t, "SNMPv2-MIB", mod.Name(), "group module")
+
+	oid := g.OID()
+	testutil.Greater(t, len(oid), 0, "group OID should not be empty")
+
+	testutil.Equal(t, mib.StatusCurrent, g.Status(), "snmpGroup should be current")
+
+	desc := g.Description()
+	testutil.Greater(t, len(desc), 0, "snmpGroup should have a description")
+
+	testutil.False(t, g.IsNotificationGroup(),
+		"snmpGroup is an OBJECT-GROUP, not NOTIFICATION-GROUP")
+}
+
+func TestObjectGroupMembers(t *testing.T) {
+	m := loadTestMIB(t)
+
+	g := m.Group("snmpGroup")
+	if g == nil {
+		t.Fatal("snmpGroup not found")
+	}
+
+	members := g.Members()
+	// snmpGroup OBJECTS { snmpInPkts, snmpInBadVersions, snmpInASNParseErrs,
+	//                     snmpSilentDrops, snmpProxyDrops, snmpEnableAuthenTraps }
+	testutil.Equal(t, 6, len(members),
+		"snmpGroup should have 6 members")
+
+	names := make(map[string]bool)
+	for _, nd := range members {
+		names[nd.Name()] = true
+	}
+	testutil.True(t, names["snmpInPkts"], "snmpInPkts should be a member")
+	testutil.True(t, names["snmpSilentDrops"], "snmpSilentDrops should be a member")
+	testutil.True(t, names["snmpEnableAuthenTraps"], "snmpEnableAuthenTraps should be a member")
+}
+
+func TestNotificationGroupMembers(t *testing.T) {
+	m := loadTestMIB(t)
+
+	g := m.Group("snmpBasicNotificationsGroup")
+	if g == nil {
+		t.Fatal("snmpBasicNotificationsGroup not found")
+	}
+
+	testutil.True(t, g.IsNotificationGroup(),
+		"snmpBasicNotificationsGroup should be a NOTIFICATION-GROUP")
+
+	members := g.Members()
+	// NOTIFICATIONS { coldStart, authenticationFailure }
+	testutil.Equal(t, 2, len(members),
+		"snmpBasicNotificationsGroup should have 2 members")
+
+	names := make(map[string]bool)
+	for _, nd := range members {
+		names[nd.Name()] = true
+	}
+	testutil.True(t, names["coldStart"], "coldStart should be a member")
+	testutil.True(t, names["authenticationFailure"],
+		"authenticationFailure should be a member")
+}
+
+func TestNodeGroup(t *testing.T) {
+	m := loadTestMIB(t)
+
+	node := m.Node("snmpGroup")
+	if node == nil {
+		t.Fatal("snmpGroup node not found")
+	}
+
+	g := node.Group()
+	testutil.NotNil(t, g, "group node should have Group()")
+	testutil.Equal(t, "snmpGroup", g.Name(), "node Group() name")
+
+	ifIndex := m.Node("ifIndex")
+	if ifIndex == nil {
+		t.Fatal("ifIndex not found")
+	}
+	testutil.Nil(t, ifIndex.Group(), "ifIndex should not have a Group()")
+}
+
+func TestGroupNodeModule(t *testing.T) {
+	m := loadTestMIB(t)
+
+	node := m.Node("snmpGroup")
+	if node == nil {
+		t.Fatal("snmpGroup node not found")
+	}
+
+	mod := node.Module()
+	testutil.NotNil(t, mod, "group node should have a Module()")
+	testutil.Equal(t, "SNMPv2-MIB", mod.Name(),
+		"snmpGroup node module should be SNMPv2-MIB")
+}
+
+func TestSmallObjectGroup(t *testing.T) {
+	m := loadTestMIB(t)
+
+	// snmpCommunityGroup has 2 members:
+	// OBJECTS { snmpInBadCommunityNames, snmpInBadCommunityUses }
+	g := m.Group("snmpCommunityGroup")
+	testutil.NotNil(t, g, "Group(snmpCommunityGroup)")
+
+	testutil.False(t, g.IsNotificationGroup(),
+		"snmpCommunityGroup is an OBJECT-GROUP")
+	testutil.Equal(t, 2, len(g.Members()),
+		"snmpCommunityGroup should have 2 members")
+}
+
+func TestWarmStartNotificationGroup(t *testing.T) {
+	m := loadTestMIB(t)
+
+	// snmpWarmStartNotificationGroup NOTIFICATION-GROUP
+	// NOTIFICATIONS { warmStart }
+	g := m.Group("snmpWarmStartNotificationGroup")
+	testutil.NotNil(t, g, "Group(snmpWarmStartNotificationGroup)")
+
+	testutil.True(t, g.IsNotificationGroup(),
+		"snmpWarmStartNotificationGroup should be a NOTIFICATION-GROUP")
+	testutil.Equal(t, 1, len(g.Members()),
+		"snmpWarmStartNotificationGroup should have 1 member")
+
+	if len(g.Members()) > 0 {
+		testutil.Equal(t, "warmStart", g.Members()[0].Name(),
+			"sole member should be warmStart")
+	}
+}

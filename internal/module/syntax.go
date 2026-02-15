@@ -4,93 +4,75 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// NamedNumber is a named number in an INTEGER enumeration.
-//
-// Used in `INTEGER { up(1), down(2) }` syntax.
+// NamedNumber is a named value in an INTEGER enumeration,
+// e.g. up(1) in INTEGER { up(1), down(2) }.
 type NamedNumber struct {
-	// Name is the name of the enumeration value (e.g., "up", "down").
-	Name string
-	// Value is the numeric value assigned to this name.
+	Name  string
 	Value int64
 }
 
-// NewNamedNumber creates a new named number.
+// NewNamedNumber returns a NamedNumber with the given name and value.
 func NewNamedNumber(name string, value int64) NamedNumber {
 	return NamedNumber{Name: name, Value: value}
 }
 
-// NamedBit is a named bit in a BITS type definition.
-//
-// Used in `BITS { flag1(0), flag2(1) }` syntax.
+// NamedBit is a named bit position in a BITS type definition,
+// e.g. flag1(0) in BITS { flag1(0), flag2(1) }.
 type NamedBit struct {
-	// Name is the name of the bit (e.g., "flag1", "flag2").
-	Name string
-	// Position is the bit position (0-indexed from the left).
+	Name     string
 	Position uint32
 }
 
-// NewNamedBit creates a new named bit.
+// NewNamedBit returns a NamedBit with the given name and position.
 func NewNamedBit(name string, position uint32) NamedBit {
 	return NamedBit{Name: name, Position: position}
 }
 
-// SequenceField is a field in a SEQUENCE type (used for row entry types).
-//
-// Used in `SEQUENCE { ifIndex InterfaceIndex, ifDescr DisplayString }` syntax.
+// SequenceField is a field in a SEQUENCE type used for table row entries.
 type SequenceField struct {
-	// Name is the name of the field (e.g., "ifIndex", "ifDescr").
-	Name string
-	// Syntax is the type of the field.
+	Name   string
 	Syntax TypeSyntax
 }
 
-// NewSequenceField creates a new sequence field.
+// NewSequenceField returns a SequenceField with the given name and syntax.
 func NewSequenceField(name string, syntax TypeSyntax) SequenceField {
 	return SequenceField{Name: name, Syntax: syntax}
 }
 
-// OidAssignment is an unresolved OID assignment.
-//
-// Keeps OID components as symbols; resolution happens in the resolver.
+// OidAssignment is an unresolved OID assignment. Components remain as
+// symbolic references until the resolver phase.
 type OidAssignment struct {
-	// Components are the OID components.
 	Components []OidComponent
-	// Span is the source span for diagnostics.
-	Span types.Span
+	Span       types.Span
 }
 
-// NewOidAssignment creates a new OID assignment.
+// NewOidAssignment returns an OidAssignment with the given components.
 func NewOidAssignment(components []OidComponent, span types.Span) OidAssignment {
 	return OidAssignment{Components: components, Span: span}
 }
 
-// OidComponent is a component of an OID assignment.
-// Use type switches to distinguish concrete types:
-//   - *OidComponentName: just a name reference
-//   - *OidComponentNumber: just a number
-//   - *OidComponentNamedNumber: name with number like org(3)
-//   - *OidComponentQualifiedName: qualified reference like SNMPv2-SMI.enterprises
-//   - *OidComponentQualifiedNamedNumber: qualified with number
+// OidComponent is one element of an OID assignment. Use type switches to
+// distinguish concrete types (Name, Number, NamedNumber, QualifiedName,
+// QualifiedNamedNumber).
 type OidComponent interface {
-	// oidComponent marker
 	oidComponent()
 }
 
-// OidComponentName is just a name reference: `internet`, `ifEntry`
+// OidComponentName is a symbolic name reference, e.g. internet.
 type OidComponentName struct {
 	NameValue string
 }
 
 func (*OidComponentName) oidComponent() {}
 
-// OidComponentNumber is just a number: `1`, `31`
+// OidComponentNumber is a numeric arc, e.g. 1 or 31.
 type OidComponentNumber struct {
 	Value uint32
 }
 
 func (*OidComponentNumber) oidComponent() {}
 
-// OidComponentNamedNumber is a name with number: `org(3)` - common in well-known roots
+// OidComponentNamedNumber is a name with number, e.g. org(3).
 type OidComponentNamedNumber struct {
 	NameValue   string
 	NumberValue uint32
@@ -98,7 +80,7 @@ type OidComponentNamedNumber struct {
 
 func (*OidComponentNamedNumber) oidComponent() {}
 
-// OidComponentQualifiedName is a qualified name: `SNMPv2-SMI.enterprises`
+// OidComponentQualifiedName is a module-qualified name, e.g. SNMPv2-SMI.enterprises.
 type OidComponentQualifiedName struct {
 	ModuleValue string
 	NameValue   string
@@ -106,7 +88,8 @@ type OidComponentQualifiedName struct {
 
 func (*OidComponentQualifiedName) oidComponent() {}
 
-// OidComponentQualifiedNamedNumber is a qualified name with number: `SNMPv2-SMI.enterprises(1)`
+// OidComponentQualifiedNamedNumber is a module-qualified name with number,
+// e.g. SNMPv2-SMI.enterprises(1).
 type OidComponentQualifiedNamedNumber struct {
 	ModuleValue string
 	NameValue   string
@@ -115,114 +98,106 @@ type OidComponentQualifiedNamedNumber struct {
 
 func (*OidComponentQualifiedNamedNumber) oidComponent() {}
 
-// TypeSyntax is a type representation with symbol references (not resolved).
-// Use type switches to distinguish concrete types:
-//   - *TypeSyntaxSequenceOf for SEQUENCE OF (table type)
-//   - *TypeSyntaxSequence for SEQUENCE (row type)
-//   - *TypeSyntaxTypeRef, *TypeSyntaxIntegerEnum, etc. for other forms
+// TypeSyntax is an unresolved type representation. Use type switches to
+// dispatch on concrete types (TypeRef, IntegerEnum, Bits, Constrained,
+// SequenceOf, Sequence, OctetString, ObjectIdentifier).
 type TypeSyntax interface {
-	// typeSyntax marker
 	typeSyntax()
 }
 
-// TypeSyntaxTypeRef is a reference to another type: `Integer32`, `DisplayString`
+// TypeSyntaxTypeRef is a reference to a named type, e.g. Integer32.
 type TypeSyntaxTypeRef struct {
 	Name string
 }
 
 func (*TypeSyntaxTypeRef) typeSyntax() {}
 
-// TypeSyntaxIntegerEnum is INTEGER with enum values: `INTEGER { up(1), down(2) }`
-// or a TC with inline restrictions: `TPSPRateType { kbps(1), percentLocal(2) }`
+// TypeSyntaxIntegerEnum is an INTEGER with named values, e.g.
+// INTEGER { up(1), down(2) }. Base is non-empty when the enum restricts
+// a named type rather than bare INTEGER.
 type TypeSyntaxIntegerEnum struct {
-	// Base is the base type name (e.g., "TPSPRateType").
-	// Empty string if the base is implicit INTEGER.
 	Base         string
 	NamedNumbers []NamedNumber
 }
 
 func (*TypeSyntaxIntegerEnum) typeSyntax() {}
 
-// TypeSyntaxBits is BITS with named bits: `BITS { flag1(0), flag2(1) }`
+// TypeSyntaxBits is a BITS type with named bit positions.
 type TypeSyntaxBits struct {
 	NamedBits []NamedBit
 }
 
 func (*TypeSyntaxBits) typeSyntax() {}
 
-// TypeSyntaxConstrained is a constrained type: `OCTET STRING (SIZE (0..255))`
+// TypeSyntaxConstrained is a type with a subtype constraint applied.
 type TypeSyntaxConstrained struct {
-	// Base is the base type.
-	Base TypeSyntax
-	// Constraint is the constraint.
+	Base       TypeSyntax
 	Constraint Constraint
 }
 
 func (*TypeSyntaxConstrained) typeSyntax() {}
 
-// TypeSyntaxSequenceOf is SEQUENCE OF: `SEQUENCE OF IfEntry`
+// TypeSyntaxSequenceOf is SEQUENCE OF, used for table types.
 type TypeSyntaxSequenceOf struct {
 	EntryType string
 }
 
 func (*TypeSyntaxSequenceOf) typeSyntax() {}
 
-// TypeSyntaxSequence is SEQUENCE with fields (for row types).
+// TypeSyntaxSequence is a SEQUENCE with named fields, used for row types.
 type TypeSyntaxSequence struct {
 	Fields []SequenceField
 }
 
 func (*TypeSyntaxSequence) typeSyntax() {}
 
-// TypeSyntaxOctetString is OCTET STRING (explicit).
+// TypeSyntaxOctetString is an explicit OCTET STRING reference.
 type TypeSyntaxOctetString struct{}
 
 func (*TypeSyntaxOctetString) typeSyntax() {}
 
-// TypeSyntaxObjectIdentifier is OBJECT IDENTIFIER (explicit).
+// TypeSyntaxObjectIdentifier is an explicit OBJECT IDENTIFIER reference.
 type TypeSyntaxObjectIdentifier struct{}
 
 func (*TypeSyntaxObjectIdentifier) typeSyntax() {}
 
-// Constraint is a type constraint.
+// Constraint is a subtype constraint (SIZE or value range).
 type Constraint interface {
-	// constraint marker
 	constraint()
 }
 
-// ConstraintSize is a SIZE constraint: `(SIZE (0..255))`
+// ConstraintSize is a SIZE constraint, e.g. (SIZE (0..255)).
 type ConstraintSize struct {
 	Ranges []Range
 }
 
 func (*ConstraintSize) constraint() {}
 
-// ConstraintRange is a value range constraint: `(0..65535)`
+// ConstraintRange is a value range constraint, e.g. (0..65535).
 type ConstraintRange struct {
 	Ranges []Range
 }
 
 func (*ConstraintRange) constraint() {}
 
-// Range is a range in a constraint.
+// Range is a single range or value within a constraint. Max is nil for
+// single-value constraints.
 type Range struct {
-	// Min is the minimum value.
 	Min RangeValue
-	// Max is the maximum value (nil for single value).
 	Max RangeValue
 }
 
-// NewRangeSingleSigned creates a single-value range with a signed value.
+// NewRangeSingleSigned returns a single-value Range with a signed value.
 func NewRangeSingleSigned(value int64) Range {
 	return Range{Min: &RangeValueSigned{Value: value}, Max: nil}
 }
 
-// NewRangeSingleUnsigned creates a single-value range with an unsigned value.
+// NewRangeSingleUnsigned returns a single-value Range with an unsigned value.
 func NewRangeSingleUnsigned(value uint64) Range {
 	return Range{Min: &RangeValueUnsigned{Value: value}, Max: nil}
 }
 
-// NewRangeSigned creates a range from min to max with signed values.
+// NewRangeSigned returns a Range from min to max with signed values.
 func NewRangeSigned(min, max int64) Range {
 	return Range{
 		Min: &RangeValueSigned{Value: min},
@@ -230,7 +205,7 @@ func NewRangeSigned(min, max int64) Range {
 	}
 }
 
-// NewRangeUnsigned creates a range from min to max with unsigned values.
+// NewRangeUnsigned returns a Range from min to max with unsigned values.
 func NewRangeUnsigned(min, max uint64) Range {
 	return Range{
 		Min: &RangeValueUnsigned{Value: min},
@@ -238,110 +213,110 @@ func NewRangeUnsigned(min, max uint64) Range {
 	}
 }
 
-// RangeValue is a value in a range constraint.
+// RangeValue is one endpoint of a Range (signed, unsigned, MIN, or MAX).
 type RangeValue interface {
-	// rangeValue marker
 	rangeValue()
 }
 
-// RangeValueSigned is a signed numeric value (for Integer32 ranges, can be negative).
+// RangeValueSigned is a signed range endpoint, used for Integer32 ranges.
 type RangeValueSigned struct {
 	Value int64
 }
 
 func (*RangeValueSigned) rangeValue() {}
 
-// RangeValueUnsigned is an unsigned numeric value (for Counter64 ranges, large positive values).
+// RangeValueUnsigned is an unsigned range endpoint, used for Counter64 ranges.
 type RangeValueUnsigned struct {
 	Value uint64
 }
 
 func (*RangeValueUnsigned) rangeValue() {}
 
-// RangeValueMin is the MIN keyword.
+// RangeValueMin represents the MIN keyword in a range constraint.
 type RangeValueMin struct{}
 
 func (*RangeValueMin) rangeValue() {}
 
-// RangeValueMax is the MAX keyword.
+// RangeValueMax represents the MAX keyword in a range constraint.
 type RangeValueMax struct{}
 
 func (*RangeValueMax) rangeValue() {}
 
-// DefVal is a default value for an OBJECT-TYPE.
-//
-// This is the normalized representation of DEFVAL clause content.
-// Symbol references are kept unresolved; resolution happens in the semantic phase.
+// DefVal is an unresolved DEFVAL clause value. Symbol references remain
+// unresolved until the semantic phase.
 type DefVal interface {
-	// defVal marker
 	defVal()
 }
 
-// DefValInteger is an integer value: `DEFVAL { 0 }`, `DEFVAL { -1 }`
+// DefValInteger is a signed integer DEFVAL, e.g. DEFVAL { 0 }.
 type DefValInteger struct {
 	Value int64
 }
 
 func (*DefValInteger) defVal() {}
 
-// DefValUnsigned is an unsigned integer (for Counter64 etc): `DEFVAL { 4294967296 }`
+// DefValUnsigned is an unsigned integer DEFVAL for Counter64 and similar.
 type DefValUnsigned struct {
 	Value uint64
 }
 
 func (*DefValUnsigned) defVal() {}
 
-// DefValString is a string value: `DEFVAL { "public" }`, `DEFVAL { "" }`
+// DefValString is a quoted string DEFVAL, e.g. DEFVAL { "public" }.
 type DefValString struct {
 	Value string
 }
 
 func (*DefValString) defVal() {}
 
-// DefValHexString is a hex string: `DEFVAL { 'FF00'H }`
-// Stored as raw hex digits (uppercase).
+// DefValHexString is a hex string DEFVAL, e.g. DEFVAL { 'FF00'H }.
+// Value contains raw uppercase hex digits.
 type DefValHexString struct {
 	Value string
 }
 
 func (*DefValHexString) defVal() {}
 
-// DefValBinaryString is a binary string: `DEFVAL { '1010'B }`
-// Stored as raw binary digits.
+// DefValBinaryString is a binary string DEFVAL, e.g. DEFVAL { '1010'B }.
+// Value contains raw binary digits.
 type DefValBinaryString struct {
 	Value string
 }
 
 func (*DefValBinaryString) defVal() {}
 
-// DefValEnum is an enum label reference: `DEFVAL { enabled }`, `DEFVAL { true }`
-// The symbol refers to an enumeration value defined in the object's type.
+// DefValEnum is an enumeration label DEFVAL, e.g. DEFVAL { enabled }.
+// The name refers to a value defined in the object's INTEGER enum type.
 type DefValEnum struct {
 	Name string
 }
 
 func (*DefValEnum) defVal() {}
 
-// DefValBits is a BITS value (set of bit labels): `DEFVAL { { flag1, flag2 } }`, `DEFVAL { {} }`
-// Each symbol refers to a bit name defined in the object's BITS type.
+// DefValBits is a BITS value DEFVAL, e.g. DEFVAL { { flag1, flag2 } }.
+// Each label refers to a bit name in the object's BITS type.
 type DefValBits struct {
 	Labels []string
 }
 
 func (*DefValBits) defVal() {}
 
-// DefValOidRef is an OID reference: `DEFVAL { sysName }`
-// The symbol refers to another OID in the MIB.
+// DefValOidRef is an OID name reference DEFVAL, e.g. DEFVAL { sysName }.
 type DefValOidRef struct {
 	Name string
 }
 
 func (*DefValOidRef) defVal() {}
 
-// DefValOidValue is an OID value (explicit components): `DEFVAL { { iso 3 6 1 } }`
-// Kept as OID components for resolution.
+// DefValOidValue is an OID value with explicit components,
+// e.g. DEFVAL { { iso 3 6 1 } }.
 type DefValOidValue struct {
 	Components []OidComponent
 }
 
 func (*DefValOidValue) defVal() {}
+
+// DefValUnparsed represents a DEFVAL whose content could not be parsed.
+type DefValUnparsed struct{}
+
+func (*DefValUnparsed) defVal() {}

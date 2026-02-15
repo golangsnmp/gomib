@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const getUsage = `gomib get - Query OID or name lookups
@@ -19,7 +19,6 @@ Query formats:
   Numeric OID:     1.3.6.1.2.1.2.2.1.1
   Name:            ifIndex
   Qualified:       IF-MIB::ifIndex
-  Partial OID:     .1.2.1.2 (relative lookup)
 
 Options:
   -m, --module MODULE   Module to load (repeatable)
@@ -42,7 +41,7 @@ func (m *moduleList) Set(value string) error {
 	return nil
 }
 
-func cmdGet(args []string) int {
+func (c *cli) cmdGet(args []string) int {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, getUsage) }
 
@@ -59,14 +58,13 @@ func cmdGet(args []string) int {
 		return 1
 	}
 
-	if *help || helpFlag {
+	if *help || c.helpFlag {
 		_, _ = fmt.Fprint(os.Stdout, getUsage)
 		return 0
 	}
 
 	remaining := fs.Args()
 
-	// Parse MODULE... -- QUERY format
 	var query string
 	dashIdx := -1
 	for i, arg := range remaining {
@@ -84,7 +82,6 @@ func cmdGet(args []string) int {
 	} else if len(remaining) > 0 {
 		query = remaining[len(remaining)-1]
 		if len(modules) == 0 && len(remaining) > 1 {
-			// First args are modules, last is query
 			modules = remaining[:len(remaining)-1]
 		}
 	}
@@ -101,14 +98,13 @@ func cmdGet(args []string) int {
 		return 1
 	}
 
-	mib, err := loadMib(modules)
+	m, err := c.loadMib(modules)
 	if err != nil {
 		printError("failed to load: %v", err)
-		return 2
+		return exitError
 	}
 
-	// Find the node
-	node := mib.FindNode(query)
+	node := resolveQuery(m, query)
 	if node == nil {
 		printError("not found: %s", query)
 		return 1
@@ -123,9 +119,36 @@ func cmdGet(args []string) int {
 	return 0
 }
 
-// printNode prints a single node's details.
-func printNode(node gomib.Node) {
-	// Header: name  MODULE::name  oid
+// resolveQuery parses a user query string and returns the matching node.
+// Supports: plain name, MODULE::name, numeric OID (with optional leading dot).
+func resolveQuery(m *mib.Mib, query string) *mib.Node {
+	// Qualified name: MODULE::name
+	if modName, itemName, ok := strings.Cut(query, "::"); ok {
+		mod := m.Module(modName)
+		if mod == nil {
+			return nil
+		}
+		return mod.Node(itemName)
+	}
+
+	// Numeric OID string
+	q := query
+	if len(q) > 0 && q[0] == '.' {
+		q = q[1:]
+	}
+	if len(q) > 0 && q[0] >= '0' && q[0] <= '9' {
+		oid, err := mib.ParseOID(q)
+		if err != nil || len(oid) == 0 {
+			return nil
+		}
+		return m.NodeByOID(oid)
+	}
+
+	// Plain name
+	return m.Node(query)
+}
+
+func printNode(node *mib.Node) {
 	label := node.Name()
 	if label == "" {
 		label = fmt.Sprintf("(%d)", node.Arc())
@@ -146,20 +169,16 @@ func printNode(node gomib.Node) {
 
 	fmt.Printf("  kind:   %s\n", node.Kind().String())
 
-	// Print object details if available
 	if node.Object() != nil {
 		printObjectDetails(node.Object())
 	}
 
-	// Print notification details if available
 	if node.Notification() != nil {
 		printNotificationDetails(node.Notification())
 	}
 }
 
-// printObjectDetails prints object-specific information.
-func printObjectDetails(obj gomib.Object) {
-	// Type
+func printObjectDetails(obj *mib.Object) {
 	if obj.Type() != nil {
 		typ := obj.Type()
 		typeName := typ.Name()
@@ -170,7 +189,6 @@ func printObjectDetails(obj gomib.Object) {
 		if typ.Parent() != nil {
 			typeDesc = fmt.Sprintf("%s (%s)", typeName, typ.Base().String())
 		}
-		// Add constraints
 		ranges := obj.EffectiveRanges()
 		if len(ranges) > 0 {
 			vr := ranges[0]
@@ -203,7 +221,6 @@ func printObjectDetails(obj gomib.Object) {
 	fmt.Printf("  access: %s\n", obj.Access().String())
 	fmt.Printf("  status: %s\n", obj.Status().String())
 
-	// Index
 	if len(obj.Index()) > 0 {
 		indexStrs := make([]string, 0, len(obj.Index()))
 		for _, idx := range obj.Index() {
@@ -219,22 +236,18 @@ func printObjectDetails(obj gomib.Object) {
 		fmt.Printf("  index:  [%s]\n", strings.Join(indexStrs, ", "))
 	}
 
-	// Augments
 	if obj.Augments() != nil {
 		fmt.Printf("  augments: %s\n", obj.Augments().Name())
 	}
 
-	// Units
 	if obj.Units() != "" {
 		fmt.Printf("  units:  %s\n", obj.Units())
 	}
 
-	// Description (truncated)
 	if obj.Description() != "" {
 		fmt.Printf("  descr:  %s\n", normalizeDescription(obj.Description(), 200))
 	}
 
-	// Enum values
 	enums := obj.EffectiveEnums()
 	bits := obj.EffectiveBits()
 	if len(enums) > 0 && len(bits) == 0 {
@@ -244,7 +257,6 @@ func printObjectDetails(obj gomib.Object) {
 		}
 	}
 
-	// BITS
 	if len(bits) > 0 {
 		fmt.Println("  bits:")
 		for _, b := range bits {
@@ -253,8 +265,7 @@ func printObjectDetails(obj gomib.Object) {
 	}
 }
 
-// printNotificationDetails prints notification-specific information.
-func printNotificationDetails(notif gomib.Notification) {
+func printNotificationDetails(notif *mib.Notification) {
 	fmt.Printf("  status: %s\n", notif.Status().String())
 
 	if len(notif.Objects()) > 0 {
@@ -269,7 +280,6 @@ func printNotificationDetails(notif gomib.Notification) {
 	}
 }
 
-// normalizeDescription truncates and normalizes a description for display.
 func normalizeDescription(s string, maxLen int) string {
 	if len(s) > maxLen {
 		s = s[:maxLen] + "..."
@@ -278,12 +288,11 @@ func normalizeDescription(s string, maxLen int) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// printNodeTree prints a subtree.
-func printNodeTree(node gomib.Node, maxDepth int) {
+func printNodeTree(node *mib.Node, maxDepth int) {
 	printNodeTreeRecursive(node, 0, maxDepth)
 }
 
-func printNodeTreeRecursive(node gomib.Node, depth int, maxDepth int) {
+func printNodeTreeRecursive(node *mib.Node, depth int, maxDepth int) {
 	if maxDepth > 0 && depth > maxDepth {
 		return
 	}
@@ -298,13 +307,11 @@ func printNodeTreeRecursive(node gomib.Node, depth int, maxDepth int) {
 	oid := node.OID().String()
 	kind := node.Kind().String()
 
-	// Module name
 	moduleName := ""
 	if node.Module() != nil {
 		moduleName = node.Module().Name()
 	}
 
-	// For objects, show type and access
 	extra := ""
 	if node.Object() != nil {
 		obj := node.Object()
@@ -324,7 +331,6 @@ func printNodeTreeRecursive(node gomib.Node, depth int, maxDepth int) {
 		fmt.Printf("%s%s  %s  %s%s\n", indent, label, oid, kind, extra)
 	}
 
-	// Print children
 	for _, child := range node.Children() {
 		printNodeTreeRecursive(child, depth+1, maxDepth)
 	}

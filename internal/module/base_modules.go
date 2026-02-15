@@ -6,7 +6,7 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// BaseModule represents SMI base modules (types and MACROs, not regular MIBs).
+// BaseModule identifies a well-known SMI base module (types and MACROs).
 type BaseModule int
 
 const (
@@ -26,7 +26,6 @@ const (
 	BaseModuleRFC1215
 )
 
-// baseModuleNames is the single source of truth for base module names.
 // Order matches the BaseModule iota constants.
 var baseModuleNames = [...]string{
 	"SNMPv2-SMI",
@@ -46,7 +45,7 @@ func (m BaseModule) Name() string {
 	return ""
 }
 
-// IsSMIv2 returns true if this is an SMIv2 module.
+// IsSMIv2 reports whether this is an SMIv2 base module.
 func (m BaseModule) IsSMIv2() bool {
 	switch m {
 	case BaseModuleSNMPv2SMI, BaseModuleSNMPv2TC, BaseModuleSNMPv2CONF:
@@ -56,7 +55,7 @@ func (m BaseModule) IsSMIv2() bool {
 	}
 }
 
-// IsSMIv1 returns true if this is an SMIv1 module.
+// IsSMIv1 reports whether this is an SMIv1 base module.
 func (m BaseModule) IsSMIv1() bool {
 	switch m {
 	case BaseModuleRFC1155SMI, BaseModuleRFC1065SMI, BaseModuleRFC1212, BaseModuleRFC1215:
@@ -66,7 +65,6 @@ func (m BaseModule) IsSMIv1() bool {
 	}
 }
 
-// baseModuleByName maps module names to BaseModule values.
 var baseModuleByName = func() map[string]BaseModule {
 	m := make(map[string]BaseModule, len(baseModuleNames))
 	for i, name := range baseModuleNames {
@@ -75,56 +73,32 @@ var baseModuleByName = func() map[string]BaseModule {
 	return m
 }()
 
-// BaseModuleFromName looks up a base module by name.
+// BaseModuleFromName returns the BaseModule for the given name, if any.
 func BaseModuleFromName(name string) (BaseModule, bool) {
 	m, ok := baseModuleByName[name]
 	return m, ok
 }
 
-// IsBaseModule returns true if the module name is a recognized base module.
+// IsBaseModule reports whether name is a recognized base module.
 func IsBaseModule(name string) bool {
 	_, ok := BaseModuleFromName(name)
 	return ok
 }
 
-// baseModuleCache holds lazily-created base modules.
-var (
-	baseModuleMu    sync.RWMutex
-	baseModuleCache = make(map[string]*Module)
-)
-
-// GetBaseModule returns the base module with the given name, or nil if not a base module.
-// Base modules are created on first access and cached.
-func GetBaseModule(name string) *Module {
-	if !IsBaseModule(name) {
-		return nil
-	}
-
-	// Fast path: check if already cached
-	baseModuleMu.RLock()
-	if mod, ok := baseModuleCache[name]; ok {
-		baseModuleMu.RUnlock()
-		return mod
-	}
-	baseModuleMu.RUnlock()
-
-	// Slow path: create all base modules and cache them
-	baseModuleMu.Lock()
-	defer baseModuleMu.Unlock()
-
-	// Double-check after acquiring write lock
-	if mod, ok := baseModuleCache[name]; ok {
-		return mod
-	}
-
+var cachedBaseModules = sync.OnceValue(func() map[string]*Module {
+	m := make(map[string]*Module, len(baseModuleNames))
 	for _, mod := range CreateBaseModules() {
-		baseModuleCache[mod.Name] = mod
+		m[mod.Name] = mod
 	}
+	return m
+})
 
-	return baseModuleCache[name]
+// GetBaseModule returns the Module for the named base module, or nil.
+func GetBaseModule(name string) *Module {
+	return cachedBaseModules()[name]
 }
 
-// AllBaseModules returns all base modules.
+// AllBaseModules returns every BaseModule constant.
 func AllBaseModules() []BaseModule {
 	result := make([]BaseModule, len(baseModuleNames))
 	for i := range baseModuleNames {
@@ -133,111 +107,79 @@ func AllBaseModules() []BaseModule {
 	return result
 }
 
-// BaseModuleNames returns the names of all base modules.
+// BaseModuleNames returns the canonical names of all base modules.
 func BaseModuleNames() []string {
 	return baseModuleNames[:]
 }
 
-// CreateBaseModules creates synthetic modules for all base modules.
-//
-// Returns modules in order: SNMPv2-SMI, SNMPv2-TC, SNMPv2-CONF,
-// RFC1155-SMI, RFC1065-SMI, RFC-1212, RFC-1215.
+// CreateBaseModules returns synthetic Module values for all base modules.
 // These should be prepended to the user module list before resolution.
 func CreateBaseModules() []*Module {
 	return []*Module{
 		createSNMPv2SMI(),
 		createSNMPv2TC(),
 		createSNMPv2CONF(),
-		createRFC1155SMI(),
-		createRFC1065SMI(),
+		createSMIv1Base("RFC1155-SMI"),
+		createSMIv1Base("RFC1065-SMI"),
 		createRFC1212(),
 		createRFC1215(),
 	}
 }
 
-// createSNMPv2SMI creates the synthetic SNMPv2-SMI module.
 func createSNMPv2SMI() *Module {
 	module := NewModule("SNMPv2-SMI", types.Synthetic)
-	module.Language = SmiLanguageSMIv2
+	module.Language = types.LanguageSMIv2
 
-	// Add OID root definitions
 	module.Definitions = append(module.Definitions, createOidDefinitions()...)
-
-	// Add base type definitions
 	module.Definitions = append(module.Definitions, createBaseTypeDefinitions()...)
 
 	return module
 }
 
-// createSNMPv2TC creates the synthetic SNMPv2-TC module.
 func createSNMPv2TC() *Module {
 	module := NewModule("SNMPv2-TC", types.Synthetic)
-	module.Language = SmiLanguageSMIv2
+	module.Language = types.LanguageSMIv2
 
-	// Add imports from SNMPv2-SMI (for base types used by TCs)
 	module.Imports = []Import{
 		NewImport("SNMPv2-SMI", "TimeTicks", types.Synthetic),
 	}
 
-	// Add textual convention definitions
 	module.Definitions = append(module.Definitions, createTCDefinitions()...)
 
 	return module
 }
 
-// createSNMPv2CONF creates the synthetic SNMPv2-CONF module.
 func createSNMPv2CONF() *Module {
 	module := NewModule("SNMPv2-CONF", types.Synthetic)
-	module.Language = SmiLanguageSMIv2
+	module.Language = types.LanguageSMIv2
 	// No definitions - MACROs only
 	return module
 }
 
-// createRFC1155SMI creates the synthetic RFC1155-SMI module.
-func createRFC1155SMI() *Module {
-	module := NewModule("RFC1155-SMI", types.Synthetic)
-	module.Language = SmiLanguageSMIv1
+func createSMIv1Base(name string) *Module {
+	module := NewModule(name, types.Synthetic)
+	module.Language = types.LanguageSMIv1
 
-	// Add SMIv1 type definitions
-	module.Definitions = append(module.Definitions, createSMIv1TypeDefinitions()...)
-
-	// Add OID root definitions (subset relevant to SMIv1)
-	module.Definitions = append(module.Definitions, createSMIv1OidDefinitions()...)
-
-	return module
-}
-
-// createRFC1065SMI creates the synthetic RFC1065-SMI module.
-func createRFC1065SMI() *Module {
-	module := NewModule("RFC1065-SMI", types.Synthetic)
-	module.Language = SmiLanguageSMIv1
-
-	// Same content as RFC1155-SMI
 	module.Definitions = append(module.Definitions, createSMIv1TypeDefinitions()...)
 	module.Definitions = append(module.Definitions, createSMIv1OidDefinitions()...)
 
 	return module
 }
 
-// createRFC1212 creates the synthetic RFC-1212 module.
 func createRFC1212() *Module {
 	module := NewModule("RFC-1212", types.Synthetic)
-	module.Language = SmiLanguageSMIv1
+	module.Language = types.LanguageSMIv1
 	// No definitions - MACRO only
 	return module
 }
 
-// createRFC1215 creates the synthetic RFC-1215 module.
 func createRFC1215() *Module {
 	module := NewModule("RFC-1215", types.Synthetic)
-	module.Language = SmiLanguageSMIv1
+	module.Language = types.LanguageSMIv1
 	// No definitions - MACRO only
 	return module
 }
 
-// === Helper functions for creating types ===
-
-// constrainedIntRange creates a constrained INTEGER type with a value range.
 func constrainedIntRange(min, max RangeValue) TypeSyntax {
 	return &TypeSyntaxConstrained{
 		Base:       &TypeSyntaxTypeRef{Name: "INTEGER"},
@@ -245,7 +187,6 @@ func constrainedIntRange(min, max RangeValue) TypeSyntax {
 	}
 }
 
-// constrainedOctetSize creates a constrained OCTET STRING type with size constraints.
 func constrainedOctetSize(ranges []Range) TypeSyntax {
 	return &TypeSyntaxConstrained{
 		Base:       &TypeSyntaxOctetString{},
@@ -253,21 +194,18 @@ func constrainedOctetSize(ranges []Range) TypeSyntax {
 	}
 }
 
-// constrainedOctetFixed creates a constrained OCTET STRING with a single fixed size.
 func constrainedOctetFixed(size uint64) TypeSyntax {
 	return constrainedOctetSize([]Range{
 		{Min: &RangeValueUnsigned{Value: size}, Max: nil},
 	})
 }
 
-// constrainedOctetRange creates a constrained OCTET STRING with a size range.
 func constrainedOctetRange(min, max uint64) TypeSyntax {
 	return constrainedOctetSize([]Range{
 		NewRangeUnsigned(min, max),
 	})
 }
 
-// constrainedUintRange creates a constrained INTEGER with unsigned range (0..max).
 func constrainedUintRange(max uint64) TypeSyntax {
 	return constrainedIntRange(
 		&RangeValueUnsigned{Value: 0},
@@ -275,7 +213,6 @@ func constrainedUintRange(max uint64) TypeSyntax {
 	)
 }
 
-// makeOidValue creates a ValueAssignment for an OID definition.
 func makeOidValue(name string, components []OidComponent) Definition {
 	return &ValueAssignment{
 		Name: name,
@@ -284,14 +221,15 @@ func makeOidValue(name string, components []OidComponent) Definition {
 	}
 }
 
-// makeTypeDef creates a TypeDef for a type definition without explicit base type.
-func makeTypeDef(name string, syntax TypeSyntax) Definition {
+func basePtr(b types.BaseType) *types.BaseType { return &b }
+
+func makeTypeDef(name string, syntax TypeSyntax, base *types.BaseType, status types.Status) Definition {
 	return &TypeDef{
 		Name:                name,
 		Syntax:              syntax,
-		BaseType:            nil,
+		BaseType:            base,
 		DisplayHint:         "",
-		Status:              types.StatusCurrent,
+		Status:              status,
 		Description:         "",
 		Reference:           "",
 		IsTextualConvention: false,
@@ -299,44 +237,13 @@ func makeTypeDef(name string, syntax TypeSyntax) Definition {
 	}
 }
 
-// makeTypeDefWithBase creates a TypeDef for a base type definition with explicit base type.
-func makeTypeDefWithBase(name string, syntax TypeSyntax, base types.BaseType) Definition {
-	return &TypeDef{
-		Name:                name,
-		Syntax:              syntax,
-		BaseType:            &base,
-		DisplayHint:         "",
-		Status:              types.StatusCurrent,
-		Description:         "",
-		Reference:           "",
-		IsTextualConvention: false,
-		Span:                types.Synthetic,
-	}
-}
-
-// makeTypeDefObsolete creates a TypeDef for an obsolete type definition.
-func makeTypeDefObsolete(name string, syntax TypeSyntax) Definition {
-	return &TypeDef{
-		Name:                name,
-		Syntax:              syntax,
-		BaseType:            nil,
-		DisplayHint:         "",
-		Status:              types.StatusObsolete,
-		Description:         "",
-		Reference:           "",
-		IsTextualConvention: false,
-		Span:                types.Synthetic,
-	}
-}
-
-// makeTC creates a TypeDef for a textual convention.
-func makeTC(name, displayHint string, syntax TypeSyntax) Definition {
+func makeTC(name, displayHint string, syntax TypeSyntax, status types.Status) Definition {
 	return &TypeDef{
 		Name:                name,
 		Syntax:              syntax,
 		BaseType:            nil,
 		DisplayHint:         displayHint,
-		Status:              types.StatusCurrent,
+		Status:              status,
 		Description:         "",
 		Reference:           "",
 		IsTextualConvention: true,
@@ -344,46 +251,11 @@ func makeTC(name, displayHint string, syntax TypeSyntax) Definition {
 	}
 }
 
-// makeTCObsolete creates a TypeDef for an obsolete textual convention.
-func makeTCObsolete(name, displayHint string, syntax TypeSyntax) Definition {
-	return &TypeDef{
-		Name:                name,
-		Syntax:              syntax,
-		BaseType:            nil,
-		DisplayHint:         displayHint,
-		Status:              types.StatusObsolete,
-		Description:         "",
-		Reference:           "",
-		IsTextualConvention: true,
-		Span:                types.Synthetic,
-	}
-}
-
-// makeTCWithEnum creates a TypeDef for a textual convention with enumerated values.
-func makeTCWithEnum(name string, values []NamedNumber) Definition {
-	return &TypeDef{
-		Name:                name,
-		Syntax:              &TypeSyntaxIntegerEnum{NamedNumbers: values},
-		BaseType:            nil,
-		DisplayHint:         "",
-		Status:              types.StatusCurrent,
-		Description:         "",
-		Reference:           "",
-		IsTextualConvention: true,
-		Span:                types.Synthetic,
-	}
-}
-
-// === OID definitions ===
-
-func createOidDefinitions() []Definition {
+// coreOidDefinitions returns the OID tree shared by both SMIv2 and SMIv1.
+func coreOidDefinitions() []Definition {
 	return []Definition{
-		// ccitt OBJECT IDENTIFIER ::= { 0 }
-		makeOidValue("ccitt", []OidComponent{&OidComponentNumber{Value: 0}}),
 		// iso OBJECT IDENTIFIER ::= { 1 }
 		makeOidValue("iso", []OidComponent{&OidComponentNumber{Value: 1}}),
-		// joint-iso-ccitt OBJECT IDENTIFIER ::= { 2 }
-		makeOidValue("joint-iso-ccitt", []OidComponent{&OidComponentNumber{Value: 2}}),
 		// org OBJECT IDENTIFIER ::= { iso 3 }
 		makeOidValue("org", []OidComponent{
 			&OidComponentName{NameValue: "iso"},
@@ -409,16 +281,6 @@ func createOidDefinitions() []Definition {
 			&OidComponentName{NameValue: "internet"},
 			&OidComponentNumber{Value: 2},
 		}),
-		// mib-2 OBJECT IDENTIFIER ::= { mgmt 1 }
-		makeOidValue("mib-2", []OidComponent{
-			&OidComponentName{NameValue: "mgmt"},
-			&OidComponentNumber{Value: 1},
-		}),
-		// transmission OBJECT IDENTIFIER ::= { mib-2 10 }
-		makeOidValue("transmission", []OidComponent{
-			&OidComponentName{NameValue: "mib-2"},
-			&OidComponentNumber{Value: 10},
-		}),
 		// experimental OBJECT IDENTIFIER ::= { internet 3 }
 		makeOidValue("experimental", []OidComponent{
 			&OidComponentName{NameValue: "internet"},
@@ -433,6 +295,28 @@ func createOidDefinitions() []Definition {
 		makeOidValue("enterprises", []OidComponent{
 			&OidComponentName{NameValue: "private"},
 			&OidComponentNumber{Value: 1},
+		}),
+	}
+}
+
+func createOidDefinitions() []Definition {
+	defs := []Definition{
+		// ccitt OBJECT IDENTIFIER ::= { 0 }
+		makeOidValue("ccitt", []OidComponent{&OidComponentNumber{Value: 0}}),
+		// joint-iso-ccitt OBJECT IDENTIFIER ::= { 2 }
+		makeOidValue("joint-iso-ccitt", []OidComponent{&OidComponentNumber{Value: 2}}),
+	}
+	defs = append(defs, coreOidDefinitions()...)
+	defs = append(defs,
+		// mib-2 OBJECT IDENTIFIER ::= { mgmt 1 }
+		makeOidValue("mib-2", []OidComponent{
+			&OidComponentName{NameValue: "mgmt"},
+			&OidComponentNumber{Value: 1},
+		}),
+		// transmission OBJECT IDENTIFIER ::= { mib-2 10 }
+		makeOidValue("transmission", []OidComponent{
+			&OidComponentName{NameValue: "mib-2"},
+			&OidComponentNumber{Value: 10},
 		}),
 		// security OBJECT IDENTIFIER ::= { internet 5 }
 		makeOidValue("security", []OidComponent{
@@ -469,10 +353,9 @@ func createOidDefinitions() []Definition {
 			&OidComponentName{NameValue: "mib-2"},
 			&OidComponentNumber{Value: 11},
 		}),
-	}
+	)
+	return defs
 }
-
-// === SMIv2 base type definitions ===
 
 func createBaseTypeDefinitions() []Definition {
 	int32Min := int64(-2147483648)
@@ -482,206 +365,137 @@ func createBaseTypeDefinitions() []Definition {
 
 	return []Definition{
 		// Integer32 ::= INTEGER (-2147483648..2147483647)
-		makeTypeDefWithBase("Integer32",
+		makeTypeDef("Integer32",
 			constrainedIntRange(
 				&RangeValueSigned{Value: int32Min},
 				&RangeValueSigned{Value: int32Max},
 			),
-			types.BaseInteger32,
+			basePtr(types.BaseInteger32), types.StatusCurrent,
 		),
 		// Counter32 ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("Counter32",
-			constrainedUintRange(uint32Max),
-			types.BaseCounter32,
-		),
+		makeTypeDef("Counter32", constrainedUintRange(uint32Max), basePtr(types.BaseCounter32), types.StatusCurrent),
 		// Counter64 ::= [APPLICATION 6] IMPLICIT INTEGER (0..18446744073709551615)
-		makeTypeDefWithBase("Counter64",
-			constrainedUintRange(uint64Max),
-			types.BaseCounter64,
-		),
+		makeTypeDef("Counter64", constrainedUintRange(uint64Max), basePtr(types.BaseCounter64), types.StatusCurrent),
 		// Gauge32 ::= [APPLICATION 2] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("Gauge32",
-			constrainedUintRange(uint32Max),
-			types.BaseGauge32,
-		),
+		makeTypeDef("Gauge32", constrainedUintRange(uint32Max), basePtr(types.BaseGauge32), types.StatusCurrent),
 		// Unsigned32 ::= [APPLICATION 2] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("Unsigned32",
-			constrainedUintRange(uint32Max),
-			types.BaseUnsigned32,
-		),
+		makeTypeDef("Unsigned32", constrainedUintRange(uint32Max), basePtr(types.BaseUnsigned32), types.StatusCurrent),
 		// TimeTicks ::= [APPLICATION 3] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("TimeTicks",
-			constrainedUintRange(uint32Max),
-			types.BaseTimeTicks,
-		),
+		makeTypeDef("TimeTicks", constrainedUintRange(uint32Max), basePtr(types.BaseTimeTicks), types.StatusCurrent),
 		// IpAddress ::= [APPLICATION 0] IMPLICIT OCTET STRING (SIZE (4))
-		makeTypeDefWithBase("IpAddress",
-			constrainedOctetFixed(4),
-			types.BaseIpAddress,
-		),
+		makeTypeDef("IpAddress", constrainedOctetFixed(4), basePtr(types.BaseIpAddress), types.StatusCurrent),
 		// Opaque ::= [APPLICATION 4] IMPLICIT OCTET STRING
-		makeTypeDefWithBase("Opaque",
-			&TypeSyntaxOctetString{},
-			types.BaseOpaque,
-		),
+		makeTypeDef("Opaque", &TypeSyntaxOctetString{}, basePtr(types.BaseOpaque), types.StatusCurrent),
 		// ObjectName ::= OBJECT IDENTIFIER
-		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}),
+		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}, nil, types.StatusCurrent),
 		// NotificationName ::= OBJECT IDENTIFIER
-		makeTypeDef("NotificationName", &TypeSyntaxObjectIdentifier{}),
+		makeTypeDef("NotificationName", &TypeSyntaxObjectIdentifier{}, nil, types.StatusCurrent),
 		// ExtUTCTime ::= OCTET STRING (SIZE (11 | 13)) - obsolete
-		makeTypeDefObsolete("ExtUTCTime",
+		makeTypeDef("ExtUTCTime",
 			constrainedOctetSize([]Range{
 				{Min: &RangeValueUnsigned{Value: 11}, Max: nil},
 				{Min: &RangeValueUnsigned{Value: 13}, Max: nil},
 			}),
+			nil, types.StatusObsolete,
 		),
 		// ObjectSyntax, SimpleSyntax, ApplicationSyntax - protocol meta-types
-		makeTypeDef("ObjectSyntax", &TypeSyntaxTypeRef{Name: "SimpleSyntax"}),
-		makeTypeDef("SimpleSyntax", &TypeSyntaxTypeRef{Name: "INTEGER"}),
-		makeTypeDef("ApplicationSyntax", &TypeSyntaxTypeRef{Name: "IpAddress"}),
+		makeTypeDef("ObjectSyntax", &TypeSyntaxTypeRef{Name: "SimpleSyntax"}, nil, types.StatusCurrent),
+		makeTypeDef("SimpleSyntax", &TypeSyntaxTypeRef{Name: "INTEGER"}, nil, types.StatusCurrent),
+		makeTypeDef("ApplicationSyntax", &TypeSyntaxTypeRef{Name: "IpAddress"}, nil, types.StatusCurrent),
 	}
 }
-
-// === SMIv1 type definitions ===
 
 func createSMIv1TypeDefinitions() []Definition {
 	uint32Max := uint64(4294967295)
 
 	return []Definition{
 		// Counter ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("Counter", constrainedUintRange(uint32Max), types.BaseCounter32),
+		makeTypeDef("Counter", constrainedUintRange(uint32Max), basePtr(types.BaseCounter32), types.StatusCurrent),
 		// Gauge ::= [APPLICATION 2] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("Gauge", constrainedUintRange(uint32Max), types.BaseGauge32),
+		makeTypeDef("Gauge", constrainedUintRange(uint32Max), basePtr(types.BaseGauge32), types.StatusCurrent),
 		// IpAddress ::= [APPLICATION 0] IMPLICIT OCTET STRING (SIZE (4))
-		makeTypeDefWithBase("IpAddress", constrainedOctetFixed(4), types.BaseIpAddress),
+		makeTypeDef("IpAddress", constrainedOctetFixed(4), basePtr(types.BaseIpAddress), types.StatusCurrent),
 		// NetworkAddress ::= CHOICE { internet IpAddress }
-		makeTypeDefWithBase("NetworkAddress", &TypeSyntaxTypeRef{Name: "IpAddress"}, types.BaseIpAddress),
+		makeTypeDef("NetworkAddress", &TypeSyntaxTypeRef{Name: "IpAddress"}, basePtr(types.BaseIpAddress), types.StatusCurrent),
 		// TimeTicks ::= [APPLICATION 3] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDefWithBase("TimeTicks", constrainedUintRange(uint32Max), types.BaseTimeTicks),
+		makeTypeDef("TimeTicks", constrainedUintRange(uint32Max), basePtr(types.BaseTimeTicks), types.StatusCurrent),
 		// Opaque ::= [APPLICATION 4] IMPLICIT OCTET STRING
-		makeTypeDefWithBase("Opaque", &TypeSyntaxOctetString{}, types.BaseOpaque),
+		makeTypeDef("Opaque", &TypeSyntaxOctetString{}, basePtr(types.BaseOpaque), types.StatusCurrent),
 		// ObjectName ::= OBJECT IDENTIFIER
-		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}),
+		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}, nil, types.StatusCurrent),
 	}
 }
-
-// === SMIv1 OID definitions ===
 
 func createSMIv1OidDefinitions() []Definition {
-	return []Definition{
-		// iso OBJECT IDENTIFIER ::= { 1 }
-		makeOidValue("iso", []OidComponent{&OidComponentNumber{Value: 1}}),
-		// org OBJECT IDENTIFIER ::= { iso 3 }
-		makeOidValue("org", []OidComponent{
-			&OidComponentName{NameValue: "iso"},
-			&OidComponentNumber{Value: 3},
-		}),
-		// dod OBJECT IDENTIFIER ::= { org 6 }
-		makeOidValue("dod", []OidComponent{
-			&OidComponentName{NameValue: "org"},
-			&OidComponentNumber{Value: 6},
-		}),
-		// internet OBJECT IDENTIFIER ::= { dod 1 }
-		makeOidValue("internet", []OidComponent{
-			&OidComponentName{NameValue: "dod"},
-			&OidComponentNumber{Value: 1},
-		}),
-		// directory OBJECT IDENTIFIER ::= { internet 1 }
-		makeOidValue("directory", []OidComponent{
-			&OidComponentName{NameValue: "internet"},
-			&OidComponentNumber{Value: 1},
-		}),
-		// mgmt OBJECT IDENTIFIER ::= { internet 2 }
-		makeOidValue("mgmt", []OidComponent{
-			&OidComponentName{NameValue: "internet"},
-			&OidComponentNumber{Value: 2},
-		}),
-		// experimental OBJECT IDENTIFIER ::= { internet 3 }
-		makeOidValue("experimental", []OidComponent{
-			&OidComponentName{NameValue: "internet"},
-			&OidComponentNumber{Value: 3},
-		}),
-		// private OBJECT IDENTIFIER ::= { internet 4 }
-		makeOidValue("private", []OidComponent{
-			&OidComponentName{NameValue: "internet"},
-			&OidComponentNumber{Value: 4},
-		}),
-		// enterprises OBJECT IDENTIFIER ::= { private 1 }
-		makeOidValue("enterprises", []OidComponent{
-			&OidComponentName{NameValue: "private"},
-			&OidComponentNumber{Value: 1},
-		}),
-	}
+	return coreOidDefinitions()
 }
-
-// === Textual convention definitions ===
 
 func createTCDefinitions() []Definition {
 	int32Max := int64(2147483647)
 
 	return []Definition{
 		// DisplayString ::= TEXTUAL-CONVENTION DISPLAY-HINT "255a" SYNTAX OCTET STRING (SIZE (0..255))
-		makeTC("DisplayString", "255a", constrainedOctetRange(0, 255)),
+		makeTC("DisplayString", "255a", constrainedOctetRange(0, 255), types.StatusCurrent),
 		// PhysAddress ::= TEXTUAL-CONVENTION DISPLAY-HINT "1x:" SYNTAX OCTET STRING
-		makeTC("PhysAddress", "1x:", &TypeSyntaxOctetString{}),
+		makeTC("PhysAddress", "1x:", &TypeSyntaxOctetString{}, types.StatusCurrent),
 		// MacAddress ::= TEXTUAL-CONVENTION DISPLAY-HINT "1x:" SYNTAX OCTET STRING (SIZE (6))
-		makeTC("MacAddress", "1x:", constrainedOctetFixed(6)),
+		makeTC("MacAddress", "1x:", constrainedOctetFixed(6), types.StatusCurrent),
 		// TruthValue ::= TEXTUAL-CONVENTION SYNTAX INTEGER { true(1), false(2) }
-		makeTCWithEnum("TruthValue", []NamedNumber{
+		makeTC("TruthValue", "", &TypeSyntaxIntegerEnum{NamedNumbers: []NamedNumber{
 			{Name: "true", Value: 1},
 			{Name: "false", Value: 2},
-		}),
+		}}, types.StatusCurrent),
 		// RowStatus ::= TEXTUAL-CONVENTION SYNTAX INTEGER { active(1), ... }
-		makeTCWithEnum("RowStatus", []NamedNumber{
+		makeTC("RowStatus", "", &TypeSyntaxIntegerEnum{NamedNumbers: []NamedNumber{
 			{Name: "active", Value: 1},
 			{Name: "notInService", Value: 2},
 			{Name: "notReady", Value: 3},
 			{Name: "createAndGo", Value: 4},
 			{Name: "createAndWait", Value: 5},
 			{Name: "destroy", Value: 6},
-		}),
+		}}, types.StatusCurrent),
 		// StorageType ::= TEXTUAL-CONVENTION SYNTAX INTEGER { other(1), ... }
-		makeTCWithEnum("StorageType", []NamedNumber{
+		makeTC("StorageType", "", &TypeSyntaxIntegerEnum{NamedNumbers: []NamedNumber{
 			{Name: "other", Value: 1},
 			{Name: "volatile", Value: 2},
 			{Name: "nonVolatile", Value: 3},
 			{Name: "permanent", Value: 4},
 			{Name: "readOnly", Value: 5},
-		}),
+		}}, types.StatusCurrent),
 		// TimeStamp ::= TEXTUAL-CONVENTION SYNTAX TimeTicks
-		makeTC("TimeStamp", "", &TypeSyntaxTypeRef{Name: "TimeTicks"}),
+		makeTC("TimeStamp", "", &TypeSyntaxTypeRef{Name: "TimeTicks"}, types.StatusCurrent),
 		// TimeInterval ::= TEXTUAL-CONVENTION SYNTAX INTEGER (0..2147483647)
 		makeTC("TimeInterval", "",
 			constrainedIntRange(
 				&RangeValueUnsigned{Value: 0},
 				&RangeValueSigned{Value: int32Max},
-			),
+			), types.StatusCurrent,
 		),
 		// DateAndTime ::= TEXTUAL-CONVENTION DISPLAY-HINT "2d-1d-1d,1d:1d:1d.1d,1a1d:1d" SYNTAX OCTET STRING (SIZE (8 | 11))
 		makeTC("DateAndTime", "2d-1d-1d,1d:1d:1d.1d,1a1d:1d",
 			constrainedOctetSize([]Range{
 				{Min: &RangeValueUnsigned{Value: 8}, Max: nil},
 				{Min: &RangeValueUnsigned{Value: 11}, Max: nil},
-			}),
+			}), types.StatusCurrent,
 		),
 		// TestAndIncr ::= TEXTUAL-CONVENTION SYNTAX INTEGER (0..2147483647)
 		makeTC("TestAndIncr", "",
 			constrainedIntRange(
 				&RangeValueUnsigned{Value: 0},
 				&RangeValueSigned{Value: int32Max},
-			),
+			), types.StatusCurrent,
 		),
 		// AutonomousType ::= TEXTUAL-CONVENTION SYNTAX OBJECT IDENTIFIER
-		makeTC("AutonomousType", "", &TypeSyntaxObjectIdentifier{}),
+		makeTC("AutonomousType", "", &TypeSyntaxObjectIdentifier{}, types.StatusCurrent),
 		// InstancePointer ::= TEXTUAL-CONVENTION (obsolete) SYNTAX OBJECT IDENTIFIER
-		makeTCObsolete("InstancePointer", "", &TypeSyntaxObjectIdentifier{}),
+		makeTC("InstancePointer", "", &TypeSyntaxObjectIdentifier{}, types.StatusObsolete),
 		// VariablePointer ::= TEXTUAL-CONVENTION SYNTAX OBJECT IDENTIFIER
-		makeTC("VariablePointer", "", &TypeSyntaxObjectIdentifier{}),
+		makeTC("VariablePointer", "", &TypeSyntaxObjectIdentifier{}, types.StatusCurrent),
 		// RowPointer ::= TEXTUAL-CONVENTION SYNTAX OBJECT IDENTIFIER
-		makeTC("RowPointer", "", &TypeSyntaxObjectIdentifier{}),
+		makeTC("RowPointer", "", &TypeSyntaxObjectIdentifier{}, types.StatusCurrent),
 		// TDomain ::= TEXTUAL-CONVENTION SYNTAX OBJECT IDENTIFIER
-		makeTC("TDomain", "", &TypeSyntaxObjectIdentifier{}),
+		makeTC("TDomain", "", &TypeSyntaxObjectIdentifier{}, types.StatusCurrent),
 		// TAddress ::= TEXTUAL-CONVENTION SYNTAX OCTET STRING (SIZE (1..255))
-		makeTC("TAddress", "", constrainedOctetRange(1, 255)),
+		makeTC("TAddress", "", constrainedOctetRange(1, 255), types.StatusCurrent),
 	}
 }

@@ -7,10 +7,10 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
-	"strings"
+
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 )
 
 const usage = `gomib-netsnmp - Compare gomib against net-snmp
@@ -23,6 +23,7 @@ Commands:
   tables     Table-focused comparison (INDEX, AUGMENTS, columns)
   testgen    Generate Go test cases from net-snmp ground truth
   validate   Validate existing test cases against net-snmp
+  fixturegen Generate JSON fixture files from net-snmp ground truth
 
 Common options:
   -p, --path PATH   Add MIB search path (repeatable)
@@ -41,7 +42,6 @@ var (
 	paths      []string
 	outputFile string
 	jsonOutput bool
-	helpFlag   bool
 )
 
 func main() {
@@ -49,49 +49,12 @@ func main() {
 }
 
 func run() int {
-	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+	flags, cmd, cmdArgs := cliutil.ParseCGOArgs(os.Args[1:])
+	paths = flags.Paths
+	outputFile = flags.OutputFile
+	jsonOutput = flags.JSONOutput
 
-	args := os.Args[1:]
-	var cmdArgs []string
-	var cmd string
-
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		switch {
-		case arg == "-h" || arg == "--help":
-			helpFlag = true
-		case arg == "-json":
-			jsonOutput = true
-		case arg == "-p" || arg == "--path":
-			if i+1 < len(args) {
-				i++
-				paths = append(paths, args[i])
-			}
-		case strings.HasPrefix(arg, "-p"):
-			paths = append(paths, arg[2:])
-		case strings.HasPrefix(arg, "--path="):
-			paths = append(paths, arg[7:])
-		case arg == "-o" || arg == "--output":
-			if i+1 < len(args) {
-				i++
-				outputFile = args[i]
-			}
-		case strings.HasPrefix(arg, "-o"):
-			outputFile = arg[2:]
-		case strings.HasPrefix(arg, "--output="):
-			outputFile = arg[9:]
-		case len(arg) > 0 && arg[0] == '-':
-			cmdArgs = append(cmdArgs, arg)
-		default:
-			if cmd == "" {
-				cmd = arg
-			} else {
-				cmdArgs = append(cmdArgs, arg)
-			}
-		}
-	}
-
-	if helpFlag && cmd == "" {
+	if flags.HelpFlag && cmd == "" {
 		fmt.Fprint(os.Stdout, usage)
 		return 0
 	}
@@ -110,6 +73,8 @@ func run() int {
 		return cmdTestgen(cmdArgs)
 	case "validate":
 		return cmdValidate(cmdArgs)
+	case "fixturegen":
+		return cmdFixturegen(cmdArgs)
 	case "help":
 		fmt.Fprint(os.Stdout, usage)
 		return 0
@@ -120,24 +85,14 @@ func run() int {
 	}
 }
 
-// getOutput returns the output writer based on -o flag.
 func getOutput() (*os.File, func(), error) {
-	if outputFile == "" {
-		return os.Stdout, func() {}, nil
-	}
-	f, err := os.Create(outputFile)
-	if err != nil {
-		return nil, nil, err
-	}
-	return f, func() { _ = f.Close() }, nil
+	return cliutil.GetOutput(outputFile)
 }
 
-// getMIBPaths returns MIB paths from -p flags.
-// Does not use any default paths to ensure fair comparison between libraries.
 func getMIBPaths() []string {
 	return paths
 }
 
 func printError(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "error: "+format+"\n", args...)
+	cliutil.PrintError(format, args...)
 }

@@ -5,17 +5,20 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const maxNetSnmpDirs = 500 // sanity limit to prevent accidental "/" or similar
 
-// NormalizedNode is a common representation for comparison between libraries.
+// NormalizedNode is a library-independent MIB node used for cross-validation
+// between gomib and net-snmp.
 type NormalizedNode struct {
 	OID        string
 	Name       string
@@ -30,7 +33,6 @@ type NormalizedNode struct {
 	Indexes    []IndexInfo
 	Augments   string
 
-	// Additional fields
 	Ranges       []RangeInfo    // Size/value constraints
 	DefaultValue string         // DEFVAL clause
 	Kind         string         // table, row, column, scalar, or empty
@@ -40,19 +42,18 @@ type NormalizedNode struct {
 	Reference    string         // REFERENCE clause
 }
 
-// RangeInfo describes a range constraint.
+// RangeInfo holds a min/max constraint pair.
 type RangeInfo struct {
 	Low  int64
 	High int64
 }
 
-// IndexInfo describes an index component.
+// IndexInfo holds an INDEX entry name and its implied flag.
 type IndexInfo struct {
 	Name    string
 	Implied bool
 }
 
-// String returns a human-readable representation of an index list.
 func indexString(indexes []IndexInfo) string {
 	if len(indexes) == 0 {
 		return ""
@@ -68,7 +69,6 @@ func indexString(indexes []IndexInfo) string {
 	return "{ " + strings.Join(parts, ", ") + " }"
 }
 
-// rangesString returns a human-readable representation of ranges.
 func rangesString(ranges []RangeInfo) string {
 	if len(ranges) == 0 {
 		return ""
@@ -84,7 +84,6 @@ func rangesString(ranges []RangeInfo) string {
 	return "(" + strings.Join(parts, " | ") + ")"
 }
 
-// bitsString returns a human-readable representation of BITS values.
 func bitsString(bits map[int]string) string {
 	if len(bits) == 0 {
 		return "{}"
@@ -93,7 +92,7 @@ func bitsString(bits map[int]string) string {
 	for k := range bits {
 		keys = append(keys, k)
 	}
-	sort.Ints(keys)
+	slices.Sort(keys)
 	var parts []string
 	for _, k := range keys {
 		parts = append(parts, fmt.Sprintf("%s(%d)", bits[k], k))
@@ -101,7 +100,6 @@ func bitsString(bits map[int]string) string {
 	return "{ " + strings.Join(parts, ", ") + " }"
 }
 
-// varbindsString returns a human-readable representation of varbinds.
 func varbindsString(varbinds []string) string {
 	if len(varbinds) == 0 {
 		return ""
@@ -110,14 +108,13 @@ func varbindsString(varbinds []string) string {
 }
 
 // loadNetSnmpNodes loads MIBs with net-snmp and returns normalized nodes.
-// Since net-snmp only reads flat directories, we find all subdirectories
-// and pass them as colon-separated paths.
+// net-snmp only reads flat directories, so all subdirectories are
+// discovered and joined into a colon-separated path.
 func loadNetSnmpNodes(mibPaths []string, modules []string) (map[string]*NormalizedNode, error) {
 	if len(mibPaths) == 0 {
 		return nil, fmt.Errorf("no MIB paths specified (use -p flag)")
 	}
 
-	// Find all directories (net-snmp doesn't recurse into subdirs)
 	allDirs, err := findAllDirs(mibPaths)
 	if err != nil {
 		return nil, err
@@ -127,13 +124,11 @@ func loadNetSnmpNodes(mibPaths []string, modules []string) (map[string]*Normaliz
 		return nil, fmt.Errorf("too many directories (%d > %d) - check your -p paths", len(allDirs), maxNetSnmpDirs)
 	}
 
-	// net-snmp uses colon-separated paths
 	mibDir := strings.Join(allDirs, ":")
 	initNetSnmp(mibDir, modules)
 	return collectNetSnmpNodes(), nil
 }
 
-// findAllDirs returns all directories under the given roots.
 func findAllDirs(roots []string) ([]string, error) {
 	var dirs []string
 	seen := make(map[string]bool)
@@ -147,11 +142,11 @@ func findAllDirs(roots []string) ([]string, error) {
 			return nil, fmt.Errorf("%s is not a directory", root)
 		}
 
-		err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return nil // skip inaccessible
 			}
-			if info.IsDir() && !seen[path] {
+			if d.IsDir() && !seen[path] {
 				seen[path] = true
 				dirs = append(dirs, path)
 			}
@@ -165,9 +160,6 @@ func findAllDirs(roots []string) ([]string, error) {
 	return dirs, nil
 }
 
-// loadGomibNodes loads MIBs with gomib and returns normalized nodes.
-// Note: gomib's DirTree handles nested directories, but for fair comparison
-// with net-snmp, callers should provide flat directory paths.
 func loadGomibNodes(mibPaths []string, modules []string) (map[string]*NormalizedNode, error) {
 	if len(mibPaths) == 0 {
 		return nil, fmt.Errorf("no MIB paths specified (use -p flag)")
@@ -190,21 +182,21 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 	}
 
 	ctx := context.Background()
-	var mib gomib.Mib
+	var m *mib.Mib
 	var err error
 
+	loadOpts := []gomib.LoadOption{gomib.WithSource(source)}
 	if len(modules) > 0 {
-		mib, err = gomib.LoadModules(ctx, modules, source)
-	} else {
-		mib, err = gomib.Load(ctx, source)
+		loadOpts = append(loadOpts, gomib.WithModules(modules...))
 	}
+	m, err = gomib.Load(ctx, loadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("gomib load failed: %w", err)
 	}
 
 	nodes := make(map[string]*NormalizedNode)
 
-	for node := range mib.Nodes() {
+	for node := range m.Nodes() {
 		oid := node.OID().String()
 		if oid == "" {
 			continue
@@ -235,31 +227,25 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 				n.TCName = t.Name()
 			}
 
-			// Get enums
 			for _, ev := range obj.EffectiveEnums() {
 				n.EnumValues[int(ev.Value)] = ev.Label
 			}
 
-			// Get BITS values (separate from enums)
 			for _, bv := range obj.EffectiveBits() {
 				n.BitValues[int(bv.Value)] = bv.Label
 			}
 
-			// Get ranges (value constraints)
 			for _, r := range obj.EffectiveRanges() {
 				n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
 			}
-			// Also include sizes (for OCTET STRING)
 			for _, r := range obj.EffectiveSizes() {
 				n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
 			}
 
-			// Get default value
 			if dv := obj.DefaultValue(); !dv.IsZero() {
 				n.DefaultValue = dv.String()
 			}
 
-			// Get indexes
 			for _, idx := range obj.Index() {
 				if idx.Object != nil {
 					n.Indexes = append(n.Indexes, IndexInfo{
@@ -269,13 +255,11 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 				}
 			}
 
-			// Get augments
 			if aug := obj.Augments(); aug != nil {
 				n.Augments = aug.Name()
 			}
 		}
 
-		// Handle notifications
 		if notif := node.Notification(); notif != nil {
 			n.Status = normalizeGomibStatus(notif.Status())
 			n.Reference = notif.Reference()
@@ -291,91 +275,28 @@ func loadGomibNodes(mibPaths []string, modules []string) (map[string]*Normalized
 	return nodes, nil
 }
 
-// normalizeGomibType converts gomib type to normalized string.
-func normalizeGomibType(t gomib.Type) string {
+func normalizeGomibType(t *mib.Type) string {
 	if t == nil {
 		return ""
 	}
-	base := t.EffectiveBase()
-	switch base {
-	case gomib.BaseInteger32:
-		return "Integer32"
-	case gomib.BaseUnsigned32:
-		return "Unsigned32"
-	case gomib.BaseCounter32:
-		return "Counter32"
-	case gomib.BaseCounter64:
-		return "Counter64"
-	case gomib.BaseGauge32:
-		return "Gauge32"
-	case gomib.BaseTimeTicks:
-		return "TimeTicks"
-	case gomib.BaseIpAddress:
-		return "IpAddress"
-	case gomib.BaseOctetString:
-		return "OCTET STRING"
-	case gomib.BaseObjectIdentifier:
-		return "OBJECT IDENTIFIER"
-	case gomib.BaseBits:
-		return "BITS"
-	case gomib.BaseOpaque:
-		return "Opaque"
-	default:
-		return base.String()
-	}
+	return t.EffectiveBase().String()
 }
 
-// normalizeGomibAccess converts gomib access to normalized string.
-func normalizeGomibAccess(a gomib.Access) string {
-	switch a {
-	case gomib.AccessNotAccessible:
-		return "not-accessible"
-	case gomib.AccessAccessibleForNotify:
-		return "accessible-for-notify"
-	case gomib.AccessReadOnly:
-		return "read-only"
-	case gomib.AccessReadWrite:
-		return "read-write"
-	case gomib.AccessReadCreate:
-		return "read-create"
-	case gomib.AccessWriteOnly:
-		return "write-only"
-	default:
-		return ""
-	}
+func normalizeGomibAccess(a mib.Access) string {
+	return a.String()
 }
 
-// normalizeGomibStatus converts gomib status to normalized string.
-func normalizeGomibStatus(s gomib.Status) string {
-	switch s {
-	case gomib.StatusCurrent:
-		return "current"
-	case gomib.StatusDeprecated:
-		return "deprecated"
-	case gomib.StatusObsolete:
-		return "obsolete"
-	default:
-		return ""
-	}
+func normalizeGomibStatus(s mib.Status) string {
+	return s.String()
 }
 
-// normalizeGomibKind converts gomib Kind to normalized string.
-func normalizeGomibKind(k gomib.Kind) string {
-	switch k {
-	case gomib.KindTable:
-		return "table"
-	case gomib.KindRow:
-		return "row"
-	case gomib.KindColumn:
-		return "column"
-	case gomib.KindScalar:
-		return "scalar"
-	default:
-		return ""
+func normalizeGomibKind(k mib.Kind) string {
+	if k.IsObjectType() {
+		return k.String()
 	}
+	return ""
 }
 
-// filterByModules filters nodes to only include those from specified modules.
 func filterByModules(nodes map[string]*NormalizedNode, modules []string) map[string]*NormalizedNode {
 	if len(modules) == 0 {
 		return nodes
