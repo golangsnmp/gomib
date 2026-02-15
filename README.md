@@ -23,7 +23,6 @@ import (
     "log"
 
     "github.com/golangsnmp/gomib"
-    "github.com/golangsnmp/gomib/mib"
 )
 
 func main() {
@@ -36,8 +35,10 @@ func main() {
     }
 
     obj := m.Object("ifIndex")
-    fmt.Printf("%s  %s  %s  %s\n", obj.Name(), obj.OID(), obj.Type().Name(), obj.Access())
-    // ifIndex  1.3.6.1.2.1.2.2.1.1  InterfaceIndex  read-only
+    if obj != nil {
+        fmt.Printf("%s  %s  %s  %s\n", obj.Name(), obj.OID(), obj.Type().Name(), obj.Access())
+        // ifIndex  1.3.6.1.2.1.2.2.1.1  InterfaceIndex  read-only
+    }
 }
 ```
 
@@ -74,7 +75,7 @@ src := gomib.Multi(systemSrc, vendorSrc)
 
 `Must` variants (`MustDir`, `MustDirTree`) panic on error for use in `var` blocks.
 
-Files are matched by extension: no extension, `.mib`, `.smi`, `.txt`, `.my`. Override with `WithExtensions`. Non-MIB files are filtered during loading by checking for `DEFINITIONS ::=` in the content.
+Files are matched by extension: no extension, `.mib`, `.smi`, `.txt`, `.my`. Override with `WithExtensions`. Non-MIB files are filtered during loading by checking for `DEFINITIONS` and `::=` in the content.
 
 ### Options
 
@@ -102,11 +103,7 @@ node := m.Node("ifEntry")
 typ := m.Type("DisplayString")
 ```
 
-For qualified lookup, scope through the module:
-
-```go
-obj := m.Module("IF-MIB").Object("ifIndex")
-```
+For qualified lookup, scope through the module (see [Module-scoped queries](#module-scoped-queries) below).
 
 Other lookup methods: `Node`, `Type`, `Notification`, `Group`, `Compliance`, `Capability`.
 
@@ -136,6 +133,9 @@ m.Columns()        // columns only
 m.Rows()           // rows only
 m.Types()          // all type definitions
 m.Notifications()  // all notifications
+m.Groups()         // all groups
+m.Compliances()    // all compliances
+m.Capabilities()   // all capabilities
 m.Modules()        // all loaded modules
 ```
 
