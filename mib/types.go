@@ -1,6 +1,7 @@
 package mib
 
 import (
+	"encoding/hex"
 	"strconv"
 	"strings"
 )
@@ -161,13 +162,7 @@ func DefValAs[T any](d DefVal) (T, bool) {
 }
 
 func bytesToHex(b []byte) string {
-	const hex = "0123456789ABCDEF"
-	result := make([]byte, len(b)*2)
-	for i, v := range b {
-		result[i*2] = hex[v>>4]
-		result[i*2+1] = hex[v&0x0f]
-	}
-	return string(result)
+	return strings.ToUpper(hex.EncodeToString(b))
 }
 
 // ComplianceModule is a MODULE clause within a MODULE-COMPLIANCE definition.

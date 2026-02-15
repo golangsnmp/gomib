@@ -304,20 +304,14 @@ func looksLikeMIBContent(content []byte) bool {
 		return false
 	}
 
-	checkLen := heuristicBinaryCheckSize
-	if checkLen > len(content) {
-		checkLen = len(content)
-	}
+	checkLen := min(heuristicBinaryCheckSize, len(content))
 	for _, b := range content[:checkLen] {
 		if b == 0 {
 			return false
 		}
 	}
 
-	probeLen := heuristicMaxProbeSize
-	if probeLen > len(content) {
-		probeLen = len(content)
-	}
+	probeLen := min(heuristicMaxProbeSize, len(content))
 	probe := content[:probeLen]
 
 	if bytes.IndexByte(probe, 0) >= 0 {

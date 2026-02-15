@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -250,7 +251,7 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 		if len(nsNode.EnumValues) > 0 {
 			result.compareCollectionField(&result.Summary.Enums, oid, "enums",
 				formatEnums(gNode.EnumValues), formatEnums(nsNode.EnumValues),
-				enumsEqual(nsNode.EnumValues, gNode.EnumValues), gNode, nsNode)
+				maps.Equal(nsNode.EnumValues, gNode.EnumValues), gNode, nsNode)
 		}
 		if len(nsNode.Indexes) > 0 {
 			result.compareCollectionField(&result.Summary.Index, oid, "index",
@@ -265,12 +266,12 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 		if len(nsNode.BitValues) > 0 {
 			result.compareCollectionField(&result.Summary.Bits, oid, "bits",
 				bitsString(gNode.BitValues), bitsString(nsNode.BitValues),
-				enumsEqual(nsNode.BitValues, gNode.BitValues), gNode, nsNode)
+				maps.Equal(nsNode.BitValues, gNode.BitValues), gNode, nsNode)
 		}
 		if len(nsNode.Varbinds) > 0 {
 			result.compareCollectionField(&result.Summary.Varbinds, oid, "varbinds",
 				varbindsString(gNode.Varbinds), varbindsString(nsNode.Varbinds),
-				varbindsEqual(nsNode.Varbinds, gNode.Varbinds), gNode, nsNode)
+				slices.Equal(nsNode.Varbinds, gNode.Varbinds), gNode, nsNode)
 		}
 	}
 
@@ -318,18 +319,6 @@ func normalizeTypeName(t string) string {
 	default:
 		return t
 	}
-}
-
-func enumsEqual(a, b map[int]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
 }
 
 func indexesEqual(a, b []IndexInfo) bool {
@@ -476,18 +465,6 @@ func oidSymbolicEquivalent(a, b string) bool {
 	}
 
 	return false
-}
-
-func varbindsEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func formatEnums(enums map[int]string) string {

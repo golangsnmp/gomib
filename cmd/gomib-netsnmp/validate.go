@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -245,7 +246,7 @@ func validateTableTestCase(file string, tc *extractedTestCase, netsnmp map[strin
 		nsIndexNames = append(nsIndexNames, idx.Name)
 	}
 
-	if !stringsEqual(tc.IndexNames, nsIndexNames) {
+	if !slices.Equal(tc.IndexNames, nsIndexNames) {
 		result.TestsFailed++
 		result.Failures = append(result.Failures, ValidationIssue{
 			File:     file,
@@ -280,18 +281,6 @@ func validateTableTestCase(file string, tc *extractedTestCase, netsnmp map[strin
 	}
 
 	result.TestsPassed++
-}
-
-func stringsEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func printValidationResult(w io.Writer, result *ValidationResult) {
