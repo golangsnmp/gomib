@@ -34,9 +34,9 @@ func TestMatchGlob(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.pattern+"/"+tt.s, func(t *testing.T) {
-			got := matchGlob(tt.pattern, tt.s)
+			got := MatchGlob(tt.pattern, tt.s)
 			if got != tt.want {
-				t.Errorf("matchGlob(%q, %q) = %v, want %v", tt.pattern, tt.s, got, tt.want)
+				t.Errorf("MatchGlob(%q, %q) = %v, want %v", tt.pattern, tt.s, got, tt.want)
 			}
 		})
 	}

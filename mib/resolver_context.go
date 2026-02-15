@@ -346,77 +346,57 @@ func logCycles(ctx *resolverContext, cycles [][]graph.Symbol, msg string) {
 	}
 }
 
-func (c *resolverContext) emitUnresolvedDiagnostic(mod *module.Module, code string, severity Severity, msg string) {
+// recordUnresolved appends an entry to a typed slice and emits a diagnostic.
+func recordUnresolved[T any](c *resolverContext, list *[]T, entry T, mod *module.Module, code, msg string) {
+	*list = append(*list, entry)
 	modName := ""
 	if mod != nil {
 		modName = mod.Name
 	}
-	c.EmitDiagnostic(code, severity, modName, 0, 0, msg)
+	c.EmitDiagnostic(code, SeverityError, modName, 0, 0, msg)
 }
 
 // RecordUnresolvedImport tracks a symbol that could not be resolved from its source module.
 func (c *resolverContext) RecordUnresolvedImport(importingModule *module.Module, fromModule, symbol, reason string, span types.Span) {
-	c.unresolvedImports = append(c.unresolvedImports, unresolvedImport{
+	code := "import-not-found"
+	if reason == reasonModuleNotFound {
+		code = "import-module-not-found"
+	}
+	recordUnresolved(c, &c.unresolvedImports, unresolvedImport{
 		importingModule: importingModule,
 		fromModule:      fromModule,
 		symbol:          symbol,
 		reason:          reason,
 		span:            span,
-	})
-	code := "import-not-found"
-	if reason == reasonModuleNotFound {
-		code = "import-module-not-found"
-	}
-	c.emitUnresolvedDiagnostic(importingModule, code, SeverityError,
-		"unresolved import: "+symbol+" from "+fromModule+" ("+reason+")")
+	}, importingModule, code, "unresolved import: "+symbol+" from "+fromModule+" ("+reason+")")
 }
 
 // RecordUnresolvedType tracks a type definition whose parent type could not be found.
 func (c *resolverContext) RecordUnresolvedType(mod *module.Module, referrer, referenced string, span types.Span) {
-	c.unresolvedTypes = append(c.unresolvedTypes, unresolvedType{
-		module:     mod,
-		referrer:   referrer,
-		referenced: referenced,
-		span:       span,
-	})
-	c.emitUnresolvedDiagnostic(mod, "type-unknown", SeverityError,
-		"unresolved type: "+referrer+" references unknown type "+referenced)
+	recordUnresolved(c, &c.unresolvedTypes, unresolvedType{
+		module: mod, referrer: referrer, referenced: referenced, span: span,
+	}, mod, "type-unknown", "unresolved type: "+referrer+" references unknown type "+referenced)
 }
 
 // RecordUnresolvedOid tracks an OID definition whose parent component could not be resolved.
 func (c *resolverContext) RecordUnresolvedOid(mod *module.Module, defName, component string, span types.Span) {
-	c.unresolvedOids = append(c.unresolvedOids, unresolvedOid{
-		module:     mod,
-		definition: defName,
-		component:  component,
-		span:       span,
-	})
-	c.emitUnresolvedDiagnostic(mod, "oid-orphan", SeverityError,
-		"unresolved OID: "+defName+" references unknown parent "+component)
+	recordUnresolved(c, &c.unresolvedOids, unresolvedOid{
+		module: mod, definition: defName, component: component, span: span,
+	}, mod, "oid-orphan", "unresolved OID: "+defName+" references unknown parent "+component)
 }
 
 // RecordUnresolvedIndex tracks a row's INDEX entry that references a missing object.
 func (c *resolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexObject string, span types.Span) {
-	c.unresolvedIndexes = append(c.unresolvedIndexes, unresolvedIndex{
-		module:      mod,
-		row:         row,
-		indexObject: indexObject,
-		span:        span,
-	})
-	c.emitUnresolvedDiagnostic(mod, "index-unresolved", SeverityError,
-		"unresolved INDEX: "+row+" references unknown object "+indexObject)
+	recordUnresolved(c, &c.unresolvedIndexes, unresolvedIndex{
+		module: mod, row: row, indexObject: indexObject, span: span,
+	}, mod, "index-unresolved", "unresolved INDEX: "+row+" references unknown object "+indexObject)
 }
 
 // RecordUnresolvedNotificationObject tracks a notification's OBJECTS entry that references a missing object.
 func (c *resolverContext) RecordUnresolvedNotificationObject(mod *module.Module, notification, object string, span types.Span) {
-	c.unresolvedNotifObjects = append(c.unresolvedNotifObjects, unresolvedNotifObject{
-		module:       mod,
-		notification: notification,
-		object:       object,
-		span:         span,
-	})
-	c.emitUnresolvedDiagnostic(mod, "objects-unresolved", SeverityError,
-		"unresolved OBJECTS: "+notification+" references unknown object "+object)
+	recordUnresolved(c, &c.unresolvedNotifObjects, unresolvedNotifObject{
+		module: mod, notification: notification, object: object, span: span,
+	}, mod, "objects-unresolved", "unresolved OBJECTS: "+notification+" references unknown object "+object)
 }
 
 // DropModules releases parsed module data to free memory after resolution completes.

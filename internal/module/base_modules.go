@@ -251,14 +251,11 @@ func makeTC(name, displayHint string, syntax TypeSyntax, status types.Status) De
 	}
 }
 
-func createOidDefinitions() []Definition {
+// coreOidDefinitions returns the OID tree shared by both SMIv2 and SMIv1.
+func coreOidDefinitions() []Definition {
 	return []Definition{
-		// ccitt OBJECT IDENTIFIER ::= { 0 }
-		makeOidValue("ccitt", []OidComponent{&OidComponentNumber{Value: 0}}),
 		// iso OBJECT IDENTIFIER ::= { 1 }
 		makeOidValue("iso", []OidComponent{&OidComponentNumber{Value: 1}}),
-		// joint-iso-ccitt OBJECT IDENTIFIER ::= { 2 }
-		makeOidValue("joint-iso-ccitt", []OidComponent{&OidComponentNumber{Value: 2}}),
 		// org OBJECT IDENTIFIER ::= { iso 3 }
 		makeOidValue("org", []OidComponent{
 			&OidComponentName{NameValue: "iso"},
@@ -284,16 +281,6 @@ func createOidDefinitions() []Definition {
 			&OidComponentName{NameValue: "internet"},
 			&OidComponentNumber{Value: 2},
 		}),
-		// mib-2 OBJECT IDENTIFIER ::= { mgmt 1 }
-		makeOidValue("mib-2", []OidComponent{
-			&OidComponentName{NameValue: "mgmt"},
-			&OidComponentNumber{Value: 1},
-		}),
-		// transmission OBJECT IDENTIFIER ::= { mib-2 10 }
-		makeOidValue("transmission", []OidComponent{
-			&OidComponentName{NameValue: "mib-2"},
-			&OidComponentNumber{Value: 10},
-		}),
 		// experimental OBJECT IDENTIFIER ::= { internet 3 }
 		makeOidValue("experimental", []OidComponent{
 			&OidComponentName{NameValue: "internet"},
@@ -308,6 +295,28 @@ func createOidDefinitions() []Definition {
 		makeOidValue("enterprises", []OidComponent{
 			&OidComponentName{NameValue: "private"},
 			&OidComponentNumber{Value: 1},
+		}),
+	}
+}
+
+func createOidDefinitions() []Definition {
+	defs := []Definition{
+		// ccitt OBJECT IDENTIFIER ::= { 0 }
+		makeOidValue("ccitt", []OidComponent{&OidComponentNumber{Value: 0}}),
+		// joint-iso-ccitt OBJECT IDENTIFIER ::= { 2 }
+		makeOidValue("joint-iso-ccitt", []OidComponent{&OidComponentNumber{Value: 2}}),
+	}
+	defs = append(defs, coreOidDefinitions()...)
+	defs = append(defs,
+		// mib-2 OBJECT IDENTIFIER ::= { mgmt 1 }
+		makeOidValue("mib-2", []OidComponent{
+			&OidComponentName{NameValue: "mgmt"},
+			&OidComponentNumber{Value: 1},
+		}),
+		// transmission OBJECT IDENTIFIER ::= { mib-2 10 }
+		makeOidValue("transmission", []OidComponent{
+			&OidComponentName{NameValue: "mib-2"},
+			&OidComponentNumber{Value: 10},
 		}),
 		// security OBJECT IDENTIFIER ::= { internet 5 }
 		makeOidValue("security", []OidComponent{
@@ -344,7 +353,8 @@ func createOidDefinitions() []Definition {
 			&OidComponentName{NameValue: "mib-2"},
 			&OidComponentNumber{Value: 11},
 		}),
-	}
+	)
+	return defs
 }
 
 func createBaseTypeDefinitions() []Definition {
@@ -417,50 +427,7 @@ func createSMIv1TypeDefinitions() []Definition {
 }
 
 func createSMIv1OidDefinitions() []Definition {
-	return []Definition{
-		// iso OBJECT IDENTIFIER ::= { 1 }
-		makeOidValue("iso", []OidComponent{&OidComponentNumber{Value: 1}}),
-		// org OBJECT IDENTIFIER ::= { iso 3 }
-		makeOidValue("org", []OidComponent{
-			&OidComponentName{NameValue: "iso"},
-			&OidComponentNumber{Value: 3},
-		}),
-		// dod OBJECT IDENTIFIER ::= { org 6 }
-		makeOidValue("dod", []OidComponent{
-			&OidComponentName{NameValue: "org"},
-			&OidComponentNumber{Value: 6},
-		}),
-		// internet OBJECT IDENTIFIER ::= { dod 1 }
-		makeOidValue("internet", []OidComponent{
-			&OidComponentName{NameValue: "dod"},
-			&OidComponentNumber{Value: 1},
-		}),
-		// directory OBJECT IDENTIFIER ::= { internet 1 }
-		makeOidValue("directory", []OidComponent{
-			&OidComponentName{NameValue: "internet"},
-			&OidComponentNumber{Value: 1},
-		}),
-		// mgmt OBJECT IDENTIFIER ::= { internet 2 }
-		makeOidValue("mgmt", []OidComponent{
-			&OidComponentName{NameValue: "internet"},
-			&OidComponentNumber{Value: 2},
-		}),
-		// experimental OBJECT IDENTIFIER ::= { internet 3 }
-		makeOidValue("experimental", []OidComponent{
-			&OidComponentName{NameValue: "internet"},
-			&OidComponentNumber{Value: 3},
-		}),
-		// private OBJECT IDENTIFIER ::= { internet 4 }
-		makeOidValue("private", []OidComponent{
-			&OidComponentName{NameValue: "internet"},
-			&OidComponentNumber{Value: 4},
-		}),
-		// enterprises OBJECT IDENTIFIER ::= { private 1 }
-		makeOidValue("enterprises", []OidComponent{
-			&OidComponentName{NameValue: "private"},
-			&OidComponentNumber{Value: 1},
-		}),
-	}
+	return coreOidDefinitions()
 }
 
 func createTCDefinitions() []Definition {

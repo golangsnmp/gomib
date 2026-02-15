@@ -100,7 +100,7 @@ func PermissiveConfig() DiagnosticConfig {
 // Lower severity numbers are more severe (Fatal=0, Info=6).
 func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
 	if slices.ContainsFunc(c.Ignore, func(pattern string) bool {
-		return matchGlob(pattern, code)
+		return MatchGlob(pattern, code)
 	}) {
 		return false
 	}
@@ -146,8 +146,8 @@ func (c DiagnosticConfig) AllowBestGuessFallbacks() bool {
 	return c.Level >= StrictnessPermissive
 }
 
-// matchGlob performs simple glob matching with * wildcard.
-func matchGlob(pattern, s string) bool {
+// MatchGlob performs simple glob matching with * wildcard.
+func MatchGlob(pattern, s string) bool {
 	if prefix, ok := strings.CutSuffix(pattern, "*"); ok {
 		return strings.HasPrefix(s, prefix)
 	}

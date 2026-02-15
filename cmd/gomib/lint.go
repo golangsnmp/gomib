@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -227,22 +228,11 @@ func (c *cli) runLint(modules []string, cfg lintConfig) *lintResult {
 
 func matchesAny(code string, patterns []string) bool {
 	for _, p := range patterns {
-		if matchGlob(p, code) {
+		if types.MatchGlob(p, code) {
 			return true
 		}
 	}
 	return false
-}
-
-// matchGlob performs simple glob matching with * wildcard.
-func matchGlob(pattern, s string) bool {
-	if prefix, ok := strings.CutSuffix(pattern, "*"); ok {
-		return strings.HasPrefix(s, prefix)
-	}
-	if suffix, ok := strings.CutPrefix(pattern, "*"); ok {
-		return strings.HasSuffix(s, suffix)
-	}
-	return pattern == s
 }
 
 func printLintText(result *lintResult, cfg lintConfig) {

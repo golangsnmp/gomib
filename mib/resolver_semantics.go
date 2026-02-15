@@ -306,7 +306,11 @@ func createResolvedNotifications(ctx *resolverContext) {
 			} else if ok {
 				// Node exists but has no object definition (intermediate node
 				// or non-object definition).
-				ctx.emitUnresolvedDiagnostic(ref.mod, "notification-object-not-object", SeverityMinor,
+				modName := ""
+				if ref.mod != nil {
+					modName = ref.mod.Name
+				}
+				ctx.EmitDiagnostic("notification-object-not-object", SeverityMinor, modName, 0, 0,
 					"notification "+notif.Name+" references "+objName+" which is not an object definition")
 			}
 		}
