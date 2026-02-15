@@ -98,10 +98,6 @@ func (m *Mib) Capability(name string) *Capability {
 }
 
 func (m *Mib) NodeByOID(oid OID) *Node {
-	return m.nodeByOID(oid)
-}
-
-func (m *Mib) nodeByOID(oid OID) *Node {
 	if len(oid) == 0 {
 		return nil
 	}
