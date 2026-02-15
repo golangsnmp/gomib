@@ -1,25 +1,21 @@
 // Package module provides a normalized representation of MIB modules.
 //
-// This package transforms AST structures into a simplified module representation
+// Lowering transforms AST structures into a simplified module representation
 // independent of whether the source was SMIv1 or SMIv2. Key transformations:
 //
 //   - Language detection from imports
 //   - Import flattening (one symbol per import)
 //   - Unified notification type (TRAP-TYPE and NOTIFICATION-TYPE)
 //
-// # What Lowering Does NOT Do (per V2 design)
+// Lowering preserves values verbatim without normalization:
+//   - STATUS: mandatory, optional kept distinct (not mapped to current/deprecated)
+//   - ACCESS: SPPI values kept (install, install-notify, report-only)
+//   - ACCESS keyword kept (ACCESS vs MAX-ACCESS vs PIB-ACCESS)
+//   - OID components kept as symbols (resolution is the resolver's job)
+//   - Type references kept as symbols (resolution is the resolver's job)
 //
-// Status and Access values are preserved without normalization:
-//   - STATUS: mandatory, optional preserved (not mapped to current/deprecated)
-//   - ACCESS: SPPI values preserved (install, install-notify, report-only)
-//   - ACCESS keyword preserved (ACCESS vs MAX-ACCESS vs PIB-ACCESS)
-//
-// These are resolver responsibilities:
-//   - OID resolution (keeps OID components as symbols)
-//   - Type resolution (keeps type references as symbols)
-//   - Nodekind inference (requires resolved OID tree)
-//   - Import resolution (just normalize; actual lookup is resolver's job)
-//   - Built-in type injection
+// OID resolution, type resolution, nodekind inference, import resolution,
+// and built-in type injection are all resolver responsibilities.
 package module
 
 import (
