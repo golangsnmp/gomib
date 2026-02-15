@@ -64,9 +64,9 @@ func TestParseSimpleObjectType(t *testing.T) {
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
 	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
 	testutil.Equal(t, "testIndex", def.Name.Name, "definition name")
-	testutil.Equal(t, ast.AccessValueReadOnly, def.Access.Value, "access value")
+	testutil.Equal(t, types.AccessReadOnly, def.Access.Value, "access value")
 	testutil.NotNil(t, def.Status, "status should be set")
-	testutil.Equal(t, ast.StatusValueCurrent, def.Status.Value, "status value")
+	testutil.Equal(t, types.StatusCurrent, def.Status.Value, "status value")
 	testutil.NotNil(t, def.Description, "description should be set")
 	testutil.Equal(t, "Test description", def.Description.Value, "description value")
 }
@@ -694,8 +694,8 @@ func TestParseSMIv1ObjectType(t *testing.T) {
 		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	testutil.Equal(t, "testSMIv1", def.Name.Name, "SMIv1 object name")
-	testutil.Equal(t, ast.AccessValueReadOnly, def.Access.Value, "SMIv1 access")
-	testutil.Equal(t, ast.StatusValueMandatory, def.Status.Value, "SMIv1 mandatory status")
+	testutil.Equal(t, types.AccessReadOnly, def.Access.Value, "SMIv1 access")
+	testutil.Equal(t, types.StatusMandatory, def.Status.Value, "SMIv1 mandatory status")
 }
 
 // === Strictness Tests ===

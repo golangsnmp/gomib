@@ -176,7 +176,7 @@ func (*RangeValueIdent) rangeValue() {}
 // AccessClause holds a parsed ACCESS, MAX-ACCESS, or MIN-ACCESS clause.
 type AccessClause struct {
 	Keyword AccessKeyword
-	Value   AccessValue
+	Value   types.Access
 	Span    types.Span
 }
 
@@ -190,38 +190,11 @@ const (
 	AccessKeywordPibAccess
 )
 
-// AccessValue enumerates the possible access levels for MIB objects.
-type AccessValue int
-
-const (
-	AccessValueReadOnly AccessValue = iota
-	AccessValueReadWrite
-	AccessValueReadCreate
-	AccessValueNotAccessible
-	AccessValueAccessibleForNotify
-	AccessValueWriteOnly
-	AccessValueNotImplemented
-	AccessValueInstall
-	AccessValueInstallNotify
-	AccessValueReportOnly
-)
-
 // StatusClause holds a parsed STATUS clause value and span.
 type StatusClause struct {
-	Value StatusValue
+	Value types.Status
 	Span  types.Span
 }
-
-// StatusValue enumerates the possible status values for MIB objects.
-type StatusValue int
-
-const (
-	StatusValueCurrent StatusValue = iota
-	StatusValueDeprecated
-	StatusValueObsolete
-	StatusValueMandatory
-	StatusValueOptional
-)
 
 // IndexClause represents an INDEX or PIB-INDEX clause in OBJECT-TYPE.
 type IndexClause interface {

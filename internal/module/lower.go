@@ -215,7 +215,7 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 	var status types.Status
 	if def.Status != nil {
-		status = lowerStatus(def.Status.Value)
+		status = def.Status.Value
 	} else {
 		status = types.StatusCurrent
 	}
@@ -249,7 +249,7 @@ func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 		Name:          def.Name.Name,
 		Syntax:        lowerTypeSyntax(def.Syntax.Syntax, ctx),
 		Units:         units,
-		Access:        lowerAccess(def.Access.Value),
+		Access:        def.Access.Value,
 		AccessKeyword: lowerAccessKeyword(def.Access.Keyword),
 		Status:        status,
 		Description:   description,
@@ -305,7 +305,7 @@ func lowerObjectIdentity(def *ast.ObjectIdentityDef, ctx *LoweringContext) *Obje
 
 	return &ObjectIdentity{
 		Name:        def.Name.Name,
-		Status:      lowerStatus(def.Status.Value),
+		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   reference,
 		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
@@ -324,7 +324,7 @@ func lowerNotificationType(def *ast.NotificationTypeDef, ctx *LoweringContext) *
 	return &Notification{
 		Name:        def.Name.Name,
 		Objects:     identNames(def.Objects),
-		Status:      lowerStatus(def.Status.Value),
+		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   reference,
 		TrapInfo:    nil,
@@ -375,7 +375,7 @@ func lowerTextualConvention(def *ast.TextualConventionDef, ctx *LoweringContext)
 		Syntax:              lowerTypeSyntax(def.Syntax.Syntax, ctx),
 		BaseType:            nil,
 		DisplayHint:         displayHint,
-		Status:              lowerStatus(def.Status.Value),
+		Status:              def.Status.Value,
 		Description:         def.Description.Value,
 		Reference:           reference,
 		IsTextualConvention: true,
@@ -414,7 +414,7 @@ func lowerObjectGroup(def *ast.ObjectGroupDef, ctx *LoweringContext) *ObjectGrou
 	return &ObjectGroup{
 		Name:        def.Name.Name,
 		Objects:     identNames(def.Objects),
-		Status:      lowerStatus(def.Status.Value),
+		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   reference,
 		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
@@ -431,7 +431,7 @@ func lowerNotificationGroup(def *ast.NotificationGroupDef, ctx *LoweringContext)
 	return &NotificationGroup{
 		Name:          def.Name.Name,
 		Notifications: identNames(def.Notifications),
-		Status:        lowerStatus(def.Status.Value),
+		Status:        def.Status.Value,
 		Description:   def.Description.Value,
 		Reference:     reference,
 		Oid:           lowerOidAssignment(def.OidAssignment, ctx),
@@ -452,7 +452,7 @@ func lowerModuleCompliance(def *ast.ModuleComplianceDef, ctx *LoweringContext) *
 
 	return &ModuleCompliance{
 		Name:        def.Name.Name,
-		Status:      lowerStatus(def.Status.Value),
+		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   reference,
 		Modules:     modules,
@@ -503,7 +503,7 @@ func lowerComplianceObject(o *ast.ComplianceObject, ctx *LoweringContext) Compli
 
 	var minAccess *types.Access
 	if o.MinAccess != nil {
-		a := lowerAccess(o.MinAccess.Value)
+		a := o.MinAccess.Value
 		minAccess = &a
 	}
 
@@ -530,7 +530,7 @@ func lowerAgentCapabilities(def *ast.AgentCapabilitiesDef, ctx *LoweringContext)
 	return &AgentCapabilities{
 		Name:           def.Name.Name,
 		ProductRelease: def.ProductRelease.Value,
-		Status:         lowerStatus(def.Status.Value),
+		Status:         def.Status.Value,
 		Description:    def.Description.Value,
 		Reference:      reference,
 		Supports:       supports,
@@ -573,7 +573,7 @@ func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVa
 
 	var access *types.Access
 	if v.Access != nil {
-		a := lowerAccess(v.Access.Value)
+		a := v.Access.Value
 		access = &a
 	}
 
@@ -601,7 +601,7 @@ func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVa
 func lowerNotificationVariation(v *ast.NotificationVariation) NotificationVariation {
 	var access *types.Access
 	if v.Access != nil {
-		a := lowerAccess(v.Access.Value)
+		a := v.Access.Value
 		access = &a
 	}
 
@@ -776,34 +776,6 @@ func lowerOidComponent(comp ast.OidComponent, ctx *LoweringContext) OidComponent
 	}
 }
 
-// lowerAccess converts AST access values without normalization.
-func lowerAccess(access ast.AccessValue) types.Access {
-	switch access {
-	case ast.AccessValueReadOnly:
-		return types.AccessReadOnly
-	case ast.AccessValueReadWrite:
-		return types.AccessReadWrite
-	case ast.AccessValueReadCreate:
-		return types.AccessReadCreate
-	case ast.AccessValueNotAccessible:
-		return types.AccessNotAccessible
-	case ast.AccessValueAccessibleForNotify:
-		return types.AccessAccessibleForNotify
-	case ast.AccessValueWriteOnly:
-		return types.AccessWriteOnly
-	case ast.AccessValueInstall:
-		return types.AccessInstall
-	case ast.AccessValueInstallNotify:
-		return types.AccessInstallNotify
-	case ast.AccessValueReportOnly:
-		return types.AccessReportOnly
-	case ast.AccessValueNotImplemented:
-		return types.AccessNotImplemented
-	default:
-		return types.AccessNotAccessible
-	}
-}
-
 func lowerAccessKeyword(keyword ast.AccessKeyword) AccessKeyword {
 	switch keyword {
 	case ast.AccessKeywordAccess:
@@ -816,25 +788,6 @@ func lowerAccessKeyword(keyword ast.AccessKeyword) AccessKeyword {
 		return AccessKeywordPibAccess
 	default:
 		return AccessKeywordAccess
-	}
-}
-
-// lowerStatus converts AST status values without normalization. SMIv1
-// mandatory/optional are kept distinct from SMIv2 current/deprecated.
-func lowerStatus(status ast.StatusValue) types.Status {
-	switch status {
-	case ast.StatusValueCurrent:
-		return types.StatusCurrent
-	case ast.StatusValueDeprecated:
-		return types.StatusDeprecated
-	case ast.StatusValueObsolete:
-		return types.StatusObsolete
-	case ast.StatusValueMandatory:
-		return types.StatusMandatory
-	case ast.StatusValueOptional:
-		return types.StatusOptional
-	default:
-		return types.StatusCurrent
 	}
 }
 

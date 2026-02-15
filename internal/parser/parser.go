@@ -1186,29 +1186,29 @@ func (p *Parser) parseAccessClause() (ast.AccessClause, *types.SpanDiagnostic) {
 		return ast.AccessClause{}, &diag
 	}
 
-	var value ast.AccessValue
+	var value types.Access
 	switch p.peek().Kind {
 	case lexer.TokKwReadOnly:
 		p.advance()
-		value = ast.AccessValueReadOnly
+		value = types.AccessReadOnly
 	case lexer.TokKwReadWrite:
 		p.advance()
-		value = ast.AccessValueReadWrite
+		value = types.AccessReadWrite
 	case lexer.TokKwReadCreate:
 		p.advance()
-		value = ast.AccessValueReadCreate
+		value = types.AccessReadCreate
 	case lexer.TokKwNotAccessible:
 		p.advance()
-		value = ast.AccessValueNotAccessible
+		value = types.AccessNotAccessible
 	case lexer.TokKwAccessibleForNotify:
 		p.advance()
-		value = ast.AccessValueAccessibleForNotify
+		value = types.AccessAccessibleForNotify
 	case lexer.TokKwWriteOnly:
 		p.advance()
-		value = ast.AccessValueWriteOnly
+		value = types.AccessWriteOnly
 	case lexer.TokKwNotImplemented:
 		p.advance()
-		value = ast.AccessValueNotImplemented
+		value = types.AccessNotImplemented
 	default:
 		diag := p.makeError("expected access value")
 		return ast.AccessClause{}, &diag
@@ -1229,23 +1229,23 @@ func (p *Parser) parseStatusClause() (ast.StatusClause, *types.SpanDiagnostic) {
 		return ast.StatusClause{}, err
 	}
 
-	var value ast.StatusValue
+	var value types.Status
 	switch p.peek().Kind {
 	case lexer.TokKwCurrent:
 		p.advance()
-		value = ast.StatusValueCurrent
+		value = types.StatusCurrent
 	case lexer.TokKwDeprecated:
 		p.advance()
-		value = ast.StatusValueDeprecated
+		value = types.StatusDeprecated
 	case lexer.TokKwObsolete:
 		p.advance()
-		value = ast.StatusValueObsolete
+		value = types.StatusObsolete
 	case lexer.TokKwMandatory:
 		p.advance()
-		value = ast.StatusValueMandatory
+		value = types.StatusMandatory
 	case lexer.TokKwOptional:
 		p.advance()
-		value = ast.StatusValueOptional
+		value = types.StatusOptional
 	default:
 		diag := p.makeError("expected status value")
 		return ast.StatusClause{}, &diag
