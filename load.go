@@ -130,21 +130,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 		return nil, ctx.Err()
 	}
 
-	for _, name := range module.BaseModuleNames() {
-		if _, ok := modules[name]; !ok {
-			if base := module.GetBaseModule(name); base != nil {
-				modules[name] = base
-			}
-		}
-	}
-
-	var mods []*module.Module
-	for _, mod := range modules {
-		mods = append(mods, mod)
-	}
-	slices.SortFunc(mods, func(a, b *module.Module) int {
-		return cmp.Compare(a.Name, b.Name)
-	})
+	mods := collectModules(modules)
 
 	if logEnabled(logger, slog.LevelInfo) {
 		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading complete",
@@ -219,26 +205,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 		}
 	}
 
-	for _, name := range module.BaseModuleNames() {
-		if _, ok := modules[name]; !ok {
-			if base := module.GetBaseModule(name); base != nil {
-				modules[name] = base
-			}
-		}
-	}
-
-	// Deduplicate since multiple names may map to the same module.
-	seen := make(map[*module.Module]struct{})
-	var mods []*module.Module
-	for _, mod := range modules {
-		if _, exists := seen[mod]; !exists {
-			seen[mod] = struct{}{}
-			mods = append(mods, mod)
-		}
-	}
-	slices.SortFunc(mods, func(a, b *module.Module) int {
-		return cmp.Compare(a.Name, b.Name)
-	})
+	mods := collectModules(modules)
 
 	m := mib.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig)
 	return m, checkLoadResult(m, cfg, names)
@@ -265,6 +232,30 @@ func findModuleContent(sources []Source, name string) ([]byte, error) {
 
 // decodeModule runs the heuristic/parse/lower pipeline on raw MIB content.
 // Returns nil if any stage fails (not a MIB, parse error, lowering error).
+// collectModules adds missing base modules to the map, deduplicates,
+// and returns the modules sorted by name.
+func collectModules(modules map[string]*module.Module) []*module.Module {
+	for _, name := range module.BaseModuleNames() {
+		if _, ok := modules[name]; !ok {
+			if base := module.GetBaseModule(name); base != nil {
+				modules[name] = base
+			}
+		}
+	}
+	seen := make(map[*module.Module]struct{}, len(modules))
+	mods := make([]*module.Module, 0, len(modules))
+	for _, mod := range modules {
+		if _, exists := seen[mod]; !exists {
+			seen[mod] = struct{}{}
+			mods = append(mods, mod)
+		}
+	}
+	slices.SortFunc(mods, func(a, b *module.Module) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+	return mods
+}
+
 func decodeModule(content []byte, name string, logger *slog.Logger, cfg loadConfig) *module.Module {
 	if !looksLikeMIBContent(content) {
 		if logEnabled(logger, slog.LevelDebug) {
