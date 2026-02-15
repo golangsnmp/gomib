@@ -76,6 +76,13 @@ func StrictConfig() DiagnosticConfig {
 
 // PermissiveConfig returns a permissive configuration for legacy/vendor MIBs.
 // Suppresses common vendor MIB violations like underscores in identifiers.
+//
+// Ignored codes:
+//   - identifier-underscore: vendor MIBs routinely use underscores (RFC style violation)
+//   - identifier-length-32: emitted at SeverityWarning by the parser for identifiers
+//     exceeding the 32-char recommendation (not the 64-char hard limit). Many vendor MIBs
+//     use long descriptive names, so this is noise in permissive mode.
+//   - bad-identifier-case: vendor MIBs frequently violate case conventions
 func PermissiveConfig() DiagnosticConfig {
 	return DiagnosticConfig{
 		Level:  StrictnessPermissive,

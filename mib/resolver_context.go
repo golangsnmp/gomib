@@ -309,9 +309,16 @@ func (c *resolverContext) registerModuleTypeSymbol(mod *module.Module, name stri
 }
 
 // EmitDiagnostic records a diagnostic, filtered by the current config's severity and code rules.
-func (c *resolverContext) EmitDiagnostic(code string, severity Severity, moduleName string, line, col int, message string) {
+// If mod is non-nil and has a line table, the span is converted to line/column numbers.
+func (c *resolverContext) EmitDiagnostic(code string, severity Severity, mod *module.Module, span types.Span, message string) {
 	if !c.diagConfig.ShouldReport(code, severity) {
 		return
+	}
+	var moduleName string
+	var line, col int
+	if mod != nil {
+		moduleName = mod.Name
+		line, col = module.LineColFromLineTable(mod.LineTable, span)
 	}
 	c.diagnostics = append(c.diagnostics, Diagnostic{
 		Severity: severity,
@@ -348,13 +355,9 @@ func logCycles(ctx *resolverContext, cycles [][]graph.Symbol, msg string) {
 }
 
 // recordUnresolved appends an entry to a typed slice and emits a diagnostic.
-func recordUnresolved[T any](c *resolverContext, list *[]T, entry T, mod *module.Module, code, msg string) {
+func recordUnresolved[T any](c *resolverContext, list *[]T, entry T, mod *module.Module, span types.Span, code, msg string) {
 	*list = append(*list, entry)
-	modName := ""
-	if mod != nil {
-		modName = mod.Name
-	}
-	c.EmitDiagnostic(code, SeverityError, modName, 0, 0, msg)
+	c.EmitDiagnostic(code, SeverityError, mod, span, msg)
 }
 
 // RecordUnresolvedImport tracks a symbol that could not be resolved from its source module.
@@ -369,35 +372,35 @@ func (c *resolverContext) RecordUnresolvedImport(importingModule *module.Module,
 		symbol:          symbol,
 		reason:          reason,
 		span:            span,
-	}, importingModule, code, fmt.Sprintf("unresolved import: %s from %s (%s)", symbol, fromModule, reason))
+	}, importingModule, span, code, fmt.Sprintf("unresolved import: %s from %s (%s)", symbol, fromModule, reason))
 }
 
 // RecordUnresolvedType tracks a type definition whose parent type could not be found.
 func (c *resolverContext) RecordUnresolvedType(mod *module.Module, referrer, referenced string, span types.Span) {
 	recordUnresolved(c, &c.unresolvedTypes, unresolvedType{
 		module: mod, referrer: referrer, referenced: referenced, span: span,
-	}, mod, types.DiagTypeUnknown, fmt.Sprintf("unresolved type: %s references unknown type %s", referrer, referenced))
+	}, mod, span, types.DiagTypeUnknown, fmt.Sprintf("unresolved type: %s references unknown type %s", referrer, referenced))
 }
 
 // RecordUnresolvedOid tracks an OID definition whose parent component could not be resolved.
 func (c *resolverContext) RecordUnresolvedOid(mod *module.Module, defName, component string, span types.Span) {
 	recordUnresolved(c, &c.unresolvedOids, unresolvedOid{
 		module: mod, definition: defName, component: component, span: span,
-	}, mod, types.DiagOidOrphan, fmt.Sprintf("unresolved OID: %s references unknown parent %s", defName, component))
+	}, mod, span, types.DiagOidOrphan, fmt.Sprintf("unresolved OID: %s references unknown parent %s", defName, component))
 }
 
 // RecordUnresolvedIndex tracks a row's INDEX entry that references a missing object.
 func (c *resolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexObject string, span types.Span) {
 	recordUnresolved(c, &c.unresolvedIndexes, unresolvedIndex{
 		module: mod, row: row, indexObject: indexObject, span: span,
-	}, mod, types.DiagIndexUnresolved, fmt.Sprintf("unresolved INDEX: %s references unknown object %s", row, indexObject))
+	}, mod, span, types.DiagIndexUnresolved, fmt.Sprintf("unresolved INDEX: %s references unknown object %s", row, indexObject))
 }
 
 // RecordUnresolvedNotificationObject tracks a notification's OBJECTS entry that references a missing object.
 func (c *resolverContext) RecordUnresolvedNotificationObject(mod *module.Module, notification, object string, span types.Span) {
 	recordUnresolved(c, &c.unresolvedNotifObjects, unresolvedNotifObject{
 		module: mod, notification: notification, object: object, span: span,
-	}, mod, types.DiagObjectsUnresolved, fmt.Sprintf("unresolved OBJECTS: %s references unknown object %s", notification, object))
+	}, mod, span, types.DiagObjectsUnresolved, fmt.Sprintf("unresolved OBJECTS: %s references unknown object %s", notification, object))
 }
 
 // DropModules releases parsed module data to free memory after resolution completes.

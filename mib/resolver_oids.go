@@ -189,7 +189,7 @@ func checkSmiv2IdentifierHyphens(ctx *resolverContext, defs []oidDefinition) {
 		name := def.defName()
 		if strings.Contains(name, "-") {
 			ctx.EmitDiagnostic(types.DiagIdentifierHyphenSMI, SeverityWarning,
-				def.mod.Name, 0, 0,
+				def.mod, def.def.DefinitionSpan(),
 				"identifier "+name+" should not contain hyphens in SMIv2 MIB")
 		}
 	}
@@ -549,12 +549,14 @@ func shouldPreferModule(ctx *resolverContext, newMod, currentMod *Module, srcMod
 
 	if ctx.TraceEnabled() {
 		ctx.Trace("module preference check",
-			slog.String("new", srcMod.Name),
-			slog.String("newLang", srcMod.Language.String()),
-			slog.Int("newRank", newRank),
-			slog.String("current", currentSrcMod.Name),
-			slog.String("currentLang", currentSrcMod.Language.String()),
-			slog.Int("currentRank", currentRank))
+			slog.Group("new",
+				slog.String("module", srcMod.Name),
+				slog.String("language", srcMod.Language.String()),
+				slog.Int("rank", newRank)),
+			slog.Group("current",
+				slog.String("module", currentSrcMod.Name),
+				slog.String("language", currentSrcMod.Language.String()),
+				slog.Int("rank", currentRank)))
 	}
 
 	if newRank > currentRank {

@@ -156,9 +156,28 @@ func TestMarkResolved(t *testing.T) {
 		t.Error("initially should not be resolved")
 	}
 
-	g.MarkResolved(a)
+	if !g.MarkResolved(a) {
+		t.Error("MarkResolved should return true for existing node")
+	}
 	if !g.IsResolved(a) {
 		t.Error("should be resolved after MarkResolved")
+	}
+
+	missing := Symbol{Module: "M", Name: "missing"}
+	if g.MarkResolved(missing) {
+		t.Error("MarkResolved should return false for missing node")
+	}
+}
+
+func TestHasNode(t *testing.T) {
+	g := New()
+	a := Symbol{Module: "M", Name: "a"}
+	if g.HasNode(a) {
+		t.Error("empty graph should not have node")
+	}
+	g.AddNode(a, NodeKindType)
+	if !g.HasNode(a) {
+		t.Error("should have node after AddNode")
 	}
 }
 

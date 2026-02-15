@@ -240,26 +240,26 @@ func (p *Parser) makeError(message string) types.SpanDiagnostic {
 	}
 }
 
-func (p *Parser) parseU32(span types.Span, context string) uint32 {
+func (p *Parser) parseU32(span types.Span, context string) (uint32, bool) {
 	text := p.text(span)
 	v, err := strconv.ParseUint(text, 10, 32)
 	if err != nil {
 		p.emitDiagnostic(types.DiagInvalidU32, types.SeverityError, span,
 			fmt.Sprintf("invalid %s (not a valid u32)", context))
-		return 0
+		return 0, false
 	}
-	return uint32(v)
+	return uint32(v), true
 }
 
-func (p *Parser) parseI64(span types.Span, context string) int64 {
+func (p *Parser) parseI64(span types.Span, context string) (int64, bool) {
 	text := p.text(span)
 	v, err := strconv.ParseInt(text, 10, 64)
 	if err != nil {
 		p.emitDiagnostic(types.DiagInvalidI64, types.SeverityError, span,
 			fmt.Sprintf("invalid %s (not a valid integer)", context))
-		return 0
+		return 0, false
 	}
-	return v
+	return v, true
 }
 
 // parseModuleHeader parses: ModuleName [{ oid }] DEFINITIONS ::= BEGIN
@@ -549,7 +549,7 @@ func (p *Parser) parseOidAssignment() (ast.OidAssignment, *types.SpanDiagnostic)
 		if p.check(lexer.TokNumber) {
 			// Numeric: 1, 3, 6, ...
 			token := p.advance()
-			value := p.parseU32(token.Span, "OID component")
+			value, _ := p.parseU32(token.Span, "OID component")
 			components = append(components, &ast.OidComponentNumber{
 				Value: value,
 				Span:  token.Span,
@@ -576,7 +576,7 @@ func (p *Parser) parseOidAssignment() (ast.OidAssignment, *types.SpanDiagnostic)
 					if err != nil {
 						return ast.OidAssignment{}, err
 					}
-					number := p.parseU32(numToken.Span, "OID component")
+					number, _ := p.parseU32(numToken.Span, "OID component")
 					endToken, err := p.expect(lexer.TokRParen)
 					if err != nil {
 						return ast.OidAssignment{}, err
@@ -602,7 +602,7 @@ func (p *Parser) parseOidAssignment() (ast.OidAssignment, *types.SpanDiagnostic)
 				if err != nil {
 					return ast.OidAssignment{}, err
 				}
-				number := p.parseU32(numToken.Span, "OID component")
+				number, _ := p.parseU32(numToken.Span, "OID component")
 				endToken, err := p.expect(lexer.TokRParen)
 				if err != nil {
 					return ast.OidAssignment{}, err
@@ -984,7 +984,7 @@ func (p *Parser) parseNamedNumberList() ([]ast.NamedNumber, *types.SpanDiagnosti
 				return nil, err
 			}
 		}
-		value := p.parseI64(numToken.Span, "named number value")
+		value, _ := p.parseI64(numToken.Span, "named number value")
 
 		endToken, err := p.expect(lexer.TokRParen)
 		if err != nil {
@@ -1095,11 +1095,11 @@ func (p *Parser) parseRangeValue() (ast.RangeValue, *types.SpanDiagnostic) {
 			return &ast.RangeValueUnsigned{Value: value}, nil
 		}
 		// Fallback to signed
-		value := p.parseI64(token.Span, "range value")
+		value, _ := p.parseI64(token.Span, "range value")
 		return &ast.RangeValueSigned{Value: value}, nil
 	} else if p.check(lexer.TokNegativeNumber) {
 		token := p.advance()
-		value := p.parseI64(token.Span, "range value")
+		value, _ := p.parseI64(token.Span, "range value")
 		return &ast.RangeValueSigned{Value: value}, nil
 	} else if p.check(lexer.TokHexString) {
 		token := p.advance()
@@ -1391,7 +1391,7 @@ func (p *Parser) parseDefValContent() (ast.DefValContent, *types.SpanDiagnostic)
 func (p *Parser) parseDefValNumber() ast.DefValContent {
 	token := p.advance()
 	if token.Kind == lexer.TokNegativeNumber {
-		value := p.parseI64(token.Span, "DEFVAL integer")
+		value, _ := p.parseI64(token.Span, "DEFVAL integer")
 		return &ast.DefValContentInteger{Value: value}
 	}
 
@@ -1402,7 +1402,7 @@ func (p *Parser) parseDefValNumber() ast.DefValContent {
 	if value, err := strconv.ParseUint(text, 10, 64); err == nil {
 		return &ast.DefValContentUnsigned{Value: value}
 	}
-	value := p.parseI64(token.Span, "DEFVAL integer")
+	value, _ := p.parseI64(token.Span, "DEFVAL integer")
 	return &ast.DefValContentInteger{Value: value}
 }
 
@@ -1506,7 +1506,7 @@ func (p *Parser) parseDefValOidWithFirstIdent(ident ast.Ident, identToken lexer.
 		if err != nil {
 			return nil, err
 		}
-		number := p.parseU32(numToken.Span, "OID component")
+		number, _ := p.parseU32(numToken.Span, "OID component")
 		endParen, err := p.expect(lexer.TokRParen)
 		if err != nil {
 			return nil, err
@@ -1553,7 +1553,7 @@ func (p *Parser) parseDefValOidComponents(components []ast.OidComponent) ([]ast.
 	for !p.check(lexer.TokRBrace) && !p.isEOF() {
 		if p.check(lexer.TokNumber) {
 			token := p.advance()
-			value := p.parseU32(token.Span, "OID component")
+			value, _ := p.parseU32(token.Span, "OID component")
 			components = append(components, &ast.OidComponentNumber{
 				Value: value,
 				Span:  token.Span,
@@ -1567,7 +1567,7 @@ func (p *Parser) parseDefValOidComponents(components []ast.OidComponent) ([]ast.
 				if err != nil {
 					return components, err
 				}
-				number := p.parseU32(numToken.Span, "OID component")
+				number, _ := p.parseU32(numToken.Span, "OID component")
 				endParen, err := p.expect(lexer.TokRParen)
 				if err != nil {
 					return components, err
@@ -1945,7 +1945,7 @@ func (p *Parser) parseTrapType() (ast.Definition, *types.SpanDiagnostic) {
 	if err != nil {
 		return nil, err
 	}
-	trapNumber := p.parseU32(numToken.Span, "trap number")
+	trapNumber, _ := p.parseU32(numToken.Span, "trap number")
 
 	span := types.NewSpan(start, numToken.Span.End)
 	return &ast.TrapTypeDef{

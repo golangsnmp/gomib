@@ -46,6 +46,13 @@ func spanToLineCol(source []byte, offset types.ByteOffset) (line, col int) {
 	return line, col
 }
 
+// LineColFromLineTable converts a span to line/col using a module's precomputed
+// line table. This is the public entry point for code outside the lowering pass
+// (e.g., the resolver) that no longer has access to source bytes.
+func LineColFromLineTable(lineTable []int, span types.Span) (line, col int) {
+	return types.LineColFromTable(lineTable, span.Start)
+}
+
 // emitDiagnostic records a diagnostic if the current config allows it.
 // The span is converted to line/column using the source text.
 func (ctx *LoweringContext) emitDiagnostic(code string, severity types.Severity, moduleName string, span types.Span, message string) {
@@ -81,6 +88,7 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 	ctx := newLoweringContext(source, logger, diagConfig)
 
 	module := NewModule(astModule.Name.Name, astModule.Span)
+	module.LineTable = types.BuildLineTable(source)
 	ctx.moduleName = module.Name
 
 	ctx.Log(slog.LevelDebug, "lowering module", slog.String("module", module.Name))

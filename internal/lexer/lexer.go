@@ -35,7 +35,7 @@ func New(source []byte, logger *slog.Logger) *Lexer {
 		state:  stateNormal,
 		Logger: types.Logger{L: logger},
 	}
-	l.Log(slog.LevelDebug, "lexer initialized", slog.Int("source_len", len(source)))
+	l.Log(slog.LevelDebug, "lexer initialized", slog.Int("bytes", len(source)))
 	return l
 }
 

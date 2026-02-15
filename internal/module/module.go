@@ -36,6 +36,12 @@ type Module struct {
 	Definitions []Definition
 	Span        types.Span
 	Diagnostics []types.Diagnostic
+
+	// LineTable maps line numbers to byte offsets of line starts.
+	// Entry i holds the byte offset where line i+1 begins (0-indexed).
+	// Used by the resolver to convert spans to line/column numbers
+	// after the raw source bytes have been released.
+	LineTable []int
 }
 
 // NewModule returns a Module with the given name and no definitions.

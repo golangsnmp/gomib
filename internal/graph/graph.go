@@ -88,16 +88,26 @@ func (g *Graph) Nodes() []*Node {
 }
 
 // MarkResolved flags a symbol as fully resolved.
-func (g *Graph) MarkResolved(sym Symbol) {
+// Returns false if the symbol is not in the graph.
+func (g *Graph) MarkResolved(sym Symbol) bool {
 	if n := g.nodes[sym]; n != nil {
 		n.Resolved = true
+		return true
 	}
+	return false
 }
 
 // IsResolved reports whether the symbol has been resolved.
+// Returns false for symbols not in the graph (use HasNode to distinguish).
 func (g *Graph) IsResolved(sym Symbol) bool {
 	if n := g.nodes[sym]; n != nil {
 		return n.Resolved
 	}
 	return false
+}
+
+// HasNode reports whether the symbol exists in the graph.
+func (g *Graph) HasNode(sym Symbol) bool {
+	_, ok := g.nodes[sym]
+	return ok
 }

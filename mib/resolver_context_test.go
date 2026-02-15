@@ -672,7 +672,8 @@ func TestEmitDiagnostic(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := newResolverContext(nil, nil, tt.config)
-			ctx.EmitDiagnostic("test-code", tt.severity, "MOD", 1, 1, "test message")
+			mod := &module.Module{Name: "MOD"}
+			ctx.EmitDiagnostic("test-code", tt.severity, mod, types.Span{}, "test message")
 			got := len(ctx.Diagnostics())
 			if got != tt.want {
 				t.Errorf("got %d diagnostics, want %d", got, tt.want)
@@ -687,13 +688,14 @@ func TestEmitDiagnostic_IgnoredCode(t *testing.T) {
 		Ignore: []string{"test-*"},
 	}
 	ctx := newResolverContext(nil, nil, config)
-	ctx.EmitDiagnostic("test-foo", SeverityError, "MOD", 1, 1, "ignored")
+	mod := &module.Module{Name: "MOD"}
+	ctx.EmitDiagnostic("test-foo", SeverityError, mod, types.Span{}, "ignored")
 	if len(ctx.Diagnostics()) != 0 {
 		t.Fatal("expected ignored code to produce no diagnostics")
 	}
 
 	// Non-matching code should still be reported.
-	ctx.EmitDiagnostic("other-code", SeverityError, "MOD", 1, 1, "not ignored")
+	ctx.EmitDiagnostic("other-code", SeverityError, mod, types.Span{}, "not ignored")
 	if len(ctx.Diagnostics()) != 1 {
 		t.Fatal("expected non-ignored code to produce a diagnostic")
 	}
@@ -701,7 +703,22 @@ func TestEmitDiagnostic_IgnoredCode(t *testing.T) {
 
 func TestEmitDiagnostic_Fields(t *testing.T) {
 	ctx := newTestContext()
-	ctx.EmitDiagnostic("my-code", SeverityMinor, "TEST-MIB", 10, 5, "something happened")
+	// Build a source with 10 lines of 10 bytes each (9 chars + newline).
+	// Line 10 starts at offset 90, column 5 is offset 94.
+	source := make([]byte, 100)
+	for i := range source {
+		if (i+1)%10 == 0 {
+			source[i] = '\n'
+		} else {
+			source[i] = 'x'
+		}
+	}
+	mod := &module.Module{
+		Name:      "TEST-MIB",
+		LineTable: types.BuildLineTable(source),
+	}
+	span := types.NewSpan(94, 95) // line 10, column 5
+	ctx.EmitDiagnostic("my-code", SeverityMinor, mod, span, "something happened")
 
 	diags := ctx.Diagnostics()
 	if len(diags) != 1 {

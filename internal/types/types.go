@@ -67,3 +67,45 @@ type SpanDiagnostic struct {
 	Span     Span
 	Message  string
 }
+
+// BuildLineTable scans source bytes and returns a table mapping line numbers
+// to byte offsets. Entry i is the byte offset where line i+1 starts.
+// Line 1 always starts at offset 0.
+func BuildLineTable(source []byte) []int {
+	// Pre-count newlines for a single allocation.
+	n := 1
+	for _, b := range source {
+		if b == '\n' {
+			n++
+		}
+	}
+	table := make([]int, 0, n)
+	table = append(table, 0) // line 1 starts at offset 0
+	for i, b := range source {
+		if b == '\n' {
+			table = append(table, i+1)
+		}
+	}
+	return table
+}
+
+// LineColFromTable converts a byte offset to 1-based line and column numbers
+// using a precomputed line table. Returns (0, 0) if the table is nil or the
+// offset cannot be resolved.
+func LineColFromTable(table []int, offset ByteOffset) (line, col int) {
+	if len(table) == 0 || offset == 0 {
+		return 0, 0
+	}
+	off := int(offset)
+	// Binary search for the last line start <= offset.
+	lo, hi := 0, len(table)-1
+	for lo < hi {
+		mid := (lo + hi + 1) / 2
+		if table[mid] <= off {
+			lo = mid
+		} else {
+			hi = mid - 1
+		}
+	}
+	return lo + 1, off - table[lo] + 1
+}
