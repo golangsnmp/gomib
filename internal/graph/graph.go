@@ -15,8 +15,6 @@ type NodeKind int
 const (
 	NodeKindType NodeKind = iota
 	NodeKindOID
-	NodeKindObject
-	NodeKindNotification
 )
 
 // Graph is a dependency graph of symbols with forward edges.

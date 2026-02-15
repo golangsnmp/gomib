@@ -66,25 +66,3 @@ func LoadFixtureByName(t testing.TB, path string) map[string]*FixtureNode {
 	return byName
 }
 
-// FixtureObjectNodes returns only fixture nodes that are OBJECT-TYPE
-// (have a non-empty Type that is not "OTHER").
-func FixtureObjectNodes(nodes map[string]*FixtureNode) map[string]*FixtureNode {
-	filtered := make(map[string]*FixtureNode)
-	for oid, node := range nodes {
-		if node.Type != "" && node.Type != "OTHER" {
-			filtered[oid] = node
-		}
-	}
-	return filtered
-}
-
-// FixtureNotificationNodes returns only fixture nodes that are NOTIFICATION-TYPE.
-func FixtureNotificationNodes(nodes map[string]*FixtureNode) map[string]*FixtureNode {
-	filtered := make(map[string]*FixtureNode)
-	for oid, node := range nodes {
-		if node.NodeType == "NOTIFICATION-TYPE" || node.NodeType == "TRAP-TYPE" {
-			filtered[oid] = node
-		}
-	}
-	return filtered
-}

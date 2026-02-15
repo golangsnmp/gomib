@@ -16,24 +16,6 @@ func NewIdent(name string, span types.Span) Ident {
 	return Ident{Name: name, Span: span}
 }
 
-// IsUppercase reports whether the identifier starts with A-Z.
-func (i Ident) IsUppercase() bool {
-	if len(i.Name) == 0 {
-		return false
-	}
-	c := i.Name[0]
-	return c >= 'A' && c <= 'Z'
-}
-
-// IsLowercase reports whether the identifier starts with a-z.
-func (i Ident) IsLowercase() bool {
-	if len(i.Name) == 0 {
-		return false
-	}
-	c := i.Name[0]
-	return c >= 'a' && c <= 'z'
-}
-
 // QuotedString holds a string literal value with its source span.
 type QuotedString struct {
 	Value string
