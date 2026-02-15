@@ -90,11 +90,7 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 			slog.Int("count", len(ctx.unresolvedIndexes)))
 	}
 
-	count := 0
-	for range ctx.Mib.Nodes() {
-		count++
-	}
-	ctx.Mib.setNodeCount(count)
+	ctx.Mib.setNodeCount(nodeCount)
 	m := ctx.Mib
 
 	r.Log(slog.LevelInfo, "resolution complete",
