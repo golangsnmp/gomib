@@ -7,9 +7,6 @@ import "slices"
 // returned separately in the second slice.
 func (g *Graph) TopologicalOrder() (order []Symbol, cyclic []Symbol) {
 	inDegree := make(map[Symbol]int)
-	for sym := range g.nodes {
-		inDegree[sym] = 0
-	}
 	for _, deps := range g.edges {
 		for _, dep := range deps {
 			inDegree[dep]++
@@ -17,8 +14,8 @@ func (g *Graph) TopologicalOrder() (order []Symbol, cyclic []Symbol) {
 	}
 
 	var queue []Symbol
-	for sym, degree := range inDegree {
-		if degree == 0 {
+	for sym := range g.nodes {
+		if inDegree[sym] == 0 {
 			queue = append(queue, sym)
 		}
 	}
