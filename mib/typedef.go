@@ -56,7 +56,14 @@ func (t *Type) IsEnumeration() bool {
 
 func (t *Type) IsBits() bool { return len(t.EffectiveBits()) > 0 }
 
-func (t *Type) EffectiveBase() BaseType { return t.base }
+func (t *Type) EffectiveBase() BaseType {
+	for current := t; current != nil; current = current.parent {
+		if current.base != 0 {
+			return current.base
+		}
+	}
+	return t.base
+}
 
 func (t *Type) EffectiveDisplayHint() string {
 	for current := t; current != nil; current = current.parent {

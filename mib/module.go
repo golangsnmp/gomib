@@ -106,7 +106,9 @@ func (m *Module) addObject(obj *Object) {
 
 func (m *Module) addType(t *Type) {
 	m.types = append(m.types, t)
-	m.typesByName[t.name] = t
+	if m.typesByName[t.name] == nil {
+		m.typesByName[t.name] = t
+	}
 }
 
 func (m *Module) addNotification(n *Notification) {

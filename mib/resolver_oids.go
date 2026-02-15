@@ -472,7 +472,10 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 
 		trapNode.setName(defName)
 		trapNode.setKind(KindNotification)
-		trapNode.setModule(ctx.ModuleToResolved[def.mod])
+		newMod := ctx.ModuleToResolved[def.mod]
+		if shouldPreferModule(ctx, newMod, trapNode.Module(), def.mod) {
+			trapNode.setModule(newMod)
+		}
 		ctx.registerModuleNodeSymbol(def.mod, defName, trapNode)
 		ctx.Mib.registerNode(defName, trapNode)
 

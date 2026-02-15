@@ -125,6 +125,7 @@ func (n *Node) LongestPrefix(oid OID) *Node {
 // walkOID walks the OID tree from n, returning the deepest node reached
 // and whether the walk matched all arcs (exact match).
 func (n *Node) walkOID(oid OID) (deepest *Node, exact bool) {
+	deepest = n
 	current := n
 	for _, arc := range oid {
 		if current.children == nil {

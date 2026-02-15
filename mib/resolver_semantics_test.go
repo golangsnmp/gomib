@@ -164,7 +164,10 @@ func TestHexToBytes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hexToBytes(tt.input)
+			got, err := hexToBytes(tt.input)
+			if err != nil {
+				t.Fatalf("hexToBytes(%q) unexpected error: %v", tt.input, err)
+			}
 			if len(got) != len(tt.want) {
 				t.Fatalf("hexToBytes(%q) len = %d, want %d", tt.input, len(got), len(tt.want))
 			}

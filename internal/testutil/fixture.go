@@ -65,4 +65,3 @@ func LoadFixtureByName(t testing.TB, path string) map[string]*FixtureNode {
 	}
 	return byName
 }
-

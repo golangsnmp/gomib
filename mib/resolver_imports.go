@@ -317,11 +317,19 @@ func isMacroSymbol(name string) bool {
 // ModuleImports[mod][symbol] points directly to the defining module.
 func resolveTransitiveImports(ctx *resolverContext) {
 	for _, imports := range ctx.ModuleImports {
+		type update struct {
+			symbol  string
+			definer *module.Module
+		}
+		var updates []update
 		for symbol, sourceMod := range imports {
 			ultimate := resolveUltimateDefiner(ctx, sourceMod, symbol)
 			if ultimate != sourceMod {
-				imports[symbol] = ultimate
+				updates = append(updates, update{symbol, ultimate})
 			}
+		}
+		for _, u := range updates {
+			imports[u.symbol] = u.definer
 		}
 	}
 }

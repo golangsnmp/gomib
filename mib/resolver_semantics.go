@@ -651,7 +651,12 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		return &dv
 	case *module.DefValHexString:
 		raw := "'" + v.Value + "'H"
-		bytes := hexToBytes(v.Value)
+		bytes, err := hexToBytes(v.Value)
+		if err != nil {
+			ctx.EmitDiagnostic("malformed-hex-defval", SeverityWarning,
+				mod.Name, 0, 0, "malformed hex DEFVAL "+raw+": "+err.Error())
+			return nil
+		}
 		dv := newDefValBytes(bytes, raw)
 		return &dv
 	case *module.DefValBinaryString:
@@ -726,16 +731,15 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 }
 
 // hexToBytes converts a hex string (e.g., "00FF1A") to bytes.
-func hexToBytes(s string) []byte {
+func hexToBytes(s string) ([]byte, error) {
 	if len(s) == 0 {
-		return []byte{}
+		return []byte{}, nil
 	}
 	// Handle odd-length hex strings by padding
 	if len(s)%2 != 0 {
 		s = "0" + s
 	}
-	b, _ := hex.DecodeString(s)
-	return b
+	return hex.DecodeString(s)
 }
 
 // binaryToBytes converts a binary string (e.g., "10101010") to bytes.
