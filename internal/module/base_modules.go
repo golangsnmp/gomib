@@ -85,39 +85,17 @@ func IsBaseModule(name string) bool {
 	return ok
 }
 
-var (
-	baseModuleMu    sync.RWMutex
-	baseModuleCache = make(map[string]*Module)
-)
+var cachedBaseModules = sync.OnceValue(func() map[string]*Module {
+	m := make(map[string]*Module, len(baseModuleNames))
+	for _, mod := range CreateBaseModules() {
+		m[mod.Name] = mod
+	}
+	return m
+})
 
 // GetBaseModule returns the Module for the named base module, or nil.
-// Modules are created on first access and cached.
 func GetBaseModule(name string) *Module {
-	if !IsBaseModule(name) {
-		return nil
-	}
-
-	// Fast path: read lock
-	baseModuleMu.RLock()
-	if mod, ok := baseModuleCache[name]; ok {
-		baseModuleMu.RUnlock()
-		return mod
-	}
-	baseModuleMu.RUnlock()
-
-	// Slow path: write lock, create and cache all base modules
-	baseModuleMu.Lock()
-	defer baseModuleMu.Unlock()
-
-	if mod, ok := baseModuleCache[name]; ok {
-		return mod
-	}
-
-	for _, mod := range CreateBaseModules() {
-		baseModuleCache[mod.Name] = mod
-	}
-
-	return baseModuleCache[name]
+	return cachedBaseModules()[name]
 }
 
 // AllBaseModules returns every BaseModule constant.
