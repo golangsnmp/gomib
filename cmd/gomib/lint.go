@@ -84,7 +84,7 @@ type lintSummary struct {
 	Modules    int            `json:"modules"`
 }
 
-func cmdLint(args []string) int {
+func (c *cli) cmdLint(args []string) int {
 	fs := flag.NewFlagSet("lint", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, lintUsage) }
 
@@ -115,7 +115,7 @@ func cmdLint(args []string) int {
 		return 1
 	}
 
-	if *help || helpFlag {
+	if *help || c.helpFlag {
 		_, _ = fmt.Fprint(os.Stdout, lintUsage)
 		return 0
 	}
@@ -143,7 +143,7 @@ func cmdLint(args []string) int {
 		return 1
 	}
 
-	result := runLint(modules, cfg)
+	result := c.runLint(modules, cfg)
 
 	if !cfg.quiet {
 		var err error
@@ -166,14 +166,14 @@ func cmdLint(args []string) int {
 	return result.ExitCode
 }
 
-func runLint(modules []string, cfg lintConfig) *lintResult {
+func (c *cli) runLint(modules []string, cfg lintConfig) *lintResult {
 	diagCfg := mib.DiagnosticConfig{
 		Level:  mib.StrictnessLevel(cfg.level),
 		FailAt: mib.SeverityFatal, // We handle failure ourselves
 		Ignore: cfg.ignore,
 	}
 
-	m, err := loadMibWithOpts(modules, gomib.WithDiagnosticConfig(diagCfg))
+	m, err := c.loadMibWithOpts(modules, gomib.WithDiagnosticConfig(diagCfg))
 
 	result := &lintResult{
 		Summary: lintSummary{

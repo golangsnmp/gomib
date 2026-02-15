@@ -28,7 +28,7 @@ Examples:
   gomib dump IF-MIB | jq '.objects'
 `
 
-func cmdDump(args []string) int {
+func (c *cli) cmdDump(args []string) int {
 	fs := flag.NewFlagSet("dump", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, dumpUsage) }
 
@@ -44,7 +44,7 @@ func cmdDump(args []string) int {
 		return 1
 	}
 
-	if *help || helpFlag {
+	if *help || c.helpFlag {
 		_, _ = fmt.Fprint(os.Stdout, dumpUsage)
 		return 0
 	}
@@ -56,7 +56,7 @@ func cmdDump(args []string) int {
 		return 1
 	}
 
-	m, err := loadMib(modules)
+	m, err := c.loadMib(modules)
 	if err != nil {
 		printError("failed to load: %v", err)
 		return 2

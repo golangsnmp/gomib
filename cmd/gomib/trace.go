@@ -38,7 +38,7 @@ Examples:
   gomib trace --all -p testdata/corpus/primary ifEntry
 `
 
-func cmdTrace(args []string) int {
+func (c *cli) cmdTrace(args []string) int {
 	fs := flag.NewFlagSet("trace", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, traceUsage) }
 
@@ -53,7 +53,7 @@ func cmdTrace(args []string) int {
 		return 1
 	}
 
-	if *help || helpFlag {
+	if *help || c.helpFlag {
 		_, _ = fmt.Fprint(os.Stdout, traceUsage)
 		return 0
 	}
@@ -79,10 +79,10 @@ func cmdTrace(args []string) int {
 
 	if *loadAll {
 		loadMode = "Load - all modules from search path"
-		m, err = loadMib(nil)
+		m, err = c.loadMib(nil)
 	} else {
 		loadMode = fmt.Sprintf("Load WithModules(%v)", modules)
-		m, err = loadMib(modules)
+		m, err = c.loadMib(modules)
 	}
 
 	if err != nil {
@@ -94,12 +94,12 @@ func cmdTrace(args []string) int {
 	fmt.Printf("Loaded: %d modules, %d objects, %d types\n\n",
 		len(m.Modules()), len(m.Objects()), len(m.Types()))
 
-	traceSymbol(m, symbol)
+	c.traceSymbol(m, symbol)
 
 	return 0
 }
 
-func traceSymbol(m *mib.Mib, symbol string) {
+func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 	fmt.Printf("=== Tracing symbol: %s ===\n\n", symbol)
 
 	var definingModules []string
@@ -299,7 +299,7 @@ func traceSymbol(m *mib.Mib, symbol string) {
 		fmt.Println()
 	}
 
-	if verbose > 0 && len(unresolved) > 0 {
+	if c.verbose > 0 && len(unresolved) > 0 {
 		fmt.Printf("ALL UNRESOLVED REFERENCES (%d total):\n", len(unresolved))
 		for _, u := range unresolved {
 			fmt.Printf("  [%s] %s in module %s\n", u.Kind, u.Symbol, u.Module)

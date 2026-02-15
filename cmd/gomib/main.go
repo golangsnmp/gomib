@@ -39,11 +39,11 @@ Examples:
   gomib trace -m IF-MIB ifEntry
 `
 
-var (
+type cli struct {
 	verbose  int
 	paths    []string
 	helpFlag bool
-)
+}
 
 func main() {
 	os.Exit(run())
@@ -52,6 +52,7 @@ func main() {
 func run() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
+	var c cli
 	args := os.Args[1:]
 	var cmdArgs []string
 	var cmd string
@@ -60,24 +61,24 @@ func run() int {
 		arg := args[i]
 		switch {
 		case arg == "-h" || arg == "--help":
-			helpFlag = true
+			c.helpFlag = true
 		case arg == "-v" || arg == "--verbose":
-			if verbose < 1 {
-				verbose = 1
+			if c.verbose < 1 {
+				c.verbose = 1
 			}
 		case arg == "-vv":
-			verbose = 2
+			c.verbose = 2
 		case arg == "--no-color":
 			// reserved for future use
 		case arg == "-p" || arg == "--path":
 			if i+1 < len(args) {
 				i++
-				paths = append(paths, args[i])
+				c.paths = append(c.paths, args[i])
 			}
 		case strings.HasPrefix(arg, "-p"):
-			paths = append(paths, arg[2:])
+			c.paths = append(c.paths, arg[2:])
 		case strings.HasPrefix(arg, "--path="):
-			paths = append(paths, arg[7:])
+			c.paths = append(c.paths, arg[7:])
 		case len(arg) > 0 && arg[0] == '-':
 			cmdArgs = append(cmdArgs, arg)
 		default:
@@ -89,7 +90,7 @@ func run() int {
 		}
 	}
 
-	if helpFlag && cmd == "" {
+	if c.helpFlag && cmd == "" {
 		_, _ = fmt.Fprint(os.Stdout, usage)
 		return 0
 	}
@@ -101,15 +102,15 @@ func run() int {
 
 	switch cmd {
 	case "load":
-		return cmdLoad(cmdArgs)
+		return c.cmdLoad(cmdArgs)
 	case "lint":
-		return cmdLint(cmdArgs)
+		return c.cmdLint(cmdArgs)
 	case "get":
-		return cmdGet(cmdArgs)
+		return c.cmdGet(cmdArgs)
 	case "dump":
-		return cmdDump(cmdArgs)
+		return c.cmdDump(cmdArgs)
 	case "trace":
-		return cmdTrace(cmdArgs)
+		return c.cmdTrace(cmdArgs)
 	case "help":
 		_, _ = fmt.Fprint(os.Stdout, usage)
 		return 0
@@ -120,12 +121,12 @@ func run() int {
 	}
 }
 
-func setupLogger() *slog.Logger {
-	if verbose == 0 {
+func (c *cli) setupLogger() *slog.Logger {
+	if c.verbose == 0 {
 		return nil
 	}
 	level := slog.LevelDebug
-	if verbose >= 2 {
+	if c.verbose >= 2 {
 		level = gomib.LevelTrace
 	}
 	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
@@ -133,17 +134,17 @@ func setupLogger() *slog.Logger {
 	}))
 }
 
-func loadMib(modules []string) (*mib.Mib, error) {
-	return loadMibWithOpts(modules)
+func (c *cli) loadMib(modules []string) (*mib.Mib, error) {
+	return c.loadMibWithOpts(modules)
 }
 
-func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (*mib.Mib, error) {
+func (c *cli) loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (*mib.Mib, error) {
 	var source gomib.Source
 	var opts []gomib.LoadOption
 
-	if len(paths) > 0 {
+	if len(c.paths) > 0 {
 		var sources []gomib.Source
-		for _, p := range paths {
+		for _, p := range c.paths {
 			if src, err := gomib.DirTree(p); err == nil {
 				sources = append(sources, src)
 			} else {
@@ -162,7 +163,7 @@ func loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (*mib.Mib,
 		opts = append(opts, gomib.WithSystemPaths())
 	}
 
-	if logger := setupLogger(); logger != nil {
+	if logger := c.setupLogger(); logger != nil {
 		opts = append(opts, gomib.WithLogger(logger))
 	}
 	opts = append(opts, extraOpts...)

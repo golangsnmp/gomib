@@ -37,7 +37,7 @@ Examples:
   gomib load --stats IF-MIB            # Show detailed stats
 `
 
-func cmdLoad(args []string) int {
+func (c *cli) cmdLoad(args []string) int {
 	fs := flag.NewFlagSet("load", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, loadUsage) }
 
@@ -52,7 +52,7 @@ func cmdLoad(args []string) int {
 		return 1
 	}
 
-	if *help || helpFlag {
+	if *help || c.helpFlag {
 		_, _ = fmt.Fprint(os.Stdout, loadUsage)
 		return 0
 	}
@@ -73,7 +73,7 @@ func cmdLoad(args []string) int {
 		opts = append(opts, gomib.WithStrictness(mib.StrictnessLevel(*level)))
 	}
 
-	m, loadErr := loadMibWithOpts(modules, opts...)
+	m, loadErr := c.loadMibWithOpts(modules, opts...)
 	if loadErr != nil && m == nil {
 		printError("failed to load: %v", loadErr)
 		return 1

@@ -41,7 +41,7 @@ func (m *moduleList) Set(value string) error {
 	return nil
 }
 
-func cmdGet(args []string) int {
+func (c *cli) cmdGet(args []string) int {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, getUsage) }
 
@@ -58,7 +58,7 @@ func cmdGet(args []string) int {
 		return 1
 	}
 
-	if *help || helpFlag {
+	if *help || c.helpFlag {
 		_, _ = fmt.Fprint(os.Stdout, getUsage)
 		return 0
 	}
@@ -98,7 +98,7 @@ func cmdGet(args []string) int {
 		return 1
 	}
 
-	m, err := loadMib(modules)
+	m, err := c.loadMib(modules)
 	if err != nil {
 		printError("failed to load: %v", err)
 		return 2
