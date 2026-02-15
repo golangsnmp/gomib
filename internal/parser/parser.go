@@ -529,9 +529,8 @@ func (p *Parser) parseValueAssignment() (ast.Definition, *types.SpanDiagnostic) 
 
 	span := types.NewSpan(start, oid.Span.End)
 	return &ast.ValueAssignmentDef{
-		Name:          name,
+		DefBase:       ast.DefBase{Name: name, Span: span},
 		OidAssignment: oid,
-		Span:          span,
 	}, nil
 }
 
@@ -722,7 +721,7 @@ func (p *Parser) parseObjectType() (ast.Definition, *types.SpanDiagnostic) {
 
 	span := types.NewSpan(start, oid.Span.End)
 	return &ast.ObjectTypeDef{
-		Name:          name,
+		DefBase:       ast.DefBase{Name: name, Span: span},
 		Syntax:        syntax,
 		Units:         units,
 		Access:        access,
@@ -733,7 +732,6 @@ func (p *Parser) parseObjectType() (ast.Definition, *types.SpanDiagnostic) {
 		Augments:      augments,
 		DefVal:        defval,
 		OidAssignment: oid,
-		Span:          span,
 	}, nil
 }
 
@@ -1751,14 +1749,13 @@ func (p *Parser) parseModuleIdentity() (ast.Definition, *types.SpanDiagnostic) {
 
 	span := types.NewSpan(start, oid.Span.End)
 	return &ast.ModuleIdentityDef{
-		Name:          name,
+		DefBase:       ast.DefBase{Name: name, Span: span},
 		LastUpdated:   lastUpdated,
 		Organization:  organization,
 		ContactInfo:   contactInfo,
 		Description:   description,
 		Revisions:     revisions,
 		OidAssignment: oid,
-		Span:          span,
 	}, nil
 }
 
@@ -1806,12 +1803,11 @@ func (p *Parser) parseObjectIdentity() (ast.Definition, *types.SpanDiagnostic) {
 
 	span := types.NewSpan(start, oid.Span.End)
 	return &ast.ObjectIdentityDef{
-		Name:          name,
+		DefBase:       ast.DefBase{Name: name, Span: span},
 		Status:        status,
 		Description:   description,
 		Reference:     reference,
 		OidAssignment: oid,
-		Span:          span,
 	}, nil
 }
 
@@ -1876,13 +1872,12 @@ func (p *Parser) parseNotificationType() (ast.Definition, *types.SpanDiagnostic)
 
 	span := types.NewSpan(start, oid.Span.End)
 	return &ast.NotificationTypeDef{
-		Name:          name,
+		DefBase:       ast.DefBase{Name: name, Span: span},
 		Objects:       objects,
 		Status:        status,
 		Description:   description,
 		Reference:     reference,
 		OidAssignment: oid,
-		Span:          span,
 	}, nil
 }
 
@@ -1954,13 +1949,12 @@ func (p *Parser) parseTrapType() (ast.Definition, *types.SpanDiagnostic) {
 
 	span := types.NewSpan(start, numToken.Span.End)
 	return &ast.TrapTypeDef{
-		Name:        name,
+		DefBase:     ast.DefBase{Name: name, Span: span},
 		Enterprise:  enterprise,
 		Variables:   variables,
 		Description: description,
 		Reference:   reference,
 		TrapNumber:  trapNumber,
-		Span:        span,
 	}, nil
 }
 
@@ -2042,13 +2036,12 @@ func (p *Parser) parseTextualConventionBody(name ast.Ident, start types.ByteOffs
 
 	span := types.NewSpan(start, syntax.Span.End)
 	return &ast.TextualConventionDef{
-		Name:        name,
+		DefBase:     ast.DefBase{Name: name, Span: span},
 		DisplayHint: displayHint,
 		Status:      status,
 		Description: description,
 		Reference:   reference,
 		Syntax:      syntax,
-		Span:        span,
 	}, nil
 }
 
@@ -2070,9 +2063,8 @@ func (p *Parser) parseTypeAssignment() (ast.Definition, *types.SpanDiagnostic) {
 	span := types.NewSpan(start, syntax.SyntaxSpan().End)
 
 	return &ast.TypeAssignmentDef{
-		Name:   name,
-		Syntax: syntax,
-		Span:   span,
+		DefBase: ast.DefBase{Name: name, Span: span},
+		Syntax:  syntax,
 	}, nil
 }
 
@@ -2135,13 +2127,12 @@ func (p *Parser) parseObjectGroup() (ast.Definition, *types.SpanDiagnostic) {
 
 	span := types.NewSpan(start, oid.Span.End)
 	return &ast.ObjectGroupDef{
-		Name:          name,
+		DefBase:       ast.DefBase{Name: name, Span: span},
 		Objects:       objects,
 		Status:        status,
 		Description:   description,
 		Reference:     reference,
 		OidAssignment: oid,
-		Span:          span,
 	}, nil
 }
 
@@ -2204,13 +2195,12 @@ func (p *Parser) parseNotificationGroup() (ast.Definition, *types.SpanDiagnostic
 
 	span := types.NewSpan(start, oid.Span.End)
 	return &ast.NotificationGroupDef{
-		Name:          name,
+		DefBase:       ast.DefBase{Name: name, Span: span},
 		Notifications: notifications,
 		Status:        status,
 		Description:   description,
 		Reference:     reference,
 		OidAssignment: oid,
-		Span:          span,
 	}, nil
 }
 
@@ -2268,13 +2258,12 @@ func (p *Parser) parseModuleCompliance() (ast.Definition, *types.SpanDiagnostic)
 
 	span := types.NewSpan(start, oid.Span.End)
 	return &ast.ModuleComplianceDef{
-		Name:          name,
+		DefBase:       ast.DefBase{Name: name, Span: span},
 		Status:        status,
 		Description:   description,
 		Reference:     reference,
 		Modules:       modules,
 		OidAssignment: oid,
-		Span:          span,
 	}, nil
 }
 
@@ -2514,14 +2503,13 @@ func (p *Parser) parseAgentCapabilities() (ast.Definition, *types.SpanDiagnostic
 
 	span := types.NewSpan(start, oid.Span.End)
 	return &ast.AgentCapabilitiesDef{
-		Name:           name,
+		DefBase:        ast.DefBase{Name: name, Span: span},
 		ProductRelease: productRelease,
 		Status:         status,
 		Description:    description,
 		Reference:      reference,
 		Supports:       supports,
 		OidAssignment:  oid,
-		Span:           span,
 	}, nil
 }
 
@@ -2713,8 +2701,7 @@ func (p *Parser) parseMacroDefinition() (ast.Definition, *types.SpanDiagnostic) 
 
 	span := types.NewSpan(start, endToken.Span.End)
 	return &ast.MacroDefinitionDef{
-		Name: name,
-		Span: span,
+		DefBase: ast.DefBase{Name: name, Span: span},
 	}, nil
 }
 
