@@ -172,6 +172,11 @@ func (k TokenKind) IsKeyword() bool {
 	return k >= TokKwDefinitions && k < tokKeywordEnd
 }
 
+// IsIdentifier reports whether k is an identifier token (uppercase or lowercase).
+func (k TokenKind) IsIdentifier() bool {
+	return k == TokUppercaseIdent || k == TokLowercaseIdent
+}
+
 // IsTypeKeyword reports whether k is a built-in type keyword
 // (INTEGER, Counter32, OCTET STRING components, etc.).
 func (k TokenKind) IsTypeKeyword() bool {

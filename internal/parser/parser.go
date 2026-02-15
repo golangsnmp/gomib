@@ -103,12 +103,6 @@ func (p *Parser) validateValueReference(name string, span types.Span) {
 	}
 }
 
-// isValueRefToken returns true if the token kind can be used as a value reference.
-// This includes both lowercase (RFC-compliant) and uppercase (common vendor violation) identifiers.
-func isValueRefToken(kind lexer.TokenKind) bool {
-	return kind == lexer.TokLowercaseIdent || kind == lexer.TokUppercaseIdent
-}
-
 // ParseModule parses a complete MIB module and returns its AST.
 // Parse errors are collected in the module's diagnostics rather
 // than causing immediate failure.
@@ -343,7 +337,7 @@ func (p *Parser) expectIdentifier() (lexer.Token, *types.SpanDiagnostic) {
 // Type keywords are accepted because vendor MIBs use them as index objects.
 func (p *Parser) expectIndexObject() (lexer.Token, *types.SpanDiagnostic) {
 	kind := p.peek().Kind
-	if kind == lexer.TokUppercaseIdent || kind == lexer.TokLowercaseIdent || kind.IsTypeKeyword() {
+	if kind.IsIdentifier() || kind.IsTypeKeyword() {
 		return p.advance(), nil
 	}
 	diag := p.makeError("expected index object")
@@ -354,7 +348,7 @@ func (p *Parser) expectIndexObject() (lexer.Token, *types.SpanDiagnostic) {
 // Keywords like "current" and "deprecated" appear as enum labels in some MIBs.
 func (p *Parser) expectEnumLabel() (lexer.Token, *types.SpanDiagnostic) {
 	kind := p.peek().Kind
-	if kind == lexer.TokUppercaseIdent || kind == lexer.TokLowercaseIdent ||
+	if kind.IsIdentifier() ||
 		kind == lexer.TokKwCurrent || kind == lexer.TokKwDeprecated ||
 		kind == lexer.TokKwObsolete || kind == lexer.TokKwMandatory ||
 		kind == lexer.TokKwOptional || kind == lexer.TokKwObject ||
@@ -391,7 +385,7 @@ func (p *Parser) parseImports() ([]ast.ImportClause, *types.SpanDiagnostic) {
 		for {
 			kind := p.peek().Kind
 			if kind.IsMacroKeyword() || kind.IsTypeKeyword() ||
-				kind == lexer.TokUppercaseIdent || kind == lexer.TokLowercaseIdent {
+				kind.IsIdentifier() {
 				symToken := p.advance()
 				symbols = append(symbols, p.makeIdent(symToken))
 			} else if p.check(lexer.TokKwFrom) {
@@ -439,27 +433,27 @@ func (p *Parser) parseDefinition() (ast.Definition, *types.SpanDiagnostic) {
 	switch {
 	// Value assignment: name OBJECT IDENTIFIER ::=
 	// Accept both lowercase (RFC-compliant) and uppercase (vendor violation) identifiers
-	case isValueRefToken(first) && second == lexer.TokKwObject && p.peekNth(2).Kind == lexer.TokKwIdentifier:
+	case first.IsIdentifier() && second == lexer.TokKwObject && p.peekNth(2).Kind == lexer.TokKwIdentifier:
 		return p.parseValueAssignment()
 
 	// OBJECT-TYPE
-	case isValueRefToken(first) && second == lexer.TokKwObjectType:
+	case first.IsIdentifier() && second == lexer.TokKwObjectType:
 		return p.parseObjectType()
 
 	// MODULE-IDENTITY
-	case isValueRefToken(first) && second == lexer.TokKwModuleIdentity:
+	case first.IsIdentifier() && second == lexer.TokKwModuleIdentity:
 		return p.parseModuleIdentity()
 
 	// OBJECT-IDENTITY
-	case isValueRefToken(first) && second == lexer.TokKwObjectIdentity:
+	case first.IsIdentifier() && second == lexer.TokKwObjectIdentity:
 		return p.parseObjectIdentity()
 
 	// NOTIFICATION-TYPE
-	case isValueRefToken(first) && second == lexer.TokKwNotificationType:
+	case first.IsIdentifier() && second == lexer.TokKwNotificationType:
 		return p.parseNotificationType()
 
 	// TRAP-TYPE
-	case isValueRefToken(first) && second == lexer.TokKwTrapType:
+	case first.IsIdentifier() && second == lexer.TokKwTrapType:
 		return p.parseTrapType()
 
 	// TEXTUAL-CONVENTION
@@ -467,19 +461,19 @@ func (p *Parser) parseDefinition() (ast.Definition, *types.SpanDiagnostic) {
 		return p.parseTextualConvention()
 
 	// OBJECT-GROUP
-	case isValueRefToken(first) && second == lexer.TokKwObjectGroup:
+	case first.IsIdentifier() && second == lexer.TokKwObjectGroup:
 		return p.parseObjectGroup()
 
 	// NOTIFICATION-GROUP
-	case isValueRefToken(first) && second == lexer.TokKwNotificationGroup:
+	case first.IsIdentifier() && second == lexer.TokKwNotificationGroup:
 		return p.parseNotificationGroup()
 
 	// MODULE-COMPLIANCE
-	case isValueRefToken(first) && second == lexer.TokKwModuleCompliance:
+	case first.IsIdentifier() && second == lexer.TokKwModuleCompliance:
 		return p.parseModuleCompliance()
 
 	// AGENT-CAPABILITIES
-	case isValueRefToken(first) && second == lexer.TokKwAgentCapabilities:
+	case first.IsIdentifier() && second == lexer.TokKwAgentCapabilities:
 		return p.parseAgentCapabilities()
 
 	// Type assignment or TEXTUAL-CONVENTION: TypeName ::=
@@ -1491,7 +1485,7 @@ func (p *Parser) parseDefValBitsLabels(first ast.Ident, innerStart types.ByteOff
 		p.advance()
 		kind := p.peek().Kind
 		// Accept identifiers or keywords as BITS labels
-		if kind == lexer.TokLowercaseIdent || kind == lexer.TokUppercaseIdent || kind.IsKeyword() {
+		if kind.IsIdentifier() || kind.IsKeyword() {
 			token := p.advance()
 			labels = append(labels, ast.NewIdent(p.text(token.Span), token.Span))
 		}
@@ -2752,11 +2746,11 @@ func (p *Parser) recoverToDefinition() {
 		current := p.peek().Kind
 		next := p.peekNth(1).Kind
 
-		if (isValueRefToken(current) && next.IsMacroKeyword()) ||
+		if (current.IsIdentifier() && next.IsMacroKeyword()) ||
 			(current == lexer.TokUppercaseIdent && next == lexer.TokColonColonEqual) ||
 			(current == lexer.TokUppercaseIdent && next == lexer.TokKwTextualConvention) ||
 			(current == lexer.TokUppercaseIdent && next == lexer.TokKwMacro) ||
-			(isValueRefToken(current) && next == lexer.TokKwObject &&
+			(current.IsIdentifier() && next == lexer.TokKwObject &&
 				p.peekNth(2).Kind == lexer.TokKwIdentifier) {
 			break
 		}
