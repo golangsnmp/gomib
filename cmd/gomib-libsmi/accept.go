@@ -283,4 +283,3 @@ func printAcceptResult(w io.Writer, result *AcceptResult, showAll bool, showDeta
 		fmt.Fprintf(w, "\nAll modules have consistent acceptance between gomib and libsmi.\n")
 	}
 }
-
