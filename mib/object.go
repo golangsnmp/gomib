@@ -68,23 +68,8 @@ func (o *Object) EffectiveEnums() []NamedValue { return slices.Clone(o.enums) }
 func (o *Object) EffectiveBits() []NamedValue  { return slices.Clone(o.bits) }
 func (o *Object) Index() []IndexEntry          { return slices.Clone(o.index) }
 
-func (o *Object) Enum(label string) (NamedValue, bool) {
-	for _, nv := range o.enums {
-		if nv.Label == label {
-			return nv, true
-		}
-	}
-	return NamedValue{}, false
-}
-
-func (o *Object) Bit(label string) (NamedValue, bool) {
-	for _, nv := range o.bits {
-		if nv.Label == label {
-			return nv, true
-		}
-	}
-	return NamedValue{}, false
-}
+func (o *Object) Enum(label string) (NamedValue, bool) { return findNamedValue(o.enums, label) }
+func (o *Object) Bit(label string) (NamedValue, bool)  { return findNamedValue(o.bits, label) }
 
 // Table returns the table object that contains this row or column, or nil.
 func (o *Object) Table() *Object {

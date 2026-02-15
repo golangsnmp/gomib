@@ -24,6 +24,15 @@ type NamedValue struct {
 	Value int64
 }
 
+func findNamedValue(values []NamedValue, label string) (NamedValue, bool) {
+	for _, nv := range values {
+		if nv.Label == label {
+			return nv, true
+		}
+	}
+	return NamedValue{}, false
+}
+
 // Revision describes a module revision.
 type Revision struct {
 	Date        string // "YYYY-MM-DD" or original format

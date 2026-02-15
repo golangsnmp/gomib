@@ -37,23 +37,8 @@ func (t *Type) Ranges() []Range     { return slices.Clone(t.ranges) }
 func (t *Type) Enums() []NamedValue { return slices.Clone(t.enums) }
 func (t *Type) Bits() []NamedValue  { return slices.Clone(t.bits) }
 
-func (t *Type) Enum(label string) (NamedValue, bool) {
-	for _, nv := range t.enums {
-		if nv.Label == label {
-			return nv, true
-		}
-	}
-	return NamedValue{}, false
-}
-
-func (t *Type) Bit(label string) (NamedValue, bool) {
-	for _, nv := range t.bits {
-		if nv.Label == label {
-			return nv, true
-		}
-	}
-	return NamedValue{}, false
-}
+func (t *Type) Enum(label string) (NamedValue, bool) { return findNamedValue(t.enums, label) }
+func (t *Type) Bit(label string) (NamedValue, bool)  { return findNamedValue(t.bits, label) }
 
 func (t *Type) IsTextualConvention() bool { return t.isTC }
 
