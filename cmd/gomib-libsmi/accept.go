@@ -245,7 +245,7 @@ func printAcceptResult(w io.Writer, result *AcceptResult, showAll bool, showDeta
 				if len(m.GomibDiags) > 0 {
 					fmt.Fprintf(w, "    gomib diagnostics:\n")
 					for _, d := range m.GomibDiags {
-						fmt.Fprintf(w, "      %s\n", truncateMsg(d, 70))
+						fmt.Fprintf(w, "      %s\n", truncate(d, 70))
 					}
 					if m.GomibErrors > len(m.GomibDiags) {
 						fmt.Fprintf(w, "      ... and %d more\n", m.GomibErrors-len(m.GomibDiags))
@@ -254,7 +254,7 @@ func printAcceptResult(w io.Writer, result *AcceptResult, showAll bool, showDeta
 				if len(m.LibsmiDiags) > 0 {
 					fmt.Fprintf(w, "    libsmi diagnostics:\n")
 					for _, d := range m.LibsmiDiags {
-						fmt.Fprintf(w, "      %s\n", truncateMsg(d, 70))
+						fmt.Fprintf(w, "      %s\n", truncate(d, 70))
 					}
 					if m.LibsmiErrors > len(m.LibsmiDiags) {
 						fmt.Fprintf(w, "      ... and %d more\n", m.LibsmiErrors-len(m.LibsmiDiags))
@@ -284,9 +284,3 @@ func printAcceptResult(w io.Writer, result *AcceptResult, showAll bool, showDeta
 	}
 }
 
-func truncateMsg(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "..."
-}
