@@ -14,6 +14,13 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
+// Exit codes.
+const (
+	exitOK              = 0 // success
+	exitError           = 1 // user error, processing failure, or severe diagnostic
+	exitStrictViolation = 2 // strict mode found errors or unresolved refs
+)
+
 const usage = `gomib - MIB parser and query tool
 
 Usage:

@@ -136,15 +136,15 @@ func (c *cli) cmdLoad(args []string) int {
 
 	if loadErr != nil {
 		printError("%v", loadErr)
-		return 1
+		return exitError
 	}
 	if hasSevere {
-		return 1
+		return exitError
 	}
 	if *strict && (hasErrors || len(unresolved) > 0) {
-		return 2
+		return exitStrictViolation
 	}
-	return 0
+	return exitOK
 }
 
 func printDiagnostic(d mib.Diagnostic) {

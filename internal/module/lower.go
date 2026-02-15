@@ -112,7 +112,7 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 			}
 		}
 		if !hasModuleIdentity {
-			ctx.emitDiagnostic("missing-module-identity", types.SeverityError, module.Name, module.Span,
+			ctx.emitDiagnostic(types.DiagMissingModuleIdentity, types.SeverityError, module.Name, module.Span,
 				fmt.Sprintf("SMIv2 module %s lacks MODULE-IDENTITY", module.Name))
 		}
 	}
@@ -198,7 +198,7 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 		// Non-semantic definitions
 		return nil
 	default:
-		ctx.emitDiagnostic("unknown-definition-type", types.SeverityWarning, ctx.moduleName, def.DefinitionSpan(),
+		ctx.emitDiagnostic(types.DiagUnknownDefinitionType, types.SeverityWarning, ctx.moduleName, def.DefinitionSpan(),
 			fmt.Sprintf("unknown definition type %T", def))
 		return nil
 	}
@@ -285,7 +285,7 @@ func checkRevisionLastUpdated(ctx *LoweringContext, moduleName string, mi *Modul
 			return
 		}
 	}
-	ctx.emitDiagnostic("revision-last-updated", types.SeverityMinor, moduleName, mi.Span,
+	ctx.emitDiagnostic(types.DiagRevisionLastUpdated, types.SeverityMinor, moduleName, mi.Span,
 		fmt.Sprintf("revision for LAST-UPDATED %s is missing", mi.LastUpdated))
 }
 
@@ -659,7 +659,7 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 		return &TypeSyntaxObjectIdentifier{}
 
 	default:
-		ctx.emitDiagnostic("unknown-type-syntax", types.SeverityWarning, ctx.moduleName, syntax.SyntaxSpan(),
+		ctx.emitDiagnostic(types.DiagUnknownTypeSyntax, types.SeverityWarning, ctx.moduleName, syntax.SyntaxSpan(),
 			fmt.Sprintf("unknown type syntax %T, defaulting to OCTET STRING", syntax))
 		return &TypeSyntaxOctetString{}
 	}
@@ -682,7 +682,7 @@ func lowerConstraint(constraint ast.Constraint, ctx *LoweringContext) Constraint
 		return &ConstraintRange{Ranges: ranges}
 
 	default:
-		ctx.emitDiagnostic("unknown-constraint-type", types.SeverityWarning, ctx.moduleName, constraint.ConstraintSpan(),
+		ctx.emitDiagnostic(types.DiagUnknownConstraintType, types.SeverityWarning, ctx.moduleName, constraint.ConstraintSpan(),
 			fmt.Sprintf("unknown constraint type %T, defaulting to empty range", constraint))
 		return &ConstraintRange{}
 	}
@@ -714,13 +714,13 @@ func lowerRangeValue(value ast.RangeValue, ctx *LoweringContext) RangeValue {
 		case "MAX":
 			return &RangeValueMax{}
 		default:
-			ctx.emitDiagnostic("unknown-range-value", types.SeverityWarning, ctx.moduleName, v.Name.Span,
+			ctx.emitDiagnostic(types.DiagUnknownRangeValue, types.SeverityWarning, ctx.moduleName, v.Name.Span,
 				fmt.Sprintf("unknown range identifier %s, defaulting to 0", v.Name.Name))
 			return &RangeValueUnsigned{Value: 0}
 		}
 
 	default:
-		ctx.emitDiagnostic("unknown-range-value", types.SeverityWarning, ctx.moduleName, types.Span{},
+		ctx.emitDiagnostic(types.DiagUnknownRangeValue, types.SeverityWarning, ctx.moduleName, types.Span{},
 			fmt.Sprintf("unknown range value type %T, defaulting to 0", value))
 		return &RangeValueUnsigned{Value: 0}
 	}
@@ -762,7 +762,7 @@ func lowerOidComponent(comp ast.OidComponent, ctx *LoweringContext) OidComponent
 		}
 
 	default:
-		ctx.emitDiagnostic("unknown-oid-component-type", types.SeverityWarning, ctx.moduleName, comp.ComponentSpan(),
+		ctx.emitDiagnostic(types.DiagUnknownOidComponent, types.SeverityWarning, ctx.moduleName, comp.ComponentSpan(),
 			fmt.Sprintf("unknown OID component type %T, defaulting to sub-id 0", comp))
 		return &OidComponentNumber{Value: 0}
 	}
@@ -882,7 +882,7 @@ func lowerDefValContent(content ast.DefValContent, ctx *LoweringContext) DefVal 
 		return &DefValOidValue{Components: components}
 
 	default:
-		ctx.emitDiagnostic("unknown-defval-type", types.SeverityWarning, ctx.moduleName, types.Span{},
+		ctx.emitDiagnostic(types.DiagUnknownDefvalType, types.SeverityWarning, ctx.moduleName, types.Span{},
 			fmt.Sprintf("unknown DEFVAL content type %T, defaulting to integer 0", content))
 		return &DefValInteger{Value: 0}
 	}

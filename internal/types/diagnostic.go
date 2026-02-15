@@ -81,9 +81,9 @@ func PermissiveConfig() DiagnosticConfig {
 		Level:  StrictnessPermissive,
 		FailAt: SeverityFatal,
 		Ignore: []string{
-			"identifier-underscore",
-			"identifier-length-32",
-			"bad-identifier-case",
+			DiagIdentifierUnderscore,
+			DiagIdentifierLength32,
+			DiagBadIdentifierCase,
 		},
 	}
 }

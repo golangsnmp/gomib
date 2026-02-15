@@ -359,9 +359,9 @@ func recordUnresolved[T any](c *resolverContext, list *[]T, entry T, mod *module
 
 // RecordUnresolvedImport tracks a symbol that could not be resolved from its source module.
 func (c *resolverContext) RecordUnresolvedImport(importingModule *module.Module, fromModule, symbol, reason string, span types.Span) {
-	code := "import-not-found"
+	code := types.DiagImportNotFound
 	if reason == reasonModuleNotFound {
-		code = "import-module-not-found"
+		code = types.DiagImportModuleNotFound
 	}
 	recordUnresolved(c, &c.unresolvedImports, unresolvedImport{
 		importingModule: importingModule,
@@ -376,28 +376,28 @@ func (c *resolverContext) RecordUnresolvedImport(importingModule *module.Module,
 func (c *resolverContext) RecordUnresolvedType(mod *module.Module, referrer, referenced string, span types.Span) {
 	recordUnresolved(c, &c.unresolvedTypes, unresolvedType{
 		module: mod, referrer: referrer, referenced: referenced, span: span,
-	}, mod, "type-unknown", fmt.Sprintf("unresolved type: %s references unknown type %s", referrer, referenced))
+	}, mod, types.DiagTypeUnknown, fmt.Sprintf("unresolved type: %s references unknown type %s", referrer, referenced))
 }
 
 // RecordUnresolvedOid tracks an OID definition whose parent component could not be resolved.
 func (c *resolverContext) RecordUnresolvedOid(mod *module.Module, defName, component string, span types.Span) {
 	recordUnresolved(c, &c.unresolvedOids, unresolvedOid{
 		module: mod, definition: defName, component: component, span: span,
-	}, mod, "oid-orphan", fmt.Sprintf("unresolved OID: %s references unknown parent %s", defName, component))
+	}, mod, types.DiagOidOrphan, fmt.Sprintf("unresolved OID: %s references unknown parent %s", defName, component))
 }
 
 // RecordUnresolvedIndex tracks a row's INDEX entry that references a missing object.
 func (c *resolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexObject string, span types.Span) {
 	recordUnresolved(c, &c.unresolvedIndexes, unresolvedIndex{
 		module: mod, row: row, indexObject: indexObject, span: span,
-	}, mod, "index-unresolved", fmt.Sprintf("unresolved INDEX: %s references unknown object %s", row, indexObject))
+	}, mod, types.DiagIndexUnresolved, fmt.Sprintf("unresolved INDEX: %s references unknown object %s", row, indexObject))
 }
 
 // RecordUnresolvedNotificationObject tracks a notification's OBJECTS entry that references a missing object.
 func (c *resolverContext) RecordUnresolvedNotificationObject(mod *module.Module, notification, object string, span types.Span) {
 	recordUnresolved(c, &c.unresolvedNotifObjects, unresolvedNotifObject{
 		module: mod, notification: notification, object: object, span: span,
-	}, mod, "objects-unresolved", fmt.Sprintf("unresolved OBJECTS: %s references unknown object %s", notification, object))
+	}, mod, types.DiagObjectsUnresolved, fmt.Sprintf("unresolved OBJECTS: %s references unknown object %s", notification, object))
 }
 
 // DropModules releases parsed module data to free memory after resolution completes.

@@ -59,7 +59,7 @@ func (c *cli) cmdDump(args []string) int {
 	m, err := c.loadMib(modules)
 	if err != nil {
 		printError("failed to load: %v", err)
-		return 2
+		return exitError
 	}
 
 	opts := JSONOptions{

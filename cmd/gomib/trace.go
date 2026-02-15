@@ -87,7 +87,7 @@ func (c *cli) cmdTrace(args []string) int {
 
 	if err != nil {
 		printError("failed to load: %v", err)
-		return 2
+		return exitError
 	}
 
 	fmt.Printf("Load mode: %s\n", loadMode)

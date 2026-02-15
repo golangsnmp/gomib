@@ -310,7 +310,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 				if ref.mod != nil {
 					modName = ref.mod.Name
 				}
-				ctx.EmitDiagnostic("notification-object-not-object", SeverityMinor, modName, 0, 0,
+				ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, SeverityMinor, modName, 0, 0,
 					"notification "+notif.Name+" references "+objName+" which is not an object definition")
 			}
 		}
@@ -373,7 +373,7 @@ func createResolvedObjectGroups(ctx *resolverContext) int {
 			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
 				resolved.addMember(memberNode)
 				if obj := memberNode.Object(); obj != nil && obj.Access() == AccessNotAccessible {
-					ctx.EmitDiagnostic("group-not-accessible", SeverityMinor,
+					ctx.EmitDiagnostic(types.DiagGroupNotAccessible, SeverityMinor,
 						ref.mod.Name, 0, 0,
 						"object "+memberName+" of group "+grp.Name+" must not be not-accessible")
 				}
@@ -657,7 +657,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		raw := "'" + v.Value + "'H"
 		bytes, err := hexToBytes(v.Value)
 		if err != nil {
-			ctx.EmitDiagnostic("malformed-hex-defval", SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagMalformedHexDefval, SeverityWarning,
 				mod.Name, 0, 0, "malformed hex DEFVAL "+raw+": "+err.Error())
 			return nil
 		}
@@ -693,9 +693,13 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			dv := newDefValOID(oid, v.Name)
 			return &dv
 		}
+		ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
+			mod.Name, 0, 0, "DEFVAL OID reference "+v.Name+" could not be resolved")
 		return nil
 	case *module.DefValOidValue:
 		if len(v.Components) == 0 {
+			ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
+				mod.Name, 0, 0, "DEFVAL OID value has no components")
 			return nil
 		}
 		var name string
@@ -710,10 +714,14 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			name = c.NameValue
 		}
 		if name == "" {
+			ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
+				mod.Name, 0, 0, "DEFVAL OID value has no named root component")
 			return nil
 		}
 		node, ok := ctx.LookupNodeForModule(mod, name)
 		if !ok {
+			ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
+				mod.Name, 0, 0, "DEFVAL OID root "+name+" could not be resolved")
 			return nil
 		}
 		oid := OID(node.OID())

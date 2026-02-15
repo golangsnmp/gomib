@@ -183,7 +183,7 @@ func checkSmiv2IdentifierHyphens(ctx *resolverContext, defs []oidDefinition) {
 		}
 		name := def.defName()
 		if strings.Contains(name, "-") {
-			ctx.EmitDiagnostic("identifier-hyphen-smiv2", SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagIdentifierHyphenSMI, SeverityWarning,
 				def.mod.Name, 0, 0,
 				"identifier "+name+" should not contain hyphens in SMIv2 MIB")
 		}
