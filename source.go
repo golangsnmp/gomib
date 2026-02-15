@@ -2,7 +2,6 @@ package gomib
 
 import (
 	"errors"
-	"io"
 	"io/fs"
 	"maps"
 	"os"
@@ -20,7 +19,7 @@ func DefaultExtensions() []string {
 
 // FindResult holds the content and location of a found MIB file.
 type FindResult struct {
-	Reader io.ReadCloser
+	Content []byte
 	// Path is used in diagnostic messages to identify the source.
 	Path string
 }
@@ -89,9 +88,9 @@ func MustDir(path string, opts ...SourceOption) Source {
 func (s *dirSource) Find(name string) (FindResult, error) {
 	for _, ext := range s.config.extensions {
 		fullPath := filepath.Join(s.path, name+ext)
-		f, err := os.Open(fullPath)
+		content, err := os.ReadFile(fullPath)
 		if err == nil {
-			return FindResult{Reader: f, Path: fullPath}, nil
+			return FindResult{Content: content, Path: fullPath}, nil
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
 			return FindResult{Path: fullPath}, err
@@ -171,11 +170,11 @@ func (s *treeSource) Find(name string) (FindResult, error) {
 	if !ok {
 		return FindResult{}, fs.ErrNotExist
 	}
-	f, err := os.Open(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return FindResult{Path: path}, err
 	}
-	return FindResult{Reader: f, Path: path}, nil
+	return FindResult{Content: content, Path: path}, nil
 }
 
 func (s *treeSource) ListModules() ([]string, error) {
@@ -224,11 +223,11 @@ func (s *fsSource) Find(name string) (FindResult, error) {
 		return FindResult{}, fs.ErrNotExist
 	}
 	fullPath := s.name + ":" + path
-	f, err := s.fsys.Open(path)
+	content, err := fs.ReadFile(s.fsys, path)
 	if err != nil {
 		return FindResult{Path: fullPath}, err
 	}
-	return FindResult{Reader: f, Path: fullPath}, nil
+	return FindResult{Content: content, Path: fullPath}, nil
 }
 
 func (s *fsSource) ListModules() ([]string, error) {

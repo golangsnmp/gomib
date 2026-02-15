@@ -5,7 +5,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"io"
 	"io/fs"
 	"log/slog"
 	"runtime"
@@ -96,18 +95,8 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 				}
 				return
 			}
-			content, err := io.ReadAll(result.Reader)
-			_ = result.Reader.Close()
-			if err != nil {
-				if logEnabled(logger, slog.LevelWarn) {
-					logger.LogAttrs(ctx, slog.LevelWarn, "module read error",
-						slog.String("module", sm.name),
-						slog.String("error", err.Error()))
-				}
-				return
-			}
 
-			mod := decodeModule(content, sm.name, logger, cfg)
+			mod := decodeModule(result.Content, sm.name, logger, cfg)
 			if mod != nil {
 				results <- parseResult{mod: mod}
 			}
@@ -224,12 +213,7 @@ func findModuleContent(sources []Source, name string) ([]byte, error) {
 			}
 			return nil, err
 		}
-		content, err := io.ReadAll(result.Reader)
-		_ = result.Reader.Close()
-		if err != nil {
-			return nil, err
-		}
-		return content, nil
+		return result.Content, nil
 	}
 	return nil, fs.ErrNotExist
 }

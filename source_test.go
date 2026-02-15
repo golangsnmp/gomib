@@ -71,8 +71,7 @@ func TestDirSourceFindExisting(t *testing.T) {
 
 	result, err := src.Find("IF-MIB")
 	testutil.NoError(t, err, "Find IF-MIB")
-	testutil.NotNil(t, result.Reader, "Reader should not be nil")
-	_ = result.Reader.Close()
+	testutil.True(t, len(result.Content) > 0, "Content should not be empty")
 	testutil.True(t, result.Path != "", "Path should be set")
 }
 
@@ -93,8 +92,7 @@ func TestDirTreeSourceFindAcrossSubdirs(t *testing.T) {
 
 	result, err := src.Find("IF-MIB")
 	testutil.NoError(t, err, "Find IF-MIB across subdirs")
-	testutil.NotNil(t, result.Reader, "Reader should not be nil")
-	_ = result.Reader.Close()
+	testutil.True(t, len(result.Content) > 0, "Content should not be empty")
 }
 
 func TestDirTreeSourceFindNotExist(t *testing.T) {
@@ -131,8 +129,7 @@ END
 
 	result, err := src.Find("TEST-FS-MIB")
 	testutil.NoError(t, err, "Find TEST-FS-MIB in FS source")
-	testutil.NotNil(t, result.Reader, "Reader should not be nil")
-	_ = result.Reader.Close()
+	testutil.True(t, len(result.Content) > 0, "Content should not be empty")
 	testutil.Contains(t, result.Path, "test-fs:", "Path should contain FS name prefix")
 
 	names, err := src.ListModules()
@@ -205,7 +202,7 @@ func TestMultiSourceFindOrder(t *testing.T) {
 
 	result, err := multi.Find("IF-MIB")
 	testutil.NoError(t, err, "Find IF-MIB from multi source")
-	_ = result.Reader.Close()
+	testutil.True(t, len(result.Content) > 0, "Content should not be empty")
 }
 
 func TestMultiSourceListModulesCombines(t *testing.T) {

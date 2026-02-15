@@ -1,10 +1,8 @@
 package gomib
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"io"
 	"io/fs"
 	"testing"
 
@@ -544,8 +542,8 @@ type fakeSource struct {
 }
 
 type fakeModule struct {
-	findErr error         // error from Find
-	reader  io.ReadCloser // reader to return from Find (if findErr is nil)
+	findErr error  // error from Find
+	content []byte // content to return from Find (if findErr is nil)
 }
 
 func (f *fakeSource) Find(name string) (FindResult, error) {
@@ -556,7 +554,7 @@ func (f *fakeSource) Find(name string) (FindResult, error) {
 	if m.findErr != nil {
 		return FindResult{}, m.findErr
 	}
-	return FindResult{Reader: m.reader, Path: "fake:" + name}, nil
+	return FindResult{Content: m.content, Path: "fake:" + name}, nil
 }
 
 func (f *fakeSource) ListModules() ([]string, error) {
@@ -570,7 +568,7 @@ func (f *fakeSource) ListModules() ([]string, error) {
 func TestFindModuleContentReturnsContent(t *testing.T) {
 	want := []byte("test content")
 	src := &fakeSource{modules: map[string]fakeModule{
-		"MOD": {reader: io.NopCloser(bytes.NewReader(want))},
+		"MOD": {content: want},
 	}}
 	got, err := findModuleContent([]Source{src}, "MOD")
 	testutil.NoError(t, err, "findModuleContent")
@@ -581,7 +579,7 @@ func TestFindModuleContentSkipsNotExist(t *testing.T) {
 	want := []byte("from second source")
 	src1 := &fakeSource{modules: map[string]fakeModule{}}
 	src2 := &fakeSource{modules: map[string]fakeModule{
-		"MOD": {reader: io.NopCloser(bytes.NewReader(want))},
+		"MOD": {content: want},
 	}}
 	got, err := findModuleContent([]Source{src1, src2}, "MOD")
 	testutil.NoError(t, err, "findModuleContent")
@@ -600,30 +598,11 @@ func TestFindModuleContentPropagatesFindError(t *testing.T) {
 		"MOD": {findErr: permErr},
 	}}
 	src2 := &fakeSource{modules: map[string]fakeModule{
-		"MOD": {reader: io.NopCloser(bytes.NewReader([]byte("ok")))},
+		"MOD": {content: []byte("ok")},
 	}}
 	_, err := findModuleContent([]Source{src1, src2}, "MOD")
 	testutil.True(t, errors.Is(err, permErr),
 		"should propagate Find error, got %v", err)
-}
-
-func TestFindModuleContentPropagatesReadError(t *testing.T) {
-	readErr := errors.New("disk I/O error")
-	src := &fakeSource{modules: map[string]fakeModule{
-		"MOD": {reader: io.NopCloser(&failingReader{err: readErr})},
-	}}
-	_, err := findModuleContent([]Source{src}, "MOD")
-	testutil.True(t, errors.Is(err, readErr),
-		"should propagate ReadAll error, got %v", err)
-}
-
-// failingReader is an io.Reader that always returns an error.
-type failingReader struct {
-	err error
-}
-
-func (r *failingReader) Read([]byte) (int, error) {
-	return 0, r.err
 }
 
 func loadInvalidMIB(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
