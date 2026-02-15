@@ -1,188 +1,707 @@
-package gomib_test
+package gomib
 
 import (
 	"context"
-	"os"
-	"path/filepath"
+	"errors"
+	"io/fs"
 	"testing"
 
-	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/mib"
 )
 
-// findMibDir tries to locate a directory with MIB files for testing
-func findMibDir(t *testing.T) string {
-	// Check common locations
-	candidates := []string{
-		"/usr/share/snmp/mibs",
-		"/usr/local/share/snmp/mibs",
+func TestLoadSingleMIB(t *testing.T) {
+	src, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree failed: %v", err)
 	}
 
-	// Also check relative to the test directory
-	if cwd, err := os.Getwd(); err == nil {
-		candidates = append(candidates,
-			filepath.Join(cwd, "testdata", "corpus", "primary"),
-			filepath.Join(cwd, "testdata", "mibs"),
-			filepath.Join(cwd, "..", "testdata", "mibs"),
-		)
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB"))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
 	}
 
-	for _, path := range candidates {
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			// Check if it has any files
-			entries, err := os.ReadDir(path)
-			if err == nil && len(entries) > 0 {
-				return path
-			}
+	testutil.NotNil(t, m, "m should not be nil")
+	testutil.Greater(t, len(m.Modules()), 0, "should have loaded modules")
+	testutil.Greater(t, len(m.Objects()), 0, "should have resolved objects")
+
+	ifMIB := m.Module("IF-MIB")
+	testutil.NotNil(t, ifMIB, "IF-MIB module should be found")
+
+	ifIndex := m.Object("ifIndex")
+	testutil.NotNil(t, ifIndex, "ifIndex object should be found")
+}
+
+func TestLoadAllCorpus(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping corpus load in short mode")
+	}
+
+	src, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree failed: %v", err)
+	}
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(src))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	testutil.Greater(t, len(m.Modules()), 50, "should have loaded many modules")
+	testutil.Greater(t, len(m.Objects()), 1000, "should have resolved many objects")
+
+	t.Logf("Loaded %d modules, %d objects, %d types",
+		len(m.Modules()), len(m.Objects()), len(m.Types()))
+}
+
+func TestDirSource(t *testing.T) {
+	src, err := Dir("testdata/corpus/primary/ietf")
+	if err != nil {
+		t.Fatalf("Dir failed: %v", err)
+	}
+
+	names, err := src.ListModules()
+	if err != nil {
+		t.Fatalf("ListModules failed: %v", err)
+	}
+	testutil.Greater(t, len(names), 0, "should list modules")
+}
+
+func TestDirTreeSource(t *testing.T) {
+	src, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree failed: %v", err)
+	}
+
+	names, err := src.ListModules()
+	if err != nil {
+		t.Fatalf("ListModules failed: %v", err)
+	}
+	testutil.Greater(t, len(names), 10, "should list many modules recursively")
+}
+
+func TestMultiSource(t *testing.T) {
+	primary, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree primary failed: %v", err)
+	}
+	problems, err := DirTree("testdata/corpus/problems")
+	if err != nil {
+		t.Fatalf("DirTree problems failed: %v", err)
+	}
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(primary, problems), WithModules("IF-MIB"))
+	if err != nil {
+		t.Fatalf("Load from multi source failed: %v", err)
+	}
+	testutil.NotNil(t, m.Module("IF-MIB"), "should find IF-MIB from primary source")
+}
+
+func TestLoadNonexistentModule(t *testing.T) {
+	src, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree failed: %v", err)
+	}
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(src), WithModules("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST"))
+	testutil.Error(t, err, "Load should error for nonexistent module")
+	testutil.NotNil(t, m, "Load should return a Mib even for nonexistent module")
+	testutil.True(t, errors.Is(err, ErrMissingModules), "error should wrap ErrMissingModules")
+
+	mod := m.Module("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST")
+	testutil.Nil(t, mod, "nonexistent module should not be in the result")
+}
+
+func TestLoadMissingModuleWithValidModule(t *testing.T) {
+	src, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree failed: %v", err)
+	}
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB", "NONEXISTENT-MIB"))
+	testutil.Error(t, err, "Load should error for missing module")
+	testutil.True(t, errors.Is(err, ErrMissingModules), "error should wrap ErrMissingModules")
+	testutil.NotNil(t, m, "Load should return a Mib with partial results")
+	testutil.NotNil(t, m.Module("IF-MIB"), "IF-MIB should still be loaded")
+	testutil.Nil(t, m.Module("NONEXISTENT-MIB"), "NONEXISTENT-MIB should not be found")
+}
+
+func TestLoadNoSources(t *testing.T) {
+	ctx := context.Background()
+	_, err := Load(ctx)
+	testutil.Error(t, err, "loading with no sources should fail")
+}
+
+func TestNodeByName(t *testing.T) {
+	m := loadTestMIB(t)
+
+	node := m.Node("ifIndex")
+	testutil.NotNil(t, node, "should find ifIndex by name")
+}
+
+func TestNodeNotFound(t *testing.T) {
+	m := loadTestMIB(t)
+
+	node := m.Node("totallyNonExistentSymbol")
+	testutil.Nil(t, node, "nonexistent symbol should return nil")
+}
+
+func TestObjectByName(t *testing.T) {
+	m := loadTestMIB(t)
+
+	obj := m.Object("sysDescr")
+	testutil.NotNil(t, obj, "should find sysDescr by name")
+	testutil.Equal(t, "sysDescr", obj.Name(), "object name")
+}
+
+func TestType(t *testing.T) {
+	m := loadTestMIB(t)
+
+	typ := m.Type("DisplayString")
+	testutil.NotNil(t, typ, "Type(DisplayString)")
+	testutil.Equal(t, "DisplayString", typ.Name(), "type name")
+	testutil.True(t, typ.IsTextualConvention(), "DisplayString should be a TC")
+}
+
+func TestNotification(t *testing.T) {
+	m := loadTestMIB(t)
+
+	notif := m.Notification("linkDown")
+	testutil.NotNil(t, notif, "Notification(linkDown)")
+	testutil.Equal(t, "linkDown", notif.Name(), "notification name")
+}
+
+func TestModulesCollection(t *testing.T) {
+	m := loadTestMIB(t)
+
+	mods := m.Modules()
+	testutil.Greater(t, len(mods), 0, "should have modules")
+
+	found := false
+	for _, mod := range mods {
+		if mod.Name() == "IF-MIB" {
+			found = true
+			break
 		}
 	}
-
-	t.Skip("No MIB directory found for testing")
-	return ""
+	testutil.True(t, found, "should find IF-MIB in modules list")
 }
 
-func TestLoadIntegration(t *testing.T) {
-	mibPath := findMibDir(t)
+func TestNodesIteration(t *testing.T) {
+	m := loadTestMIB(t)
 
-	src, err := gomib.DirTree(mibPath)
-	testutil.NoError(t, err, "create source")
-
-	mib, err := gomib.Load(context.Background(), src)
-	testutil.NoError(t, err, "load")
-
-	// Basic sanity checks
-	modules := mib.Modules()
-	testutil.NotEmpty(t, modules, "expected at least some modules")
-	t.Logf("Loaded %d modules", len(modules))
-
-	objects := mib.Objects()
-	t.Logf("Found %d objects", len(objects))
-
-	types := mib.Types()
-	t.Logf("Found %d types", len(types))
-
-	// Test lookup
-	obj := mib.FindObject("sysDescr")
-	if obj != nil {
-		t.Logf("sysDescr found: OID=%s, Module=%s", obj.OID(), obj.Module().Name())
+	count := 0
+	for range m.Nodes() {
+		count++
 	}
-
-	// Test OID lookup
-	node := mib.FindNode("1.3.6.1.2.1.1.1")
-	if node != nil {
-		t.Logf("Node 1.3.6.1.2.1.1.1: Name=%s, Kind=%v", node.Name(), node.Kind())
-	}
+	testutil.Greater(t, count, 0, "should have nodes")
+	testutil.Equal(t, m.NodeCount(), count, "NodeCount should match iteration count")
 }
 
-func TestLoadModulesIntegration(t *testing.T) {
-	mibPath := findMibDir(t)
+func TestObjectsCollection(t *testing.T) {
+	m := loadTestMIB(t)
 
-	src, err := gomib.DirTree(mibPath)
-	testutil.NoError(t, err, "create source")
-
-	mib, err := gomib.LoadModules(context.Background(), []string{"IF-MIB"}, src)
-	testutil.NoError(t, err, "load IF-MIB")
-
-	// Check we got IF-MIB
-	mod := mib.Module("IF-MIB")
-	if mod == nil {
-		t.Log("IF-MIB not found (might be missing from source)")
-		return
-	}
-	t.Logf("Loaded IF-MIB: %s", mod.Name())
-
-	// Check for ifOperStatus
-	obj := mib.FindObject("ifOperStatus")
-	if obj != nil {
-		t.Logf("ifOperStatus found: OID=%s", obj.OID())
-	}
+	objs := m.Objects()
+	testutil.Equal(t, len(m.Objects()), len(objs), "Objects() should be consistent")
 }
 
-func TestLoadNoSource(t *testing.T) {
-	// Loading with nil source should return ErrNoSources
-	_, err := gomib.Load(context.Background(), nil)
-	testutil.Equal(t, gomib.ErrNoSources, err, "Load(nil)")
+func TestTablesAndScalars(t *testing.T) {
+	m := loadTestMIB(t)
+
+	tables := m.Tables()
+	scalars := m.Scalars()
+
+	testutil.Greater(t, len(tables), 0, "should have tables (IF-MIB has ifTable)")
+	testutil.Greater(t, len(scalars), 0, "should have scalars (SNMPv2-MIB has sysDescr)")
 }
 
-func TestFindNode(t *testing.T) {
-	mibPath := findMibDir(t)
-
-	src, err := gomib.DirTree(mibPath)
-	testutil.NoError(t, err, "create source")
-
-	mib, err := gomib.LoadModules(context.Background(), []string{"SNMPv2-MIB"}, src)
-	testutil.NoError(t, err, "load SNMPv2-MIB")
-
-	// Check that SNMPv2-MIB loaded
-	if mib.Module("SNMPv2-MIB") == nil {
-		t.Skip("SNMPv2-MIB not found")
+func TestStrictMIBsPassAtStrictLevel(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	strict, err := DirTree("testdata/strictness/strict")
+	if err != nil {
+		t.Fatalf("DirTree strict failed: %v", err)
 	}
 
-	tests := []struct {
-		name     string
-		query    string
-		wantName string
-	}{
-		{"qualified name", "SNMPv2-MIB::sysDescr", "sysDescr"},
-		{"simple name", "sysDescr", "sysDescr"},
-		{"numeric OID", "1.3.6.1.2.1.1.1", "sysDescr"},
-		{"partial OID", ".1.3.6.1.2.1.1.1", "sysDescr"},
-		{"nonexistent", "nonexistent-object-xyz", ""},
-	}
+	tests := []string{"STRICT-TEST-MIB", "STRICT-TABLE-MIB"}
+	for _, name := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			m, err := Load(ctx, WithSource(corpus, strict), WithModules(name), WithStrictness(mib.StrictnessStrict))
+			if err != nil {
+				t.Fatalf("Load failed: %v", err)
+			}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			node := mib.FindNode(tt.query)
-			if tt.wantName == "" {
-				testutil.Nil(t, node, "FindNode(%q)", tt.query)
-			} else {
-				testutil.NotNil(t, node, "FindNode(%q)", tt.query)
-				testutil.Equal(t, tt.wantName, node.Name(), "FindNode(%q) name", tt.query)
+			diags := m.Diagnostics()
+			if len(diags) > 0 {
+				for _, d := range diags {
+					t.Errorf("unexpected diagnostic: [%s] %s: %s", d.Code, d.Severity, d.Message)
+				}
 			}
 		})
 	}
 }
 
-func TestNodesIterator(t *testing.T) {
-	mibPath := findMibDir(t)
-
-	src, err := gomib.DirTree(mibPath)
-	testutil.NoError(t, err, "create source")
-
-	mib, err := gomib.LoadModules(context.Background(), []string{"SNMPv2-MIB"}, src)
-	testutil.NoError(t, err, "load SNMPv2-MIB")
-
-	if mib.Module("SNMPv2-MIB") == nil {
-		t.Skip("SNMPv2-MIB not found")
+func TestUnderscoreViolationEmitsDiagnostic(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
 	}
 
-	// Test Mib.Nodes() iterator
-	nodeCount := 0
-	for range mib.Nodes() {
-		nodeCount++
+	ctx := context.Background()
+
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("UNDERSCORE-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
 	}
 
-	t.Logf("Iterator visited %d nodes", nodeCount)
-	testutil.Greater(t, nodeCount, 0, "Nodes() should return nodes")
-
-	// Test early termination
-	earlyCount := 0
-	for range mib.Nodes() {
-		earlyCount++
-		if earlyCount >= 5 {
-			break
+	var underscoreDiags int
+	for _, d := range m.Diagnostics() {
+		if d.Code == "identifier-underscore" {
+			underscoreDiags++
 		}
 	}
-	testutil.Equal(t, 5, earlyCount, "early termination count")
+	testutil.Equal(t, 2, underscoreDiags, "expected 2 identifier-underscore diagnostics")
 
-	// Test Node.Descendants()
-	sysNode := mib.FindNode("system")
-	if sysNode != nil {
-		var descendants []gomib.Node
-		for n := range sysNode.Descendants() {
-			descendants = append(descendants, n)
+	m, err = Load(ctx, WithSource(corpus, violations), WithModules("UNDERSCORE-TEST-MIB"), WithStrictness(mib.StrictnessPermissive))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	underscoreDiags = 0
+	for _, d := range m.Diagnostics() {
+		if d.Code == "identifier-underscore" {
+			underscoreDiags++
 		}
-		testutil.NotEmpty(t, descendants, "system node Descendants()")
-		t.Logf("system node has %d descendants", len(descendants))
+	}
+	testutil.Equal(t, 0, underscoreDiags, "expected no identifier-underscore diagnostics in permissive mode")
+}
+
+func TestHyphenEndViolationEmitsDiagnostic(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("HYPHEN-END-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	var hyphenDiags int
+	for _, d := range m.Diagnostics() {
+		if d.Code == "identifier-hyphen-end" {
+			hyphenDiags++
+		}
+	}
+	testutil.Equal(t, 1, hyphenDiags, "expected 1 identifier-hyphen-end diagnostic")
+}
+
+func TestLongIdentifierViolationEmitsDiagnostic(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("LONG-IDENT-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	var lengthDiags int
+	for _, d := range m.Diagnostics() {
+		if d.Code == "identifier-length-64" {
+			lengthDiags++
+		}
+	}
+	testutil.Equal(t, 1, lengthDiags, "expected 1 identifier-length-64 diagnostic")
+}
+
+func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	problems, err := DirTree("testdata/corpus/problems")
+	if err != nil {
+		t.Fatalf("DirTree problems failed: %v", err)
+	}
+
+	ctx := context.Background()
+
+	m, err := Load(ctx, WithSource(corpus, problems), WithModules("PROBLEM-NAMING-MIB"), WithStrictness(mib.StrictnessNormal))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	var caseDiags int
+	for _, d := range m.Diagnostics() {
+		if d.Code == "bad-identifier-case" {
+			caseDiags++
+		}
+	}
+	testutil.Equal(t, 4, caseDiags, "expected 4 bad-identifier-case diagnostics in normal mode")
+
+	node := m.Node("NetEngine8000SysOid")
+	testutil.NotNil(t, node, "uppercase identifier should resolve in normal mode")
+
+	m, err = Load(ctx, WithSource(corpus, problems), WithModules("PROBLEM-NAMING-MIB"), WithStrictness(mib.StrictnessPermissive))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	caseDiags = 0
+	for _, d := range m.Diagnostics() {
+		if d.Code == "bad-identifier-case" {
+			caseDiags++
+		}
+	}
+	testutil.Equal(t, 0, caseDiags, "expected no bad-identifier-case diagnostics in permissive mode")
+}
+
+func TestMissingModuleIdentityEmitsDiagnostic(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IDENTITY-MIB"), WithStrictness(mib.StrictnessStrict))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	var identityDiags int
+	for _, d := range m.Diagnostics() {
+		if d.Code == "missing-module-identity" {
+			identityDiags++
+		}
+	}
+	testutil.Equal(t, 1, identityDiags, "expected 1 missing-module-identity diagnostic")
+}
+
+func TestMissingImportFailsInStrictMode(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+
+	ctx := context.Background()
+
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	unresolved := m.Unresolved()
+	var oidUnresolved int
+	for _, u := range unresolved {
+		if u.Kind == mib.UnresolvedOID {
+			oidUnresolved++
+		}
+	}
+	testutil.Greater(t, oidUnresolved, 0, "strict mode should have unresolved OID references")
+
+	testObj := m.Object("testObject")
+	testutil.Nil(t, testObj, "testObject should not resolve in strict mode")
+}
+
+func TestMissingImportWorksInPermissiveMode(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+
+	ctx := context.Background()
+
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessPermissive))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	unresolved := m.Unresolved()
+	var oidUnresolved int
+	for _, u := range unresolved {
+		if u.Kind == mib.UnresolvedOID && u.Module == "MISSING-IMPORT-TEST-MIB" {
+			oidUnresolved++
+		}
+	}
+	testutil.Equal(t, 0, oidUnresolved, "permissive mode should resolve enterprises via fallback")
+
+	testObj := m.Object("testObject")
+	testutil.NotNil(t, testObj, "testObject should resolve in permissive mode")
+}
+
+func TestMissingImportFailsInNormalMode(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+
+	ctx := context.Background()
+
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessNormal))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	unresolved := m.Unresolved()
+	var oidUnresolved int
+	for _, u := range unresolved {
+		if u.Kind == mib.UnresolvedOID && u.Module == "MISSING-IMPORT-TEST-MIB" {
+			oidUnresolved++
+		}
+	}
+	testutil.Greater(t, oidUnresolved, 0, "normal mode should have unresolved OID references")
+}
+
+func TestDiagnosticThresholdEnforced(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// MISSING-IMPORT-TEST-MIB produces Error-level diagnostics for unresolved OIDs.
+	// With FailAt=mib.SeverityError, Load should return the Mib and an error.
+	cfg := mib.DiagnosticConfig{
+		Level:  mib.StrictnessStrict,
+		FailAt: mib.SeverityError,
+	}
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithDiagnosticConfig(cfg))
+	testutil.Error(t, err, "Load should error when diagnostics exceed FailAt threshold")
+	testutil.True(t, errors.Is(err, ErrDiagnosticThreshold), "error should wrap ErrDiagnosticThreshold")
+	testutil.NotNil(t, m, "Load should return non-nil Mib even on threshold failure")
+	testutil.NotNil(t, m.Module("MISSING-IMPORT-TEST-MIB"), "module should still be loaded")
+}
+
+func TestDiagnosticThresholdNotTriggered(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	violations, err := DirTree("testdata/strictness/violations")
+	if err != nil {
+		t.Fatalf("DirTree violations failed: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Same MIB but with default FailAt=SeveritySevere.
+	// Error-level diagnostics should not trigger failure.
+	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
+	testutil.NoError(t, err, "Load should not error when diagnostics are below FailAt threshold")
+	testutil.NotNil(t, m, "Mib should be returned")
+}
+
+// fakeSource is a test Source that returns pre-configured results.
+type fakeSource struct {
+	modules map[string]fakeModule
+}
+
+type fakeModule struct {
+	findErr error  // error from Find
+	content []byte // content to return from Find (if findErr is nil)
+}
+
+func (f *fakeSource) Find(name string) (FindResult, error) {
+	m, ok := f.modules[name]
+	if !ok {
+		return FindResult{}, fs.ErrNotExist
+	}
+	if m.findErr != nil {
+		return FindResult{}, m.findErr
+	}
+	return FindResult{Content: m.content, Path: "fake:" + name}, nil
+}
+
+func (f *fakeSource) ListModules() ([]string, error) {
+	var names []string
+	for name := range f.modules {
+		names = append(names, name)
+	}
+	return names, nil
+}
+
+func TestFindModuleContentReturnsContent(t *testing.T) {
+	want := []byte("test content")
+	src := &fakeSource{modules: map[string]fakeModule{
+		"MOD": {content: want},
+	}}
+	got, err := findModuleContent([]Source{src}, "MOD")
+	testutil.NoError(t, err, "findModuleContent")
+	testutil.Equal(t, string(want), string(got), "content")
+}
+
+func TestFindModuleContentSkipsNotExist(t *testing.T) {
+	want := []byte("from second source")
+	src1 := &fakeSource{modules: map[string]fakeModule{}}
+	src2 := &fakeSource{modules: map[string]fakeModule{
+		"MOD": {content: want},
+	}}
+	got, err := findModuleContent([]Source{src1, src2}, "MOD")
+	testutil.NoError(t, err, "findModuleContent")
+	testutil.Equal(t, string(want), string(got), "content from second source")
+}
+
+func TestFindModuleContentNotFound(t *testing.T) {
+	src := &fakeSource{modules: map[string]fakeModule{}}
+	_, err := findModuleContent([]Source{src}, "MISSING")
+	testutil.True(t, errors.Is(err, fs.ErrNotExist), "should return fs.ErrNotExist, got %v", err)
+}
+
+func TestFindModuleContentPropagatesFindError(t *testing.T) {
+	permErr := errors.New("permission denied")
+	src1 := &fakeSource{modules: map[string]fakeModule{
+		"MOD": {findErr: permErr},
+	}}
+	src2 := &fakeSource{modules: map[string]fakeModule{
+		"MOD": {content: []byte("ok")},
+	}}
+	_, err := findModuleContent([]Source{src1, src2}, "MOD")
+	testutil.True(t, errors.Is(err, permErr),
+		"should propagate Find error, got %v", err)
+}
+
+func loadInvalidMIB(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
+	t.Helper()
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+	invalid, err := DirTree("testdata/strictness/invalid")
+	if err != nil {
+		t.Fatalf("DirTree invalid failed: %v", err)
+	}
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(corpus, invalid), WithModules(name), WithStrictness(level))
+	if err != nil {
+		t.Fatalf("Load(%s) failed: %v", name, err)
+	}
+	return m
+}
+
+func moduleObjects(m *mib.Mib, moduleName string) []*mib.Object {
+	var result []*mib.Object
+	for _, o := range m.Objects() {
+		if o.Module().Name() == moduleName {
+			result = append(result, o)
+		}
+	}
+	return result
+}
+
+func moduleDiagnostics(m *mib.Mib, moduleName string) []mib.Diagnostic {
+	var result []mib.Diagnostic
+	for _, d := range m.Diagnostics() {
+		if d.Module == moduleName {
+			result = append(result, d)
+		}
+	}
+	return result
+}
+
+func TestInvalidSyntaxMIBProducesNoBrokenObjects(t *testing.T) {
+	levels := []struct {
+		name  string
+		level mib.StrictnessLevel
+	}{
+		{"strict", mib.StrictnessStrict},
+		{"normal", mib.StrictnessNormal},
+		{"permissive", mib.StrictnessPermissive},
+	}
+
+	for _, lvl := range levels {
+		t.Run(lvl.name, func(t *testing.T) {
+			m := loadInvalidMIB(t, "INVALID-SYNTAX-MIB", lvl.level)
+
+			objs := moduleObjects(m, "INVALID-SYNTAX-MIB")
+			testutil.Equal(t, 0, len(objs),
+				"broken OBJECT-TYPE should not produce objects at %s level", lvl.name)
+
+			diags := moduleDiagnostics(m, "INVALID-SYNTAX-MIB")
+			testutil.Greater(t, len(diags), 0,
+				"should emit diagnostic for missing SYNTAX at %s level", lvl.name)
+		})
+	}
+}
+
+func TestInvalidTruncatedMIBProducesNoObjects(t *testing.T) {
+	levels := []struct {
+		name  string
+		level mib.StrictnessLevel
+	}{
+		{"strict", mib.StrictnessStrict},
+		{"normal", mib.StrictnessNormal},
+		{"permissive", mib.StrictnessPermissive},
+	}
+
+	for _, lvl := range levels {
+		t.Run(lvl.name, func(t *testing.T) {
+			m := loadInvalidMIB(t, "INVALID-TRUNCATED-MIB", lvl.level)
+
+			objs := moduleObjects(m, "INVALID-TRUNCATED-MIB")
+			testutil.Equal(t, 0, len(objs),
+				"truncated OBJECT-TYPE should not produce objects at %s level", lvl.name)
+
+			diags := moduleDiagnostics(m, "INVALID-TRUNCATED-MIB")
+			testutil.Greater(t, len(diags), 0,
+				"should emit diagnostic for truncated definition at %s level", lvl.name)
+		})
+	}
+}
+
+func TestInvalidDuplicateOIDMIBBothObjectsLoad(t *testing.T) {
+	m := loadInvalidMIB(t, "INVALID-DUPLICATE-OID-MIB", mib.StrictnessPermissive)
+
+	objs := moduleObjects(m, "INVALID-DUPLICATE-OID-MIB")
+	testutil.Equal(t, 2, len(objs),
+		"both duplicate-OID objects should load")
+
+	if len(objs) == 2 {
+		testutil.Equal(t, objs[0].OID().String(), objs[1].OID().String(),
+			"duplicate objects should share the same OID")
 	}
 }

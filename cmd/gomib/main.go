@@ -10,6 +10,15 @@ import (
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
+	"github.com/golangsnmp/gomib/mib"
+)
+
+// Exit codes.
+const (
+	exitOK              = 0 // success
+	exitError           = 1 // user error, processing failure, or severe diagnostic
+	exitStrictViolation = 2 // strict mode found errors or unresolved refs
 )
 
 const usage = `gomib - MIB parser and query tool
@@ -19,6 +28,7 @@ Usage:
 
 Commands:
   load    Load and resolve MIB modules
+  lint    Check modules for issues (linter mode)
   get     Query OID or name lookups
   dump    Output modules or subtrees as JSON
   trace   Trace symbol resolution for debugging
@@ -36,11 +46,11 @@ Examples:
   gomib trace -m IF-MIB ifEntry
 `
 
-var (
+type cli struct {
 	verbose  int
 	paths    []string
 	helpFlag bool
-)
+}
 
 func main() {
 	os.Exit(run())
@@ -49,7 +59,7 @@ func main() {
 func run() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
-	// Parse global flags manually to support -vv and subcommands
+	var c cli
 	args := os.Args[1:]
 	var cmdArgs []string
 	var cmd string
@@ -58,26 +68,25 @@ func run() int {
 		arg := args[i]
 		switch {
 		case arg == "-h" || arg == "--help":
-			helpFlag = true
+			c.helpFlag = true
 		case arg == "-v" || arg == "--verbose":
-			if verbose < 1 {
-				verbose = 1
+			if c.verbose < 1 {
+				c.verbose = 1
 			}
 		case arg == "-vv":
-			verbose = 2
+			c.verbose = 2
 		case arg == "--no-color":
-			// noColor is reserved for future use
+			// reserved for future use
 		case arg == "-p" || arg == "--path":
 			if i+1 < len(args) {
 				i++
-				paths = append(paths, args[i])
+				c.paths = append(c.paths, args[i])
 			}
 		case strings.HasPrefix(arg, "-p"):
-			paths = append(paths, arg[2:])
+			c.paths = append(c.paths, arg[2:])
 		case strings.HasPrefix(arg, "--path="):
-			paths = append(paths, arg[7:])
+			c.paths = append(c.paths, arg[7:])
 		case len(arg) > 0 && arg[0] == '-':
-			// Unknown flag, pass to subcommand
 			cmdArgs = append(cmdArgs, arg)
 		default:
 			if cmd == "" {
@@ -88,7 +97,7 @@ func run() int {
 		}
 	}
 
-	if helpFlag && cmd == "" {
+	if c.helpFlag && cmd == "" {
 		_, _ = fmt.Fprint(os.Stdout, usage)
 		return 0
 	}
@@ -100,13 +109,15 @@ func run() int {
 
 	switch cmd {
 	case "load":
-		return cmdLoad(cmdArgs)
+		return c.cmdLoad(cmdArgs)
+	case "lint":
+		return c.cmdLint(cmdArgs)
 	case "get":
-		return cmdGet(cmdArgs)
+		return c.cmdGet(cmdArgs)
 	case "dump":
-		return cmdDump(cmdArgs)
+		return c.cmdDump(cmdArgs)
 	case "trace":
-		return cmdTrace(cmdArgs)
+		return c.cmdTrace(cmdArgs)
 	case "help":
 		_, _ = fmt.Fprint(os.Stdout, usage)
 		return 0
@@ -117,14 +128,12 @@ func run() int {
 	}
 }
 
-// setupLogger creates a logger based on verbosity level.
-// Returns nil if verbosity is 0 (no logging).
-func setupLogger() *slog.Logger {
-	if verbose == 0 {
+func (c *cli) setupLogger() *slog.Logger {
+	if c.verbose == 0 {
 		return nil
 	}
 	level := slog.LevelDebug
-	if verbose >= 2 {
+	if c.verbose >= 2 {
 		level = gomib.LevelTrace
 	}
 	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
@@ -132,83 +141,49 @@ func setupLogger() *slog.Logger {
 	}))
 }
 
-// getSources returns MIB sources from -p flags or default paths.
-func getSources() []gomib.Source {
-	if len(paths) > 0 {
+func (c *cli) loadMib(modules []string) (*mib.Mib, error) {
+	return c.loadMibWithOpts(modules)
+}
+
+func (c *cli) loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (*mib.Mib, error) {
+	var source gomib.Source
+	var opts []gomib.LoadOption
+
+	if len(c.paths) > 0 {
 		var sources []gomib.Source
-		for _, p := range paths {
+		for _, p := range c.paths {
 			if src, err := gomib.DirTree(p); err == nil {
 				sources = append(sources, src)
 			} else {
 				fmt.Fprintf(os.Stderr, "warning: cannot access path %s: %v\n", p, err)
 			}
 		}
-		return sources
-	}
-	return defaultSources()
-}
-
-// defaultSources returns net-snmp compatible search paths.
-func defaultSources() []gomib.Source {
-	var sources []gomib.Source
-	searchPaths := getDefaultSearchPaths()
-	for _, p := range searchPaths {
-		if src, err := gomib.DirTree(p); err == nil {
-			sources = append(sources, src)
+		if len(sources) == 0 {
+			return nil, gomib.ErrNoSources
 		}
-	}
-	return sources
-}
-
-// getDefaultSearchPaths returns net-snmp compatible MIB paths.
-func getDefaultSearchPaths() []string {
-	var paths []string
-
-	// MIBDIRS environment variable
-	if mibdirs := os.Getenv("MIBDIRS"); mibdirs != "" {
-		paths = append(paths, strings.Split(mibdirs, ":")...)
-	}
-
-	// User directory
-	if home, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, home+"/.snmp/mibs")
-	}
-
-	// System directories
-	paths = append(paths,
-		"/usr/share/snmp/mibs",
-		"/usr/local/share/snmp/mibs",
-	)
-
-	return paths
-}
-
-// loadMib loads and resolves MIB modules.
-func loadMib(modules []string) (gomib.Mib, error) {
-	sources := getSources()
-	if len(sources) == 0 {
-		return nil, gomib.ErrNoSources
-	}
-
-	var source gomib.Source
-	if len(sources) == 1 {
-		source = sources[0]
+		if len(sources) == 1 {
+			source = sources[0]
+		} else {
+			source = gomib.Multi(sources...)
+		}
 	} else {
-		source = gomib.Multi(sources...)
+		opts = append(opts, gomib.WithSystemPaths())
 	}
 
-	var opts []gomib.LoadOption
-	if logger := setupLogger(); logger != nil {
+	if logger := c.setupLogger(); logger != nil {
 		opts = append(opts, gomib.WithLogger(logger))
 	}
+	opts = append(opts, extraOpts...)
 
-	if len(modules) > 0 {
-		return gomib.LoadModules(context.Background(), modules, source, opts...)
+	if source != nil {
+		opts = append(opts, gomib.WithSource(source))
 	}
-	return gomib.Load(context.Background(), source, opts...)
+	if len(modules) > 0 {
+		opts = append(opts, gomib.WithModules(modules...))
+	}
+	return gomib.Load(context.Background(), opts...)
 }
 
-// printError prints an error message to stderr.
 func printError(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "error: "+format+"\n", args...)
+	cliutil.PrintError(format, args...)
 }

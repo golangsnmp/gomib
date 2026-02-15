@@ -2,7 +2,6 @@ package gomib
 
 import (
 	"errors"
-	"io"
 	"io/fs"
 	"maps"
 	"os"
@@ -18,31 +17,28 @@ func DefaultExtensions() []string {
 	return []string{"", ".mib", ".smi", ".txt", ".my"}
 }
 
-// FindResult contains the result of a Source.Find operation.
+// FindResult holds the content and location of a found MIB file.
 type FindResult struct {
-	// Reader provides access to the file content.
-	Reader io.ReadCloser
-	// Path is the source path for diagnostics.
+	Content []byte
+	// Path is used in diagnostic messages to identify the source.
 	Path string
 }
 
-// Source finds MIB files by module name.
+// Source provides access to MIB files for loading.
 type Source interface {
-	// Find locates a module by name.
-	// Returns fs.ErrNotExist if not found.
+	// Find returns the MIB content for the named module,
+	// or fs.ErrNotExist if the module is not available.
 	Find(name string) (FindResult, error)
 
-	// ListFiles returns all MIB file paths known to this source.
-	// Used for parallel loading.
-	ListFiles() ([]string, error)
+	// ListModules returns all module names known to this source.
+	ListModules() ([]string, error)
 }
 
-// SourceOption configures a source.
+// SourceOption modifies source behavior.
 type SourceOption func(*sourceConfig)
 
 type sourceConfig struct {
-	extensions  []string
-	noHeuristic bool
+	extensions []string
 }
 
 func defaultSourceConfig() sourceConfig {
@@ -51,21 +47,12 @@ func defaultSourceConfig() sourceConfig {
 	}
 }
 
-// WithExtensions sets the file extensions to recognize for this source.
+// WithExtensions overrides the default file extensions used to match MIB files.
 func WithExtensions(exts ...string) SourceOption {
 	return func(c *sourceConfig) {
 		c.extensions = exts
 	}
 }
-
-// WithNoHeuristic disables content validation for this source.
-func WithNoHeuristic() SourceOption {
-	return func(c *sourceConfig) {
-		c.noHeuristic = true
-	}
-}
-
-// --- Dir Source (single directory, lazy) ---
 
 type dirSource struct {
 	path   string
@@ -101,9 +88,9 @@ func MustDir(path string, opts ...SourceOption) Source {
 func (s *dirSource) Find(name string) (FindResult, error) {
 	for _, ext := range s.config.extensions {
 		fullPath := filepath.Join(s.path, name+ext)
-		f, err := os.Open(fullPath)
+		content, err := os.ReadFile(fullPath)
 		if err == nil {
-			return FindResult{Reader: f, Path: fullPath}, nil
+			return FindResult{Content: content, Path: fullPath}, nil
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
 			return FindResult{Path: fullPath}, err
@@ -112,9 +99,10 @@ func (s *dirSource) Find(name string) (FindResult, error) {
 	return FindResult{}, fs.ErrNotExist
 }
 
-func (s *dirSource) ListFiles() ([]string, error) {
+func (s *dirSource) ListModules() ([]string, error) {
 	extSet := makeExtensionSet(s.config.extensions)
-	var files []string
+	seen := make(map[string]struct{})
+	var names []string
 
 	entries, err := os.ReadDir(s.path)
 	if err != nil {
@@ -125,15 +113,16 @@ func (s *dirSource) ListFiles() ([]string, error) {
 		if entry.IsDir() {
 			continue
 		}
-		path := filepath.Join(s.path, entry.Name())
-		if hasValidExtension(path, extSet) {
-			files = append(files, path)
+		if hasValidExtension(entry.Name(), extSet) {
+			name := moduleNameFromPath(entry.Name())
+			if _, ok := seen[name]; !ok {
+				seen[name] = struct{}{}
+				names = append(names, name)
+			}
 		}
 	}
-	return files, nil
+	return names, nil
 }
-
-// --- DirTree Source (recursive directory, indexed) ---
 
 type treeSource struct {
 	index  map[string]string // module name -> file path
@@ -157,28 +146,8 @@ func DirTree(root string, opts ...SourceOption) (Source, error) {
 		opt(&cfg)
 	}
 
-	extSet := makeExtensionSet(cfg.extensions)
-	index := make(map[string]string)
-
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if d != nil && d.IsDir() {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if !hasValidExtension(path, extSet) {
-			return nil
-		}
-
-		name := moduleNameFromPath(path)
-		if _, exists := index[name]; !exists {
-			index[name] = path
-		}
-		return nil
+	index, err := buildTreeIndex(cfg.extensions, func(fn fs.WalkDirFunc) error {
+		return filepath.WalkDir(root, fn)
 	})
 	if err != nil {
 		return nil, err
@@ -201,18 +170,16 @@ func (s *treeSource) Find(name string) (FindResult, error) {
 	if !ok {
 		return FindResult{}, fs.ErrNotExist
 	}
-	f, err := os.Open(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return FindResult{Path: path}, err
 	}
-	return FindResult{Reader: f, Path: path}, nil
+	return FindResult{Content: content, Path: path}, nil
 }
 
-func (s *treeSource) ListFiles() ([]string, error) {
-	return slices.Collect(maps.Values(s.index)), nil
+func (s *treeSource) ListModules() ([]string, error) {
+	return slices.Sorted(maps.Keys(s.index)), nil
 }
-
-// --- FS Source (for embed.FS, testing, http filesystems) ---
 
 type fsSource struct {
 	name   string
@@ -225,8 +192,12 @@ type fsSource struct {
 }
 
 // FS creates a Source backed by an fs.FS (e.g., embed.FS).
-// The name is used for error messages and path reporting.
-// It lazily indexes the filesystem on first Find() call.
+// The name is used in diagnostic paths. The filesystem is lazily
+// indexed on first use.
+//
+// Unlike Dir and DirTree, FS does not return an error at construction time.
+// This is intentional: embed.FS cannot be walked until the program runs,
+// so validation is deferred to the first Find or ListModules call.
 func FS(name string, fsys fs.FS, opts ...SourceOption) Source {
 	cfg := defaultSourceConfig()
 	for _, opt := range opts {
@@ -252,56 +223,28 @@ func (s *fsSource) Find(name string) (FindResult, error) {
 		return FindResult{}, fs.ErrNotExist
 	}
 	fullPath := s.name + ":" + path
-	f, err := s.fsys.Open(path)
+	content, err := fs.ReadFile(s.fsys, path)
 	if err != nil {
 		return FindResult{Path: fullPath}, err
 	}
-	return FindResult{Reader: f, Path: fullPath}, nil
+	return FindResult{Content: content, Path: fullPath}, nil
 }
 
-func (s *fsSource) ListFiles() ([]string, error) {
+func (s *fsSource) ListModules() ([]string, error) {
 	s.once.Do(func() {
 		s.index, s.err = s.buildIndex()
 	})
 	if s.err != nil {
 		return nil, s.err
 	}
-
-	files := make([]string, 0, len(s.index))
-	for _, path := range s.index {
-		files = append(files, s.name+":"+path)
-	}
-	return files, nil
+	return slices.Sorted(maps.Keys(s.index)), nil
 }
 
 func (s *fsSource) buildIndex() (map[string]string, error) {
-	extSet := makeExtensionSet(s.config.extensions)
-	index := make(map[string]string)
-
-	err := fs.WalkDir(s.fsys, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if d != nil && d.IsDir() {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if !hasValidExtension(path, extSet) {
-			return nil
-		}
-
-		name := moduleNameFromPath(path)
-		if _, exists := index[name]; !exists {
-			index[name] = path
-		}
-		return nil
+	return buildTreeIndex(s.config.extensions, func(fn fs.WalkDirFunc) error {
+		return fs.WalkDir(s.fsys, ".", fn)
 	})
-	return index, err
 }
-
-// --- Multi Source (combines multiple sources) ---
 
 type multiSource struct {
 	sources []Source
@@ -326,19 +269,23 @@ func (s *multiSource) Find(name string) (FindResult, error) {
 	return FindResult{}, fs.ErrNotExist
 }
 
-func (s *multiSource) ListFiles() ([]string, error) {
-	var files []string
+func (s *multiSource) ListModules() ([]string, error) {
+	seen := make(map[string]struct{})
+	var names []string
 	for _, src := range s.sources {
-		f, err := src.ListFiles()
+		n, err := src.ListModules()
 		if err != nil {
 			return nil, err
 		}
-		files = append(files, f...)
+		for _, name := range n {
+			if _, ok := seen[name]; !ok {
+				seen[name] = struct{}{}
+				names = append(names, name)
+			}
+		}
 	}
-	return files, nil
+	return names, nil
 }
-
-// --- Helpers ---
 
 func makeExtensionSet(extensions []string) map[string]struct{} {
 	set := make(map[string]struct{}, len(extensions))
@@ -358,4 +305,33 @@ func moduleNameFromPath(path string) string {
 	base := filepath.Base(path)
 	ext := filepath.Ext(base)
 	return strings.TrimSuffix(base, ext)
+}
+
+// buildTreeIndex walks a file tree and builds a module name -> path index.
+// First match wins for duplicate names.
+func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error) (map[string]string, error) {
+	extSet := makeExtensionSet(extensions)
+	index := make(map[string]string)
+
+	err := walkFn(func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if d != nil && d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !hasValidExtension(path, extSet) {
+			return nil
+		}
+
+		name := moduleNameFromPath(path)
+		if _, exists := index[name]; !exists {
+			index[name] = path
+		}
+		return nil
+	})
+	return index, err
 }

@@ -1,35 +1,23 @@
 package ast
 
 import (
+	"slices"
+
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// Module is a parsed MIB module.
-//
-// Represents the top-level structure of a MIB file:
-//
-//	ModuleName DEFINITIONS ::= BEGIN
-//	    IMPORTS ... ;
-//	    <definitions>
-//	END
+// Module is the top-level AST node for a parsed MIB module.
 type Module struct {
-	// Name is the module name (e.g., IF-MIB, SNMPv2-SMI).
-	Name Ident
-	// DefinitionsKind is the kind of definitions (DEFINITIONS or PIB-DEFINITIONS).
+	Name            Ident
 	DefinitionsKind DefinitionsKind
-	// Imports are the import clauses.
-	Imports []ImportClause
-	// Exports is the export clause (SMIv1 only, rare).
-	Exports *ExportsClause
-	// Body contains the module body definitions.
-	Body []Definition
-	// Span is the source location (entire module).
-	Span types.Span
-	// Diagnostics are the parse diagnostics (errors and warnings).
-	Diagnostics []types.Diagnostic
+	Imports         []ImportClause
+	Exports         *ExportsClause
+	Body            []Definition
+	Span            types.Span
+	Diagnostics     []types.SpanDiagnostic
 }
 
-// NewModule creates a new module.
+// NewModule creates a Module with nil imports, body, and diagnostics.
 func NewModule(name Ident, definitionsKind DefinitionsKind, span types.Span) *Module {
 	return &Module{
 		Name:            name,
@@ -42,47 +30,29 @@ func NewModule(name Ident, definitionsKind DefinitionsKind, span types.Span) *Mo
 	}
 }
 
-// HasErrors returns true if this module has parse errors.
+// HasErrors reports whether any diagnostic has error severity or worse.
 func (m *Module) HasErrors() bool {
-	for _, d := range m.Diagnostics {
-		if d.Severity == types.SeverityError {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(m.Diagnostics, func(d types.SpanDiagnostic) bool {
+		return d.Severity.AtLeast(types.SeverityError)
+	})
 }
 
-// DefinitionsKind is the kind of module definition.
+// DefinitionsKind distinguishes DEFINITIONS from PIB-DEFINITIONS.
 type DefinitionsKind int
 
 const (
-	// DefinitionsKindDefinitions is a standard MIB module: DEFINITIONS ::= BEGIN
 	DefinitionsKindDefinitions DefinitionsKind = iota
-	// DefinitionsKindPibDefinitions is a SPPI PIB module: PIB-DEFINITIONS ::= BEGIN
 	DefinitionsKindPibDefinitions
 )
 
-// ImportClause is an import clause specifying symbols imported from another module.
-//
-// Example:
-//
-//	IMPORTS
-//	    MODULE-IDENTITY, OBJECT-TYPE
-//	        FROM SNMPv2-SMI
-//	    DisplayString
-//	        FROM SNMPv2-TC;
-//
-// Each ImportClause represents one <symbols> FROM <module> group.
+// ImportClause groups symbols imported from a single source module.
 type ImportClause struct {
-	// Symbols are the symbols being imported.
-	Symbols []Ident
-	// FromModule is the source module name.
+	Symbols    []Ident
 	FromModule Ident
-	// Span is the source location (covers <symbols> FROM <module>).
-	Span types.Span
+	Span       types.Span
 }
 
-// NewImportClause creates a new import clause.
+// NewImportClause creates an ImportClause from its components.
 func NewImportClause(symbols []Ident, fromModule Ident, span types.Span) ImportClause {
 	return ImportClause{
 		Symbols:    symbols,
@@ -91,11 +61,8 @@ func NewImportClause(symbols []Ident, fromModule Ident, span types.Span) ImportC
 	}
 }
 
-// ExportsClause is an exports clause (SMIv1 only).
-//
-// The EXPORTS keyword is handled by the lexer skip state, so this type
-// only records that an EXPORTS clause was present.
+// ExportsClause records the presence of an EXPORTS clause (SMIv1 only).
+// The exported symbols are not tracked since EXPORTS is skipped.
 type ExportsClause struct {
-	// Span is the source location.
 	Span types.Span
 }

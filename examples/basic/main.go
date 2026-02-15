@@ -1,67 +1,58 @@
-// Example: basic - load MIBs and explore the resolved model.
+// Load IF-MIB and print a module summary with selected objects.
 package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 
 	"github.com/golangsnmp/gomib"
 )
 
 func main() {
-	// Find the test corpus relative to this example
-	corpusPath := findCorpus()
+	path := flag.String("p", "", "MIB search path (default: system paths)")
+	flag.Parse()
 
-	// Create a source from the corpus directory tree
-	source, err := gomib.DirTree(corpusPath)
-	if err != nil {
-		log.Fatalf("failed to open MIB directory: %v", err)
-	}
-
-	// Load all MIBs from the source
-	mib, err := gomib.Load(context.Background(), source)
-	if err != nil {
-		log.Fatalf("failed to load MIBs: %v", err)
-	}
-
-	// Print summary
-	fmt.Printf("Loaded %d modules, %d objects, %d types, %d notifications\n",
-		mib.ModuleCount(), mib.ObjectCount(), mib.TypeCount(), mib.NotificationCount())
-
-	// Check for unresolved references
-	if !mib.IsComplete() {
-		fmt.Printf("\nUnresolved references: %d\n", len(mib.Unresolved()))
-		for _, ref := range mib.Unresolved()[:min(5, len(mib.Unresolved()))] {
-			fmt.Printf("  %s: %s (in %s)\n", ref.Kind, ref.Symbol, ref.Module)
+	var src gomib.Source
+	if *path != "" {
+		var err error
+		src, err = gomib.DirTree(*path)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 
-	// List loaded modules
-	fmt.Println("\nModules:")
-	for _, mod := range mib.Modules()[:min(10, len(mib.Modules()))] {
-		fmt.Printf("  %s (%s)\n", mod.Name(), mod.Language())
+	var opts []gomib.LoadOption
+	if src != nil {
+		opts = append(opts, gomib.WithSource(src))
 	}
-	if len(mib.Modules()) > 10 {
-		fmt.Printf("  ... and %d more\n", len(mib.Modules())-10)
+	opts = append(opts, gomib.WithModules("IF-MIB"), gomib.WithSystemPaths())
+	m, err := gomib.Load(context.Background(), opts...)
+	if err != nil {
+		log.Fatal(err)
 	}
-}
 
-func findCorpus() string {
-	// Try relative to working directory
-	candidates := []string{
-		"testdata/corpus/primary",
-		"../testdata/corpus/primary",
-		"gomib/testdata/corpus/primary",
-	}
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			abs, _ := filepath.Abs(p)
-			return abs
+	mod := m.Module("IF-MIB")
+	fmt.Printf("Module:    %s\n", mod.Name())
+	fmt.Printf("Language:  %s\n", mod.Language())
+	fmt.Printf("Objects:   %d\n", len(mod.Objects()))
+	fmt.Printf("Tables:    %d\n", len(mod.Tables()))
+	fmt.Printf("Scalars:   %d\n", len(mod.Scalars()))
+	fmt.Printf("Types:     %d\n", len(mod.Types()))
+	fmt.Println()
+
+	fmt.Printf("%-24s %-30s %-16s %s\n", "NAME", "OID", "TYPE", "ACCESS")
+	fmt.Printf("%-24s %-30s %-16s %s\n", "----", "---", "----", "------")
+	for _, obj := range mod.Objects() {
+		if !obj.IsScalar() && !obj.IsColumn() {
+			continue
 		}
+		typeName := ""
+		if t := obj.Type(); t != nil {
+			typeName = t.Name()
+		}
+		fmt.Printf("%-24s %-30s %-16s %s\n",
+			obj.Name(), obj.OID(), typeName, obj.Access())
 	}
-	log.Fatal("could not find test corpus; run from gomib directory")
-	return ""
 }

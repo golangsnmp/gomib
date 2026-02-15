@@ -11,13 +11,14 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
-	"os"
+	"io/fs"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
 
-// ValidationResult holds the results of validating test files.
+// ValidationResult tallies test cases checked against net-snmp ground truth.
 type ValidationResult struct {
 	FilesChecked   int               `json:"files_checked"`
 	TestsValidated int               `json:"tests_validated"`
@@ -27,7 +28,7 @@ type ValidationResult struct {
 	Warnings       []ValidationIssue `json:"warnings,omitempty"`
 }
 
-// ValidationIssue describes a problem found during validation.
+// ValidationIssue describes a test case that disagrees with net-snmp.
 type ValidationIssue struct {
 	File     string `json:"file"`
 	TestName string `json:"test_name"`
@@ -38,7 +39,7 @@ type ValidationIssue struct {
 }
 
 func cmdValidate(args []string) int {
-	fs := flag.NewFlagSet("validate", flag.ExitOnError)
+	fs := flag.NewFlagSet("validate", flag.ContinueOnError)
 	testDir := fs.String("tests", "", "Directory containing test files (default: ./integration)")
 
 	fs.Usage = func() {
@@ -67,7 +68,6 @@ Options:
 	}
 	defer cleanup()
 
-	// Load net-snmp as reference
 	fmt.Fprintln(out, "Loading MIBs with net-snmp...")
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, nil)
 	if err != nil {
@@ -76,7 +76,6 @@ Options:
 	}
 	fmt.Fprintf(out, "Loaded %d nodes from net-snmp\n", len(netsnmpNodes))
 
-	// Find test directory
 	dir := *testDir
 	if dir == "" {
 		dir = "./integration"
@@ -104,22 +103,20 @@ Options:
 func validateTestFiles(dir string, netsnmp map[string]*NormalizedNode) *ValidationResult {
 	result := &ValidationResult{}
 
-	// Build lookup by name for net-snmp nodes
 	byName := make(map[string]*NormalizedNode)
 	for _, node := range netsnmp {
 		if node.Name != "" {
 			key := node.Module + "::" + node.Name
 			byName[key] = node
-			byName[node.Name] = node // Also index by name alone
+			byName[node.Name] = node
 		}
 	}
 
-	// Find test files
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-		if !info.IsDir() && strings.HasSuffix(path, "_test.go") {
+		if !d.IsDir() && strings.HasSuffix(path, "_test.go") {
 			result.FilesChecked++
 			validateFile(path, byName, result)
 		}
@@ -146,15 +143,12 @@ func validateFile(path string, netsnmp map[string]*NormalizedNode, result *Valid
 		return
 	}
 
-	// Look for table test cases
 	ast.Inspect(f, func(n ast.Node) bool {
-		// Look for composite literals that might be test cases
 		cl, ok := n.(*ast.CompositeLit)
 		if !ok {
 			return true
 		}
 
-		// Check if this looks like a TableTestCase
 		testCase := extractTableTestCase(cl)
 		if testCase != nil {
 			validateTableTestCase(path, testCase, netsnmp, result)
@@ -164,7 +158,6 @@ func validateFile(path string, netsnmp map[string]*NormalizedNode, result *Valid
 	})
 }
 
-// extractedTestCase holds parsed test case data.
 type extractedTestCase struct {
 	TableName  string
 	RowName    string
@@ -220,7 +213,6 @@ func extractTableTestCase(cl *ast.CompositeLit) *extractedTestCase {
 		}
 	}
 
-	// Only return if this looks like a TableTestCase
 	if hasRowName && hasIndexNames {
 		return tc
 	}
@@ -230,7 +222,6 @@ func extractTableTestCase(cl *ast.CompositeLit) *extractedTestCase {
 func validateTableTestCase(file string, tc *extractedTestCase, netsnmp map[string]*NormalizedNode, result *ValidationResult) {
 	result.TestsValidated++
 
-	// Look up the row in net-snmp
 	key := tc.Module + "::" + tc.RowName
 	nsNode := netsnmp[key]
 	if nsNode == nil {
@@ -250,13 +241,12 @@ func validateTableTestCase(file string, tc *extractedTestCase, netsnmp map[strin
 		return
 	}
 
-	// Validate index names
 	var nsIndexNames []string
 	for _, idx := range nsNode.Indexes {
 		nsIndexNames = append(nsIndexNames, idx.Name)
 	}
 
-	if !stringsEqual(tc.IndexNames, nsIndexNames) {
+	if !slices.Equal(tc.IndexNames, nsIndexNames) {
 		result.TestsFailed++
 		result.Failures = append(result.Failures, ValidationIssue{
 			File:     file,
@@ -269,7 +259,6 @@ func validateTableTestCase(file string, tc *extractedTestCase, netsnmp map[strin
 		return
 	}
 
-	// Validate HasImplied
 	nsHasImplied := false
 	for _, idx := range nsNode.Indexes {
 		if idx.Implied {
@@ -292,18 +281,6 @@ func validateTableTestCase(file string, tc *extractedTestCase, netsnmp map[strin
 	}
 
 	result.TestsPassed++
-}
-
-func stringsEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func printValidationResult(w io.Writer, result *ValidationResult) {

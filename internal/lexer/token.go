@@ -5,274 +5,205 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// Token is a token with kind and source span.
+// Token represents a lexed unit with its classification and source location.
 type Token struct {
 	Kind TokenKind
 	Span types.Span
 }
 
-// NewToken creates a new token.
+// NewToken creates a Token from a kind and source span.
 func NewToken(kind TokenKind, span types.Span) Token {
 	return Token{Kind: kind, Span: span}
 }
 
-// TokenKind identifies a token type.
-// Derived from libsmi's scanner-smi.l lexer.
-//
-//go:generate stringer -type=TokenKind
+// TokenKind classifies a token (punctuation, keyword, literal, etc.).
 type TokenKind int
 
 const (
-	// === Special ===
+	// Special
 
-	// TokError is a lexical error.
 	TokError TokenKind = iota
-	// TokEOF is end of input.
 	TokEOF
-	// TokForbiddenKeyword is a forbidden ASN.1 keyword (FALSE, TRUE, NULL, etc.).
 	TokForbiddenKeyword
 
-	// === Identifiers ===
+	// Identifiers
 
-	// TokUppercaseIdent is an uppercase identifier (module names, type names).
 	TokUppercaseIdent
-	// TokLowercaseIdent is a lowercase identifier (object names, enum labels).
 	TokLowercaseIdent
 
-	// === Literals ===
+	// Literals
 
-	// TokNumber is an unsigned decimal number.
 	TokNumber
-	// TokNegativeNumber is a signed decimal number (negative).
 	TokNegativeNumber
-	// TokQuotedString is a quoted string literal.
 	TokQuotedString
-	// TokHexString is a hex string literal ('...'H).
 	TokHexString
-	// TokBinString is a binary string literal ('...'B).
 	TokBinString
 
-	// === Single-character punctuation ===
+	// Single-character punctuation
 
-	// TokLBracket is '['.
 	TokLBracket
-	// TokRBracket is ']'.
 	TokRBracket
-	// TokLBrace is '{'.
 	TokLBrace
-	// TokRBrace is '}'.
 	TokRBrace
-	// TokLParen is '('.
 	TokLParen
-	// TokRParen is ')'.
 	TokRParen
-	// TokColon is ':'.
 	TokColon
-	// TokSemicolon is ';'.
 	TokSemicolon
-	// TokComma is ','.
 	TokComma
-	// TokDot is '.'.
 	TokDot
-	// TokPipe is '|'.
 	TokPipe
-	// TokMinus is '-'.
 	TokMinus
 
-	// === Multi-character operators ===
+	// Multi-character operators
 
-	// TokDotDot is '..'.
 	TokDotDot
-	// TokColonColonEqual is '::='.
 	TokColonColonEqual
 
-	// === Structural keywords ===
+	// Structural keywords
 
-	// TokKwDefinitions is 'DEFINITIONS'.
 	TokKwDefinitions
-	// TokKwBegin is 'BEGIN'.
 	TokKwBegin
-	// TokKwEnd is 'END'.
 	TokKwEnd
-	// TokKwImports is 'IMPORTS'.
 	TokKwImports
-	// TokKwExports is 'EXPORTS'.
 	TokKwExports
-	// TokKwFrom is 'FROM'.
 	TokKwFrom
-	// TokKwObject is 'OBJECT'.
 	TokKwObject
-	// TokKwIdentifier is 'IDENTIFIER'.
 	TokKwIdentifier
-	// TokKwSequence is 'SEQUENCE'.
 	TokKwSequence
-	// TokKwOf is 'OF'.
 	TokKwOf
-	// TokKwChoice is 'CHOICE'.
 	TokKwChoice
-	// TokKwMacro is 'MACRO'.
 	TokKwMacro
 
-	// === Clause keywords ===
+	// Clause keywords
 
-	// TokKwSyntax is 'SYNTAX'.
 	TokKwSyntax
-	// TokKwMaxAccess is 'MAX-ACCESS'.
 	TokKwMaxAccess
-	// TokKwMinAccess is 'MIN-ACCESS'.
 	TokKwMinAccess
-	// TokKwAccess is 'ACCESS'.
 	TokKwAccess
-	// TokKwStatus is 'STATUS'.
 	TokKwStatus
-	// TokKwDescription is 'DESCRIPTION'.
 	TokKwDescription
-	// TokKwReference is 'REFERENCE'.
 	TokKwReference
-	// TokKwIndex is 'INDEX'.
 	TokKwIndex
-	// TokKwDefval is 'DEFVAL'.
 	TokKwDefval
-	// TokKwAugments is 'AUGMENTS'.
 	TokKwAugments
-	// TokKwUnits is 'UNITS'.
 	TokKwUnits
-	// TokKwDisplayHint is 'DISPLAY-HINT'.
 	TokKwDisplayHint
-	// TokKwObjects is 'OBJECTS'.
 	TokKwObjects
-	// TokKwNotifications is 'NOTIFICATIONS'.
 	TokKwNotifications
-	// TokKwModule is 'MODULE'.
 	TokKwModule
-	// TokKwMandatoryGroups is 'MANDATORY-GROUPS'.
 	TokKwMandatoryGroups
-	// TokKwGroup is 'GROUP'.
 	TokKwGroup
-	// TokKwWriteSyntax is 'WRITE-SYNTAX'.
 	TokKwWriteSyntax
-	// TokKwProductRelease is 'PRODUCT-RELEASE'.
 	TokKwProductRelease
-	// TokKwSupports is 'SUPPORTS'.
 	TokKwSupports
-	// TokKwIncludes is 'INCLUDES'.
 	TokKwIncludes
-	// TokKwVariation is 'VARIATION'.
 	TokKwVariation
-	// TokKwCreationRequires is 'CREATION-REQUIRES'.
 	TokKwCreationRequires
-	// TokKwRevision is 'REVISION'.
 	TokKwRevision
-	// TokKwLastUpdated is 'LAST-UPDATED'.
 	TokKwLastUpdated
-	// TokKwOrganization is 'ORGANIZATION'.
 	TokKwOrganization
-	// TokKwContactInfo is 'CONTACT-INFO'.
 	TokKwContactInfo
-	// TokKwImplied is 'IMPLIED'.
 	TokKwImplied
-	// TokKwSize is 'SIZE'.
 	TokKwSize
-	// TokKwEnterprise is 'ENTERPRISE'.
 	TokKwEnterprise
-	// TokKwVariables is 'VARIABLES'.
 	TokKwVariables
 
-	// === MACRO invocation keywords ===
+	// MACRO invocation keywords
 
-	// TokKwModuleIdentity is 'MODULE-IDENTITY'.
 	TokKwModuleIdentity
-	// TokKwModuleCompliance is 'MODULE-COMPLIANCE'.
 	TokKwModuleCompliance
-	// TokKwObjectGroup is 'OBJECT-GROUP'.
 	TokKwObjectGroup
-	// TokKwNotificationGroup is 'NOTIFICATION-GROUP'.
 	TokKwNotificationGroup
-	// TokKwAgentCapabilities is 'AGENT-CAPABILITIES'.
 	TokKwAgentCapabilities
-	// TokKwObjectType is 'OBJECT-TYPE'.
 	TokKwObjectType
-	// TokKwObjectIdentity is 'OBJECT-IDENTITY'.
 	TokKwObjectIdentity
-	// TokKwNotificationType is 'NOTIFICATION-TYPE'.
 	TokKwNotificationType
-	// TokKwTextualConvention is 'TEXTUAL-CONVENTION'.
 	TokKwTextualConvention
-	// TokKwTrapType is 'TRAP-TYPE'.
 	TokKwTrapType
 
-	// === Type keywords ===
+	// Type keywords
 
-	// TokKwInteger is 'INTEGER'.
 	TokKwInteger
-	// TokKwInteger32 is 'Integer32'.
 	TokKwInteger32
-	// TokKwUnsigned32 is 'Unsigned32'.
 	TokKwUnsigned32
-	// TokKwCounter32 is 'Counter32'.
 	TokKwCounter32
-	// TokKwCounter64 is 'Counter64'.
 	TokKwCounter64
-	// TokKwGauge32 is 'Gauge32'.
 	TokKwGauge32
-	// TokKwIpAddress is 'IpAddress'.
 	TokKwIpAddress
-	// TokKwOpaque is 'Opaque'.
 	TokKwOpaque
-	// TokKwTimeTicks is 'TimeTicks'.
 	TokKwTimeTicks
-	// TokKwBits is 'BITS'.
 	TokKwBits
-	// TokKwOctet is 'OCTET'.
 	TokKwOctet
-	// TokKwString is 'STRING'.
 	TokKwString
 
-	// === SMIv1 type aliases ===
+	// SMIv1 type aliases
 
-	// TokKwCounter is 'Counter' (normalized to Counter32).
 	TokKwCounter
-	// TokKwGauge is 'Gauge' (normalized to Gauge32).
 	TokKwGauge
-	// TokKwNetworkAddress is 'NetworkAddress' (normalized to IpAddress).
 	TokKwNetworkAddress
 
-	// === ASN.1 tag keywords ===
+	// ASN.1 tag keywords
 
-	// TokKwApplication is 'APPLICATION'.
 	TokKwApplication
-	// TokKwImplicit is 'IMPLICIT'.
 	TokKwImplicit
-	// TokKwUniversal is 'UNIVERSAL'.
 	TokKwUniversal
 
-	// === Status/Access value keywords ===
+	// Status/Access value keywords
 
-	// TokKwCurrent is 'current'.
 	TokKwCurrent
-	// TokKwDeprecated is 'deprecated'.
 	TokKwDeprecated
-	// TokKwObsolete is 'obsolete'.
 	TokKwObsolete
-	// TokKwMandatory is 'mandatory' (v1 status).
 	TokKwMandatory
-	// TokKwOptional is 'optional' (v1 status).
 	TokKwOptional
-	// TokKwReadOnly is 'read-only'.
 	TokKwReadOnly
-	// TokKwReadWrite is 'read-write'.
 	TokKwReadWrite
-	// TokKwReadCreate is 'read-create'.
 	TokKwReadCreate
-	// TokKwWriteOnly is 'write-only' (deprecated).
 	TokKwWriteOnly
-	// TokKwNotAccessible is 'not-accessible'.
 	TokKwNotAccessible
-	// TokKwAccessibleForNotify is 'accessible-for-notify'.
 	TokKwAccessibleForNotify
-	// TokKwNotImplemented is 'not-implemented' (AGENT-CAPABILITIES).
 	TokKwNotImplemented
+
+	// Sentinels for keyword range. New keywords must be added above this line.
+	tokKeywordEnd // must remain last
 )
+
+// IsKeyword reports whether k is any keyword token.
+func (k TokenKind) IsKeyword() bool {
+	return k >= TokKwDefinitions && k < tokKeywordEnd
+}
+
+// IsIdentifier reports whether k is an identifier token (uppercase or lowercase).
+func (k TokenKind) IsIdentifier() bool {
+	return k == TokUppercaseIdent || k == TokLowercaseIdent
+}
+
+// IsTypeKeyword reports whether k is a built-in type keyword
+// (INTEGER, Counter32, OCTET STRING components, etc.).
+func (k TokenKind) IsTypeKeyword() bool {
+	switch k {
+	case TokKwInteger, TokKwInteger32, TokKwUnsigned32, TokKwCounter32,
+		TokKwCounter64, TokKwGauge32, TokKwIpAddress, TokKwOpaque,
+		TokKwTimeTicks, TokKwBits, TokKwOctet, TokKwString,
+		TokKwCounter, TokKwGauge, TokKwNetworkAddress:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsMacroKeyword reports whether k is a macro invocation keyword
+// (OBJECT-TYPE, MODULE-IDENTITY, etc.).
+func (k TokenKind) IsMacroKeyword() bool {
+	switch k {
+	case TokKwModuleIdentity, TokKwModuleCompliance, TokKwObjectGroup,
+		TokKwNotificationGroup, TokKwAgentCapabilities, TokKwObjectType,
+		TokKwObjectIdentity, TokKwNotificationType, TokKwTextualConvention,
+		TokKwTrapType:
+		return true
+	default:
+		return false
+	}
+}
 
 // LibsmiName returns the libsmi-compatible name for this token kind.
 func (k TokenKind) LibsmiName() string {
@@ -493,36 +424,5 @@ func (k TokenKind) LibsmiName() string {
 		return "NOT_IMPLEMENTED"
 	default:
 		return "UNKNOWN"
-	}
-}
-
-// IsKeyword returns true if this token is a keyword.
-func (k TokenKind) IsKeyword() bool {
-	return k >= TokKwDefinitions && k <= TokKwNotImplemented
-}
-
-// IsTypeKeyword returns true if this token is a type keyword.
-func (k TokenKind) IsTypeKeyword() bool {
-	switch k {
-	case TokKwInteger, TokKwInteger32, TokKwUnsigned32, TokKwCounter32,
-		TokKwCounter64, TokKwGauge32, TokKwIpAddress, TokKwOpaque,
-		TokKwTimeTicks, TokKwBits, TokKwOctet, TokKwString,
-		TokKwCounter, TokKwGauge, TokKwNetworkAddress:
-		return true
-	default:
-		return false
-	}
-}
-
-// IsMacroKeyword returns true if this token is a macro keyword (OBJECT-TYPE, etc.).
-func (k TokenKind) IsMacroKeyword() bool {
-	switch k {
-	case TokKwModuleIdentity, TokKwModuleCompliance, TokKwObjectGroup,
-		TokKwNotificationGroup, TokKwAgentCapabilities, TokKwObjectType,
-		TokKwObjectIdentity, TokKwNotificationType, TokKwTextualConvention,
-		TokKwTrapType:
-		return true
-	default:
-		return false
 	}
 }

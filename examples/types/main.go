@@ -1,131 +1,113 @@
-// Example: types - explore type definitions and textual conventions.
+// Show type chain walking, textual conventions, and effective constraints.
 package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 
 	"github.com/golangsnmp/gomib"
 )
 
 func main() {
-	source, err := gomib.DirTree(findCorpus())
+	path := flag.String("p", "", "MIB search path (default: system paths)")
+	flag.Parse()
+
+	var src gomib.Source
+	if *path != "" {
+		var err error
+		src, err = gomib.DirTree(*path)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	var opts []gomib.LoadOption
+	if src != nil {
+		opts = append(opts, gomib.WithSource(src))
+	}
+	opts = append(opts, gomib.WithModules("IF-MIB"), gomib.WithSystemPaths())
+	m, err := gomib.Load(context.Background(), opts...)
 	if err != nil {
-		log.Fatalf("failed to open MIB directory: %v", err)
+		log.Fatal(err)
 	}
 
-	mib, err := gomib.Load(context.Background(), source)
-	if err != nil {
-		log.Fatalf("failed to load MIBs: %v", err)
+	// Walk the type chain for DisplayString
+	fmt.Println("=== Type chain: DisplayString ===")
+	typ := m.Type("DisplayString")
+	for t := typ; t != nil; t = t.Parent() {
+		fmt.Printf("  %s (base: %s)\n", t.Name(), t.Base())
+		if t.IsTextualConvention() {
+			fmt.Println("    textual convention")
+		}
+		if t.DisplayHint() != "" {
+			fmt.Printf("    hint: %q\n", t.DisplayHint())
+		}
+		if len(t.Sizes()) > 0 {
+			fmt.Printf("    sizes: %v\n", t.Sizes())
+		}
 	}
 
-	// Look up a textual convention
-	fmt.Println("=== Textual Convention: DisplayString ===")
-	displayString := mib.FindType("DisplayString")
-	if displayString != nil {
-		printType(displayString)
+	// Effective values resolve through the chain
+	fmt.Println("\n=== Effective values: DisplayString ===")
+	if typ != nil {
+		fmt.Printf("  EffectiveBase:        %s\n", typ.EffectiveBase())
+		fmt.Printf("  EffectiveDisplayHint: %q\n", typ.EffectiveDisplayHint())
+		fmt.Printf("  EffectiveSizes:       %v\n", typ.EffectiveSizes())
 	}
 
-	// Type with enumerations
-	fmt.Println("\n=== Enumerated type from object ===")
-	ifAdminStatus := mib.FindObject("IF-MIB::ifAdminStatus")
-	if ifAdminStatus != nil && ifAdminStatus.Type() != nil {
-		fmt.Printf("ifAdminStatus type: %s (base: %s)\n",
-			ifAdminStatus.Type().Name(), ifAdminStatus.Type().Base())
-		enums := ifAdminStatus.EffectiveEnums()
-		if len(enums) > 0 {
-			fmt.Println("  Named values:")
-			for _, nv := range enums {
-				fmt.Printf("    %s(%d)\n", nv.Label, nv.Value)
+	// Enumeration type (ifType -> IANAifType)
+	fmt.Println("\n=== Enum type: ifType ===")
+	obj := m.Object("ifType")
+	if obj != nil && obj.Type() != nil {
+		fmt.Printf("  object type: %s\n", obj.Type().Name())
+		fmt.Printf("  is enum:     %v\n", obj.Type().IsEnumeration())
+		enums := obj.EffectiveEnums()
+		fmt.Printf("  values:      %d total\n", len(enums))
+		for i, e := range enums {
+			if i >= 10 {
+				fmt.Printf("    ... and %d more\n", len(enums)-10)
+				break
 			}
+			fmt.Printf("    %s(%d)\n", e.Label, e.Value)
 		}
 	}
 
-	// Find all textual conventions
-	fmt.Println("\n=== Textual Conventions (first 10) ===")
-	count := 0
-	for _, t := range mib.Types() {
-		if t.IsTextualConvention() && count < 10 {
-			fmt.Printf("  %s (%s) from %s\n", t.Name(), t.Base(), t.Module().Name())
-			count++
-		}
+	// InterfaceIndex - TC with range constraint
+	fmt.Println("\n=== Textual convention: InterfaceIndex ===")
+	tc := m.Type("InterfaceIndex")
+	if tc != nil {
+		fmt.Printf("  TC:     %v\n", tc.IsTextualConvention())
+		fmt.Printf("  Base:   %s\n", tc.Base())
+		fmt.Printf("  Ranges: %v\n", tc.EffectiveRanges())
+		fmt.Printf("  Hint:   %q\n", tc.EffectiveDisplayHint())
 	}
 
-	// Object with size constraint
-	fmt.Println("\n=== Object with SIZE constraint ===")
-	sysDescr := mib.FindObject("sysDescr")
-	if sysDescr != nil {
-		fmt.Printf("sysDescr:\n")
-		fmt.Printf("  Type: %s\n", sysDescr.Type().Name())
-		fmt.Printf("  Base: %s\n", sysDescr.Type().Base())
-		sizes := sysDescr.EffectiveSizes()
-		if len(sizes) > 0 {
-			fmt.Printf("  Size: ")
-			for i, r := range sizes {
-				if i > 0 {
-					fmt.Print(" | ")
-				}
-				if r.Min == r.Max {
-					fmt.Printf("%d", r.Min)
-				} else {
-					fmt.Printf("%d..%d", r.Min, r.Max)
-				}
-			}
-			fmt.Println()
+	// Classification helpers
+	fmt.Println("\n=== Type classification ===")
+	for _, name := range []string{"ifIndex", "ifDescr", "ifType", "ifInOctets", "ifSpeed"} {
+		o := m.Object(name)
+		if o == nil || o.Type() == nil {
+			continue
 		}
-		if hint := sysDescr.EffectiveDisplayHint(); hint != "" {
-			fmt.Printf("  Hint: %s\n", hint)
+		t := o.Type()
+		var flags []string
+		if t.IsCounter() {
+			flags = append(flags, "counter")
 		}
-	}
-
-	// Counter64 type
-	fmt.Println("\n=== Counter64 objects (first 5) ===")
-	count = 0
-	for _, obj := range mib.Objects() {
-		if obj.Type() != nil && obj.Type().Base() == gomib.BaseCounter64 && count < 5 {
-			fmt.Printf("  %s::%s\n", obj.Module().Name(), obj.Name())
-			count++
+		if t.IsGauge() {
+			flags = append(flags, "gauge")
 		}
-	}
-}
-
-func printType(t gomib.Type) {
-	fmt.Printf("Name: %s\n", t.Name())
-	fmt.Printf("Module: %s\n", t.Module().Name())
-	fmt.Printf("Base: %s\n", t.Base())
-	fmt.Printf("IsTC: %v\n", t.IsTextualConvention())
-	if t.Parent() != nil {
-		fmt.Printf("Parent: %s\n", t.Parent().Name())
-	}
-	if len(t.Sizes()) > 0 {
-		fmt.Printf("Size: %v\n", t.Sizes())
-	}
-	if hint := t.DisplayHint(); hint != "" {
-		fmt.Printf("Hint: %s\n", hint)
-	}
-	if desc := t.Description(); desc != "" {
-		if len(desc) > 80 {
-			desc = desc[:77] + "..."
+		if t.IsString() {
+			flags = append(flags, "string")
 		}
-		fmt.Printf("Description: %s\n", desc)
-	}
-}
-
-func findCorpus() string {
-	candidates := []string{
-		"testdata/corpus/primary",
-		"../testdata/corpus/primary",
-		"gomib/testdata/corpus/primary",
-	}
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			abs, _ := filepath.Abs(p)
-			return abs
+		if t.IsEnumeration() {
+			flags = append(flags, "enum")
 		}
+		if t.IsBits() {
+			flags = append(flags, "bits")
+		}
+		fmt.Printf("  %-16s %-20s %v\n", name, t.Name(), flags)
 	}
-	log.Fatal("could not find test corpus")
-	return ""
 }

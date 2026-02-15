@@ -8,7 +8,9 @@
 *.so
 *.dylib
 /gomib
+/gomib-cli
 /gomib-netsnmp
+/gomib-libsmi
 
 # Test binary, built with `go test -c`
 *.test

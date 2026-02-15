@@ -44,7 +44,6 @@ func Error(t testing.TB, err error, msgAndArgs ...any) {
 }
 
 // NotNil fails the test if v is nil.
-// Works with pointers, slices, maps, channels, functions, and interfaces.
 func NotNil(t testing.TB, v any, msgAndArgs ...any) {
 	t.Helper()
 	if isNil(v) {
@@ -53,7 +52,6 @@ func NotNil(t testing.TB, v any, msgAndArgs ...any) {
 }
 
 // Nil fails the test if v is not nil.
-// Works with pointers, slices, maps, channels, functions, and interfaces.
 func Nil(t testing.TB, v any, msgAndArgs ...any) {
 	t.Helper()
 	if !isNil(v) {
@@ -61,7 +59,6 @@ func Nil(t testing.TB, v any, msgAndArgs ...any) {
 	}
 }
 
-// isNil checks if a value is nil, handling all nillable types.
 func isNil(v any) bool {
 	if v == nil {
 		return true
