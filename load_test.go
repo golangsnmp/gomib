@@ -1,8 +1,11 @@
 package gomib
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
+	"io/fs"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
@@ -533,6 +536,94 @@ func TestDiagnosticThresholdNotTriggered(t *testing.T) {
 	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
 	testutil.NoError(t, err, "Load should not error when diagnostics are below FailAt threshold")
 	testutil.NotNil(t, m, "Mib should be returned")
+}
+
+// fakeSource is a test Source that returns pre-configured results.
+type fakeSource struct {
+	modules map[string]fakeModule
+}
+
+type fakeModule struct {
+	findErr error         // error from Find
+	reader  io.ReadCloser // reader to return from Find (if findErr is nil)
+}
+
+func (f *fakeSource) Find(name string) (FindResult, error) {
+	m, ok := f.modules[name]
+	if !ok {
+		return FindResult{}, fs.ErrNotExist
+	}
+	if m.findErr != nil {
+		return FindResult{}, m.findErr
+	}
+	return FindResult{Reader: m.reader, Path: "fake:" + name}, nil
+}
+
+func (f *fakeSource) ListModules() ([]string, error) {
+	var names []string
+	for name := range f.modules {
+		names = append(names, name)
+	}
+	return names, nil
+}
+
+func TestFindModuleContentReturnsContent(t *testing.T) {
+	want := []byte("test content")
+	src := &fakeSource{modules: map[string]fakeModule{
+		"MOD": {reader: io.NopCloser(bytes.NewReader(want))},
+	}}
+	got, err := findModuleContent([]Source{src}, "MOD")
+	testutil.NoError(t, err, "findModuleContent")
+	testutil.Equal(t, string(want), string(got), "content")
+}
+
+func TestFindModuleContentSkipsNotExist(t *testing.T) {
+	want := []byte("from second source")
+	src1 := &fakeSource{modules: map[string]fakeModule{}}
+	src2 := &fakeSource{modules: map[string]fakeModule{
+		"MOD": {reader: io.NopCloser(bytes.NewReader(want))},
+	}}
+	got, err := findModuleContent([]Source{src1, src2}, "MOD")
+	testutil.NoError(t, err, "findModuleContent")
+	testutil.Equal(t, string(want), string(got), "content from second source")
+}
+
+func TestFindModuleContentNotFound(t *testing.T) {
+	src := &fakeSource{modules: map[string]fakeModule{}}
+	_, err := findModuleContent([]Source{src}, "MISSING")
+	testutil.True(t, errors.Is(err, fs.ErrNotExist), "should return fs.ErrNotExist, got %v", err)
+}
+
+func TestFindModuleContentPropagatesFindError(t *testing.T) {
+	permErr := errors.New("permission denied")
+	src1 := &fakeSource{modules: map[string]fakeModule{
+		"MOD": {findErr: permErr},
+	}}
+	src2 := &fakeSource{modules: map[string]fakeModule{
+		"MOD": {reader: io.NopCloser(bytes.NewReader([]byte("ok")))},
+	}}
+	_, err := findModuleContent([]Source{src1, src2}, "MOD")
+	testutil.True(t, errors.Is(err, permErr),
+		"should propagate Find error, got %v", err)
+}
+
+func TestFindModuleContentPropagatesReadError(t *testing.T) {
+	readErr := errors.New("disk I/O error")
+	src := &fakeSource{modules: map[string]fakeModule{
+		"MOD": {reader: io.NopCloser(&failingReader{err: readErr})},
+	}}
+	_, err := findModuleContent([]Source{src}, "MOD")
+	testutil.True(t, errors.Is(err, readErr),
+		"should propagate ReadAll error, got %v", err)
+}
+
+// failingReader is an io.Reader that always returns an error.
+type failingReader struct {
+	err error
+}
+
+func (r *failingReader) Read([]byte) (int, error) {
+	return 0, r.err
 }
 
 func loadInvalidMIB(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -85,8 +86,14 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 
 			result, err := sm.source.Find(sm.name)
 			if err != nil {
-				if logEnabled(logger, slog.LevelDebug) {
-					logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
+				if errors.Is(err, fs.ErrNotExist) {
+					if logEnabled(logger, slog.LevelDebug) {
+						logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
+							slog.String("module", sm.name),
+							slog.String("error", err.Error()))
+					}
+				} else if logEnabled(logger, slog.LevelWarn) {
+					logger.LogAttrs(ctx, slog.LevelWarn, "module read error",
 						slog.String("module", sm.name),
 						slog.String("error", err.Error()))
 				}
@@ -95,8 +102,8 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 			content, err := io.ReadAll(result.Reader)
 			_ = result.Reader.Close()
 			if err != nil {
-				if logEnabled(logger, slog.LevelDebug) {
-					logger.LogAttrs(ctx, slog.LevelDebug, "read failed",
+				if logEnabled(logger, slog.LevelWarn) {
+					logger.LogAttrs(ctx, slog.LevelWarn, "module read error",
 						slog.String("module", sm.name),
 						slog.String("error", err.Error()))
 				}
@@ -182,6 +189,9 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 
 		content, err := findModuleContent(sources, name)
 		if err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				return err
+			}
 			if logEnabled(logger, slog.LevelDebug) {
 				logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
 					slog.String("module", name))
@@ -242,13 +252,18 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 func findModuleContent(sources []Source, name string) ([]byte, error) {
 	for _, src := range sources {
 		result, err := src.Find(name)
-		if err == nil {
-			content, err := io.ReadAll(result.Reader)
-			_ = result.Reader.Close()
-			if err == nil {
-				return content, nil
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
 			}
+			return nil, err
 		}
+		content, err := io.ReadAll(result.Reader)
+		_ = result.Reader.Close()
+		if err != nil {
+			return nil, err
+		}
+		return content, nil
 	}
 	return nil, fs.ErrNotExist
 }
