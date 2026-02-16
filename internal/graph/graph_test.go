@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -10,12 +11,15 @@ func TestGraphBasic(t *testing.T) {
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
 
-	g.AddNode(a, NodeKindType)
-	g.AddNode(b, NodeKindType)
-	g.AddEdge(a, b) // a depends on b
+	g.AddNode(a)
+	g.AddNode(b)
+	g.AddEdge(a, b)
 
-	if len(g.Nodes()) != 2 {
-		t.Errorf("node count = %d, want 2", len(g.Nodes()))
+	if !g.HasNode(a) {
+		t.Error("graph should have node a")
+	}
+	if !g.HasNode(b) {
+		t.Error("graph should have node b")
 	}
 	if len(g.Dependencies(a)) != 1 {
 		t.Errorf("a dependencies = %d, want 1", len(g.Dependencies(a)))
@@ -25,147 +29,23 @@ func TestGraphBasic(t *testing.T) {
 	}
 }
 
-func TestFindCyclesNoCycle(t *testing.T) {
-	g := New()
-
-	a := Symbol{Module: "M", Name: "a"}
-	b := Symbol{Module: "M", Name: "b"}
-	c := Symbol{Module: "M", Name: "c"}
-
-	g.AddNode(a, NodeKindType)
-	g.AddNode(b, NodeKindType)
-	g.AddNode(c, NodeKindType)
-	g.AddEdge(a, b) // a -> b
-	g.AddEdge(b, c) // b -> c
-
-	cycles := g.FindCycles()
-	if len(cycles) != 0 {
-		t.Errorf("cycles = %d, want 0", len(cycles))
-	}
-}
-
-func TestFindCyclesSimple(t *testing.T) {
+func TestAddEdgeCreatesNodes(t *testing.T) {
 	g := New()
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
 
-	g.AddNode(a, NodeKindType)
-	g.AddNode(b, NodeKindType)
-	g.AddEdge(a, b) // a -> b
-	g.AddEdge(b, a) // b -> a (cycle!)
-
-	cycles := g.FindCycles()
-	if len(cycles) != 1 {
-		t.Fatalf("cycles = %d, want 1", len(cycles))
-	}
-	if len(cycles[0]) != 2 {
-		t.Errorf("cycle length = %d, want 2", len(cycles[0]))
-	}
-}
-
-func TestFindCyclesTriangle(t *testing.T) {
-	g := New()
-
-	a := Symbol{Module: "M", Name: "a"}
-	b := Symbol{Module: "M", Name: "b"}
-	c := Symbol{Module: "M", Name: "c"}
-
-	g.AddNode(a, NodeKindType)
-	g.AddNode(b, NodeKindType)
-	g.AddNode(c, NodeKindType)
-	g.AddEdge(a, b) // a -> b
-	g.AddEdge(b, c) // b -> c
-	g.AddEdge(c, a) // c -> a (cycle!)
-
-	cycles := g.FindCycles()
-	if len(cycles) != 1 {
-		t.Fatalf("cycles = %d, want 1", len(cycles))
-	}
-	if len(cycles[0]) != 3 {
-		t.Errorf("cycle length = %d, want 3", len(cycles[0]))
-	}
-}
-
-func TestTopologicalOrderSimple(t *testing.T) {
-	g := New()
-
-	a := Symbol{Module: "M", Name: "a"}
-	b := Symbol{Module: "M", Name: "b"}
-	c := Symbol{Module: "M", Name: "c"}
-
-	g.AddNode(a, NodeKindType)
-	g.AddNode(b, NodeKindType)
-	g.AddNode(c, NodeKindType)
-	g.AddEdge(a, b) // a depends on b
-	g.AddEdge(b, c) // b depends on c
-
-	order, cyclic := g.ResolutionOrder()
-	if len(cyclic) != 0 {
-		t.Errorf("cyclic = %d, want 0", len(cyclic))
-	}
-	if len(order) != 3 {
-		t.Fatalf("order = %d, want 3", len(order))
-	}
-
-	// c should come before b, b should come before a
-	indexOf := func(s Symbol) int {
-		for i, sym := range order {
-			if sym == s {
-				return i
-			}
-		}
-		return -1
-	}
-
-	if indexOf(c) >= indexOf(b) {
-		t.Error("c should come before b")
-	}
-	if indexOf(b) >= indexOf(a) {
-		t.Error("b should come before a")
-	}
-}
-
-func TestTopologicalOrderWithCycle(t *testing.T) {
-	g := New()
-
-	a := Symbol{Module: "M", Name: "a"}
-	b := Symbol{Module: "M", Name: "b"}
-	c := Symbol{Module: "M", Name: "c"}
-
-	g.AddNode(a, NodeKindType)
-	g.AddNode(b, NodeKindType)
-	g.AddNode(c, NodeKindType)
+	// No AddNode calls, only AddEdge.
 	g.AddEdge(a, b)
-	g.AddEdge(b, a) // cycle between a and b
-	g.AddEdge(c, a)
 
-	_, cyclic := g.ResolutionOrder()
-	if len(cyclic) == 0 {
-		t.Error("should have cyclic nodes")
+	if !g.HasNode(a) {
+		t.Error("AddEdge should create 'from' node")
 	}
-}
-
-func TestMarkResolved(t *testing.T) {
-	g := New()
-
-	a := Symbol{Module: "M", Name: "a"}
-	g.AddNode(a, NodeKindType)
-
-	if g.IsResolved(a) {
-		t.Error("initially should not be resolved")
+	if !g.HasNode(b) {
+		t.Error("AddEdge should create 'to' node")
 	}
-
-	if !g.MarkResolved(a) {
-		t.Error("MarkResolved should return true for existing node")
-	}
-	if !g.IsResolved(a) {
-		t.Error("should be resolved after MarkResolved")
-	}
-
-	missing := Symbol{Module: "M", Name: "missing"}
-	if g.MarkResolved(missing) {
-		t.Error("MarkResolved should return false for missing node")
+	if len(g.Dependencies(a)) != 1 {
+		t.Errorf("a dependencies = %d, want 1", len(g.Dependencies(a)))
 	}
 }
 
@@ -175,9 +55,197 @@ func TestHasNode(t *testing.T) {
 	if g.HasNode(a) {
 		t.Error("empty graph should not have node")
 	}
-	g.AddNode(a, NodeKindType)
+	g.AddNode(a)
 	if !g.HasNode(a) {
 		t.Error("should have node after AddNode")
+	}
+}
+
+func TestDuplicateEdges(t *testing.T) {
+	g := New()
+
+	a := Symbol{Module: "M", Name: "a"}
+	b := Symbol{Module: "M", Name: "b"}
+
+	g.AddEdge(a, b)
+	g.AddEdge(a, b)
+	g.AddEdge(a, b)
+
+	if len(g.Dependencies(a)) != 1 {
+		t.Errorf("dependencies = %d, want 1 (duplicate edges deduplicated)", len(g.Dependencies(a)))
+	}
+
+	order, cycles := g.ResolutionOrder()
+	if len(cycles) != 0 {
+		t.Errorf("cycles = %d, want 0", len(cycles))
+	}
+	if len(order) != 2 {
+		t.Errorf("order = %d, want 2", len(order))
+	}
+}
+
+func TestResolutionOrderEmpty(t *testing.T) {
+	g := New()
+	order, cycles := g.ResolutionOrder()
+	if len(order) != 0 {
+		t.Errorf("order = %d, want 0", len(order))
+	}
+	if len(cycles) != 0 {
+		t.Errorf("cycles = %d, want 0", len(cycles))
+	}
+}
+
+func TestResolutionOrderIsolatedNode(t *testing.T) {
+	g := New()
+	a := Symbol{Module: "M", Name: "a"}
+	g.AddNode(a)
+
+	order, cycles := g.ResolutionOrder()
+	if len(cycles) != 0 {
+		t.Errorf("cycles = %d, want 0", len(cycles))
+	}
+	if len(order) != 1 {
+		t.Fatalf("order = %d, want 1", len(order))
+	}
+	if order[0] != a {
+		t.Errorf("order[0] = %v, want %v", order[0], a)
+	}
+}
+
+func TestResolutionOrderChain(t *testing.T) {
+	g := New()
+
+	a := Symbol{Module: "M", Name: "a"}
+	b := Symbol{Module: "M", Name: "b"}
+	c := Symbol{Module: "M", Name: "c"}
+
+	g.AddEdge(a, b)
+	g.AddEdge(b, c)
+
+	order, cycles := g.ResolutionOrder()
+	if len(cycles) != 0 {
+		t.Errorf("cycles = %d, want 0", len(cycles))
+	}
+
+	// Deterministic: c, b, a.
+	want := []Symbol{c, b, a}
+	if !slices.Equal(order, want) {
+		t.Errorf("order = %v, want %v", order, want)
+	}
+}
+
+func TestResolutionOrderDiamond(t *testing.T) {
+	g := New()
+
+	a := Symbol{Module: "M", Name: "a"}
+	b := Symbol{Module: "M", Name: "b"}
+	c := Symbol{Module: "M", Name: "c"}
+	d := Symbol{Module: "M", Name: "d"}
+
+	// a depends on b and c, both depend on d.
+	g.AddEdge(a, b)
+	g.AddEdge(a, c)
+	g.AddEdge(b, d)
+	g.AddEdge(c, d)
+
+	order, cycles := g.ResolutionOrder()
+	if len(cycles) != 0 {
+		t.Errorf("cycles = %d, want 0", len(cycles))
+	}
+	if len(order) != 4 {
+		t.Fatalf("order = %d, want 4", len(order))
+	}
+
+	indexOf := func(s Symbol) int {
+		for i, sym := range order {
+			if sym == s {
+				return i
+			}
+		}
+		return -1
+	}
+
+	// d must come before b and c, both before a.
+	if indexOf(d) >= indexOf(b) {
+		t.Error("d should come before b")
+	}
+	if indexOf(d) >= indexOf(c) {
+		t.Error("d should come before c")
+	}
+	if indexOf(b) >= indexOf(a) {
+		t.Error("b should come before a")
+	}
+	if indexOf(c) >= indexOf(a) {
+		t.Error("c should come before a")
+	}
+}
+
+func TestResolutionOrderSimpleCycle(t *testing.T) {
+	g := New()
+
+	a := Symbol{Module: "M", Name: "a"}
+	b := Symbol{Module: "M", Name: "b"}
+
+	g.AddEdge(a, b)
+	g.AddEdge(b, a)
+
+	order, cycles := g.ResolutionOrder()
+	if len(order) != 0 {
+		t.Errorf("order = %d, want 0 (all nodes in cycle)", len(order))
+	}
+	if len(cycles) != 1 {
+		t.Fatalf("cycles = %d, want 1", len(cycles))
+	}
+	if len(cycles[0]) != 2 {
+		t.Errorf("cycle length = %d, want 2", len(cycles[0]))
+	}
+}
+
+func TestResolutionOrderTriangleCycle(t *testing.T) {
+	g := New()
+
+	a := Symbol{Module: "M", Name: "a"}
+	b := Symbol{Module: "M", Name: "b"}
+	c := Symbol{Module: "M", Name: "c"}
+
+	g.AddEdge(a, b)
+	g.AddEdge(b, c)
+	g.AddEdge(c, a)
+
+	_, cycles := g.ResolutionOrder()
+	if len(cycles) != 1 {
+		t.Fatalf("cycles = %d, want 1", len(cycles))
+	}
+	if len(cycles[0]) != 3 {
+		t.Errorf("cycle length = %d, want 3", len(cycles[0]))
+	}
+}
+
+func TestResolutionOrderCycleDependents(t *testing.T) {
+	g := New()
+
+	a := Symbol{Module: "M", Name: "a"}
+	b := Symbol{Module: "M", Name: "b"}
+	c := Symbol{Module: "M", Name: "c"}
+
+	g.AddEdge(a, b)
+	g.AddEdge(b, a)
+	g.AddEdge(c, a)
+
+	order, cycles := g.ResolutionOrder()
+	if len(cycles) != 1 {
+		t.Fatalf("cycles = %d, want 1", len(cycles))
+	}
+	if len(cycles[0]) != 2 {
+		t.Errorf("cycle length = %d, want 2", len(cycles[0]))
+	}
+
+	// c should still appear in the order despite depending on a cycle member.
+	if len(order) != 1 {
+		t.Fatalf("order = %d, want 1", len(order))
+	}
+	if order[0] != c {
+		t.Errorf("order[0] = %v, want %v", order[0], c)
 	}
 }
 
@@ -187,13 +255,10 @@ func TestSelfLoop(t *testing.T) {
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
 
-	g.AddNode(a, NodeKindType)
-	g.AddNode(b, NodeKindType)
-	g.AddEdge(a, a) // self-loop
+	g.AddEdge(a, a)
 	g.AddEdge(b, a)
 
-	// FindCycles should detect the self-loop.
-	cycles := g.FindCycles()
+	order, cycles := g.ResolutionOrder()
 	if len(cycles) != 1 {
 		t.Fatalf("cycles = %d, want 1", len(cycles))
 	}
@@ -204,55 +269,101 @@ func TestSelfLoop(t *testing.T) {
 		t.Errorf("self-loop node = %v, want %v", cycles[0][0], a)
 	}
 
-	// TopologicalOrder should also report it as cyclic.
-	_, cyclic := g.TopologicalOrder()
-	if len(cyclic) == 0 {
-		t.Error("self-loop should be cyclic in topo sort")
+	// b should still appear in the order.
+	if len(order) != 1 {
+		t.Fatalf("order = %d, want 1", len(order))
+	}
+	if order[0] != b {
+		t.Errorf("order[0] = %v, want %v", order[0], b)
 	}
 }
 
-func TestDuplicateEdges(t *testing.T) {
+func TestResolutionOrderMultipleSCCs(t *testing.T) {
+	// Adapted from the Wikipedia Tarjan's example.
+	// Three cycles ({a,b,c}, {d,e}, {f,g}), one self-loop (h).
+	g := New()
+
+	sym := func(name string) Symbol { return Symbol{Module: "M", Name: name} }
+	a, b, c := sym("a"), sym("b"), sym("c")
+	d, e := sym("d"), sym("e")
+	f, gg := sym("f"), sym("g")
+	h := sym("h")
+
+	g.AddEdge(a, b)
+	g.AddEdge(b, c)
+	g.AddEdge(c, a) // cycle: a, b, c
+	g.AddEdge(d, b)
+	g.AddEdge(d, c)
+	g.AddEdge(d, e)
+	g.AddEdge(e, d) // cycle: d, e (but d also depends on the a-b-c cycle)
+	g.AddEdge(f, c)
+	g.AddEdge(f, gg)
+	g.AddEdge(gg, f) // cycle: f, g
+	g.AddEdge(h, e)
+	g.AddEdge(h, gg)
+	g.AddEdge(h, h) // self-loop
+
+	order, cycles := g.ResolutionOrder()
+
+	// Three cycles: {a,b,c}, {d,e}, {f,g}. Plus self-loop {h}.
+	if len(cycles) != 4 {
+		t.Errorf("cycles = %d, want 4", len(cycles))
+		for i, cyc := range cycles {
+			t.Logf("  cycle %d: %v", i, cyc)
+		}
+	}
+
+	// No acyclic nodes in this graph, so order should be empty.
+	if len(order) != 0 {
+		t.Errorf("order = %d, want 0 (all nodes are in cycles)", len(order))
+		t.Logf("  order: %v", order)
+	}
+}
+
+func TestResolutionOrderCrossModule(t *testing.T) {
+	g := New()
+
+	// Symbols across two modules. Tests that Module-then-Name sort
+	// produces deterministic output.
+	a1 := Symbol{Module: "A", Name: "x"}
+	a2 := Symbol{Module: "A", Name: "y"}
+	b1 := Symbol{Module: "B", Name: "x"}
+
+	g.AddEdge(a2, a1)
+	g.AddEdge(b1, a1)
+
+	order, cycles := g.ResolutionOrder()
+	if len(cycles) != 0 {
+		t.Errorf("cycles = %d, want 0", len(cycles))
+	}
+
+	// Deterministic: A:x first (leaf), then A:y and B:x.
+	// A:y before B:x because "A" < "B" in module sort.
+	want := []Symbol{a1, a2, b1}
+	if !slices.Equal(order, want) {
+		t.Errorf("order = %v, want %v", order, want)
+	}
+}
+
+func TestResolutionOrderDisconnected(t *testing.T) {
 	g := New()
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
+	c := Symbol{Module: "M", Name: "c"}
 
-	g.AddNode(a, NodeKindType)
-	g.AddNode(b, NodeKindType)
-	g.AddEdge(a, b)
-	g.AddEdge(a, b) // duplicate
-	g.AddEdge(a, b) // duplicate
+	g.AddNode(a)
+	g.AddNode(b)
+	g.AddNode(c)
 
-	// Should only have one edge.
-	if len(g.Dependencies(a)) != 1 {
-		t.Errorf("dependencies = %d, want 1 (duplicate edges deduplicated)", len(g.Dependencies(a)))
+	order, cycles := g.ResolutionOrder()
+	if len(cycles) != 0 {
+		t.Errorf("cycles = %d, want 0", len(cycles))
 	}
 
-	// Topo sort should work correctly.
-	order, cyclic := g.TopologicalOrder()
-	if len(cyclic) != 0 {
-		t.Errorf("cyclic = %d, want 0", len(cyclic))
-	}
-	if len(order) != 2 {
-		t.Errorf("order = %d, want 2", len(order))
-	}
-}
-
-func TestImplicitNodeKindUpdate(t *testing.T) {
-	g := New()
-
-	a := Symbol{Module: "M", Name: "a"}
-	b := Symbol{Module: "M", Name: "b"}
-
-	// b is implicitly created by AddEdge with zero-value kind.
-	g.AddEdge(a, b)
-	if g.Node(b).Kind != NodeKind(0) {
-		t.Errorf("implicit node kind = %v, want 0", g.Node(b).Kind)
-	}
-
-	// Explicit AddNode should update the kind.
-	g.AddNode(b, NodeKindOID)
-	if g.Node(b).Kind != NodeKindOID {
-		t.Errorf("kind = %v, want NodeKindOID", g.Node(b).Kind)
+	// Deterministic: sorted by name since module is the same.
+	want := []Symbol{a, b, c}
+	if !slices.Equal(order, want) {
+		t.Errorf("order = %v, want %v", order, want)
 	}
 }

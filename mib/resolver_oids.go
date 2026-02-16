@@ -42,7 +42,7 @@ func resolveOids(ctx *resolverContext) {
 
 	for _, def := range defs.oidDefs {
 		sym := graph.Symbol{Module: def.mod.Name, Name: def.defName()}
-		g.AddNode(sym, graph.NodeKindOID)
+		g.AddNode(sym)
 		defIndex[sym] = def
 
 		if parentSym, ok := getOidParentSymbol(ctx, def); ok {
@@ -50,15 +50,13 @@ func resolveOids(ctx *resolverContext) {
 		}
 	}
 
-	cycles := g.FindCycles()
+	order, cycles := g.ResolutionOrder()
 	logCycles(ctx, cycles, "OID cycle detected")
-
-	order, cyclic := g.ResolutionOrder()
 
 	if ctx.TraceEnabled() {
 		ctx.Trace("OID resolution order",
 			slog.Int("total", len(order)),
-			slog.Int("cyclic", len(cyclic)))
+			slog.Int("cycles", len(cycles)))
 	}
 
 	resolved := 0
@@ -72,22 +70,24 @@ func resolveOids(ctx *resolverContext) {
 		}
 	}
 
-	for _, sym := range cyclic {
-		def, ok := defIndex[sym]
-		if !ok {
-			continue
+	for _, scc := range cycles {
+		for _, sym := range scc {
+			def, ok := defIndex[sym]
+			if !ok {
+				continue
+			}
+			oid := def.oid()
+			if oid == nil || len(oid.Components) == 0 {
+				continue
+			}
+			recordUnresolvedFirstComponent(ctx, def, oid)
 		}
-		oid := def.oid()
-		if oid == nil || len(oid.Components) == 0 {
-			continue
-		}
-		recordUnresolvedFirstComponent(ctx, def, oid)
 	}
 
 	if ctx.TraceEnabled() {
 		ctx.Trace("OID resolution complete",
 			slog.Int("resolved", resolved),
-			slog.Int("unresolved", len(cyclic)))
+			slog.Int("cycles", len(cycles)))
 	}
 
 	resolveTrapTypeDefinitions(ctx, defs.trapDefs)
