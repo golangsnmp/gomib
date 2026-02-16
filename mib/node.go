@@ -3,6 +3,7 @@ package mib
 import (
 	"cmp"
 	"iter"
+	"maps"
 	"slices"
 )
 
@@ -88,15 +89,10 @@ func (n *Node) sortedChildren() []*Node {
 	if n.sortedCache != nil {
 		return n.sortedCache
 	}
-	result := make([]*Node, 0, len(n.children))
-	for _, child := range n.children {
-		result = append(result, child)
-	}
-	slices.SortFunc(result, func(a, b *Node) int {
+	n.sortedCache = slices.SortedFunc(maps.Values(n.children), func(a, b *Node) int {
 		return cmp.Compare(a.arc, b.arc)
 	})
-	n.sortedCache = result
-	return result
+	return n.sortedCache
 }
 
 func (n *Node) Subtree() iter.Seq[*Node] {
@@ -122,23 +118,18 @@ func (n *Node) LongestPrefix(oid OID) *Node {
 	return nd
 }
 
-// walkOID walks the OID tree from n, returning the deepest node reached
-// and whether the walk matched all arcs (exact match).
-func (n *Node) walkOID(oid OID) (deepest *Node, exact bool) {
-	deepest = n
+// walkOID walks the OID tree from n, returning the last matched node
+// and whether the full OID was matched.
+func (n *Node) walkOID(oid OID) (matched *Node, exact bool) {
 	current := n
 	for _, arc := range oid {
-		if current.children == nil {
-			return deepest, false
-		}
-		child := current.children[arc]
+		child := current.children[arc] // nil map yields nil
 		if child == nil {
-			return deepest, false
+			return current, false
 		}
 		current = child
-		deepest = current
 	}
-	return deepest, true
+	return current, true
 }
 
 // String returns a brief summary: "name (oid)" or just "(oid)" for
