@@ -918,3 +918,38 @@ func TestParseTextualConventionWithAssignment(t *testing.T) {
 	testutil.NotNil(t, def.Reference, "reference should be set")
 	testutil.Equal(t, "RFC 1213", def.Reference.Value, "reference value")
 }
+
+func TestStripQuotedLiteral(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"hex uppercase H", "'FF'H", "FF"},
+		{"hex uppercase H with zeros", "'0000'H", "0000"},
+		{"hex uppercase H long", "'7FFFFFFF'H", "7FFFFFFF"},
+
+		{"hex lowercase h", "'FF'h", "FF"},
+		{"hex lowercase h with zeros", "'0000'h", "0000"},
+		{"hex lowercase h long", "'7FFFFFFF'h", "7FFFFFFF"},
+
+		{"binary uppercase B", "'10110'B", "10110"},
+		{"binary uppercase B zeros", "'00000000'B", "00000000"},
+
+		{"binary lowercase b", "'10110'b", "10110"},
+		{"binary lowercase b zeros", "'00000000'b", "00000000"},
+
+		{"no suffix", "'FF'", "FF'"},
+		{"empty string", "", ""},
+		{"no quotes", "FF", "FF"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripQuotedLiteral(tt.input)
+			if got != tt.want {
+				t.Errorf("stripQuotedLiteral(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

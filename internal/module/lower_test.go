@@ -224,3 +224,75 @@ END
 		}
 	}
 }
+
+func TestLower_MissingModuleIdentity_SeverityByStrictness(t *testing.T) {
+	source := []byte(`NO-IDENTITY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    OBJECT-TYPE, Integer32
+        FROM SNMPv2-SMI;
+
+someObject OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    ::= { 1 3 6 1 }
+
+END
+`)
+
+	t.Run("default_config", func(t *testing.T) {
+		p := parser.New(source, nil, types.DefaultConfig())
+		ast := p.ParseModule()
+		if ast == nil {
+			t.Fatal("parse returned nil")
+		}
+
+		mod := Lower(ast, source, nil, types.DefaultConfig())
+		if mod == nil {
+			t.Fatal("lower returned nil")
+		}
+
+		var foundError bool
+		for _, d := range mod.Diagnostics {
+			if d.Code == "missing-module-identity" {
+				if d.Severity != types.SeverityError {
+					t.Errorf("expected SeverityError (2) in default mode, got %v", d.Severity)
+				}
+				foundError = true
+				break
+			}
+		}
+		if !foundError {
+			t.Error("expected missing-module-identity diagnostic with default config")
+		}
+	})
+
+	t.Run("permissive_config", func(t *testing.T) {
+		p := parser.New(source, nil, types.PermissiveConfig())
+		ast := p.ParseModule()
+		if ast == nil {
+			t.Fatal("parse returned nil")
+		}
+
+		mod := Lower(ast, source, nil, types.PermissiveConfig())
+		if mod == nil {
+			t.Fatal("lower returned nil")
+		}
+
+		var foundWarning bool
+		for _, d := range mod.Diagnostics {
+			if d.Code == "missing-module-identity" {
+				if d.Severity != types.SeverityWarning {
+					t.Errorf("expected SeverityWarning (5) in permissive mode, got %v", d.Severity)
+				}
+				foundWarning = true
+				break
+			}
+		}
+		if !foundWarning {
+			t.Error("expected missing-module-identity diagnostic with permissive config")
+		}
+	})
+}

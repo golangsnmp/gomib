@@ -122,7 +122,11 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 			}
 		}
 		if !hasModuleIdentity {
-			ctx.emitDiagnostic(types.DiagMissingModuleIdentity, types.SeverityError, module.Name, module.Span,
+			severity := types.SeverityError
+			if ctx.DiagConfig.AllowBestGuessFallbacks() {
+				severity = types.SeverityWarning
+			}
+			ctx.emitDiagnostic(types.DiagMissingModuleIdentity, severity, module.Name, module.Span,
 				fmt.Sprintf("SMIv2 module %s lacks MODULE-IDENTITY", module.Name))
 		}
 	}

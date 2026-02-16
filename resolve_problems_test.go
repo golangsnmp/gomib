@@ -1009,3 +1009,112 @@ func TestProblemNamingHyphens(t *testing.T) {
 		}
 	}
 }
+
+func TestHexLiteralRanges(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(corpus), WithModules("INTEGRATED-SERVICES-MIB"))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	for _, d := range m.Diagnostics() {
+		if d.Module == "INTEGRATED-SERVICES-MIB" && d.Severity <= mib.SeverityError {
+			t.Errorf("unexpected error-level diagnostic: %s", d.Message)
+		}
+	}
+
+	typ := m.Type("MessageSize")
+	testutil.NotNil(t, typ, "MessageSize type should exist")
+
+	ranges := typ.Ranges()
+	testutil.Equal(t, len(ranges), 1, "MessageSize should have 1 range")
+	if len(ranges) == 1 {
+		testutil.Equal(t, ranges[0].Min, int64(0), "MessageSize range min")
+		testutil.Equal(t, ranges[0].Max, int64(2147483647), "MessageSize range max")
+	}
+
+	for _, name := range []string{"BitRate", "BurstSize"} {
+		typ := m.Type(name)
+		testutil.NotNil(t, typ, "%s type should exist", name)
+
+		ranges := typ.Ranges()
+		testutil.Equal(t, len(ranges), 1, "%s should have 1 range", name)
+		if len(ranges) == 1 {
+			testutil.Equal(t, ranges[0].Min, int64(0), "%s range min", name)
+			testutil.Equal(t, ranges[0].Max, int64(2147483647), "%s range max", name)
+		}
+	}
+}
+
+func TestHexLiteralDefval(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(corpus), WithModules("RIPv2-MIB"))
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	for _, d := range m.Diagnostics() {
+		if d.Module == "RIPv2-MIB" && d.Severity <= mib.SeverityError {
+			t.Errorf("unexpected error-level diagnostic: %s", d.Message)
+		}
+	}
+
+	obj := m.Object("rip2IfConfDomain")
+	testutil.NotNil(t, obj, "rip2IfConfDomain should exist")
+
+	defval := obj.DefaultValue()
+	testutil.True(t, !defval.IsZero(), "rip2IfConfDomain should have DEFVAL")
+}
+
+func TestModuleIdentityPermissive(t *testing.T) {
+	corpus, err := DirTree("testdata/corpus/primary")
+	if err != nil {
+		t.Fatalf("DirTree corpus failed: %v", err)
+	}
+
+	ctx := context.Background()
+
+	t.Run("IPV6-TC", func(t *testing.T) {
+		m, err := Load(ctx, WithSource(corpus), WithModules("IPV6-TC"), WithStrictness(mib.StrictnessPermissive))
+		if err != nil {
+			t.Fatalf("Load failed: %v", err)
+		}
+
+		for _, d := range m.Diagnostics() {
+			if d.Module == "IPV6-TC" && d.Severity <= mib.SeverityError {
+				t.Errorf("unexpected error-level diagnostic in permissive mode: code=%s, severity=%v, msg=%s",
+					d.Code, d.Severity, d.Message)
+			}
+		}
+
+		testutil.NotNil(t, m.Type("Ipv6Address"), "Ipv6Address type should exist")
+		testutil.NotNil(t, m.Type("Ipv6AddressPrefix"), "Ipv6AddressPrefix type should exist")
+	})
+
+	t.Run("IPV6-MIB", func(t *testing.T) {
+		m, err := Load(ctx, WithSource(corpus), WithModules("IPV6-MIB"), WithStrictness(mib.StrictnessPermissive))
+		if err != nil {
+			t.Fatalf("Load failed: %v", err)
+		}
+
+		for _, d := range m.Diagnostics() {
+			if d.Module == "IPV6-MIB" && d.Severity <= mib.SeverityError {
+				t.Errorf("unexpected error-level diagnostic in permissive mode: code=%s, severity=%v, msg=%s",
+					d.Code, d.Severity, d.Message)
+			}
+		}
+
+		testutil.NotNil(t, m.Object("ipv6IfDescr"), "ipv6IfDescr should exist")
+		testutil.NotNil(t, m.Object("ipv6IfIndex"), "ipv6IfIndex should exist")
+	})
+}
