@@ -1433,7 +1433,13 @@ func stripQuotedLiteral(s string) string {
 	if inner, ok := strings.CutSuffix(s, "'H"); ok {
 		return inner
 	}
+	if inner, ok := strings.CutSuffix(s, "'h"); ok {
+		return inner
+	}
 	if inner, ok := strings.CutSuffix(s, "'B"); ok {
+		return inner
+	}
+	if inner, ok := strings.CutSuffix(s, "'b"); ok {
 		return inner
 	}
 	return s
