@@ -901,5 +901,152 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 	}
 }
 
+func TestResolveTrapTypeDefinitions_GenericTraps(t *testing.T) {
+	// RFC 3584 section 3: generic traps 0-5 with ENTERPRISE snmpTraps
+	// resolve to snmpTraps.(trapNumber+1). This matches net-snmp's
+	// netsnmp_build_trap_oid() in agent_trap.c.
+	//
+	// SMIv1-translated MIBs define these as:
+	//   coldStart TRAP-TYPE
+	//       ENTERPRISE snmpTraps
+	//       ::= 0
+
+	srcMod := &module.Module{Name: "TEST-V1-MIB", Language: types.LanguageSMIv1}
+	resolvedMod := newModule("TEST-V1-MIB")
+
+	ctx := newResolverContext([]*module.Module{srcMod}, nil, DefaultConfig())
+	ctx.ModuleToResolved[srcMod] = resolvedMod
+	ctx.ResolvedToModule[resolvedMod] = srcMod
+
+	// Build snmpTraps node at 1.3.6.1.6.3.1.1.5
+	snmpTrapsNode := ctx.Mib.Root().
+		getOrCreateChild(1). // iso
+		getOrCreateChild(3). // org
+		getOrCreateChild(6). // dod
+		getOrCreateChild(1). // internet
+		getOrCreateChild(6). // snmpV2
+		getOrCreateChild(3). // snmpModules
+		getOrCreateChild(1). // snmpMIB
+		getOrCreateChild(1). // snmpMIBObjects
+		getOrCreateChild(5)  // snmpTraps
+	snmpTrapsNode.setName("snmpTraps")
+	ctx.registerModuleNodeSymbol(srcMod, "snmpTraps", snmpTrapsNode)
+
+	// The six generic traps per RFC 3584
+	genericTraps := []struct {
+		name       string
+		trapNumber uint32
+		wantOID    OID
+	}{
+		{"coldStart", 0, OID{1, 3, 6, 1, 6, 3, 1, 1, 5, 1}},
+		{"warmStart", 1, OID{1, 3, 6, 1, 6, 3, 1, 1, 5, 2}},
+		{"linkDown", 2, OID{1, 3, 6, 1, 6, 3, 1, 1, 5, 3}},
+		{"linkUp", 3, OID{1, 3, 6, 1, 6, 3, 1, 1, 5, 4}},
+		{"authenticationFailure", 4, OID{1, 3, 6, 1, 6, 3, 1, 1, 5, 5}},
+		{"egpNeighborLoss", 5, OID{1, 3, 6, 1, 6, 3, 1, 1, 5, 6}},
+	}
+
+	var defs []trapTypeRef
+	for _, tt := range genericTraps {
+		defs = append(defs, trapTypeRef{
+			mod: srcMod,
+			notif: &module.Notification{
+				Name:     tt.name,
+				TrapInfo: &module.TrapInfo{Enterprise: "snmpTraps", TrapNumber: tt.trapNumber},
+			},
+		})
+	}
+
+	resolveTrapTypeDefinitions(ctx, defs)
+
+	for _, tt := range genericTraps {
+		node, ok := ctx.LookupNodeForModule(srcMod, tt.name)
+		if !ok {
+			t.Errorf("%s: not resolved", tt.name)
+			continue
+		}
+		got := node.OID()
+		if !got.Equal(tt.wantOID) {
+			t.Errorf("%s: OID = %v, want %v", tt.name, got, tt.wantOID)
+		}
+		if node.Kind() != KindNotification {
+			t.Errorf("%s: kind = %v, want KindNotification", tt.name, node.Kind())
+		}
+	}
+}
+
+func TestResolveTrapTypeDefinitions_EnterpriseSpecific(t *testing.T) {
+	// Enterprise-specific traps use the enterprise.0.trapNumber convention
+	// per RFC 3584 section 3.
+
+	srcMod := &module.Module{Name: "VENDOR-MIB", Language: types.LanguageSMIv1}
+	resolvedMod := newModule("VENDOR-MIB")
+
+	ctx := newResolverContext([]*module.Module{srcMod}, nil, DefaultConfig())
+	ctx.ModuleToResolved[srcMod] = resolvedMod
+	ctx.ResolvedToModule[resolvedMod] = srcMod
+
+	// Build vendor enterprise node at 1.3.6.1.4.1.9 (e.g. Cisco)
+	enterpriseNode := ctx.Mib.Root().
+		getOrCreateChild(1). // iso
+		getOrCreateChild(3). // org
+		getOrCreateChild(6). // dod
+		getOrCreateChild(1). // internet
+		getOrCreateChild(4). // private
+		getOrCreateChild(1). // enterprises
+		getOrCreateChild(9)  // cisco
+	enterpriseNode.setName("cisco")
+	ctx.registerModuleNodeSymbol(srcMod, "cisco", enterpriseNode)
+
+	defs := []trapTypeRef{
+		{
+			mod: srcMod,
+			notif: &module.Notification{
+				Name:     "vendorTrap",
+				TrapInfo: &module.TrapInfo{Enterprise: "cisco", TrapNumber: 42},
+			},
+		},
+	}
+
+	resolveTrapTypeDefinitions(ctx, defs)
+
+	node, ok := ctx.LookupNodeForModule(srcMod, "vendorTrap")
+	if !ok {
+		t.Fatal("vendorTrap: not resolved")
+	}
+	// enterprise.0.trapNumber = cisco.0.42
+	wantOID := OID{1, 3, 6, 1, 4, 1, 9, 0, 42}
+	got := node.OID()
+	if !got.Equal(wantOID) {
+		t.Errorf("vendorTrap: OID = %v, want %v", got, wantOID)
+	}
+	if node.Kind() != KindNotification {
+		t.Errorf("vendorTrap: kind = %v, want KindNotification", node.Kind())
+	}
+}
+
+func TestIsSnmpTrapsOID(t *testing.T) {
+	tests := []struct {
+		name string
+		oid  OID
+		want bool
+	}{
+		{"snmpTraps", OID{1, 3, 6, 1, 6, 3, 1, 1, 5}, true},
+		{"enterprises", OID{1, 3, 6, 1, 4, 1}, false},
+		{"snmpTraps child", OID{1, 3, 6, 1, 6, 3, 1, 1, 5, 1}, false},
+		{"snmpTraps parent", OID{1, 3, 6, 1, 6, 3, 1, 1}, false},
+		{"nil", nil, false},
+		{"empty", OID{}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isSnmpTrapsOID(tt.oid); got != tt.want {
+				t.Errorf("isSnmpTrapsOID(%v) = %v, want %v", tt.oid, got, tt.want)
+			}
+		})
+	}
+}
+
 // Ensure we use the graph.Symbol type correctly in tests.
 var _ = graph.Symbol{Module: "test", Name: "test"}
