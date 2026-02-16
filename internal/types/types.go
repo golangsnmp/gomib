@@ -90,10 +90,9 @@ func BuildLineTable(source []byte) []int {
 }
 
 // LineColFromTable converts a byte offset to 1-based line and column numbers
-// using a precomputed line table. Returns (0, 0) if the table is nil or the
-// offset cannot be resolved.
+// using a precomputed line table. Returns (0, 0) if the table is empty.
 func LineColFromTable(table []int, offset ByteOffset) (line, col int) {
-	if len(table) == 0 || offset == 0 {
+	if len(table) == 0 {
 		return 0, 0
 	}
 	off := int(offset)

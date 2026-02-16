@@ -42,6 +42,10 @@ type resolverContext struct {
 	// ModuleDefNames caches definition names per module for import resolution.
 	ModuleDefNames map[*module.Module]map[string]struct{}
 
+	// ModuleOidDefNames caches names of definitions that have OIDs, per module.
+	// Used by findOidDefiningModule to avoid O(n) linear scans.
+	ModuleOidDefNames map[*module.Module]map[string]struct{}
+
 	// Snmpv2SMIModule is the SNMPv2-SMI base module (for primitive types).
 	Snmpv2SMIModule *module.Module
 
@@ -103,7 +107,7 @@ type unresolvedNotifObject struct {
 
 func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig DiagnosticConfig) *resolverContext {
 	n := len(mods)
-	return &resolverContext{
+	ctx := &resolverContext{
 		Mib:                newMib(),
 		Modules:            mods,
 		ModuleIndex:        make(map[string][]*module.Module, n),
@@ -113,9 +117,24 @@ func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig D
 		ModuleImports:      make(map[*module.Module]map[string]*module.Module, n),
 		ModuleSymbolToType: make(map[*module.Module]map[string]*Type, n),
 		ModuleDefNames:     make(map[*module.Module]map[string]struct{}, n),
+		ModuleOidDefNames:  make(map[*module.Module]map[string]struct{}, n),
 		diagConfig:         diagConfig,
 		Logger:             types.Logger{L: logger},
 	}
+	// Pre-populate OID definition name index for all initial modules.
+	// This allows findOidDefiningModule to use O(1) lookups instead of
+	// scanning all definitions. registerModules rebuilds this with
+	// base modules included.
+	for _, mod := range mods {
+		oidDefs := make(map[string]struct{})
+		for _, def := range mod.Definitions {
+			if def.DefinitionOid() != nil {
+				oidDefs[def.DefinitionName()] = struct{}{}
+			}
+		}
+		ctx.ModuleOidDefNames[mod] = oidDefs
+	}
+	return ctx
 }
 
 // LookupNodeForModule resolves a node by name, traversing imports from mod.
@@ -408,6 +427,7 @@ func (c *resolverContext) DropModules() {
 	c.Modules = nil
 	c.ModuleIndex = nil
 	c.ModuleDefNames = nil
+	c.ModuleOidDefNames = nil
 }
 
 func addUnresolved(m *Mib, kind UnresolvedKind, symbol string, mod *module.Module) {
