@@ -1,7 +1,10 @@
 // Package graph provides dependency graph construction and analysis for MIB resolution.
 package graph
 
-import "slices"
+import (
+	"cmp"
+	"slices"
+)
 
 // Symbol uniquely identifies a definition in a module.
 type Symbol struct {
@@ -9,58 +12,31 @@ type Symbol struct {
 	Name   string
 }
 
-// NodeKind classifies what kind of definition a node represents.
-type NodeKind int
-
-const (
-	NodeKindType NodeKind = iota
-	NodeKindOID
-)
-
 // Graph is a dependency graph of symbols with forward edges.
 type Graph struct {
-	nodes map[Symbol]*Node
+	nodes map[Symbol]struct{}
 	edges map[Symbol][]Symbol
 }
 
-// Node holds metadata about a symbol in the graph.
-type Node struct {
-	Symbol   Symbol
-	Kind     NodeKind
-	Resolved bool
-}
-
-// New creates an empty dependency graph.
+// New returns a graph with no nodes or edges.
 func New() *Graph {
 	return &Graph{
-		nodes: make(map[Symbol]*Node),
+		nodes: make(map[Symbol]struct{}),
 		edges: make(map[Symbol][]Symbol),
 	}
 }
 
-// AddNode registers a symbol with its kind. If the node was implicitly
-// created by AddEdge, the kind is updated.
-func (g *Graph) AddNode(sym Symbol, kind NodeKind) {
-	if n, exists := g.nodes[sym]; exists {
-		n.Kind = kind
-	} else {
-		g.nodes[sym] = &Node{
-			Symbol: sym,
-			Kind:   kind,
-		}
-	}
+// AddNode registers a symbol. Duplicate calls are no-ops.
+func (g *Graph) AddNode(sym Symbol) {
+	g.nodes[sym] = struct{}{}
 }
 
 // AddEdge records that "from" depends on "to", meaning "to" must be
 // resolved before "from". Missing nodes are created implicitly.
 // Duplicate edges are ignored.
 func (g *Graph) AddEdge(from, to Symbol) {
-	if _, ok := g.nodes[from]; !ok {
-		g.nodes[from] = &Node{Symbol: from}
-	}
-	if _, ok := g.nodes[to]; !ok {
-		g.nodes[to] = &Node{Symbol: to}
-	}
+	g.nodes[from] = struct{}{}
+	g.nodes[to] = struct{}{}
 
 	if slices.Contains(g.edges[from], to) {
 		return
@@ -68,46 +44,84 @@ func (g *Graph) AddEdge(from, to Symbol) {
 	g.edges[from] = append(g.edges[from], to)
 }
 
-// Node returns the metadata for a symbol, or nil if not present.
-func (g *Graph) Node(sym Symbol) *Node {
-	return g.nodes[sym]
-}
-
 // Dependencies returns the symbols that sym depends on (forward edges).
 func (g *Graph) Dependencies(sym Symbol) []Symbol {
 	return g.edges[sym]
-}
-
-// Nodes returns all registered nodes.
-func (g *Graph) Nodes() []*Node {
-	result := make([]*Node, 0, len(g.nodes))
-	for _, n := range g.nodes {
-		result = append(result, n)
-	}
-	return result
-}
-
-// MarkResolved flags a symbol as fully resolved.
-// Returns false if the symbol is not in the graph.
-func (g *Graph) MarkResolved(sym Symbol) bool {
-	if n := g.nodes[sym]; n != nil {
-		n.Resolved = true
-		return true
-	}
-	return false
-}
-
-// IsResolved reports whether the symbol has been resolved.
-// Returns false for symbols not in the graph (use HasNode to distinguish).
-func (g *Graph) IsResolved(sym Symbol) bool {
-	if n := g.nodes[sym]; n != nil {
-		return n.Resolved
-	}
-	return false
 }
 
 // HasNode reports whether the symbol exists in the graph.
 func (g *Graph) HasNode(sym Symbol) bool {
 	_, ok := g.nodes[sym]
 	return ok
+}
+
+// ResolutionOrder returns symbols ordered so that dependencies come before
+// dependents, using Tarjan's algorithm. Strongly connected components with
+// more than one node (or a single node with a self-loop) are reported as
+// cycles and excluded from the resolution order.
+func (g *Graph) ResolutionOrder() (order []Symbol, cycles [][]Symbol) {
+	var (
+		index    int
+		stack    []Symbol
+		onStack  = make(map[Symbol]bool)
+		indices  = make(map[Symbol]int)
+		lowlinks = make(map[Symbol]int)
+	)
+
+	var strongConnect func(sym Symbol)
+	strongConnect = func(sym Symbol) {
+		indices[sym] = index
+		lowlinks[sym] = index
+		index++
+		stack = append(stack, sym)
+		onStack[sym] = true
+
+		for _, dep := range g.edges[sym] {
+			if _, visited := indices[dep]; !visited {
+				strongConnect(dep)
+				lowlinks[sym] = min(lowlinks[sym], lowlinks[dep])
+			} else if onStack[dep] {
+				lowlinks[sym] = min(lowlinks[sym], indices[dep])
+			}
+		}
+
+		if lowlinks[sym] == indices[sym] {
+			var scc []Symbol
+			for {
+				w := stack[len(stack)-1]
+				stack = stack[:len(stack)-1]
+				onStack[w] = false
+				scc = append(scc, w)
+				if w == sym {
+					break
+				}
+			}
+			if len(scc) > 1 {
+				cycles = append(cycles, scc)
+			} else if slices.Contains(g.edges[scc[0]], scc[0]) {
+				cycles = append(cycles, scc)
+			} else {
+				order = append(order, scc[0])
+			}
+		}
+	}
+
+	sorted := make([]Symbol, 0, len(g.nodes))
+	for sym := range g.nodes {
+		sorted = append(sorted, sym)
+	}
+	slices.SortFunc(sorted, func(a, b Symbol) int {
+		if c := cmp.Compare(a.Module, b.Module); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Name, b.Name)
+	})
+
+	for _, sym := range sorted {
+		if _, visited := indices[sym]; !visited {
+			strongConnect(sym)
+		}
+	}
+
+	return order, cycles
 }

@@ -138,7 +138,7 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 			}
 
 			sym := graph.Symbol{Module: mod.Name, Name: td.Name}
-			g.AddNode(sym, graph.NodeKindType)
+			g.AddNode(sym)
 			entries[sym] = typeResolutionEntry{mod: mod, td: td, typ: typ}
 
 			if baseName := getTypeRefBaseName(td.Syntax); baseName != "" {
@@ -151,15 +151,13 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 		}
 	}
 
-	cycles := g.FindCycles()
+	order, cycles := g.ResolutionOrder()
 	logCycles(ctx, cycles, "type cycle detected")
-
-	order, cyclic := g.ResolutionOrder()
 
 	if ctx.TraceEnabled() {
 		ctx.Trace("type resolution order",
 			slog.Int("total", len(order)),
-			slog.Int("cyclic", len(cyclic)))
+			slog.Int("cycles", len(cycles)))
 	}
 
 	resolved := 0
@@ -173,21 +171,23 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 		}
 	}
 
-	for _, sym := range cyclic {
-		entry, ok := entries[sym]
-		if !ok {
-			continue
-		}
-		baseName := getTypeRefBaseName(entry.td.Syntax)
-		if baseName != "" {
-			ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Span)
+	for _, scc := range cycles {
+		for _, sym := range scc {
+			entry, ok := entries[sym]
+			if !ok {
+				continue
+			}
+			baseName := getTypeRefBaseName(entry.td.Syntax)
+			if baseName != "" {
+				ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Span)
+			}
 		}
 	}
 
 	if ctx.TraceEnabled() {
 		ctx.Trace("type resolution complete",
 			slog.Int("resolved", resolved),
-			slog.Int("unresolved", len(cyclic)))
+			slog.Int("cycles", len(cycles)))
 	}
 }
 
