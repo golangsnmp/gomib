@@ -6,7 +6,7 @@ import (
 )
 
 func TestGraphBasic(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
@@ -30,7 +30,7 @@ func TestGraphBasic(t *testing.T) {
 }
 
 func TestAddEdgeCreatesNodes(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
@@ -50,7 +50,7 @@ func TestAddEdgeCreatesNodes(t *testing.T) {
 }
 
 func TestHasNode(t *testing.T) {
-	g := New()
+	g := New(0)
 	a := Symbol{Module: "M", Name: "a"}
 	if g.HasNode(a) {
 		t.Error("empty graph should not have node")
@@ -62,7 +62,7 @@ func TestHasNode(t *testing.T) {
 }
 
 func TestDuplicateEdges(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
@@ -85,7 +85,7 @@ func TestDuplicateEdges(t *testing.T) {
 }
 
 func TestResolutionOrderEmpty(t *testing.T) {
-	g := New()
+	g := New(0)
 	order, cycles := g.ResolutionOrder()
 	if len(order) != 0 {
 		t.Errorf("order = %d, want 0", len(order))
@@ -96,7 +96,7 @@ func TestResolutionOrderEmpty(t *testing.T) {
 }
 
 func TestResolutionOrderIsolatedNode(t *testing.T) {
-	g := New()
+	g := New(0)
 	a := Symbol{Module: "M", Name: "a"}
 	g.AddNode(a)
 
@@ -113,7 +113,7 @@ func TestResolutionOrderIsolatedNode(t *testing.T) {
 }
 
 func TestResolutionOrderChain(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
@@ -135,7 +135,7 @@ func TestResolutionOrderChain(t *testing.T) {
 }
 
 func TestResolutionOrderDiamond(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
@@ -181,7 +181,7 @@ func TestResolutionOrderDiamond(t *testing.T) {
 }
 
 func TestResolutionOrderSimpleCycle(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
@@ -202,7 +202,7 @@ func TestResolutionOrderSimpleCycle(t *testing.T) {
 }
 
 func TestResolutionOrderTriangleCycle(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
@@ -222,7 +222,7 @@ func TestResolutionOrderTriangleCycle(t *testing.T) {
 }
 
 func TestResolutionOrderCycleDependents(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
@@ -250,7 +250,7 @@ func TestResolutionOrderCycleDependents(t *testing.T) {
 }
 
 func TestSelfLoop(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}
@@ -281,7 +281,7 @@ func TestSelfLoop(t *testing.T) {
 func TestResolutionOrderMultipleSCCs(t *testing.T) {
 	// Adapted from the Wikipedia Tarjan's example.
 	// Three cycles ({a,b,c}, {d,e}, {f,g}), one self-loop (h).
-	g := New()
+	g := New(0)
 
 	sym := func(name string) Symbol { return Symbol{Module: "M", Name: name} }
 	a, b, c := sym("a"), sym("b"), sym("c")
@@ -321,7 +321,7 @@ func TestResolutionOrderMultipleSCCs(t *testing.T) {
 }
 
 func TestResolutionOrderCrossModule(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	// Symbols across two modules. Tests that Module-then-Name sort
 	// produces deterministic output.
@@ -346,7 +346,7 @@ func TestResolutionOrderCrossModule(t *testing.T) {
 }
 
 func TestResolutionOrderDisconnected(t *testing.T) {
-	g := New()
+	g := New(0)
 
 	a := Symbol{Module: "M", Name: "a"}
 	b := Symbol{Module: "M", Name: "b"}

@@ -359,6 +359,15 @@ func (c *resolverContext) DiagnosticConfig() DiagnosticConfig {
 	return c.diagConfig
 }
 
+// TypeCount returns the total number of registered types across all modules.
+func (c *resolverContext) TypeCount() int {
+	n := 0
+	for _, symbols := range c.ModuleSymbolToType {
+		n += len(symbols)
+	}
+	return n
+}
+
 // logCycles logs detected dependency cycles at trace level.
 func logCycles(ctx *resolverContext, cycles [][]graph.Symbol, msg string) {
 	if len(cycles) == 0 || !ctx.TraceEnabled() {
