@@ -123,8 +123,9 @@ func resolveTypeBases(ctx *resolverContext) {
 // resolveTypeRefParentsGraph uses a dependency graph to resolve type parents
 // in topological order (single pass).
 func resolveTypeRefParentsGraph(ctx *resolverContext) {
-	entries := make(map[graph.Symbol]typeResolutionEntry)
-	g := graph.New()
+	nTypes := ctx.TypeCount()
+	entries := make(map[graph.Symbol]typeResolutionEntry, nTypes)
+	g := graph.New(nTypes)
 
 	for _, mod := range ctx.Modules {
 		for _, def := range mod.Definitions {

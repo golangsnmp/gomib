@@ -37,8 +37,9 @@ func resolveOids(ctx *resolverContext) {
 	defs := collectOidDefinitions(ctx)
 	checkSmiv2IdentifierHyphens(ctx, defs.oidDefs)
 
-	g := graph.New()
-	defIndex := make(map[graph.Symbol]oidDefinition)
+	nDefs := len(defs.oidDefs)
+	g := graph.New(nDefs)
+	defIndex := make(map[graph.Symbol]oidDefinition, nDefs)
 
 	for _, def := range defs.oidDefs {
 		sym := graph.Symbol{Module: def.mod.Name, Name: def.defName()}
@@ -245,7 +246,14 @@ type collectedOidDefinitions struct {
 }
 
 func collectOidDefinitions(ctx *resolverContext) collectedOidDefinitions {
-	var defs collectedOidDefinitions
+	// Estimate capacity: most definitions are OID-bearing (TypeDefs are the exception).
+	totalDefs := 0
+	for _, mod := range ctx.Modules {
+		totalDefs += len(mod.Definitions)
+	}
+	defs := collectedOidDefinitions{
+		oidDefs: make([]oidDefinition, 0, totalDefs),
+	}
 
 	for _, mod := range ctx.Modules {
 		for _, def := range mod.Definitions {
