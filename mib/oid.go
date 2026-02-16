@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const oidArcEstimate = 4 // average digits per arc for buffer pre-sizing
+
 // OID is a sequence of arc values representing an SNMP Object Identifier.
 type OID []uint32
 
@@ -25,7 +27,7 @@ func ParseOID(s string) (OID, error) {
 		return nil, fmt.Errorf("empty OID string")
 	}
 
-	var arcs []uint32
+	arcs := make([]uint32, 0, strings.Count(s, ".")+1)
 	var current uint32
 	var hasDigit bool
 	for i := 0; i < len(s); i++ {
@@ -60,13 +62,13 @@ func (o OID) String() string {
 	if len(o) == 0 {
 		return ""
 	}
-	var b strings.Builder
-	b.WriteString(strconv.FormatUint(uint64(o[0]), 10))
+	buf := make([]byte, 0, len(o)*oidArcEstimate)
+	buf = strconv.AppendUint(buf, uint64(o[0]), 10)
 	for _, arc := range o[1:] {
-		b.WriteByte('.')
-		b.WriteString(strconv.FormatUint(uint64(arc), 10))
+		buf = append(buf, '.')
+		buf = strconv.AppendUint(buf, uint64(arc), 10)
 	}
-	return b.String()
+	return string(buf)
 }
 
 // Parent returns the parent OID (all arcs except the last).
