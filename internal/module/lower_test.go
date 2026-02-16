@@ -108,6 +108,7 @@ END
 func TestLower_DiagnosticSourceLocation_Synthetic(t *testing.T) {
 	// Lowering-generated diagnostics (no span) should keep line/column 0.
 	// An SMIv2 module without MODULE-IDENTITY triggers a lowering diagnostic.
+	// Use permissive config so the warning-level diagnostic is visible.
 	source := []byte(`NO-IDENTITY-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
@@ -124,13 +125,13 @@ someObject OBJECT-TYPE
 END
 `)
 
-	p := parser.New(source, nil, types.DefaultConfig())
+	p := parser.New(source, nil, types.PermissiveConfig())
 	ast := p.ParseModule()
 	if ast == nil {
 		t.Fatal("parse returned nil")
 	}
 
-	mod := Lower(ast, source, nil, types.DefaultConfig())
+	mod := Lower(ast, source, nil, types.PermissiveConfig())
 	if mod == nil {
 		t.Fatal("lower returned nil")
 	}
@@ -156,6 +157,7 @@ func TestLower_SNMPv2MIBNotTreatedAsBaseModule(t *testing.T) {
 	// without MODULE-IDENTITY should get the missing-module-identity diagnostic.
 	// This tests that language detection and base module checks use
 	// consistent definitions via BaseModuleFromName/IsBaseModule.
+	// Use permissive config so the warning-level diagnostic is visible.
 	source := []byte(`SNMPv2-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
@@ -172,13 +174,13 @@ sysDescr OBJECT-TYPE
 END
 `)
 
-	p := parser.New(source, nil, types.DefaultConfig())
+	p := parser.New(source, nil, types.PermissiveConfig())
 	ast := p.ParseModule()
 	if ast == nil {
 		t.Fatal("parse returned nil")
 	}
 
-	mod := Lower(ast, source, nil, types.DefaultConfig())
+	mod := Lower(ast, source, nil, types.PermissiveConfig())
 	if mod == nil {
 		t.Fatal("lower returned nil")
 	}
@@ -225,7 +227,7 @@ END
 	}
 }
 
-func TestLower_MissingModuleIdentity_SeverityByStrictness(t *testing.T) {
+func TestLower_MissingModuleIdentity_AlwaysWarning(t *testing.T) {
 	source := []byte(`NO-IDENTITY-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
@@ -242,57 +244,40 @@ someObject OBJECT-TYPE
 END
 `)
 
-	t.Run("default_config", func(t *testing.T) {
-		p := parser.New(source, nil, types.DefaultConfig())
-		ast := p.ParseModule()
-		if ast == nil {
-			t.Fatal("parse returned nil")
-		}
-
-		mod := Lower(ast, source, nil, types.DefaultConfig())
-		if mod == nil {
-			t.Fatal("lower returned nil")
-		}
-
-		var foundError bool
-		for _, d := range mod.Diagnostics {
-			if d.Code == "missing-module-identity" {
-				if d.Severity != types.SeverityError {
-					t.Errorf("expected SeverityError (2) in default mode, got %v", d.Severity)
-				}
-				foundError = true
-				break
+	// Warning-level diagnostics are filtered at default strictness (level 3),
+	// so test with permissive (shows warnings) and strict (shows everything).
+	for _, tc := range []struct {
+		name   string
+		config types.DiagnosticConfig
+	}{
+		{"permissive_config", types.PermissiveConfig()},
+		{"strict_config", types.StrictConfig()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := parser.New(source, nil, tc.config)
+			ast := p.ParseModule()
+			if ast == nil {
+				t.Fatal("parse returned nil")
 			}
-		}
-		if !foundError {
-			t.Error("expected missing-module-identity diagnostic with default config")
-		}
-	})
 
-	t.Run("permissive_config", func(t *testing.T) {
-		p := parser.New(source, nil, types.PermissiveConfig())
-		ast := p.ParseModule()
-		if ast == nil {
-			t.Fatal("parse returned nil")
-		}
-
-		mod := Lower(ast, source, nil, types.PermissiveConfig())
-		if mod == nil {
-			t.Fatal("lower returned nil")
-		}
-
-		var foundWarning bool
-		for _, d := range mod.Diagnostics {
-			if d.Code == "missing-module-identity" {
-				if d.Severity != types.SeverityWarning {
-					t.Errorf("expected SeverityWarning (5) in permissive mode, got %v", d.Severity)
-				}
-				foundWarning = true
-				break
+			mod := Lower(ast, source, nil, tc.config)
+			if mod == nil {
+				t.Fatal("lower returned nil")
 			}
-		}
-		if !foundWarning {
-			t.Error("expected missing-module-identity diagnostic with permissive config")
-		}
-	})
+
+			var found bool
+			for _, d := range mod.Diagnostics {
+				if d.Code == "missing-module-identity" {
+					if d.Severity != types.SeverityWarning {
+						t.Errorf("expected SeverityWarning in %s, got %v", tc.name, d.Severity)
+					}
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Error("expected missing-module-identity diagnostic")
+			}
+		})
+	}
 }
