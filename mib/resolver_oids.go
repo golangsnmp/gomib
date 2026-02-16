@@ -146,8 +146,8 @@ func lookupNamedParentSymbol(ctx *resolverContext, def oidDefinition, name strin
 // findOidDefiningModule finds the module that defines an OID symbol,
 // checking local definitions first, then imports.
 func findOidDefiningModule(ctx *resolverContext, fromMod *module.Module, name string) string {
-	for _, def := range fromMod.Definitions {
-		if def.DefinitionName() == name && def.DefinitionOid() != nil {
+	if oidDefs := ctx.ModuleOidDefNames[fromMod]; oidDefs != nil {
+		if _, ok := oidDefs[name]; ok {
 			return fromMod.Name
 		}
 	}

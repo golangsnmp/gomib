@@ -14,6 +14,7 @@ type LoweringContext struct {
 	Language    types.Language
 	DiagConfig  types.DiagnosticConfig
 	source      []byte // source text for span-to-line/column conversion
+	lineTable   []int  // precomputed line table for O(log n) span-to-line/col
 	moduleName  string // current module name for diagnostics
 	types.Logger
 }
@@ -24,6 +25,7 @@ func newLoweringContext(source []byte, logger *slog.Logger, diagConfig types.Dia
 		Language:   types.LanguageUnknown,
 		DiagConfig: diagConfig,
 		source:     source,
+		lineTable:  types.BuildLineTable(source),
 		Logger:     types.Logger{L: logger},
 	}
 }
@@ -54,12 +56,12 @@ func LineColFromLineTable(lineTable []int, span types.Span) (line, col int) {
 }
 
 // emitDiagnostic records a diagnostic if the current config allows it.
-// The span is converted to line/column using the source text.
+// The span is converted to line/column using the precomputed line table.
 func (ctx *LoweringContext) emitDiagnostic(code string, severity types.Severity, moduleName string, span types.Span, message string) {
 	if !ctx.DiagConfig.ShouldReport(code, severity) {
 		return
 	}
-	line, col := spanToLineCol(ctx.source, span.Start)
+	line, col := types.LineColFromTable(ctx.lineTable, span.Start)
 	ctx.Diagnostics = append(ctx.Diagnostics, types.Diagnostic{
 		Severity: severity,
 		Code:     code,
@@ -88,7 +90,7 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 	ctx := newLoweringContext(source, logger, diagConfig)
 
 	module := NewModule(astModule.Name.Name, astModule.Span)
-	module.LineTable = types.BuildLineTable(source)
+	module.LineTable = ctx.lineTable
 	ctx.moduleName = module.Name
 
 	ctx.Log(slog.LevelDebug, "lowering module", slog.String("module", module.Name))
@@ -126,7 +128,7 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 	}
 
 	for _, d := range astModule.Diagnostics {
-		line, col := spanToLineCol(ctx.source, d.Span.Start)
+		line, col := types.LineColFromTable(ctx.lineTable, d.Span.Start)
 		module.Diagnostics = append(module.Diagnostics, types.Diagnostic{
 			Severity: d.Severity,
 			Code:     d.Code,
