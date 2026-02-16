@@ -1,3 +1,4 @@
+// Package mib provides the in-memory representation of loaded MIB data.
 package mib
 
 import (
@@ -6,6 +7,7 @@ import (
 )
 
 // Mib is the top-level container for loaded MIB data.
+// It is intended to be built once and then used as a read-only structure.
 type Mib struct {
 	root          *Node
 	modules       []*Module
@@ -35,8 +37,10 @@ func newMib() *Mib {
 	}
 }
 
+// Root returns the unnamed root node of the OID tree.
 func (m *Mib) Root() *Node { return m.root }
 
+// Nodes returns an iterator over all nodes in the tree, depth-first by arc.
 func (m *Mib) Nodes() iter.Seq[*Node] {
 	return func(yield func(*Node) bool) {
 		for _, child := range m.root.sortedChildren() {
@@ -97,6 +101,7 @@ func (m *Mib) Capability(name string) *Capability {
 	return findEntity(m, name, func(nd *Node) *Capability { return nd.capability })
 }
 
+// NodeByOID returns the node at the exact OID, or nil if not found.
 func (m *Mib) NodeByOID(oid OID) *Node {
 	nd, ok := m.root.walkOID(oid)
 	if !ok {
@@ -105,42 +110,65 @@ func (m *Mib) NodeByOID(oid OID) *Node {
 	return nd
 }
 
+// LongestPrefixByOID returns the deepest node matching a prefix of the OID.
 func (m *Mib) LongestPrefixByOID(oid OID) *Node {
 	nd, _ := m.root.walkOID(oid)
 	return nd
 }
 
+// Module returns the module with the given name, or nil if not found.
 func (m *Mib) Module(name string) *Module {
 	return m.moduleByName[name]
 }
 
-func (m *Mib) Modules() []*Module             { return slices.Clone(m.modules) }
-func (m *Mib) Objects() []*Object             { return slices.Clone(m.objects) }
-func (m *Mib) Types() []*Type                 { return slices.Clone(m.types) }
+// Modules returns a copy of all loaded modules.
+func (m *Mib) Modules() []*Module { return slices.Clone(m.modules) }
+
+// Objects returns a copy of all object definitions.
+func (m *Mib) Objects() []*Object { return slices.Clone(m.objects) }
+
+// Types returns a copy of all type definitions.
+func (m *Mib) Types() []*Type { return slices.Clone(m.types) }
+
+// Notifications returns a copy of all notification definitions.
 func (m *Mib) Notifications() []*Notification { return slices.Clone(m.notifications) }
-func (m *Mib) Groups() []*Group               { return slices.Clone(m.groups) }
-func (m *Mib) Compliances() []*Compliance     { return slices.Clone(m.compliances) }
-func (m *Mib) Capabilities() []*Capability    { return slices.Clone(m.capabilities) }
 
-func (m *Mib) Tables() []*Object  { return objectsByKind(m.objects, KindTable) }
+// Groups returns a copy of all group definitions.
+func (m *Mib) Groups() []*Group { return slices.Clone(m.groups) }
+
+// Compliances returns a copy of all compliance definitions.
+func (m *Mib) Compliances() []*Compliance { return slices.Clone(m.compliances) }
+
+// Capabilities returns a copy of all capability definitions.
+func (m *Mib) Capabilities() []*Capability { return slices.Clone(m.capabilities) }
+
+// Tables returns all objects classified as tables.
+func (m *Mib) Tables() []*Object { return objectsByKind(m.objects, KindTable) }
+
+// Scalars returns all objects classified as scalars.
 func (m *Mib) Scalars() []*Object { return objectsByKind(m.objects, KindScalar) }
+
+// Columns returns all objects classified as table columns.
 func (m *Mib) Columns() []*Object { return objectsByKind(m.objects, KindColumn) }
-func (m *Mib) Rows() []*Object    { return objectsByKind(m.objects, KindRow) }
 
-func (m *Mib) NodeCount() int              { return m.nodeCount }
+// Rows returns all objects classified as table rows.
+func (m *Mib) Rows() []*Object { return objectsByKind(m.objects, KindRow) }
+
+// NodeCount returns the total number of nodes in the OID tree.
+func (m *Mib) NodeCount() int { return m.nodeCount }
+
+// Unresolved returns a copy of all unresolved references from loading.
 func (m *Mib) Unresolved() []UnresolvedRef { return slices.Clone(m.unresolved) }
-func (m *Mib) Diagnostics() []Diagnostic   { return slices.Clone(m.diagnostics) }
 
+// Diagnostics returns a copy of all diagnostics collected during loading.
+func (m *Mib) Diagnostics() []Diagnostic { return slices.Clone(m.diagnostics) }
+
+// HasErrors reports whether any diagnostic has error severity or above.
 func (m *Mib) HasErrors() bool {
-	for _, d := range m.diagnostics {
-		if d.Severity.AtLeast(SeverityError) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(m.diagnostics, func(d Diagnostic) bool {
+		return d.Severity.AtLeast(SeverityError)
+	})
 }
-
-// Construction methods used by the builder/resolver.
 
 func (m *Mib) setNodeCount(n int) { m.nodeCount = n }
 
