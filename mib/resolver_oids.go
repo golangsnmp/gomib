@@ -476,9 +476,16 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 			continue
 		}
 
-		// SNMPv1 trap OID convention: enterprise.0.trapNumber
-		zeroNode := enterpriseNode.getOrCreateChild(0)
-		trapNode := zeroNode.getOrCreateChild(trapNumber)
+		// RFC 3584 section 3 defines two OID conventions for TRAP-TYPE:
+		//  - Generic traps (ENTERPRISE snmpTraps): snmpTraps.(trapNumber+1)
+		//  - Enterprise-specific traps:            enterprise.0.trapNumber
+		var trapNode *Node
+		if isSnmpTrapsOID(enterpriseNode.OID()) {
+			trapNode = enterpriseNode.getOrCreateChild(trapNumber + 1)
+		} else {
+			zeroNode := enterpriseNode.getOrCreateChild(0)
+			trapNode = zeroNode.getOrCreateChild(trapNumber)
+		}
 
 		trapNode.setName(defName)
 		trapNode.setKind(KindNotification)
@@ -517,6 +524,15 @@ func lookupSmiGlobalOidRoot(ctx *resolverContext, name string) (*Node, bool) {
 		return node, true
 	}
 	return nil, false
+}
+
+// snmpTrapsOID is 1.3.6.1.6.3.1.1.5 (SNMPv2-MIB::snmpTraps).
+var snmpTrapsOID = OID{1, 3, 6, 1, 6, 3, 1, 1, 5}
+
+// isSnmpTrapsOID returns true if oid matches the snmpTraps OID,
+// identifying the enterprise node for the six standard generic traps.
+func isSnmpTrapsOID(oid OID) bool {
+	return oid.Equal(snmpTrapsOID)
 }
 
 func wellKnownRootArc(name string) int {
