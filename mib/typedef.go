@@ -19,7 +19,6 @@ type Type struct {
 	isTC   bool
 }
 
-// newType returns a Type initialized with the given name.
 func newType(name string) *Type {
 	return &Type{name: name}
 }
@@ -37,34 +36,48 @@ func (t *Type) Ranges() []Range     { return slices.Clone(t.ranges) }
 func (t *Type) Enums() []NamedValue { return slices.Clone(t.enums) }
 func (t *Type) Bits() []NamedValue  { return slices.Clone(t.bits) }
 
+// Enum looks up an enumeration value by label.
 func (t *Type) Enum(label string) (NamedValue, bool) { return findNamedValue(t.enums, label) }
-func (t *Type) Bit(label string) (NamedValue, bool)  { return findNamedValue(t.bits, label) }
 
+// Bit looks up a BITS value by label.
+func (t *Type) Bit(label string) (NamedValue, bool) { return findNamedValue(t.bits, label) }
+
+// IsTextualConvention reports whether this type was defined as a TEXTUAL-CONVENTION.
 func (t *Type) IsTextualConvention() bool { return t.isTC }
 
+// IsCounter reports whether the resolved base type is Counter32 or Counter64.
 func (t *Type) IsCounter() bool {
 	b := t.EffectiveBase()
 	return b == BaseCounter32 || b == BaseCounter64
 }
 
-func (t *Type) IsGauge() bool  { return t.EffectiveBase() == BaseGauge32 }
+// IsGauge reports whether the resolved base type is Gauge32.
+func (t *Type) IsGauge() bool { return t.EffectiveBase() == BaseGauge32 }
+
+// IsString reports whether the resolved base type is OCTET STRING.
 func (t *Type) IsString() bool { return t.EffectiveBase() == BaseOctetString }
 
+// IsEnumeration reports whether this is an INTEGER type with named values.
 func (t *Type) IsEnumeration() bool {
 	return t.EffectiveBase() == BaseInteger32 && len(t.EffectiveEnums()) > 0
 }
 
+// IsBits reports whether this type has BITS definitions.
 func (t *Type) IsBits() bool { return len(t.EffectiveBits()) > 0 }
 
+// EffectiveBase walks the parent type chain and returns the first non-zero
+// base type, or 0 if none is set.
 func (t *Type) EffectiveBase() BaseType {
 	for current := t; current != nil; current = current.parent {
 		if current.base != 0 {
 			return current.base
 		}
 	}
-	return t.base
+	return 0
 }
 
+// EffectiveDisplayHint walks the parent type chain and returns the first
+// non-empty display hint.
 func (t *Type) EffectiveDisplayHint() string {
 	for current := t; current != nil; current = current.parent {
 		if current.hint != "" {
@@ -74,6 +87,8 @@ func (t *Type) EffectiveDisplayHint() string {
 	return ""
 }
 
+// EffectiveSizes walks the parent type chain and returns the first non-empty
+// size constraint list.
 func (t *Type) EffectiveSizes() []Range {
 	for current := t; current != nil; current = current.parent {
 		if len(current.sizes) > 0 {
@@ -83,6 +98,8 @@ func (t *Type) EffectiveSizes() []Range {
 	return nil
 }
 
+// EffectiveRanges walks the parent type chain and returns the first non-empty
+// range constraint list.
 func (t *Type) EffectiveRanges() []Range {
 	for current := t; current != nil; current = current.parent {
 		if len(current.ranges) > 0 {
@@ -92,6 +109,8 @@ func (t *Type) EffectiveRanges() []Range {
 	return nil
 }
 
+// EffectiveEnums walks the parent type chain and returns the first non-empty
+// enumeration value list.
 func (t *Type) EffectiveEnums() []NamedValue {
 	for current := t; current != nil; current = current.parent {
 		if len(current.enums) > 0 {
@@ -101,6 +120,8 @@ func (t *Type) EffectiveEnums() []NamedValue {
 	return nil
 }
 
+// EffectiveBits walks the parent type chain and returns the first non-empty
+// BITS definition list.
 func (t *Type) EffectiveBits() []NamedValue {
 	for current := t; current != nil; current = current.parent {
 		if len(current.bits) > 0 {
