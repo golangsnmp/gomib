@@ -24,7 +24,6 @@ type Object struct {
 	bits   []NamedValue
 }
 
-// newObject returns an Object initialized with the given name.
 func newObject(name string) *Object {
 	return &Object{name: name}
 }
@@ -40,6 +39,7 @@ func (o *Object) Reference() string   { return o.ref }
 func (o *Object) Units() string       { return o.units }
 func (o *Object) Augments() *Object   { return o.augments }
 
+// OID returns the object's position in the OID tree, or nil if unresolved.
 func (o *Object) OID() OID {
 	if o == nil || o.node == nil {
 		return nil
@@ -47,33 +47,49 @@ func (o *Object) OID() OID {
 	return o.node.OID()
 }
 
+// Kind reports the structural classification of this object's tree node.
 func (o *Object) Kind() Kind {
-	if o.node == nil {
+	if o == nil || o.node == nil {
 		return KindUnknown
 	}
 	return o.node.kind
 }
 
+// DefaultValue returns the DEFVAL clause, or a zero DefVal if none was declared.
 func (o *Object) DefaultValue() DefVal {
-	if o.defVal == nil {
+	if o == nil || o.defVal == nil {
 		return DefVal{}
 	}
 	return *o.defVal
 }
 
+// EffectiveDisplayHint returns the display hint resolved through the type chain.
 func (o *Object) EffectiveDisplayHint() string { return o.hint }
-func (o *Object) EffectiveSizes() []Range      { return slices.Clone(o.sizes) }
-func (o *Object) EffectiveRanges() []Range     { return slices.Clone(o.ranges) }
-func (o *Object) EffectiveEnums() []NamedValue { return slices.Clone(o.enums) }
-func (o *Object) EffectiveBits() []NamedValue  { return slices.Clone(o.bits) }
-func (o *Object) Index() []IndexEntry          { return slices.Clone(o.index) }
 
+// EffectiveSizes returns size constraints resolved through the type chain.
+func (o *Object) EffectiveSizes() []Range { return slices.Clone(o.sizes) }
+
+// EffectiveRanges returns range constraints resolved through the type chain.
+func (o *Object) EffectiveRanges() []Range { return slices.Clone(o.ranges) }
+
+// EffectiveEnums returns enumeration values resolved through the type chain.
+func (o *Object) EffectiveEnums() []NamedValue { return slices.Clone(o.enums) }
+
+// EffectiveBits returns bit definitions resolved through the type chain.
+func (o *Object) EffectiveBits() []NamedValue { return slices.Clone(o.bits) }
+
+// Index returns the declared INDEX entries for this object.
+func (o *Object) Index() []IndexEntry { return slices.Clone(o.index) }
+
+// Enum looks up an enumeration value by label.
 func (o *Object) Enum(label string) (NamedValue, bool) { return findNamedValue(o.enums, label) }
-func (o *Object) Bit(label string) (NamedValue, bool)  { return findNamedValue(o.bits, label) }
+
+// Bit looks up a BITS value by label.
+func (o *Object) Bit(label string) (NamedValue, bool) { return findNamedValue(o.bits, label) }
 
 // Table returns the table object that contains this row or column, or nil.
 func (o *Object) Table() *Object {
-	if o.node == nil {
+	if o == nil || o.node == nil {
 		return nil
 	}
 	switch o.node.kind {
@@ -91,8 +107,9 @@ func (o *Object) Table() *Object {
 	return nil
 }
 
+// Row returns the parent row object for a column, or nil.
 func (o *Object) Row() *Object {
-	if o.node == nil {
+	if o == nil || o.node == nil {
 		return nil
 	}
 	if o.node.kind == KindColumn {
@@ -103,8 +120,9 @@ func (o *Object) Row() *Object {
 	return nil
 }
 
+// Entry returns the row entry for a table, or nil.
 func (o *Object) Entry() *Object {
-	if o.node == nil || o.node.kind != KindTable {
+	if o == nil || o.node == nil || o.node.kind != KindTable {
 		return nil
 	}
 	for _, child := range o.node.sortedChildren() {
@@ -115,8 +133,9 @@ func (o *Object) Entry() *Object {
 	return nil
 }
 
+// Columns returns the column objects for a table or row, or nil.
 func (o *Object) Columns() []*Object {
-	if o.node == nil {
+	if o == nil || o.node == nil {
 		return nil
 	}
 	var rowNode *Node
@@ -145,12 +164,17 @@ func (o *Object) Columns() []*Object {
 	return cols
 }
 
+// EffectiveIndexes returns INDEX entries for a row, following the AUGMENTS
+// chain if the row has no indexes of its own.
 func (o *Object) EffectiveIndexes() []IndexEntry {
+	if o == nil {
+		return nil
+	}
 	return o.effectiveIndexes(make(map[*Object]struct{}))
 }
 
 func (o *Object) effectiveIndexes(visited map[*Object]struct{}) []IndexEntry {
-	if o.node == nil || o.node.kind != KindRow {
+	if o == nil || o.node == nil || o.node.kind != KindRow {
 		return nil
 	}
 	if len(o.index) > 0 {
@@ -166,10 +190,17 @@ func (o *Object) effectiveIndexes(visited map[*Object]struct{}) []IndexEntry {
 	return nil
 }
 
-func (o *Object) IsTable() bool  { return o.node != nil && o.node.kind == KindTable }
-func (o *Object) IsRow() bool    { return o.node != nil && o.node.kind == KindRow }
-func (o *Object) IsColumn() bool { return o.node != nil && o.node.kind == KindColumn }
-func (o *Object) IsScalar() bool { return o.node != nil && o.node.kind == KindScalar }
+// IsTable reports whether this object is a table node.
+func (o *Object) IsTable() bool { return o != nil && o.node != nil && o.node.kind == KindTable }
+
+// IsRow reports whether this object is a table row (entry) node.
+func (o *Object) IsRow() bool { return o != nil && o.node != nil && o.node.kind == KindRow }
+
+// IsColumn reports whether this object is a table column node.
+func (o *Object) IsColumn() bool { return o != nil && o.node != nil && o.node.kind == KindColumn }
+
+// IsScalar reports whether this object is a scalar node.
+func (o *Object) IsScalar() bool { return o != nil && o.node != nil && o.node.kind == KindScalar }
 
 // String returns a brief summary: "name (oid)".
 func (o *Object) String() string {
@@ -196,7 +227,6 @@ func (o *Object) setEffectiveRanges(r []Range)     { o.ranges = r }
 func (o *Object) setEffectiveEnums(e []NamedValue) { o.enums = e }
 func (o *Object) setEffectiveBits(b []NamedValue)  { o.bits = b }
 
-// objectsByKind returns objects whose node matches the given kind.
 func objectsByKind(objs []*Object, kind Kind) []*Object {
 	var result []*Object
 	for _, obj := range objs {
