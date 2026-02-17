@@ -26,6 +26,7 @@ func registerModules(ctx *resolverContext) {
 
 	for _, mod := range ctx.Modules {
 		resolved := newModule(mod.Name)
+		resolved.setSourcePath(mod.SourcePath)
 		resolved.setLanguage(mod.Language)
 
 		for _, def := range mod.Definitions {

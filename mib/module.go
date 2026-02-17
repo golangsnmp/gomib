@@ -6,6 +6,7 @@ import "slices"
 type Module struct {
 	name         string
 	language     Language
+	sourcePath   string
 	oid          OID
 	organization string
 	contactInfo  string
@@ -46,6 +47,7 @@ func newModule(name string) *Module {
 
 func (m *Module) Name() string          { return m.name }
 func (m *Module) Language() Language    { return m.language }
+func (m *Module) SourcePath() string    { return m.sourcePath }
 func (m *Module) OID() OID              { return slices.Clone(m.oid) }
 func (m *Module) Organization() string  { return m.organization }
 func (m *Module) ContactInfo() string   { return m.contactInfo }
@@ -92,6 +94,7 @@ func (m *Module) Capability(name string) *Capability {
 	return m.capabilitiesByName[name]
 }
 
+func (m *Module) setSourcePath(path string)    { m.sourcePath = path }
 func (m *Module) setLanguage(l Language)       { m.language = l }
 func (m *Module) setOID(oid OID)               { m.oid = oid }
 func (m *Module) setOrganization(org string)   { m.organization = org }

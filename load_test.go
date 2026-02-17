@@ -565,34 +565,34 @@ func (f *fakeSource) ListModules() ([]string, error) {
 	return names, nil
 }
 
-func TestFindModuleContentReturnsContent(t *testing.T) {
+func TestFindModuleReturnsContent(t *testing.T) {
 	want := []byte("test content")
 	src := &fakeSource{modules: map[string]fakeModule{
 		"MOD": {content: want},
 	}}
-	got, err := findModuleContent([]Source{src}, "MOD")
-	testutil.NoError(t, err, "findModuleContent")
-	testutil.Equal(t, string(want), string(got), "content")
+	got, err := findModule([]Source{src}, "MOD")
+	testutil.NoError(t, err, "findModule")
+	testutil.Equal(t, string(want), string(got.Content), "content")
 }
 
-func TestFindModuleContentSkipsNotExist(t *testing.T) {
+func TestFindModuleSkipsNotExist(t *testing.T) {
 	want := []byte("from second source")
 	src1 := &fakeSource{modules: map[string]fakeModule{}}
 	src2 := &fakeSource{modules: map[string]fakeModule{
 		"MOD": {content: want},
 	}}
-	got, err := findModuleContent([]Source{src1, src2}, "MOD")
-	testutil.NoError(t, err, "findModuleContent")
-	testutil.Equal(t, string(want), string(got), "content from second source")
+	got, err := findModule([]Source{src1, src2}, "MOD")
+	testutil.NoError(t, err, "findModule")
+	testutil.Equal(t, string(want), string(got.Content), "content from second source")
 }
 
-func TestFindModuleContentNotFound(t *testing.T) {
+func TestFindModuleNotFound(t *testing.T) {
 	src := &fakeSource{modules: map[string]fakeModule{}}
-	_, err := findModuleContent([]Source{src}, "MISSING")
+	_, err := findModule([]Source{src}, "MISSING")
 	testutil.True(t, errors.Is(err, fs.ErrNotExist), "should return fs.ErrNotExist, got %v", err)
 }
 
-func TestFindModuleContentPropagatesFindError(t *testing.T) {
+func TestFindModulePropagatesFindError(t *testing.T) {
 	permErr := errors.New("permission denied")
 	src1 := &fakeSource{modules: map[string]fakeModule{
 		"MOD": {findErr: permErr},
@@ -600,7 +600,7 @@ func TestFindModuleContentPropagatesFindError(t *testing.T) {
 	src2 := &fakeSource{modules: map[string]fakeModule{
 		"MOD": {content: []byte("ok")},
 	}}
-	_, err := findModuleContent([]Source{src1, src2}, "MOD")
+	_, err := findModule([]Source{src1, src2}, "MOD")
 	testutil.True(t, errors.Is(err, permErr),
 		"should propagate Find error, got %v", err)
 }
