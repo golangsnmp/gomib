@@ -96,7 +96,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 				return
 			}
 
-			mod := decodeModule(ctx, result.Content, sm.name, logger, cfg)
+			mod := decodeModule(ctx, result.Content, result.Path, sm.name, logger, cfg)
 			if mod != nil {
 				results <- parseResult{mod: mod}
 			}
@@ -161,7 +161,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 		loading[name] = struct{}{}
 		defer delete(loading, name)
 
-		content, err := findModuleContent(sources, name)
+		result, err := findModule(sources, name)
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
 				return err
@@ -173,7 +173,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			return nil // skip missing modules
 		}
 
-		mod := decodeModule(ctx, content, name, logger, cfg)
+		mod := decodeModule(ctx, result.Content, result.Path, name, logger, cfg)
 		if mod == nil {
 			return nil
 		}
@@ -204,18 +204,18 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 	return m, checkLoadResult(m, cfg, names)
 }
 
-func findModuleContent(sources []Source, name string) ([]byte, error) {
+func findModule(sources []Source, name string) (FindResult, error) {
 	for _, src := range sources {
 		result, err := src.Find(name)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			return nil, err
+			return FindResult{}, err
 		}
-		return result.Content, nil
+		return result, nil
 	}
-	return nil, fs.ErrNotExist
+	return FindResult{}, fs.ErrNotExist
 }
 
 // collectModules adds missing base modules to the map, deduplicates,
@@ -244,7 +244,7 @@ func collectModules(modules map[string]*module.Module) []*module.Module {
 
 // decodeModule runs the heuristic/parse/lower pipeline on raw MIB content.
 // Returns nil if the content doesn't look like a MIB.
-func decodeModule(ctx context.Context, content []byte, name string, logger *slog.Logger, cfg loadConfig) *module.Module {
+func decodeModule(ctx context.Context, content []byte, sourcePath string, name string, logger *slog.Logger, cfg loadConfig) *module.Module {
 	if !looksLikeMIBContent(content) {
 		if logEnabled(logger, slog.LevelDebug) {
 			logger.LogAttrs(ctx, slog.LevelDebug, "content rejected by heuristic",
@@ -256,7 +256,11 @@ func decodeModule(ctx context.Context, content []byte, name string, logger *slog
 	p := parser.New(content, componentLogger(logger, "parser"), cfg.diagConfig)
 	ast := p.ParseModule()
 
-	return module.Lower(ast, content, componentLogger(logger, "module"), cfg.diagConfig)
+	mod := module.Lower(ast, content, componentLogger(logger, "module"), cfg.diagConfig)
+	if mod != nil {
+		mod.SourcePath = sourcePath
+	}
+	return mod
 }
 
 var (
