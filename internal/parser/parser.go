@@ -24,8 +24,8 @@ import (
 // Parser converts a token stream into an AST module with diagnostics.
 type Parser struct {
 	source      []byte
-	tokens      []lexer.Token
-	pos         int
+	lex         *lexer.Lexer
+	buf         [3]lexer.Token // lookahead buffer: buf[0]=current, buf[1]=peek(1), buf[2]=peek(2)
 	diagnostics []types.SpanDiagnostic
 	diagConfig  types.DiagnosticConfig
 	eofToken    lexer.Token
@@ -41,21 +41,19 @@ func New(source []byte, logger *slog.Logger, diagConfig types.DiagnosticConfig) 
 		lexLogger = logger.With(slog.String("component", "lexer"))
 	}
 	lex := lexer.New(source, lexLogger)
-	tokens, lexerDiags := lex.Tokenize()
 	eofSpan := types.NewSpan(types.ByteOffset(len(source)), types.ByteOffset(len(source)))
 	eofToken := lexer.NewToken(lexer.TokEOF, eofSpan)
 	p := &Parser{
-		source:      source,
-		tokens:      tokens,
-		pos:         0,
-		diagnostics: lexerDiags,
-		diagConfig:  diagConfig,
-		eofToken:    eofToken,
-		Logger:      types.Logger{L: logger},
+		source:     source,
+		lex:        lex,
+		diagConfig: diagConfig,
+		eofToken:   eofToken,
+		Logger:     types.Logger{L: logger},
 	}
-	p.Log(slog.LevelDebug, "parser initialized",
-		slog.Int("tokens", len(tokens)),
-		slog.Int("lexer_diagnostics", len(lexerDiags)))
+	p.buf[0] = lex.NextToken()
+	p.buf[1] = lex.NextToken()
+	p.buf[2] = lex.NextToken()
+	p.Log(slog.LevelDebug, "parser initialized")
 	return p
 }
 
@@ -118,7 +116,7 @@ func (p *Parser) ParseModule() *ast.Module {
 			Name:            ast.NewIdent("UNKNOWN", span),
 			DefinitionsKind: ast.DefinitionsKindDefinitions,
 			Span:            span,
-			Diagnostics:     p.diagnostics,
+			Diagnostics:     append(p.lex.Diagnostics(), p.diagnostics...),
 		}
 	}
 
@@ -156,7 +154,7 @@ func (p *Parser) ParseModule() *ast.Module {
 	}
 
 	module.Span = types.NewSpan(start, p.currentSpan().End)
-	module.Diagnostics = p.diagnostics
+	module.Diagnostics = append(p.lex.Diagnostics(), p.diagnostics...)
 
 	p.Log(slog.LevelDebug, "parsing complete",
 		slog.String("module", name.Name),
@@ -171,25 +169,22 @@ func (p *Parser) isEOF() bool {
 }
 
 func (p *Parser) peek() lexer.Token {
-	if p.pos < len(p.tokens) {
-		return p.tokens[p.pos]
-	}
-	return p.eofToken
+	return p.buf[0]
 }
 
 func (p *Parser) peekNth(n int) lexer.Token {
-	if p.pos+n < len(p.tokens) {
-		return p.tokens[p.pos+n]
+	if n < len(p.buf) {
+		return p.buf[n]
 	}
 	return p.eofToken
 }
 
 func (p *Parser) advance() lexer.Token {
-	token := p.peek()
-	if p.pos < len(p.tokens) {
-		p.pos++
-	}
-	return token
+	tok := p.buf[0]
+	p.buf[0] = p.buf[1]
+	p.buf[1] = p.buf[2]
+	p.buf[2] = p.lex.NextToken()
+	return tok
 }
 
 func (p *Parser) check(kind lexer.TokenKind) bool {
