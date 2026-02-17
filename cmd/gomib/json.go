@@ -18,6 +18,7 @@ type DumpOutput struct {
 type ModuleJSON struct {
 	Name         string         `json:"name"`
 	Language     string         `json:"language,omitempty"`
+	SourcePath   string         `json:"sourcePath,omitempty"`
 	OID          string         `json:"oid,omitempty"`
 	Organization string         `json:"organization,omitempty"`
 	ContactInfo  string         `json:"contactInfo,omitempty"`

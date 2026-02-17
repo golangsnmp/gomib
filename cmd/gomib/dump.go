@@ -170,6 +170,7 @@ func buildModuleJSON(mod *mib.Module, opts JSONOptions) ModuleJSON {
 	m := ModuleJSON{
 		Name:         mod.Name(),
 		Language:     mod.Language().String(),
+		SourcePath:   mod.SourcePath(),
 		Organization: mod.Organization(),
 		ContactInfo:  mod.ContactInfo(),
 	}
