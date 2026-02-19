@@ -12,6 +12,7 @@ type Module struct {
 	contactInfo  string
 	description  string
 	revisions    []Revision
+	imports      []Import
 
 	objects       []*Object
 	types         []*Type
@@ -53,6 +54,7 @@ func (m *Module) Organization() string  { return m.organization }
 func (m *Module) ContactInfo() string   { return m.contactInfo }
 func (m *Module) Description() string   { return m.description }
 func (m *Module) Revisions() []Revision { return slices.Clone(m.revisions) }
+func (m *Module) Imports() []Import     { return slices.Clone(m.imports) }
 
 func (m *Module) Objects() []*Object             { return slices.Clone(m.objects) }
 func (m *Module) Types() []*Type                 { return slices.Clone(m.types) }

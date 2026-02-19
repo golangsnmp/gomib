@@ -2,6 +2,7 @@ package mib
 
 import (
 	"log/slog"
+	"slices"
 
 	"github.com/golangsnmp/gomib/internal/module"
 )
@@ -28,6 +29,7 @@ func registerModules(ctx *resolverContext) {
 		resolved := newModule(mod.Name)
 		resolved.setSourcePath(mod.SourcePath)
 		resolved.setLanguage(mod.Language)
+		resolved.imports = groupImports(mod.Imports)
 
 		for _, def := range mod.Definitions {
 			if mi, ok := def.(*module.ModuleIdentity); ok {
@@ -83,6 +85,28 @@ func registerModules(ctx *resolverContext) {
 				slog.Int("definitions", len(mod.Definitions)))
 		}
 	}
+}
+
+// groupImports converts flat per-symbol imports into grouped-by-module form.
+func groupImports(raw []module.Import) []Import {
+	if len(raw) == 0 {
+		return nil
+	}
+	order := make([]string, 0)
+	grouped := make(map[string][]string)
+	for _, imp := range raw {
+		if _, ok := grouped[imp.Module]; !ok {
+			order = append(order, imp.Module)
+		}
+		grouped[imp.Module] = append(grouped[imp.Module], imp.Symbol)
+	}
+	result := make([]Import, 0, len(order))
+	for _, modName := range order {
+		syms := grouped[modName]
+		slices.Sort(syms)
+		result = append(result, Import{Module: modName, Symbols: syms})
+	}
+	return result
 }
 
 func convertRevisions(revs []module.Revision) []Revision {
