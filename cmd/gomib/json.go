@@ -10,6 +10,9 @@ type DumpOutput struct {
 	Types         []TypeJSON         `json:"types,omitempty"`
 	Objects       []ObjectJSON       `json:"objects,omitempty"`
 	Notifications []NotificationJSON `json:"notifications,omitempty"`
+	Groups        []GroupJSON        `json:"groups,omitempty"`
+	Compliances   []ComplianceJSON   `json:"compliances,omitempty"`
+	Capabilities  []CapabilityJSON   `json:"capabilities,omitempty"`
 	Tree          *TreeNodeJSON      `json:"tree,omitempty"`
 	Diagnostics   []DiagnosticJSON   `json:"diagnostics,omitempty"`
 }
@@ -98,6 +101,50 @@ type NotificationJSON struct {
 	Status      string   `json:"status"`
 	Description string   `json:"description,omitempty"`
 	Objects     []string `json:"objects,omitempty"`
+}
+
+// GroupJSON holds the JSON-serializable form of a group definition.
+type GroupJSON struct {
+	Name        string   `json:"name"`
+	Module      string   `json:"module,omitempty"`
+	OID         string   `json:"oid"`
+	Kind        string   `json:"kind"`
+	Status      string   `json:"status"`
+	Description string   `json:"description,omitempty"`
+	Members     []string `json:"members,omitempty"`
+}
+
+// ComplianceJSON holds the JSON-serializable form of a compliance definition.
+type ComplianceJSON struct {
+	Name        string                 `json:"name"`
+	Module      string                 `json:"module,omitempty"`
+	OID         string                 `json:"oid"`
+	Status      string                 `json:"status"`
+	Description string                 `json:"description,omitempty"`
+	Modules     []ComplianceModuleJSON `json:"modules,omitempty"`
+}
+
+// ComplianceModuleJSON holds a MODULE clause within MODULE-COMPLIANCE.
+type ComplianceModuleJSON struct {
+	Module          string   `json:"module,omitempty"`
+	MandatoryGroups []string `json:"mandatoryGroups,omitempty"`
+}
+
+// CapabilityJSON holds the JSON-serializable form of a capability definition.
+type CapabilityJSON struct {
+	Name           string                   `json:"name"`
+	Module         string                   `json:"module,omitempty"`
+	OID            string                   `json:"oid"`
+	Status         string                   `json:"status"`
+	ProductRelease string                   `json:"productRelease,omitempty"`
+	Description    string                   `json:"description,omitempty"`
+	Supports       []CapabilitiesModuleJSON `json:"supports,omitempty"`
+}
+
+// CapabilitiesModuleJSON holds a SUPPORTS clause within AGENT-CAPABILITIES.
+type CapabilitiesModuleJSON struct {
+	Module   string   `json:"module"`
+	Includes []string `json:"includes,omitempty"`
 }
 
 // TreeNodeJSON holds a node in the OID tree hierarchy.
