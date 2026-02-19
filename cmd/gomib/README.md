@@ -63,13 +63,15 @@ gomib get -m IF-MIB 1.3.6.1.2.1.2.2.1.1
 gomib get IF-MIB SNMPv2-MIB -- sysDescr
 gomib get -m IF-MIB -t ifTable
 gomib get --all -p testdata/corpus/primary ifIndex
+gomib get -m IF-MIB --format json ifIndex
+gomib get -m IF-MIB --full ifIndex
 ```
 
-Flags: `-m MODULE` (repeatable), `--all` (load all modules from search path), `-t`/`--tree` (show subtree), `--max-depth N`.
+Flags: `-m MODULE` (repeatable), `--all` (load all modules from search path), `-t`/`--tree` (show subtree), `--max-depth N`, `--format` (text/json), `--full` (untruncated descriptions).
 
 ### dump
 
-Output modules or subtrees as JSON.
+Output modules or subtrees as JSON. Includes types, objects, notifications, groups, compliances, and capabilities.
 
 ```
 gomib dump IF-MIB
@@ -90,9 +92,23 @@ gomib lint --format json IF-MIB
 gomib lint --format sarif IF-MIB
 gomib lint --ignore "identifier-*" IF-MIB
 gomib lint --summary IF-MIB
+gomib lint --list-codes
 ```
 
-Flags: `--level N` (severity threshold, 0-6), `--fail-on N`, `--ignore CODE` (repeatable, supports globs), `--only CODE`, `--format` (text/json/sarif/compact), `--group-by` (module/code/severity), `--summary`, `--quiet`.
+Flags: `--level N` (severity threshold, 0-6), `--fail-on N`, `--ignore CODE` (repeatable, supports globs), `--only CODE`, `--format` (text/json/sarif/compact), `--group-by` (module/code/severity), `--summary`, `--quiet`, `--list-codes` (show all diagnostic codes).
+
+### find
+
+Search for object names across loaded MIBs using glob patterns.
+
+```
+gomib find --all -p testdata/corpus/primary 'if*'
+gomib find --all -p testdata/corpus/primary --kind table '*'
+gomib find --all -p testdata/corpus/primary --type Counter32 'if*'
+gomib find -m IF-MIB -p testdata/corpus/primary --count 'if*'
+```
+
+Flags: `-m MODULE` (repeatable), `--all` (load all modules), `--kind` (scalar/table/row/column/notification), `--type` (base type filter), `--count` (print count only).
 
 ### trace
 
@@ -105,6 +121,14 @@ gomib trace --all -p testdata/corpus/primary ifEntry
 ```
 
 Flags: `-m MODULE` (repeatable), `--all` (load all modules from search path).
+
+### version
+
+Show version information.
+
+```
+gomib version
+```
 
 ## Exit Codes
 
