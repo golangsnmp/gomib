@@ -302,7 +302,12 @@ gomib get -m IF-MIB ifIndex          # query by name
 gomib get -m IF-MIB 1.3.6.1.2.1.2   # query by OID
 gomib dump IF-MIB                    # JSON output
 gomib lint IF-MIB                    # check for issues
+gomib find --all 'if*'               # search by pattern
 gomib trace -m IF-MIB ifEntry        # trace resolution
+gomib paths                          # show search paths
+gomib list                           # list available modules
 ```
 
 Use `-p PATH` to specify MIB search paths (repeatable). Without `-p`, paths are discovered from net-snmp and libsmi configuration (config files, `MIBDIRS`/`SMIPATH` env vars, standard default directories).
+
+See [cmd/gomib/README.md](cmd/gomib/README.md) for full command reference.
