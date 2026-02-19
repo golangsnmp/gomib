@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
@@ -34,6 +35,7 @@ Commands:
   trace   Trace symbol resolution for debugging
   paths   Show MIB search paths
   list    List available module names
+  version Show version
 
 Common options:
   -p, --path PATH   Add MIB search path (repeatable)
@@ -126,6 +128,9 @@ func run() int {
 		return c.cmdPaths(cmdArgs)
 	case "list":
 		return c.cmdList(cmdArgs)
+	case "version":
+		printVersion()
+		return 0
 	case "help":
 		_, _ = fmt.Fprint(os.Stdout, usage)
 		return 0
@@ -196,6 +201,14 @@ func (c *cli) loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (
 		opts = append(opts, gomib.WithModules(modules...))
 	}
 	return gomib.Load(context.Background(), opts...)
+}
+
+func printVersion() {
+	version := "(devel)"
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" {
+		version = info.Main.Version
+	}
+	fmt.Printf("gomib %s\n", version)
 }
 
 func printError(format string, args ...any) {
