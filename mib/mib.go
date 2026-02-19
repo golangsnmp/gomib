@@ -4,6 +4,8 @@ package mib
 import (
 	"iter"
 	"slices"
+	"strconv"
+	"strings"
 )
 
 // Mib is the top-level container for loaded MIB data.
@@ -114,6 +116,41 @@ func (m *Mib) NodeByOID(oid OID) *Node {
 func (m *Mib) LongestPrefixByOID(oid OID) *Node {
 	nd, _ := m.root.walkOID(oid)
 	return nd
+}
+
+// FormatOID translates a numeric OID into a human-readable string using
+// the longest matching prefix in the OID tree. The result uses the form
+// "MODULE::name.suffix" where suffix contains any unmatched trailing arcs.
+// If no named node matches, returns the numeric OID string unchanged.
+//
+// Examples:
+//
+//	FormatOID({1,3,6,1,2,1,2,2,1,1,5}) => "IF-MIB::ifIndex.5"
+//	FormatOID({1,3,6,1,2,1,2,2,1,1})   => "IF-MIB::ifIndex"
+//	FormatOID({1,3,999})                => "1.3.999"
+func (m *Mib) FormatOID(oid OID) string {
+	if len(oid) == 0 {
+		return ""
+	}
+	node := m.LongestPrefixByOID(oid)
+	if node == nil || node.Name() == "" {
+		return oid.String()
+	}
+
+	nodeOID := node.OID()
+	suffix := oid[len(nodeOID):]
+
+	var b strings.Builder
+	if mod := node.Module(); mod != nil {
+		b.WriteString(mod.Name())
+		b.WriteString("::")
+	}
+	b.WriteString(node.Name())
+	for _, arc := range suffix {
+		b.WriteByte('.')
+		b.WriteString(strconv.FormatUint(uint64(arc), 10))
+	}
+	return b.String()
 }
 
 // Module returns the module with the given name, or nil if not found.
