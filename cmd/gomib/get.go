@@ -263,6 +263,10 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 		fmt.Printf("  descr:  %s\n", normalizeDescription(obj.Description(), descLimit))
 	}
 
+	if obj.Reference() != "" {
+		fmt.Printf("  ref:    %s\n", normalizeDescription(obj.Reference(), descLimit))
+	}
+
 	enums := obj.EffectiveEnums()
 	bits := obj.EffectiveBits()
 	if len(enums) > 0 && len(bits) == 0 {
@@ -292,6 +296,10 @@ func printNotificationDetails(notif *mib.Notification, descLimit int) {
 
 	if notif.Description() != "" {
 		fmt.Printf("  descr:  %s\n", normalizeDescription(notif.Description(), descLimit))
+	}
+
+	if notif.Reference() != "" {
+		fmt.Printf("  ref:    %s\n", normalizeDescription(notif.Reference(), descLimit))
 	}
 }
 
