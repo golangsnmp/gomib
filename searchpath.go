@@ -26,7 +26,17 @@ const (
 	pathPrepend
 )
 
-// discoverSystemSources returns Sources for all discovered system MIB directories.
+// DiscoverSystemPaths returns MIB directories from net-snmp and libsmi
+// configuration, deduplicated and filtered to directories that exist.
+func DiscoverSystemPaths() []string {
+	return discoverSystemPaths(types.Logger{})
+}
+
+// DiscoverSystemSources returns Sources for all discovered system MIB directories.
+func DiscoverSystemSources() []Source {
+	return discoverSystemSources(types.Logger{})
+}
+
 func discoverSystemSources(logger types.Logger) []Source {
 	dirs := discoverSystemPaths(logger)
 	var sources []Source

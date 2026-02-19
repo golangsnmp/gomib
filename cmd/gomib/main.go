@@ -32,6 +32,8 @@ Commands:
   get     Query OID or name lookups
   dump    Output modules or subtrees as JSON
   trace   Trace symbol resolution for debugging
+  paths   Show MIB search paths
+  list    List available module names
 
 Common options:
   -p, --path PATH   Add MIB search path (repeatable)
@@ -44,6 +46,8 @@ Examples:
   gomib get -m IF-MIB ifIndex
   gomib dump IF-MIB
   gomib trace -m IF-MIB ifEntry
+  gomib paths
+  gomib list -p testdata/corpus/primary
 `
 
 type cli struct {
@@ -118,6 +122,10 @@ func run() int {
 		return c.cmdDump(cmdArgs)
 	case "trace":
 		return c.cmdTrace(cmdArgs)
+	case "paths":
+		return c.cmdPaths(cmdArgs)
+	case "list":
+		return c.cmdList(cmdArgs)
 	case "help":
 		_, _ = fmt.Fprint(os.Stdout, usage)
 		return 0
@@ -145,29 +153,38 @@ func (c *cli) loadMib(modules []string) (*mib.Mib, error) {
 	return c.loadMibWithOpts(modules)
 }
 
+// buildSources returns the composed source list from -p paths or system path
+// discovery. Returns (nil, true) when no explicit paths are set, indicating
+// that WithSystemPaths() should be used instead.
+func (c *cli) buildSources() ([]gomib.Source, bool, error) {
+	if len(c.paths) == 0 {
+		return nil, true, nil
+	}
+	var sources []gomib.Source
+	for _, p := range c.paths {
+		if src, err := gomib.DirTree(p); err == nil {
+			sources = append(sources, src)
+		} else {
+			fmt.Fprintf(os.Stderr, "warning: cannot access path %s: %v\n", p, err)
+		}
+	}
+	if len(sources) == 0 {
+		return nil, false, gomib.ErrNoSources
+	}
+	return sources, false, nil
+}
+
 func (c *cli) loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (*mib.Mib, error) {
-	var source gomib.Source
 	var opts []gomib.LoadOption
 
-	if len(c.paths) > 0 {
-		var sources []gomib.Source
-		for _, p := range c.paths {
-			if src, err := gomib.DirTree(p); err == nil {
-				sources = append(sources, src)
-			} else {
-				fmt.Fprintf(os.Stderr, "warning: cannot access path %s: %v\n", p, err)
-			}
-		}
-		if len(sources) == 0 {
-			return nil, gomib.ErrNoSources
-		}
-		if len(sources) == 1 {
-			source = sources[0]
-		} else {
-			source = gomib.Multi(sources...)
-		}
-	} else {
+	sources, useSystem, err := c.buildSources()
+	if err != nil {
+		return nil, err
+	}
+	if useSystem {
 		opts = append(opts, gomib.WithSystemPaths())
+	} else {
+		opts = append(opts, gomib.WithSource(sources...))
 	}
 
 	if logger := c.setupLogger(); logger != nil {
@@ -175,9 +192,6 @@ func (c *cli) loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (
 	}
 	opts = append(opts, extraOpts...)
 
-	if source != nil {
-		opts = append(opts, gomib.WithSource(source))
-	}
 	if len(modules) > 0 {
 		opts = append(opts, gomib.WithModules(modules...))
 	}

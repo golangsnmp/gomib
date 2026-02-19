@@ -14,6 +14,7 @@ const getUsage = `gomib get - Query OID or name lookups
 Usage:
   gomib get [options] -m MODULE QUERY
   gomib get [options] MODULE... -- QUERY
+  gomib get [options] --all QUERY
 
 Query formats:
   Numeric OID:     1.3.6.1.2.1.2.2.1.1
@@ -22,6 +23,7 @@ Query formats:
 
 Options:
   -m, --module MODULE   Module to load (repeatable)
+  --all                 Load all MIBs from search path
   -t, --tree            Show subtree instead of single node
   --max-depth N         Limit subtree depth (default: unlimited)
   -h, --help            Show help
@@ -31,6 +33,7 @@ Examples:
   gomib get -m IF-MIB 1.3.6.1.2.1.2.2.1.1
   gomib get IF-MIB SNMPv2-MIB -- sysDescr
   gomib get -m IF-MIB -t ifTable
+  gomib get --all ifIndex
 `
 
 type moduleList []string
@@ -48,6 +51,7 @@ func (c *cli) cmdGet(args []string) int {
 	var modules moduleList
 	fs.Var(&modules, "m", "module to load")
 	fs.Var(&modules, "module", "module to load")
+	loadAll := fs.Bool("all", false, "load all MIBs from search path")
 	tree := fs.Bool("t", false, "show subtree")
 	fs.BoolVar(tree, "tree", false, "show subtree")
 	maxDepth := fs.Int("max-depth", 0, "limit subtree depth")
@@ -81,13 +85,13 @@ func (c *cli) cmdGet(args []string) int {
 		}
 	} else if len(remaining) > 0 {
 		query = remaining[len(remaining)-1]
-		if len(modules) == 0 && len(remaining) > 1 {
+		if !*loadAll && len(modules) == 0 && len(remaining) > 1 {
 			modules = remaining[:len(remaining)-1]
 		}
 	}
 
-	if len(modules) == 0 {
-		printError("no modules specified")
+	if !*loadAll && len(modules) == 0 {
+		printError("specify -m MODULE or --all")
 		fmt.Fprint(os.Stderr, getUsage)
 		return 1
 	}
@@ -98,7 +102,11 @@ func (c *cli) cmdGet(args []string) int {
 		return 1
 	}
 
-	m, err := c.loadMib(modules)
+	var loadModules []string
+	if !*loadAll {
+		loadModules = modules
+	}
+	m, err := c.loadMib(loadModules)
 	if err != nil {
 		printError("failed to load: %v", err)
 		return exitError
