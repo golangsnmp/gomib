@@ -60,6 +60,7 @@ func (m *Module) Notifications() []*Notification { return slices.Clone(m.notific
 func (m *Module) Groups() []*Group               { return slices.Clone(m.groups) }
 func (m *Module) Compliances() []*Compliance     { return slices.Clone(m.compliances) }
 func (m *Module) Capabilities() []*Capability    { return slices.Clone(m.capabilities) }
+func (m *Module) Nodes() []*Node                 { return slices.Clone(m.nodes) }
 
 func (m *Module) Tables() []*Object  { return objectsByKind(m.objects, KindTable) }
 func (m *Module) Scalars() []*Object { return objectsByKind(m.objects, KindScalar) }
