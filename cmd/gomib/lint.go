@@ -28,6 +28,7 @@ Options:
   --group-by KEY  Group output: module, code, severity (default: none)
   --summary       Show summary only (counts by severity)
   --quiet         No output, exit code only
+  --list-codes    List all diagnostic codes and exit
   -h, --help      Show help
 
 Severity Levels:
@@ -109,6 +110,7 @@ func (c *cli) cmdLint(args []string) int {
 	fs.StringVar(&cfg.groupBy, "group-by", cfg.groupBy, "grouping key")
 	fs.BoolVar(&cfg.summary, "summary", false, "summary only")
 	fs.BoolVar(&cfg.quiet, "quiet", false, "no output")
+	listCodes := fs.Bool("list-codes", false, "list all diagnostic codes")
 	help := fs.Bool("h", false, "show help")
 	fs.BoolVar(help, "help", false, "show help")
 
@@ -118,6 +120,11 @@ func (c *cli) cmdLint(args []string) int {
 
 	if *help || c.helpFlag {
 		_, _ = fmt.Fprint(os.Stdout, lintUsage)
+		return 0
+	}
+
+	if *listCodes {
+		printDiagnosticCodes()
 		return 0
 	}
 
@@ -573,5 +580,19 @@ func severityToSARIF(sev int) string {
 		return "warning"
 	default: // warning, info
 		return "note"
+	}
+}
+
+func printDiagnosticCodes() {
+	currentPhase := ""
+	for _, info := range types.AllDiagnosticCodes() {
+		if info.Phase != currentPhase {
+			if currentPhase != "" {
+				fmt.Println()
+			}
+			fmt.Printf("%s:\n", info.Phase)
+			currentPhase = info.Phase
+		}
+		fmt.Printf("  %s\n", info.Code)
 	}
 }
