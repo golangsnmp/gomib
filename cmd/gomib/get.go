@@ -9,6 +9,11 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
+const (
+	formatText = "text"
+	formatJSON = "json"
+)
+
 const getUsage = `gomib get - Query OID or name lookups
 
 Usage:
@@ -27,6 +32,7 @@ Options:
   -t, --tree            Show subtree instead of single node
   --max-depth N         Limit subtree depth (default: unlimited)
   --full                Show full descriptions (no truncation)
+  --format FMT          Output format: text, json (default: text)
   -h, --help            Show help
 
 Examples:
@@ -57,6 +63,7 @@ func (c *cli) cmdGet(args []string) int {
 	fs.BoolVar(tree, "tree", false, "show subtree")
 	maxDepth := fs.Int("max-depth", 0, "limit subtree depth")
 	full := fs.Bool("full", false, "show full descriptions")
+	format := fs.String("format", "text", "output format: text, json")
 	help := fs.Bool("h", false, "show help")
 	fs.BoolVar(help, "help", false, "show help")
 
@@ -125,13 +132,82 @@ func (c *cli) cmdGet(args []string) int {
 		descLimit = 0
 	}
 
-	if *tree {
-		printNodeTree(node, *maxDepth)
-	} else {
-		printNode(node, descLimit)
+	switch *format {
+	case formatJSON:
+		return printNodeJSON(node, *tree, *maxDepth)
+	case formatText, "":
+		if *tree {
+			printNodeTree(node, *maxDepth)
+		} else {
+			printNode(node, descLimit)
+		}
+		return 0
+	default:
+		printError("unknown format: %s", *format)
+		return 1
+	}
+}
+
+func printNodeJSON(node *mib.Node, tree bool, maxDepth int) int {
+	opts := JSONOptions{IncludeDescr: true}
+	if tree {
+		output := buildTreeJSON(node, opts)
+		if maxDepth > 0 {
+			trimTreeDepth(output, 0, maxDepth)
+		}
+		data, err := marshalJSON(output, true)
+		if err != nil {
+			printError("encoding JSON: %v", err)
+			return exitError
+		}
+		fmt.Println(string(data))
+		return 0
 	}
 
+	// Single node: include object or notification detail
+	type nodeJSON struct {
+		Name         string            `json:"name,omitempty"`
+		Module       string            `json:"module,omitempty"`
+		OID          string            `json:"oid"`
+		Kind         string            `json:"kind"`
+		Object       *ObjectJSON       `json:"object,omitempty"`
+		Notification *NotificationJSON `json:"notification,omitempty"`
+	}
+
+	out := nodeJSON{
+		Name: node.Name(),
+		OID:  node.OID().String(),
+		Kind: node.Kind().String(),
+	}
+	if node.Module() != nil {
+		out.Module = node.Module().Name()
+	}
+	if node.Object() != nil {
+		obj := buildObjectJSON(node.Object(), opts)
+		out.Object = &obj
+	}
+	if node.Notification() != nil {
+		notif := buildNotificationJSON(node.Notification(), opts)
+		out.Notification = &notif
+	}
+
+	data, err := marshalJSON(out, true)
+	if err != nil {
+		printError("encoding JSON: %v", err)
+		return exitError
+	}
+	fmt.Println(string(data))
 	return 0
+}
+
+func trimTreeDepth(node *TreeNodeJSON, depth, maxDepth int) {
+	if depth >= maxDepth {
+		node.Children = nil
+		return
+	}
+	for _, child := range node.Children {
+		trimTreeDepth(child, depth+1, maxDepth)
+	}
 }
 
 // resolveQuery parses a user query string and returns the matching node.
