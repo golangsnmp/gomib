@@ -191,6 +191,28 @@ func (m *Mib) Columns() []*Object { return objectsByKind(m.objects, KindColumn) 
 // Rows returns all objects classified as table rows.
 func (m *Mib) Rows() []*Object { return objectsByKind(m.objects, KindRow) }
 
+// ObjectsByType returns all objects whose resolved type has the given name.
+func (m *Mib) ObjectsByType(typeName string) []*Object {
+	var result []*Object
+	for _, obj := range m.objects {
+		if obj.typ != nil && obj.typ.name == typeName {
+			result = append(result, obj)
+		}
+	}
+	return result
+}
+
+// ObjectsByBaseType returns all objects whose effective base type matches.
+func (m *Mib) ObjectsByBaseType(base BaseType) []*Object {
+	var result []*Object
+	for _, obj := range m.objects {
+		if obj.typ != nil && obj.typ.Base() == base {
+			result = append(result, obj)
+		}
+	}
+	return result
+}
+
 // NodeCount returns the total number of nodes in the OID tree.
 func (m *Mib) NodeCount() int { return m.nodeCount }
 
