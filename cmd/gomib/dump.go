@@ -124,6 +124,27 @@ func buildDumpOutput(m *mib.Mib, opts JSONOptions) *DumpOutput {
 		output.Notifications = append(output.Notifications, buildNotificationJSON(notif, opts))
 	}
 
+	for _, grp := range m.Groups() {
+		if grp.Module() != nil && !shouldIncludeModule(grp.Module().Name(), opts.RequestedMods) {
+			continue
+		}
+		output.Groups = append(output.Groups, buildGroupJSON(grp, opts))
+	}
+
+	for _, comp := range m.Compliances() {
+		if comp.Module() != nil && !shouldIncludeModule(comp.Module().Name(), opts.RequestedMods) {
+			continue
+		}
+		output.Compliances = append(output.Compliances, buildComplianceJSON(comp, opts))
+	}
+
+	for _, cap := range m.Capabilities() {
+		if cap.Module() != nil && !shouldIncludeModule(cap.Module().Name(), opts.RequestedMods) {
+			continue
+		}
+		output.Capabilities = append(output.Capabilities, buildCapabilityJSON(cap, opts))
+	}
+
 	if opts.IncludeTree {
 		if opts.OidFilter != "" {
 			node := resolveQuery(m, opts.OidFilter)
@@ -296,6 +317,72 @@ func buildNotificationJSON(notif *mib.Notification, opts JSONOptions) Notificati
 	}
 
 	return n
+}
+
+func buildGroupJSON(grp *mib.Group, opts JSONOptions) GroupJSON {
+	g := GroupJSON{
+		Name:   grp.Name(),
+		OID:    grp.OID().String(),
+		Status: grp.Status().String(),
+	}
+	if grp.IsNotificationGroup() {
+		g.Kind = "notification-group"
+	} else {
+		g.Kind = "object-group"
+	}
+	if grp.Module() != nil {
+		g.Module = grp.Module().Name()
+	}
+	if opts.IncludeDescr {
+		g.Description = grp.Description()
+	}
+	for _, member := range grp.Members() {
+		g.Members = append(g.Members, member.Name())
+	}
+	return g
+}
+
+func buildComplianceJSON(comp *mib.Compliance, opts JSONOptions) ComplianceJSON {
+	c := ComplianceJSON{
+		Name:   comp.Name(),
+		OID:    comp.OID().String(),
+		Status: comp.Status().String(),
+	}
+	if comp.Module() != nil {
+		c.Module = comp.Module().Name()
+	}
+	if opts.IncludeDescr {
+		c.Description = comp.Description()
+	}
+	for _, cm := range comp.Modules() {
+		c.Modules = append(c.Modules, ComplianceModuleJSON{
+			Module:          cm.ModuleName,
+			MandatoryGroups: cm.MandatoryGroups,
+		})
+	}
+	return c
+}
+
+func buildCapabilityJSON(cap *mib.Capability, opts JSONOptions) CapabilityJSON {
+	c := CapabilityJSON{
+		Name:           cap.Name(),
+		OID:            cap.OID().String(),
+		Status:         cap.Status().String(),
+		ProductRelease: cap.ProductRelease(),
+	}
+	if cap.Module() != nil {
+		c.Module = cap.Module().Name()
+	}
+	if opts.IncludeDescr {
+		c.Description = cap.Description()
+	}
+	for _, s := range cap.Supports() {
+		c.Supports = append(c.Supports, CapabilitiesModuleJSON{
+			Module:   s.ModuleName,
+			Includes: s.Includes,
+		})
+	}
+	return c
 }
 
 func buildTreeJSON(node *mib.Node, opts JSONOptions) *TreeNodeJSON {
