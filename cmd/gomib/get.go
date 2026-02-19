@@ -26,6 +26,7 @@ Options:
   --all                 Load all MIBs from search path
   -t, --tree            Show subtree instead of single node
   --max-depth N         Limit subtree depth (default: unlimited)
+  --full                Show full descriptions (no truncation)
   -h, --help            Show help
 
 Examples:
@@ -55,6 +56,7 @@ func (c *cli) cmdGet(args []string) int {
 	tree := fs.Bool("t", false, "show subtree")
 	fs.BoolVar(tree, "tree", false, "show subtree")
 	maxDepth := fs.Int("max-depth", 0, "limit subtree depth")
+	full := fs.Bool("full", false, "show full descriptions")
 	help := fs.Bool("h", false, "show help")
 	fs.BoolVar(help, "help", false, "show help")
 
@@ -118,10 +120,15 @@ func (c *cli) cmdGet(args []string) int {
 		return 1
 	}
 
+	descLimit := 200
+	if *full {
+		descLimit = 0
+	}
+
 	if *tree {
 		printNodeTree(node, *maxDepth)
 	} else {
-		printNode(node)
+		printNode(node, descLimit)
 	}
 
 	return 0
@@ -156,7 +163,7 @@ func resolveQuery(m *mib.Mib, query string) *mib.Node {
 	return m.Node(query)
 }
 
-func printNode(node *mib.Node) {
+func printNode(node *mib.Node, descLimit int) {
 	label := node.Name()
 	if label == "" {
 		label = fmt.Sprintf("(%d)", node.Arc())
@@ -178,15 +185,15 @@ func printNode(node *mib.Node) {
 	fmt.Printf("  kind:   %s\n", node.Kind().String())
 
 	if node.Object() != nil {
-		printObjectDetails(node.Object())
+		printObjectDetails(node.Object(), descLimit)
 	}
 
 	if node.Notification() != nil {
-		printNotificationDetails(node.Notification())
+		printNotificationDetails(node.Notification(), descLimit)
 	}
 }
 
-func printObjectDetails(obj *mib.Object) {
+func printObjectDetails(obj *mib.Object, descLimit int) {
 	if obj.Type() != nil {
 		typ := obj.Type()
 		typeName := typ.Name()
@@ -253,7 +260,7 @@ func printObjectDetails(obj *mib.Object) {
 	}
 
 	if obj.Description() != "" {
-		fmt.Printf("  descr:  %s\n", normalizeDescription(obj.Description(), 200))
+		fmt.Printf("  descr:  %s\n", normalizeDescription(obj.Description(), descLimit))
 	}
 
 	enums := obj.EffectiveEnums()
@@ -273,7 +280,7 @@ func printObjectDetails(obj *mib.Object) {
 	}
 }
 
-func printNotificationDetails(notif *mib.Notification) {
+func printNotificationDetails(notif *mib.Notification, descLimit int) {
 	fmt.Printf("  status: %s\n", notif.Status().String())
 
 	if len(notif.Objects()) > 0 {
@@ -284,12 +291,12 @@ func printNotificationDetails(notif *mib.Notification) {
 	}
 
 	if notif.Description() != "" {
-		fmt.Printf("  descr:  %s\n", normalizeDescription(notif.Description(), 200))
+		fmt.Printf("  descr:  %s\n", normalizeDescription(notif.Description(), descLimit))
 	}
 }
 
 func normalizeDescription(s string, maxLen int) string {
-	if len(s) > maxLen {
+	if maxLen > 0 && len(s) > maxLen {
 		s = s[:maxLen] + "..."
 	}
 	s = strings.ReplaceAll(s, "\n", " ")
