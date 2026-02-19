@@ -35,6 +35,7 @@ Commands:
   trace   Trace symbol resolution for debugging
   paths   Show MIB search paths
   list    List available module names
+  find    Search for names across loaded MIBs
   version Show version
 
 Common options:
@@ -128,6 +129,8 @@ func run() int {
 		return c.cmdPaths(cmdArgs)
 	case "list":
 		return c.cmdList(cmdArgs)
+	case "find":
+		return c.cmdFind(cmdArgs)
 	case "version":
 		printVersion()
 		return 0
