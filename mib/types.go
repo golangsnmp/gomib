@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+// Import describes a group of symbols imported from a single source module.
+type Import struct {
+	Module  string   // source module name
+	Symbols []string // imported symbol names
+}
+
 // Range represents a min..max constraint for sizes or values.
 type Range struct {
 	Min, Max int64
