@@ -538,6 +538,7 @@ func TestDiagnosticThresholdNotTriggered(t *testing.T) {
 
 // fakeSource is a test Source that returns pre-configured results.
 type fakeSource struct {
+	prefix  string // path prefix (default "fake")
 	modules map[string]fakeModule
 }
 
@@ -554,7 +555,11 @@ func (f *fakeSource) Find(name string) (FindResult, error) {
 	if m.findErr != nil {
 		return FindResult{}, m.findErr
 	}
-	return FindResult{Content: m.content, Path: "fake:" + name}, nil
+	prefix := f.prefix
+	if prefix == "" {
+		prefix = "fake"
+	}
+	return FindResult{Content: m.content, Path: prefix + ":" + name}, nil
 }
 
 func (f *fakeSource) ListModules() ([]string, error) {
@@ -563,6 +568,63 @@ func (f *fakeSource) ListModules() ([]string, error) {
 		names = append(names, name)
 	}
 	return names, nil
+}
+
+func TestSourcePrecedenceDeterministic(t *testing.T) {
+	// Two sources both provide the same module name. The first source
+	// should always win, regardless of load path (WithModules or full-load).
+	mibContent := []byte(`
+TEST-PRECEDENCE-MIB DEFINITIONS ::= BEGIN
+IMPORTS
+    MODULE-IDENTITY, Integer32
+        FROM SNMPv2-SMI;
+
+testPrecedenceMIB MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "test"
+    CONTACT-INFO "test"
+    DESCRIPTION  "test"
+    ::= { 1 3 6 1 4 1 99999 }
+
+END
+`)
+
+	src1 := &fakeSource{
+		prefix:  "src1",
+		modules: map[string]fakeModule{"TEST-PRECEDENCE-MIB": {content: mibContent}},
+	}
+	src2 := &fakeSource{
+		prefix:  "src2",
+		modules: map[string]fakeModule{"TEST-PRECEDENCE-MIB": {content: mibContent}},
+	}
+
+	ctx := context.Background()
+
+	// WithModules path (loadModulesByName via findModule)
+	t.Run("WithModules", func(t *testing.T) {
+		m, err := Load(ctx, WithSource(src1, src2), WithModules("TEST-PRECEDENCE-MIB"),
+			WithStrictness(mib.StrictnessSilent))
+		if err != nil {
+			t.Fatalf("Load failed: %v", err)
+		}
+		mod := m.Module("TEST-PRECEDENCE-MIB")
+		testutil.NotNil(t, mod, "module should be found")
+		testutil.Equal(t, "src1:TEST-PRECEDENCE-MIB", mod.SourcePath(),
+			"WithModules should pick first source")
+	})
+
+	// Full-load path (loadAllModules)
+	t.Run("FullLoad", func(t *testing.T) {
+		m, err := Load(ctx, WithSource(src1, src2),
+			WithStrictness(mib.StrictnessSilent))
+		if err != nil {
+			t.Fatalf("Load failed: %v", err)
+		}
+		mod := m.Module("TEST-PRECEDENCE-MIB")
+		testutil.NotNil(t, mod, "module should be found")
+		testutil.Equal(t, "src1:TEST-PRECEDENCE-MIB", mod.SourcePath(),
+			"full-load should pick first source")
+	})
 }
 
 func TestFindModuleReturnsContent(t *testing.T) {

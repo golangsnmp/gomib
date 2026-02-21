@@ -36,6 +36,9 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 		name   string
 	}
 
+	// Deduplicate module names across sources: first source wins, matching
+	// the precedence used by findModule() and Multi.Find().
+	seen := make(map[string]struct{})
 	var allModules []sourceModule
 	for _, src := range sources {
 		names, err := src.ListModules()
@@ -43,7 +46,10 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 			return nil, err
 		}
 		for _, name := range names {
-			allModules = append(allModules, sourceModule{source: src, name: name})
+			if _, ok := seen[name]; !ok {
+				seen[name] = struct{}{}
+				allModules = append(allModules, sourceModule{source: src, name: name})
+			}
 		}
 	}
 
@@ -108,10 +114,6 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 		close(results)
 	}()
 
-	// First-result-wins is safe here: each Source.ListModules() deduplicates
-	// internally (see multiSource.ListModules), so a module name appears in
-	// allModules at most once per source. Separate sources with overlapping
-	// names are not a supported configuration.
 	modules := make(map[string]*module.Module)
 	for r := range results {
 		if _, exists := modules[r.mod.Name]; !exists {
