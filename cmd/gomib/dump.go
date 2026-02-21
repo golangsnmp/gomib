@@ -283,6 +283,10 @@ func buildObjectJSON(obj *mib.Object, opts JSONOptions) ObjectJSON {
 		o.Index = append(o.Index, idxJSON)
 	}
 
+	if dv := obj.DefaultValue(); !dv.IsZero() {
+		o.DefaultValue = dv.String()
+	}
+
 	if obj.Augments() != nil {
 		o.Augments = obj.Augments().Name()
 	}
