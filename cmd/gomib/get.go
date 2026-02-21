@@ -331,6 +331,10 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 		fmt.Printf("  augments: %s\n", obj.Augments().Name())
 	}
 
+	if dv := obj.DefaultValue(); !dv.IsZero() {
+		fmt.Printf("  defval: %s\n", dv.String())
+	}
+
 	if obj.Units() != "" {
 		fmt.Printf("  units:  %s\n", obj.Units())
 	}

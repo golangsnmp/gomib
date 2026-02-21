@@ -71,20 +71,21 @@ type BitJSON struct {
 
 // ObjectJSON holds the JSON-serializable form of a resolved object.
 type ObjectJSON struct {
-	Name        string      `json:"name"`
-	Module      string      `json:"module,omitempty"`
-	OID         string      `json:"oid"`
-	Kind        string      `json:"kind"`
-	Type        string      `json:"type,omitempty"`
-	BaseType    string      `json:"baseType,omitempty"`
-	Access      string      `json:"access"`
-	Status      string      `json:"status"`
-	Description string      `json:"description,omitempty"`
-	Units       string      `json:"units,omitempty"`
-	Index       []IndexJSON `json:"index,omitempty"`
-	Augments    string      `json:"augments,omitempty"`
-	Enums       []EnumJSON  `json:"enums,omitempty"`
-	Bits        []BitJSON   `json:"bits,omitempty"`
+	Name         string      `json:"name"`
+	Module       string      `json:"module,omitempty"`
+	OID          string      `json:"oid"`
+	Kind         string      `json:"kind"`
+	Type         string      `json:"type,omitempty"`
+	BaseType     string      `json:"baseType,omitempty"`
+	Access       string      `json:"access"`
+	Status       string      `json:"status"`
+	Description  string      `json:"description,omitempty"`
+	Units        string      `json:"units,omitempty"`
+	DefaultValue string      `json:"defaultValue,omitempty"`
+	Index        []IndexJSON `json:"index,omitempty"`
+	Augments     string      `json:"augments,omitempty"`
+	Enums        []EnumJSON  `json:"enums,omitempty"`
+	Bits         []BitJSON   `json:"bits,omitempty"`
 }
 
 // IndexJSON holds an INDEX entry with its implied flag.
