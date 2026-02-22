@@ -18,14 +18,28 @@ func newCompliance(name string) *Compliance {
 	return &Compliance{name: name}
 }
 
-func (c *Compliance) Name() string                { return c.name }
-func (c *Compliance) Node() *Node                 { return c.node }
-func (c *Compliance) Module() *Module             { return c.module }
-func (c *Compliance) Status() Status              { return c.status }
-func (c *Compliance) Description() string         { return c.desc }
-func (c *Compliance) Reference() string           { return c.ref }
+// Name returns the compliance statement's descriptor.
+func (c *Compliance) Name() string { return c.name }
+
+// Node returns the OID tree node this compliance statement is attached to.
+func (c *Compliance) Node() *Node { return c.node }
+
+// Module returns the module that defines this compliance statement.
+func (c *Compliance) Module() *Module { return c.module }
+
+// Status returns the STATUS clause value.
+func (c *Compliance) Status() Status { return c.status }
+
+// Description returns the DESCRIPTION clause text.
+func (c *Compliance) Description() string { return c.desc }
+
+// Reference returns the REFERENCE clause text, or "".
+func (c *Compliance) Reference() string { return c.ref }
+
+// Modules returns the MODULE clauses within this compliance statement.
 func (c *Compliance) Modules() []ComplianceModule { return slices.Clone(c.modules) }
 
+// OID returns the compliance statement's position in the OID tree, or nil if unresolved.
 func (c *Compliance) OID() OID {
 	if c == nil || c.node == nil {
 		return nil

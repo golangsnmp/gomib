@@ -161,7 +161,8 @@ func (d DefVal) IsZero() bool {
 	return d.value == nil
 }
 
-// String returns a human-readable name for the kind.
+// String returns a human-readable name for the default value kind
+// (e.g. "int", "string", "enum").
 func (k DefValKind) String() string {
 	switch k {
 	case DefValKindInt:
@@ -183,7 +184,10 @@ func (k DefValKind) String() string {
 	}
 }
 
-// DefValAs returns the value as type T if compatible.
+// DefValAs extracts the default value as the concrete type T.
+// It returns the value and true if the underlying value is assignable to T,
+// or the zero value and false otherwise. For example, DefValAs[int64](d)
+// succeeds when d.Kind() is DefValKindInt.
 func DefValAs[T any](d DefVal) (T, bool) {
 	v, ok := d.value.(T)
 	return v, ok
@@ -271,6 +275,8 @@ const (
 	UnresolvedNotificationObject                       // OBJECTS entry in notification
 )
 
+// String returns a human-readable name for the unresolved reference kind
+// (e.g. "import", "type", "oid").
 func (k UnresolvedKind) String() string {
 	switch k {
 	case UnresolvedImport:

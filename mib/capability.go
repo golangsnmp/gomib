@@ -19,15 +19,31 @@ func newCapability(name string) *Capability {
 	return &Capability{name: name}
 }
 
-func (c *Capability) Name() string                   { return c.name }
-func (c *Capability) Node() *Node                    { return c.node }
-func (c *Capability) Module() *Module                { return c.module }
-func (c *Capability) Status() Status                 { return c.status }
-func (c *Capability) Description() string            { return c.desc }
-func (c *Capability) Reference() string              { return c.ref }
-func (c *Capability) ProductRelease() string         { return c.productRelease }
+// Name returns the capability statement's descriptor.
+func (c *Capability) Name() string { return c.name }
+
+// Node returns the OID tree node this capability statement is attached to.
+func (c *Capability) Node() *Node { return c.node }
+
+// Module returns the module that defines this capability statement.
+func (c *Capability) Module() *Module { return c.module }
+
+// Status returns the STATUS clause value.
+func (c *Capability) Status() Status { return c.status }
+
+// Description returns the DESCRIPTION clause text.
+func (c *Capability) Description() string { return c.desc }
+
+// Reference returns the REFERENCE clause text, or "".
+func (c *Capability) Reference() string { return c.ref }
+
+// ProductRelease returns the PRODUCT-RELEASE clause text.
+func (c *Capability) ProductRelease() string { return c.productRelease }
+
+// Supports returns the SUPPORTS clauses listing the modules this agent implements.
 func (c *Capability) Supports() []CapabilitiesModule { return slices.Clone(c.supports) }
 
+// OID returns the capability statement's position in the OID tree, or nil if unresolved.
 func (c *Capability) OID() OID {
 	if c == nil || c.node == nil {
 		return nil

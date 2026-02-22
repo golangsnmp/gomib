@@ -47,54 +47,100 @@ func newModule(name string) *Module {
 	}
 }
 
-func (m *Module) Name() string          { return m.name }
-func (m *Module) Language() Language    { return m.language }
-func (m *Module) SourcePath() string    { return m.sourcePath }
-func (m *Module) OID() OID              { return slices.Clone(m.oid) }
-func (m *Module) Organization() string  { return m.organization }
-func (m *Module) ContactInfo() string   { return m.contactInfo }
-func (m *Module) Description() string   { return m.description }
-func (m *Module) LastUpdated() string   { return m.lastUpdated }
+// Name returns the module name (e.g. "IF-MIB").
+func (m *Module) Name() string { return m.name }
+
+// Language returns the SMI language version of this module.
+func (m *Module) Language() Language { return m.language }
+
+// SourcePath returns the file path this module was loaded from, or "" for synthetic modules.
+func (m *Module) SourcePath() string { return m.sourcePath }
+
+// OID returns the MODULE-IDENTITY OID, or nil if not declared.
+func (m *Module) OID() OID { return slices.Clone(m.oid) }
+
+// Organization returns the ORGANIZATION clause text, or "".
+func (m *Module) Organization() string { return m.organization }
+
+// ContactInfo returns the CONTACT-INFO clause text, or "".
+func (m *Module) ContactInfo() string { return m.contactInfo }
+
+// Description returns the DESCRIPTION clause text.
+func (m *Module) Description() string { return m.description }
+
+// LastUpdated returns the LAST-UPDATED clause value, or "".
+func (m *Module) LastUpdated() string { return m.lastUpdated }
+
+// Revisions returns the REVISION clauses in declaration order.
 func (m *Module) Revisions() []Revision { return slices.Clone(m.revisions) }
-func (m *Module) Imports() []Import     { return slices.Clone(m.imports) }
 
-func (m *Module) Objects() []*Object             { return slices.Clone(m.objects) }
-func (m *Module) Types() []*Type                 { return slices.Clone(m.types) }
+// Imports returns the IMPORTS declarations for this module.
+func (m *Module) Imports() []Import { return slices.Clone(m.imports) }
+
+// Objects returns all OBJECT-TYPE definitions in this module.
+func (m *Module) Objects() []*Object { return slices.Clone(m.objects) }
+
+// Types returns all type definitions in this module.
+func (m *Module) Types() []*Type { return slices.Clone(m.types) }
+
+// Notifications returns all NOTIFICATION-TYPE and TRAP-TYPE definitions in this module.
 func (m *Module) Notifications() []*Notification { return slices.Clone(m.notifications) }
-func (m *Module) Groups() []*Group               { return slices.Clone(m.groups) }
-func (m *Module) Compliances() []*Compliance     { return slices.Clone(m.compliances) }
-func (m *Module) Capabilities() []*Capability    { return slices.Clone(m.capabilities) }
-func (m *Module) Nodes() []*Node                 { return slices.Clone(m.nodes) }
 
-func (m *Module) Tables() []*Object  { return objectsByKind(m.objects, KindTable) }
+// Groups returns all OBJECT-GROUP and NOTIFICATION-GROUP definitions in this module.
+func (m *Module) Groups() []*Group { return slices.Clone(m.groups) }
+
+// Compliances returns all MODULE-COMPLIANCE definitions in this module.
+func (m *Module) Compliances() []*Compliance { return slices.Clone(m.compliances) }
+
+// Capabilities returns all AGENT-CAPABILITIES definitions in this module.
+func (m *Module) Capabilities() []*Capability { return slices.Clone(m.capabilities) }
+
+// Nodes returns all OID tree nodes registered by this module.
+func (m *Module) Nodes() []*Node { return slices.Clone(m.nodes) }
+
+// Tables returns the OBJECT-TYPE definitions classified as tables.
+func (m *Module) Tables() []*Object { return objectsByKind(m.objects, KindTable) }
+
+// Scalars returns the OBJECT-TYPE definitions classified as scalars.
 func (m *Module) Scalars() []*Object { return objectsByKind(m.objects, KindScalar) }
-func (m *Module) Columns() []*Object { return objectsByKind(m.objects, KindColumn) }
-func (m *Module) Rows() []*Object    { return objectsByKind(m.objects, KindRow) }
 
+// Columns returns the OBJECT-TYPE definitions classified as table columns.
+func (m *Module) Columns() []*Object { return objectsByKind(m.objects, KindColumn) }
+
+// Rows returns the OBJECT-TYPE definitions classified as table rows.
+func (m *Module) Rows() []*Object { return objectsByKind(m.objects, KindRow) }
+
+// Node returns the node with the given name in this module, or nil if not found.
 func (m *Module) Node(name string) *Node {
 	return m.nodesByName[name]
 }
 
+// Object returns the object with the given name in this module, or nil if not found.
 func (m *Module) Object(name string) *Object {
 	return m.objectsByName[name]
 }
 
+// Type returns the type with the given name in this module, or nil if not found.
 func (m *Module) Type(name string) *Type {
 	return m.typesByName[name]
 }
 
+// Notification returns the notification with the given name in this module, or nil if not found.
 func (m *Module) Notification(name string) *Notification {
 	return m.notificationsByName[name]
 }
 
+// Group returns the group with the given name in this module, or nil if not found.
 func (m *Module) Group(name string) *Group {
 	return m.groupsByName[name]
 }
 
+// Compliance returns the compliance with the given name in this module, or nil if not found.
 func (m *Module) Compliance(name string) *Compliance {
 	return m.compliancesByName[name]
 }
 
+// Capability returns the capability with the given name in this module, or nil if not found.
 func (m *Module) Capability(name string) *Capability {
 	return m.capabilitiesByName[name]
 }

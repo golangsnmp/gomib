@@ -19,14 +19,28 @@ func newNotification(name string) *Notification {
 	return &Notification{name: name}
 }
 
-func (n *Notification) Name() string        { return n.name }
-func (n *Notification) Node() *Node         { return n.node }
-func (n *Notification) Module() *Module     { return n.module }
-func (n *Notification) Status() Status      { return n.status }
-func (n *Notification) Description() string { return n.desc }
-func (n *Notification) Reference() string   { return n.ref }
-func (n *Notification) Objects() []*Object  { return slices.Clone(n.objects) }
+// Name returns the notification's descriptor.
+func (n *Notification) Name() string { return n.name }
 
+// Node returns the OID tree node this notification is attached to.
+func (n *Notification) Node() *Node { return n.node }
+
+// Module returns the module that defines this notification.
+func (n *Notification) Module() *Module { return n.module }
+
+// Status returns the STATUS clause value.
+func (n *Notification) Status() Status { return n.status }
+
+// Description returns the DESCRIPTION clause text.
+func (n *Notification) Description() string { return n.desc }
+
+// Reference returns the REFERENCE clause text, or "".
+func (n *Notification) Reference() string { return n.ref }
+
+// Objects returns the OBJECTS clause entries (the varbinds sent with this notification).
+func (n *Notification) Objects() []*Object { return slices.Clone(n.objects) }
+
+// OID returns the notification's position in the OID tree, or nil if unresolved.
 func (n *Notification) OID() OID {
 	if n == nil || n.node == nil {
 		return nil
@@ -42,6 +56,7 @@ func (n *Notification) String() string {
 	return n.name + " (" + n.OID().String() + ")"
 }
 
+// TrapInfo returns SMIv1 TRAP-TYPE fields, or nil for SMIv2 NOTIFICATION-TYPE definitions.
 func (n *Notification) TrapInfo() *TrapInfo { return n.trapInfo }
 
 func (n *Notification) setNode(nd *Node)        { n.node = nd }
