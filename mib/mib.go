@@ -1,4 +1,11 @@
-// Package mib provides the in-memory representation of loaded MIB data.
+// Package mib provides the resolved, read-only model produced by loading
+// SNMP MIB modules. The central type is [Mib], which contains the OID tree,
+// object definitions, type definitions, notifications, groups, compliance
+// statements, and agent capabilities extracted from one or more MIB files.
+//
+// All types in this package use unexported fields with exported accessor
+// methods. Slice-returning accessors return cloned copies, so callers may
+// freely modify the returned slices without affecting the model.
 package mib
 
 import (
@@ -8,8 +15,11 @@ import (
 	"strings"
 )
 
-// Mib is the top-level container for loaded MIB data.
-// It is intended to be built once and then used as a read-only structure.
+// Mib is the top-level container returned by [gomib.Load]. It holds the
+// merged OID tree, all resolved definitions (objects, types, notifications,
+// groups, compliances, capabilities), and any diagnostics produced during
+// loading. A Mib is built once during resolution and is safe for concurrent
+// reads from multiple goroutines.
 type Mib struct {
 	root          *Node
 	modules       []*Module

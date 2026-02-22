@@ -2,7 +2,9 @@ package mib
 
 import "slices"
 
-// Object is an OBJECT-TYPE definition.
+// Object is an OBJECT-TYPE definition from an SMIv1 or SMIv2 module.
+// Each object is classified by its [Kind]: scalar, table, row, or column.
+// Objects are attached to the OID tree via their [Node].
 type Object struct {
 	name     string
 	node     *Node
@@ -28,16 +30,35 @@ func newObject(name string) *Object {
 	return &Object{name: name}
 }
 
-func (o *Object) Name() string        { return o.name }
-func (o *Object) Node() *Node         { return o.node }
-func (o *Object) Module() *Module     { return o.module }
-func (o *Object) Type() *Type         { return o.typ }
-func (o *Object) Access() Access      { return o.access }
-func (o *Object) Status() Status      { return o.status }
+// Name returns the object's descriptor (e.g. "ifIndex").
+func (o *Object) Name() string { return o.name }
+
+// Node returns the OID tree node this object is attached to.
+func (o *Object) Node() *Node { return o.node }
+
+// Module returns the module that defines this object.
+func (o *Object) Module() *Module { return o.module }
+
+// Type returns the resolved type of this object, or nil if unresolved.
+func (o *Object) Type() *Type { return o.typ }
+
+// Access returns the MAX-ACCESS or ACCESS clause value.
+func (o *Object) Access() Access { return o.access }
+
+// Status returns the STATUS clause value.
+func (o *Object) Status() Status { return o.status }
+
+// Description returns the DESCRIPTION clause text.
 func (o *Object) Description() string { return o.desc }
-func (o *Object) Reference() string   { return o.ref }
-func (o *Object) Units() string       { return o.units }
-func (o *Object) Augments() *Object   { return o.augments }
+
+// Reference returns the REFERENCE clause text, or "".
+func (o *Object) Reference() string { return o.ref }
+
+// Units returns the UNITS clause text, or "".
+func (o *Object) Units() string { return o.units }
+
+// Augments returns the row object this one augments, or nil.
+func (o *Object) Augments() *Object { return o.augments }
 
 // OID returns the object's position in the OID tree, or nil if unresolved.
 func (o *Object) OID() OID {

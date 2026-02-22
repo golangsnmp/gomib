@@ -24,7 +24,10 @@ type FindResult struct {
 	Path string
 }
 
-// Source provides access to MIB files for loading.
+// Source provides access to MIB files for the loading pipeline.
+// Implementations are passed to [WithSource] and searched in order
+// during [Load] to locate module files by name. The standard
+// implementations are [Dir], [DirTree], [FS], and [Multi].
 type Source interface {
 	// Find returns the MIB content for the named module,
 	// or fs.ErrNotExist if the module is not available.

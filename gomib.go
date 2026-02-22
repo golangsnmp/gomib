@@ -1,3 +1,8 @@
+// Package gomib loads and resolves SNMP MIB modules.
+//
+// Call [Load] with one or more [Source] values to parse MIB files,
+// resolve cross-module imports, build the OID tree, and return a
+// read-only [mib.Mib] containing the merged result.
 package gomib
 
 import (

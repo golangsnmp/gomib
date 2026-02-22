@@ -19,16 +19,31 @@ func newGroup(name string) *Group {
 	return &Group{name: name}
 }
 
-func (g *Group) Name() string        { return g.name }
-func (g *Group) Node() *Node         { return g.node }
-func (g *Group) Module() *Module     { return g.module }
-func (g *Group) Status() Status      { return g.status }
-func (g *Group) Description() string { return g.desc }
-func (g *Group) Reference() string   { return g.ref }
-func (g *Group) Members() []*Node    { return slices.Clone(g.members) }
+// Name returns the group's descriptor.
+func (g *Group) Name() string { return g.name }
 
+// Node returns the OID tree node this group is attached to.
+func (g *Group) Node() *Node { return g.node }
+
+// Module returns the module that defines this group.
+func (g *Group) Module() *Module { return g.module }
+
+// Status returns the STATUS clause value.
+func (g *Group) Status() Status { return g.status }
+
+// Description returns the DESCRIPTION clause text.
+func (g *Group) Description() string { return g.desc }
+
+// Reference returns the REFERENCE clause text, or "".
+func (g *Group) Reference() string { return g.ref }
+
+// Members returns the OID tree nodes listed in the OBJECTS or NOTIFICATIONS clause.
+func (g *Group) Members() []*Node { return slices.Clone(g.members) }
+
+// IsNotificationGroup reports whether this is a NOTIFICATION-GROUP (vs OBJECT-GROUP).
 func (g *Group) IsNotificationGroup() bool { return g.isNotificationGroup }
 
+// OID returns the group's position in the OID tree, or nil if unresolved.
 func (g *Group) OID() OID {
 	if g == nil || g.node == nil {
 		return nil

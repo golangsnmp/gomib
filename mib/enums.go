@@ -1,4 +1,3 @@
-// Package mib defines the public types and interfaces for MIB data.
 package mib
 
 import "github.com/golangsnmp/gomib/internal/types"

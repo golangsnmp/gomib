@@ -2,7 +2,10 @@ package mib
 
 import "slices"
 
-// Type is a type definition (textual convention or type reference).
+// Type is a named type definition, either a TEXTUAL-CONVENTION or an inline
+// type refinement. Types form chains via [Type.Parent]; the chain terminates
+// at a base SMI type. Walking the chain with the Effective* methods resolves
+// inherited constraints, display hints, and enum/BITS definitions.
 type Type struct {
 	name   string
 	module *Module
@@ -23,18 +26,41 @@ func newType(name string) *Type {
 	return &Type{name: name}
 }
 
-func (t *Type) Name() string        { return t.name }
-func (t *Type) Module() *Module     { return t.module }
-func (t *Type) Base() BaseType      { return t.base }
-func (t *Type) Parent() *Type       { return t.parent }
-func (t *Type) Status() Status      { return t.status }
+// Name returns the type's name (e.g. "DisplayString"), or "" for anonymous types.
+func (t *Type) Name() string { return t.name }
+
+// Module returns the module that defines this type.
+func (t *Type) Module() *Module { return t.module }
+
+// Base returns the directly assigned base type, or 0 if inherited from the parent.
+func (t *Type) Base() BaseType { return t.base }
+
+// Parent returns the parent type in the type chain, or nil for root types.
+func (t *Type) Parent() *Type { return t.parent }
+
+// Status returns the STATUS clause value.
+func (t *Type) Status() Status { return t.status }
+
+// DisplayHint returns the DISPLAY-HINT string declared on this type, or "".
 func (t *Type) DisplayHint() string { return t.hint }
+
+// Description returns the DESCRIPTION clause text.
 func (t *Type) Description() string { return t.desc }
-func (t *Type) Reference() string   { return t.ref }
-func (t *Type) Sizes() []Range      { return slices.Clone(t.sizes) }
-func (t *Type) Ranges() []Range     { return slices.Clone(t.ranges) }
+
+// Reference returns the REFERENCE clause text, or "".
+func (t *Type) Reference() string { return t.ref }
+
+// Sizes returns the SIZE constraints declared directly on this type.
+func (t *Type) Sizes() []Range { return slices.Clone(t.sizes) }
+
+// Ranges returns the range constraints declared directly on this type.
+func (t *Type) Ranges() []Range { return slices.Clone(t.ranges) }
+
+// Enums returns the enumeration values declared directly on this type.
 func (t *Type) Enums() []NamedValue { return slices.Clone(t.enums) }
-func (t *Type) Bits() []NamedValue  { return slices.Clone(t.bits) }
+
+// Bits returns the BITS definitions declared directly on this type.
+func (t *Type) Bits() []NamedValue { return slices.Clone(t.bits) }
 
 // Enum looks up an enumeration value by label.
 func (t *Type) Enum(label string) (NamedValue, bool) { return findNamedValue(t.enums, label) }

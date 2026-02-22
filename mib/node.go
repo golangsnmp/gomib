@@ -7,7 +7,11 @@ import (
 	"slices"
 )
 
-// Node is a point in the OID tree.
+// Node is a point in the OID tree. Each node has a numeric arc relative to
+// its parent and an optional name. Nodes form a trie rooted at an unnamed
+// root; the path from root to a node determines its OID. Entity definitions
+// (Object, Notification, Group, Compliance, Capability) are attached to the
+// node at their registered OID.
 type Node struct {
 	arc         uint32
 	name        string
@@ -23,9 +27,16 @@ type Node struct {
 	sortedCache []*Node // lazily computed sorted children; nil = invalidated
 }
 
-func (n *Node) Arc() uint32  { return n.arc }
+// Arc returns the numeric arc of this node relative to its parent.
+func (n *Node) Arc() uint32 { return n.arc }
+
+// Name returns the node's symbolic name, or "" if unnamed.
 func (n *Node) Name() string { return n.name }
-func (n *Node) Kind() Kind   { return n.kind }
+
+// Kind returns the structural classification of this node.
+func (n *Node) Kind() Kind { return n.kind }
+
+// IsRoot reports whether this is the unnamed root of the OID tree.
 func (n *Node) IsRoot() bool { return n.parent == nil }
 
 // Module returns the module that defines this node's primary entity.
@@ -49,6 +60,7 @@ func (n *Node) Module() *Module {
 	return n.module
 }
 
+// OID returns the full numeric OID from the root to this node, or nil for the root.
 func (n *Node) OID() OID {
 	if n == nil || n.parent == nil {
 		return nil
@@ -61,13 +73,25 @@ func (n *Node) OID() OID {
 	return arcs
 }
 
-func (n *Node) Object() *Object             { return n.obj }
-func (n *Node) Notification() *Notification { return n.notif }
-func (n *Node) Group() *Group               { return n.group }
-func (n *Node) Compliance() *Compliance     { return n.compliance }
-func (n *Node) Capability() *Capability     { return n.capability }
-func (n *Node) Parent() *Node               { return n.parent }
+// Object returns the OBJECT-TYPE attached to this node, or nil.
+func (n *Node) Object() *Object { return n.obj }
 
+// Notification returns the NOTIFICATION-TYPE or TRAP-TYPE attached to this node, or nil.
+func (n *Node) Notification() *Notification { return n.notif }
+
+// Group returns the OBJECT-GROUP or NOTIFICATION-GROUP attached to this node, or nil.
+func (n *Node) Group() *Group { return n.group }
+
+// Compliance returns the MODULE-COMPLIANCE attached to this node, or nil.
+func (n *Node) Compliance() *Compliance { return n.compliance }
+
+// Capability returns the AGENT-CAPABILITIES attached to this node, or nil.
+func (n *Node) Capability() *Capability { return n.capability }
+
+// Parent returns the parent node, or nil for the root.
+func (n *Node) Parent() *Node { return n.parent }
+
+// Child returns the child node at the given arc, or nil if no such child exists.
 func (n *Node) Child(arc uint32) *Node {
 	if n.children == nil {
 		return nil
@@ -75,6 +99,7 @@ func (n *Node) Child(arc uint32) *Node {
 	return n.children[arc]
 }
 
+// Children returns the direct children of this node, sorted by arc.
 func (n *Node) Children() []*Node {
 	if len(n.children) == 0 {
 		return nil
@@ -95,6 +120,7 @@ func (n *Node) sortedChildren() []*Node {
 	return n.sortedCache
 }
 
+// Subtree returns an iterator over this node and all its descendants, depth-first.
 func (n *Node) Subtree() iter.Seq[*Node] {
 	return func(yield func(*Node) bool) {
 		n.yieldAll(yield)
@@ -113,6 +139,7 @@ func (n *Node) yieldAll(yield func(*Node) bool) bool {
 	return true
 }
 
+// LongestPrefix returns the deepest descendant of this node matching a prefix of the OID.
 func (n *Node) LongestPrefix(oid OID) *Node {
 	nd, _ := n.walkOID(oid)
 	return nd
