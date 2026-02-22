@@ -41,7 +41,13 @@ func (c *Capability) Reference() string { return c.ref }
 func (c *Capability) ProductRelease() string { return c.productRelease }
 
 // Supports returns the SUPPORTS clauses listing the modules this agent implements.
-func (c *Capability) Supports() []CapabilitiesModule { return slices.Clone(c.supports) }
+func (c *Capability) Supports() []CapabilitiesModule {
+	result := slices.Clone(c.supports)
+	for i := range result {
+		result[i] = result[i].clone()
+	}
+	return result
+}
 
 // OID returns the capability statement's position in the OID tree, or nil if unresolved.
 func (c *Capability) OID() OID {

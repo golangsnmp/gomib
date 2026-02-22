@@ -2,6 +2,7 @@ package mib
 
 import (
 	"encoding/hex"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -220,12 +221,37 @@ type ComplianceObject struct {
 	Description string
 }
 
+// clone returns a deep copy of the ComplianceModule.
+func (cm ComplianceModule) clone() ComplianceModule {
+	cm.MandatoryGroups = slices.Clone(cm.MandatoryGroups)
+	cm.Groups = slices.Clone(cm.Groups)
+	cm.Objects = slices.Clone(cm.Objects)
+	for i := range cm.Objects {
+		cm.Objects[i].Syntax = cm.Objects[i].Syntax.clone()
+		cm.Objects[i].WriteSyntax = cm.Objects[i].WriteSyntax.clone()
+	}
+	return cm
+}
+
 // CapabilitiesModule is a SUPPORTS clause within an AGENT-CAPABILITIES definition.
 type CapabilitiesModule struct {
 	ModuleName             string                  // supported module name
 	Includes               []string                // INCLUDES group references
 	ObjectVariations       []ObjectVariation       // object VARIATION clauses
 	NotificationVariations []NotificationVariation // notification VARIATION clauses
+}
+
+// clone returns a deep copy of the CapabilitiesModule.
+func (cm CapabilitiesModule) clone() CapabilitiesModule {
+	cm.Includes = slices.Clone(cm.Includes)
+	cm.ObjectVariations = slices.Clone(cm.ObjectVariations)
+	for i := range cm.ObjectVariations {
+		cm.ObjectVariations[i].Syntax = cm.ObjectVariations[i].Syntax.clone()
+		cm.ObjectVariations[i].WriteSyntax = cm.ObjectVariations[i].WriteSyntax.clone()
+		cm.ObjectVariations[i].CreationRequires = slices.Clone(cm.ObjectVariations[i].CreationRequires)
+	}
+	cm.NotificationVariations = slices.Clone(cm.NotificationVariations)
+	return cm
 }
 
 // ObjectVariation is an object VARIATION within AGENT-CAPABILITIES.
@@ -255,6 +281,19 @@ type SyntaxConstraints struct {
 	Ranges []Range
 	Enums  []NamedValue
 	Bits   []NamedValue
+}
+
+// clone returns a deep copy of sc, or nil if sc is nil.
+func (sc *SyntaxConstraints) clone() *SyntaxConstraints {
+	if sc == nil {
+		return nil
+	}
+	c := *sc
+	c.Sizes = slices.Clone(sc.Sizes)
+	c.Ranges = slices.Clone(sc.Ranges)
+	c.Enums = slices.Clone(sc.Enums)
+	c.Bits = slices.Clone(sc.Bits)
+	return &c
 }
 
 // TrapInfo holds SMIv1 TRAP-TYPE fields. Only present on notifications

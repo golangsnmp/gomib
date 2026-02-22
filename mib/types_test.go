@@ -1,6 +1,9 @@
 package mib
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestDefValString(t *testing.T) {
 	tests := []struct {
@@ -242,5 +245,171 @@ func TestBytesToHex(t *testing.T) {
 				t.Errorf("bytesToHex(%x) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestModuleImportsDeepClone(t *testing.T) {
+	m := newModule("TEST-MIB")
+	m.imports = []Import{
+		{Module: "SNMPv2-SMI", Symbols: []string{"MODULE-IDENTITY", "OBJECT-TYPE"}},
+	}
+
+	got := m.Imports()
+	got[0].Symbols[0] = "MUTATED"
+
+	if m.imports[0].Symbols[0] == "MUTATED" {
+		t.Error("mutating Imports() return value should not affect module internal state")
+	}
+}
+
+func TestComplianceModulesDeepClone(t *testing.T) {
+	c := newCompliance("testCompliance")
+	access := AccessReadOnly
+	c.setModules([]ComplianceModule{
+		{
+			ModuleName:      "IF-MIB",
+			MandatoryGroups: []string{"ifGeneralGroup"},
+			Groups:          []ComplianceGroup{{Group: "ifGroup", Description: "desc"}},
+			Objects: []ComplianceObject{{
+				Object:      "ifType",
+				Syntax:      &SyntaxConstraints{Sizes: []Range{{Min: 1, Max: 255}}},
+				WriteSyntax: &SyntaxConstraints{Ranges: []Range{{Min: 0, Max: 100}}},
+				MinAccess:   &access,
+				Description: "obj desc",
+			}},
+		},
+	})
+
+	got := c.Modules()
+
+	// Mutate the returned MandatoryGroups
+	got[0].MandatoryGroups[0] = "MUTATED"
+	if c.modules[0].MandatoryGroups[0] == "MUTATED" {
+		t.Error("mutating Modules()[].MandatoryGroups should not affect internal state")
+	}
+
+	// Mutate the returned Groups
+	got[0].Groups[0].Group = "MUTATED"
+	if c.modules[0].Groups[0].Group == "MUTATED" {
+		t.Error("mutating Modules()[].Groups should not affect internal state")
+	}
+
+	// Mutate the returned Objects
+	got[0].Objects[0].Object = "MUTATED"
+	if c.modules[0].Objects[0].Object == "MUTATED" {
+		t.Error("mutating Modules()[].Objects should not affect internal state")
+	}
+
+	// Mutate the Syntax constraints through the returned value
+	got[0].Objects[0].Syntax.Sizes[0].Min = 999
+	if c.modules[0].Objects[0].Syntax.Sizes[0].Min == 999 {
+		t.Error("mutating Modules()[].Objects[].Syntax should not affect internal state")
+	}
+
+	// Mutate the WriteSyntax constraints
+	got[0].Objects[0].WriteSyntax.Ranges[0].Min = 999
+	if c.modules[0].Objects[0].WriteSyntax.Ranges[0].Min == 999 {
+		t.Error("mutating Modules()[].Objects[].WriteSyntax should not affect internal state")
+	}
+}
+
+func TestCapabilitySupportsDeepClone(t *testing.T) {
+	cap := newCapability("testCap")
+	cap.setSupports([]CapabilitiesModule{
+		{
+			ModuleName: "IF-MIB",
+			Includes:   []string{"ifGeneralGroup"},
+			ObjectVariations: []ObjectVariation{{
+				Object:           "ifType",
+				Syntax:           &SyntaxConstraints{Enums: []NamedValue{{Label: "e1", Value: 1}}},
+				WriteSyntax:      &SyntaxConstraints{Bits: []NamedValue{{Label: "b1", Value: 0}}},
+				CreationRequires: []string{"ifName"},
+				Description:      "var desc",
+			}},
+			NotificationVariations: []NotificationVariation{{
+				Notification: "linkDown",
+				Description:  "notif desc",
+			}},
+		},
+	})
+
+	got := cap.Supports()
+
+	// Mutate Includes
+	got[0].Includes[0] = "MUTATED"
+	if cap.supports[0].Includes[0] == "MUTATED" {
+		t.Error("mutating Supports()[].Includes should not affect internal state")
+	}
+
+	// Mutate ObjectVariations
+	got[0].ObjectVariations[0].Object = "MUTATED"
+	if cap.supports[0].ObjectVariations[0].Object == "MUTATED" {
+		t.Error("mutating Supports()[].ObjectVariations should not affect internal state")
+	}
+
+	// Mutate CreationRequires
+	got[0].ObjectVariations[0].CreationRequires[0] = "MUTATED"
+	if cap.supports[0].ObjectVariations[0].CreationRequires[0] == "MUTATED" {
+		t.Error("mutating Supports()[].ObjectVariations[].CreationRequires should not affect internal state")
+	}
+
+	// Mutate Syntax through returned value
+	got[0].ObjectVariations[0].Syntax.Enums[0].Label = "MUTATED"
+	if cap.supports[0].ObjectVariations[0].Syntax.Enums[0].Label == "MUTATED" {
+		t.Error("mutating Supports()[].ObjectVariations[].Syntax should not affect internal state")
+	}
+
+	// Mutate WriteSyntax through returned value
+	got[0].ObjectVariations[0].WriteSyntax.Bits[0].Label = "MUTATED"
+	if cap.supports[0].ObjectVariations[0].WriteSyntax.Bits[0].Label == "MUTATED" {
+		t.Error("mutating Supports()[].ObjectVariations[].WriteSyntax should not affect internal state")
+	}
+
+	// Mutate NotificationVariations
+	got[0].NotificationVariations[0].Notification = "MUTATED"
+	if cap.supports[0].NotificationVariations[0].Notification == "MUTATED" {
+		t.Error("mutating Supports()[].NotificationVariations should not affect internal state")
+	}
+}
+
+func TestSyntaxConstraintsClone(t *testing.T) {
+	orig := &SyntaxConstraints{
+		Sizes:  []Range{{Min: 1, Max: 10}},
+		Ranges: []Range{{Min: 0, Max: 255}},
+		Enums:  []NamedValue{{Label: "up", Value: 1}},
+		Bits:   []NamedValue{{Label: "bit0", Value: 0}},
+	}
+
+	cloned := orig.clone()
+
+	// Verify values match
+	if !slices.Equal(cloned.Sizes, orig.Sizes) {
+		t.Error("cloned Sizes should equal original")
+	}
+	if !slices.Equal(cloned.Ranges, orig.Ranges) {
+		t.Error("cloned Ranges should equal original")
+	}
+
+	// Mutate clone, verify original unchanged
+	cloned.Sizes[0].Min = 999
+	if orig.Sizes[0].Min == 999 {
+		t.Error("mutating cloned Sizes should not affect original")
+	}
+
+	cloned.Enums[0].Label = "MUTATED"
+	if orig.Enums[0].Label == "MUTATED" {
+		t.Error("mutating cloned Enums should not affect original")
+	}
+
+	cloned.Bits[0].Label = "MUTATED"
+	if orig.Bits[0].Label == "MUTATED" {
+		t.Error("mutating cloned Bits should not affect original")
+	}
+}
+
+func TestSyntaxConstraintsCloneNil(t *testing.T) {
+	var sc *SyntaxConstraints
+	if sc.clone() != nil {
+		t.Error("clone of nil SyntaxConstraints should return nil")
 	}
 }

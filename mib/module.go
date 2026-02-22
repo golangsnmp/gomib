@@ -75,7 +75,13 @@ func (m *Module) LastUpdated() string { return m.lastUpdated }
 func (m *Module) Revisions() []Revision { return slices.Clone(m.revisions) }
 
 // Imports returns the IMPORTS declarations for this module.
-func (m *Module) Imports() []Import { return slices.Clone(m.imports) }
+func (m *Module) Imports() []Import {
+	result := slices.Clone(m.imports)
+	for i := range result {
+		result[i].Symbols = slices.Clone(result[i].Symbols)
+	}
+	return result
+}
 
 // Objects returns all OBJECT-TYPE definitions in this module.
 func (m *Module) Objects() []*Object { return slices.Clone(m.objects) }
