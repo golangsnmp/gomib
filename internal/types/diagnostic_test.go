@@ -27,6 +27,19 @@ func TestMatchGlob(t *testing.T) {
 		{"exact", "exact", true},
 		{"exact", "other", false},
 
+		// Middle wildcard
+		{"foo*bar", "fooxbar", true},
+		{"foo*bar", "foobar", true},
+		{"foo*bar", "foobaz", false},
+		{"foo*bar", "foo-and-bar", true},
+		{"foo*bar", "xfoobar", false},
+		{"a*b*c", "axbxc", true},
+		{"a*b*c", "abc", true},
+		{"a*b*c", "aXXbYYc", true},
+		{"a*b*c", "aXXc", false},
+		{"a*a*a", "aaa", true},
+		{"a*a*a", "aa", false},
+
 		// Edge cases
 		{"", "", true},
 		{"", "x", false},

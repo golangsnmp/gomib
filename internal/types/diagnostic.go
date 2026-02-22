@@ -153,13 +153,34 @@ func (c DiagnosticConfig) AllowBestGuessFallbacks() bool {
 	return c.Level >= StrictnessPermissive
 }
 
-// MatchGlob performs simple glob matching with * wildcard.
+// MatchGlob performs glob matching with * wildcards.
+// Each * matches zero or more characters. Multiple wildcards are supported.
 func MatchGlob(pattern, s string) bool {
-	if prefix, ok := strings.CutSuffix(pattern, "*"); ok {
-		return strings.HasPrefix(s, prefix)
+	parts := strings.Split(pattern, "*")
+	if len(parts) == 1 {
+		return pattern == s
 	}
-	if suffix, ok := strings.CutPrefix(pattern, "*"); ok {
-		return strings.HasSuffix(s, suffix)
+
+	// First segment must be a prefix.
+	if !strings.HasPrefix(s, parts[0]) {
+		return false
 	}
-	return pattern == s
+	s = s[len(parts[0]):]
+
+	// Last segment must be a suffix.
+	last := parts[len(parts)-1]
+	if !strings.HasSuffix(s, last) {
+		return false
+	}
+	s = s[:len(s)-len(last)]
+
+	// Middle segments must appear in order.
+	for _, part := range parts[1 : len(parts)-1] {
+		i := strings.Index(s, part)
+		if i < 0 {
+			return false
+		}
+		s = s[i+len(part):]
+	}
+	return true
 }
