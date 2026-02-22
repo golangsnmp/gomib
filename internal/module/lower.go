@@ -154,6 +154,23 @@ func identNames(idents []ast.Ident) []string {
 	return names
 }
 
+// optionalString returns qs.Value if qs is non-nil, or "" otherwise.
+func optionalString(qs *ast.QuotedString) string {
+	if qs != nil {
+		return qs.Value
+	}
+	return ""
+}
+
+// optionalAccess returns a pointer to a.Value if a is non-nil, or nil otherwise.
+func optionalAccess(a *ast.AccessClause) *types.Access {
+	if a != nil {
+		v := a.Value
+		return &v
+	}
+	return nil
+}
+
 // lowerImports flattens import clauses and detects the SMI language.
 func lowerImports(importClauses []ast.ImportClause, ctx *LoweringContext) []Import {
 	var imports []Import
@@ -223,21 +240,6 @@ func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 		status = types.StatusCurrent
 	}
 
-	var units string
-	if def.Units != nil {
-		units = def.Units.Value
-	}
-
-	var description string
-	if def.Description != nil {
-		description = def.Description.Value
-	}
-
-	var reference string
-	if def.Reference != nil {
-		reference = def.Reference.Value
-	}
-
 	var augments string
 	if def.Augments != nil {
 		augments = def.Augments.Target.Name
@@ -251,12 +253,12 @@ func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 	return &ObjectType{
 		Name:          def.Name.Name,
 		Syntax:        lowerTypeSyntax(def.Syntax.Syntax, ctx),
-		Units:         units,
+		Units:         optionalString(def.Units),
 		Access:        def.Access.Value,
 		AccessKeyword: lowerAccessKeyword(def.Access.Keyword),
 		Status:        status,
-		Description:   description,
-		Reference:     reference,
+		Description:   optionalString(def.Description),
+		Reference:     optionalString(def.Reference),
 		Index:         lowerIndexClause(def.Index),
 		Augments:      augments,
 		DefVal:        defval,
@@ -301,27 +303,17 @@ func checkRevisionLastUpdated(ctx *LoweringContext, moduleName string, mi *Modul
 }
 
 func lowerObjectIdentity(def *ast.ObjectIdentityDef, ctx *LoweringContext) *ObjectIdentity {
-	var reference string
-	if def.Reference != nil {
-		reference = def.Reference.Value
-	}
-
 	return &ObjectIdentity{
 		Name:        def.Name.Name,
 		Status:      def.Status.Value,
 		Description: def.Description.Value,
-		Reference:   reference,
+		Reference:   optionalString(def.Reference),
 		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
 		Span:        def.Span,
 	}
 }
 
 func lowerNotificationType(def *ast.NotificationTypeDef, ctx *LoweringContext) *Notification {
-	var reference string
-	if def.Reference != nil {
-		reference = def.Reference.Value
-	}
-
 	oid := lowerOidAssignment(def.OidAssignment, ctx)
 
 	return &Notification{
@@ -329,7 +321,7 @@ func lowerNotificationType(def *ast.NotificationTypeDef, ctx *LoweringContext) *
 		Objects:     identNames(def.Objects),
 		Status:      def.Status.Value,
 		Description: def.Description.Value,
-		Reference:   reference,
+		Reference:   optionalString(def.Reference),
 		TrapInfo:    nil,
 		Oid:         &oid,
 		Span:        def.Span,
@@ -337,22 +329,12 @@ func lowerNotificationType(def *ast.NotificationTypeDef, ctx *LoweringContext) *
 }
 
 func lowerTrapType(def *ast.TrapTypeDef) *Notification {
-	var description string
-	if def.Description != nil {
-		description = def.Description.Value
-	}
-
-	var reference string
-	if def.Reference != nil {
-		reference = def.Reference.Value
-	}
-
 	return &Notification{
 		Name:        def.Name.Name,
 		Objects:     identNames(def.Variables),
 		Status:      types.StatusCurrent, // TRAP-TYPE has no STATUS clause
-		Description: description,
-		Reference:   reference,
+		Description: optionalString(def.Description),
+		Reference:   optionalString(def.Reference),
 		TrapInfo: &TrapInfo{
 			Enterprise: def.Enterprise.Name,
 			TrapNumber: def.TrapNumber,
@@ -363,24 +345,14 @@ func lowerTrapType(def *ast.TrapTypeDef) *Notification {
 }
 
 func lowerTextualConvention(def *ast.TextualConventionDef, ctx *LoweringContext) *TypeDef {
-	var displayHint string
-	if def.DisplayHint != nil {
-		displayHint = def.DisplayHint.Value
-	}
-
-	var reference string
-	if def.Reference != nil {
-		reference = def.Reference.Value
-	}
-
 	return &TypeDef{
 		Name:                def.Name.Name,
 		Syntax:              lowerTypeSyntax(def.Syntax.Syntax, ctx),
 		BaseType:            nil,
-		DisplayHint:         displayHint,
+		DisplayHint:         optionalString(def.DisplayHint),
 		Status:              def.Status.Value,
 		Description:         def.Description.Value,
-		Reference:           reference,
+		Reference:           optionalString(def.Reference),
 		IsTextualConvention: true,
 		Span:                def.Span,
 	}
@@ -409,34 +381,24 @@ func lowerValueAssignment(def *ast.ValueAssignmentDef, ctx *LoweringContext) *Va
 }
 
 func lowerObjectGroup(def *ast.ObjectGroupDef, ctx *LoweringContext) *ObjectGroup {
-	var reference string
-	if def.Reference != nil {
-		reference = def.Reference.Value
-	}
-
 	return &ObjectGroup{
 		Name:        def.Name.Name,
 		Objects:     identNames(def.Objects),
 		Status:      def.Status.Value,
 		Description: def.Description.Value,
-		Reference:   reference,
+		Reference:   optionalString(def.Reference),
 		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
 		Span:        def.Span,
 	}
 }
 
 func lowerNotificationGroup(def *ast.NotificationGroupDef, ctx *LoweringContext) *NotificationGroup {
-	var reference string
-	if def.Reference != nil {
-		reference = def.Reference.Value
-	}
-
 	return &NotificationGroup{
 		Name:          def.Name.Name,
 		Notifications: identNames(def.Notifications),
 		Status:        def.Status.Value,
 		Description:   def.Description.Value,
-		Reference:     reference,
+		Reference:     optionalString(def.Reference),
 		Oid:           lowerOidAssignment(def.OidAssignment, ctx),
 		Span:          def.Span,
 	}
@@ -448,16 +410,11 @@ func lowerModuleCompliance(def *ast.ModuleComplianceDef, ctx *LoweringContext) *
 		modules[i] = lowerComplianceModule(m, ctx)
 	}
 
-	var reference string
-	if def.Reference != nil {
-		reference = def.Reference.Value
-	}
-
 	return &ModuleCompliance{
 		Name:        def.Name.Name,
 		Status:      def.Status.Value,
 		Description: def.Description.Value,
-		Reference:   reference,
+		Reference:   optionalString(def.Reference),
 		Modules:     modules,
 		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
 		Span:        def.Span,
@@ -504,17 +461,11 @@ func lowerComplianceObject(o *ast.ComplianceObject, ctx *LoweringContext) Compli
 		writeSyntax = lowerTypeSyntax(o.WriteSyntax.Syntax, ctx)
 	}
 
-	var minAccess *types.Access
-	if o.MinAccess != nil {
-		a := o.MinAccess.Value
-		minAccess = &a
-	}
-
 	return ComplianceObject{
 		Object:      o.Object.Name,
 		Syntax:      syntax,
 		WriteSyntax: writeSyntax,
-		MinAccess:   minAccess,
+		MinAccess:   optionalAccess(o.MinAccess),
 		Description: o.Description.Value,
 	}
 }
@@ -525,17 +476,12 @@ func lowerAgentCapabilities(def *ast.AgentCapabilitiesDef, ctx *LoweringContext)
 		supports[i] = lowerSupportsModule(s, ctx)
 	}
 
-	var reference string
-	if def.Reference != nil {
-		reference = def.Reference.Value
-	}
-
 	return &AgentCapabilities{
 		Name:           def.Name.Name,
 		ProductRelease: def.ProductRelease.Value,
 		Status:         def.Status.Value,
 		Description:    def.Description.Value,
-		Reference:      reference,
+		Reference:      optionalString(def.Reference),
 		Supports:       supports,
 		Oid:            lowerOidAssignment(def.OidAssignment, ctx),
 		Span:           def.Span,
@@ -574,12 +520,6 @@ func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVa
 		writeSyntax = lowerTypeSyntax(v.WriteSyntax.Syntax, ctx)
 	}
 
-	var access *types.Access
-	if v.Access != nil {
-		a := v.Access.Value
-		access = &a
-	}
-
 	var creationRequires []string
 	if len(v.CreationRequires) > 0 {
 		creationRequires = identNames(v.CreationRequires)
@@ -594,7 +534,7 @@ func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVa
 		Object:           v.Object.Name,
 		Syntax:           syntax,
 		WriteSyntax:      writeSyntax,
-		Access:           access,
+		Access:           optionalAccess(v.Access),
 		CreationRequires: creationRequires,
 		DefVal:           defval,
 		Description:      v.Description.Value,
@@ -602,15 +542,9 @@ func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVa
 }
 
 func lowerNotificationVariation(v *ast.NotificationVariation) NotificationVariation {
-	var access *types.Access
-	if v.Access != nil {
-		a := v.Access.Value
-		access = &a
-	}
-
 	return NotificationVariation{
 		Notification: v.Notification.Name,
-		Access:       access,
+		Access:       optionalAccess(v.Access),
 		Description:  v.Description.Value,
 	}
 }
