@@ -17,3 +17,6 @@ func StrictConfig() DiagnosticConfig { return types.StrictConfig() }
 // PermissiveConfig returns a permissive configuration for legacy/vendor MIBs.
 // Suppresses common vendor MIB violations like underscores in identifiers.
 func PermissiveConfig() DiagnosticConfig { return types.PermissiveConfig() }
+
+// SilentConfig returns a silent configuration that suppresses all diagnostics.
+func SilentConfig() DiagnosticConfig { return types.SilentConfig() }

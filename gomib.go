@@ -68,10 +68,7 @@ func WithStrictness(level mib.StrictnessLevel) LoadOption {
 		case mib.StrictnessPermissive:
 			c.diagConfig = mib.PermissiveConfig()
 		case mib.StrictnessSilent:
-			c.diagConfig = mib.DiagnosticConfig{
-				Level:  mib.StrictnessSilent,
-				FailAt: mib.SeverityFatal,
-			}
+			c.diagConfig = mib.SilentConfig()
 		default:
 			c.diagConfig = mib.DefaultConfig()
 		}
