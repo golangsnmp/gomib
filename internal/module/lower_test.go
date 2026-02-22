@@ -89,7 +89,7 @@ END
 
 	var found bool
 	for _, d := range mod.Diagnostics {
-		if d.Code == "identifier-underscore" {
+		if d.Code == types.DiagIdentifierUnderscore {
 			found = true
 			// test_object is on line 16, column 1 of the source
 			if d.Line != 16 {
@@ -102,7 +102,7 @@ END
 		}
 	}
 	if !found {
-		t.Error("expected identifier-underscore diagnostic")
+		t.Errorf("expected %s diagnostic", types.DiagIdentifierUnderscore)
 	}
 }
 
@@ -139,7 +139,7 @@ END
 
 	var found bool
 	for _, d := range mod.Diagnostics {
-		if d.Code == "missing-module-identity" {
+		if d.Code == types.DiagMissingModuleIdentity {
 			found = true
 			// Lowering diagnostics now include source location from the module span
 			if d.Line == 0 || d.Column == 0 {
@@ -149,7 +149,7 @@ END
 		}
 	}
 	if !found {
-		t.Error("expected missing-module-identity diagnostic")
+		t.Errorf("expected %s diagnostic", types.DiagMissingModuleIdentity)
 	}
 }
 
@@ -189,13 +189,13 @@ END
 	// SNMPv2-MIB without MODULE-IDENTITY should get a diagnostic
 	var found bool
 	for _, d := range mod.Diagnostics {
-		if d.Code == "missing-module-identity" {
+		if d.Code == types.DiagMissingModuleIdentity {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("SNMPv2-MIB without MODULE-IDENTITY should get missing-module-identity diagnostic")
+		t.Errorf("SNMPv2-MIB without MODULE-IDENTITY should get %s diagnostic", types.DiagMissingModuleIdentity)
 	}
 }
 
@@ -222,8 +222,8 @@ END
 	}
 
 	for _, d := range mod.Diagnostics {
-		if d.Code == "missing-module-identity" {
-			t.Error("base module SNMPv2-SMI should not get missing-module-identity diagnostic")
+		if d.Code == types.DiagMissingModuleIdentity {
+			t.Errorf("base module SNMPv2-SMI should not get %s diagnostic", types.DiagMissingModuleIdentity)
 		}
 	}
 }
@@ -320,7 +320,7 @@ END
 
 			var found bool
 			for _, d := range mod.Diagnostics {
-				if d.Code == "missing-module-identity" {
+				if d.Code == types.DiagMissingModuleIdentity {
 					if d.Severity != types.SeverityWarning {
 						t.Errorf("expected SeverityWarning in %s, got %v", tc.name, d.Severity)
 					}
@@ -329,7 +329,7 @@ END
 				}
 			}
 			if !found {
-				t.Error("expected missing-module-identity diagnostic")
+				t.Errorf("expected %s diagnostic", types.DiagMissingModuleIdentity)
 			}
 		})
 	}
