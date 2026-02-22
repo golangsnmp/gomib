@@ -322,13 +322,8 @@ func createResolvedNotifications(ctx *resolverContext) {
 			}
 		}
 
-		ctx.Mib.addNotification(resolved)
-		node.setNotification(resolved)
+		registerNotification(ctx, ref.mod, node, resolved)
 		created++
-
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
-			resolvedMod.addNotification(resolved)
-		}
 	}
 
 	if ctx.TraceEnabled() {
@@ -427,11 +422,35 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 	return created
 }
 
+func registerNotification(ctx *resolverContext, mod *module.Module, node *Node, resolved *Notification) {
+	ctx.Mib.addNotification(resolved)
+	node.setNotification(resolved)
+	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
+		resolvedMod.addNotification(resolved)
+	}
+}
+
 func registerGroup(ctx *resolverContext, mod *module.Module, node *Node, resolved *Group) {
 	ctx.Mib.addGroup(resolved)
 	node.setGroup(resolved)
 	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
 		resolvedMod.addGroup(resolved)
+	}
+}
+
+func registerCompliance(ctx *resolverContext, mod *module.Module, node *Node, resolved *Compliance) {
+	ctx.Mib.addCompliance(resolved)
+	node.setCompliance(resolved)
+	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
+		resolvedMod.addCompliance(resolved)
+	}
+}
+
+func registerCapability(ctx *resolverContext, mod *module.Module, node *Node, resolved *Capability) {
+	ctx.Mib.addCapability(resolved)
+	node.setCapability(resolved)
+	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
+		resolvedMod.addCapability(resolved)
 	}
 }
 
@@ -467,13 +486,8 @@ func createResolvedCompliances(ctx *resolverContext) {
 		resolved.setReference(comp.Reference)
 		resolved.setModules(convertComplianceModules(ctx, ref.mod, comp.Modules))
 
-		ctx.Mib.addCompliance(resolved)
-		node.setCompliance(resolved)
+		registerCompliance(ctx, ref.mod, node, resolved)
 		created++
-
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
-			resolvedMod.addCompliance(resolved)
-		}
 	}
 
 	if ctx.TraceEnabled() {
@@ -540,13 +554,8 @@ func createResolvedCapabilities(ctx *resolverContext) {
 		resolved.setProductRelease(cap.ProductRelease)
 		resolved.setSupports(convertSupportsModules(ctx, ref.mod, cap.Supports))
 
-		ctx.Mib.addCapability(resolved)
-		node.setCapability(resolved)
+		registerCapability(ctx, ref.mod, node, resolved)
 		created++
-
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
-			resolvedMod.addCapability(resolved)
-		}
 	}
 
 	if ctx.TraceEnabled() {
