@@ -29,7 +29,7 @@ func registerModules(ctx *resolverContext) {
 		resolved := newModule(mod.Name)
 		resolved.setSourcePath(mod.SourcePath)
 		resolved.setLanguage(mod.Language)
-		resolved.imports = groupImports(mod.Imports)
+		resolved.setImports(groupImports(mod.Imports))
 
 		for _, def := range mod.Definitions {
 			if mi, ok := def.(*module.ModuleIdentity); ok {
