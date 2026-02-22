@@ -482,22 +482,18 @@ func (l *Lexer) scanIdentifierOrKeyword() Token {
 
 func (l *Lexer) scanNumber() Token {
 	start := l.pos
-
-	for {
-		b, ok := l.peek()
-		if !ok || !isDigit(b) {
-			break
-		}
-		l.advance()
-	}
-
+	l.scanDigits()
 	return l.token(TokNumber, start)
 }
 
 func (l *Lexer) scanNegativeNumber() Token {
 	start := l.pos
 	l.advance() // consume -
+	l.scanDigits()
+	return l.token(TokNegativeNumber, start)
+}
 
+func (l *Lexer) scanDigits() {
 	for {
 		b, ok := l.peek()
 		if !ok || !isDigit(b) {
@@ -505,8 +501,6 @@ func (l *Lexer) scanNegativeNumber() Token {
 		}
 		l.advance()
 	}
-
-	return l.token(TokNegativeNumber, start)
 }
 
 func (l *Lexer) scanQuotedString() Token {
