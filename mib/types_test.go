@@ -38,6 +38,30 @@ func TestDefValString(t *testing.T) {
 	}
 }
 
+func TestDefValKindString(t *testing.T) {
+	tests := []struct {
+		kind DefValKind
+		want string
+	}{
+		{DefValKindInt, "int"},
+		{DefValKindUint, "uint"},
+		{DefValKindString, "string"},
+		{DefValKindBytes, "bytes"},
+		{DefValKindEnum, "enum"},
+		{DefValKindBits, "bits"},
+		{DefValKindOID, "oid"},
+		{DefValKind(99), "DefValKind(99)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			got := tt.kind.String()
+			if got != tt.want {
+				t.Errorf("DefValKind(%d).String() = %q, want %q", int(tt.kind), got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDefValIsZero(t *testing.T) {
 	var zero DefVal
 	if !zero.IsZero() {

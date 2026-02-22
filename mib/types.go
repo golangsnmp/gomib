@@ -161,6 +161,28 @@ func (d DefVal) IsZero() bool {
 	return d.value == nil
 }
 
+// String returns a human-readable name for the kind.
+func (k DefValKind) String() string {
+	switch k {
+	case DefValKindInt:
+		return "int"
+	case DefValKindUint:
+		return "uint"
+	case DefValKindString:
+		return "string"
+	case DefValKindBytes:
+		return "bytes"
+	case DefValKindEnum:
+		return "enum"
+	case DefValKindBits:
+		return "bits"
+	case DefValKindOID:
+		return "oid"
+	default:
+		return "DefValKind(" + strconv.Itoa(int(k)) + ")"
+	}
+}
+
 // DefValAs returns the value as type T if compatible.
 func DefValAs[T any](d DefVal) (T, bool) {
 	v, ok := d.value.(T)
@@ -204,6 +226,7 @@ type CapabilitiesModule struct {
 type ObjectVariation struct {
 	Object      string  // object reference name
 	Access      *Access // ACCESS restriction (nil if not specified)
+	DefVal      DefVal  // overridden default value (zero if not specified)
 	Description string
 }
 
