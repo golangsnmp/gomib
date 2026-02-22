@@ -3,6 +3,7 @@ package module
 import (
 	"fmt"
 	"log/slog"
+	"math"
 
 	"github.com/golangsnmp/gomib/internal/ast"
 	"github.com/golangsnmp/gomib/internal/types"
@@ -633,8 +634,13 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 	case *ast.TypeSyntaxBits:
 		namedBits := make([]NamedBit, len(s.NamedBits))
 		for i, nb := range s.NamedBits {
-			// BITS positions are small non-negative integers (0-127)
-			namedBits[i] = NewNamedBit(nb.Name.Name, uint32(nb.Value))
+			pos := nb.Value
+			if pos < 0 || pos > math.MaxUint32 {
+				ctx.emitDiagnostic(types.DiagInvalidBitsPosition, types.SeverityWarning, ctx.moduleName, nb.Span,
+					fmt.Sprintf("invalid BITS position %d for %q, must be 0..%d", pos, nb.Name.Name, math.MaxUint32))
+				pos = 0
+			}
+			namedBits[i] = NewNamedBit(nb.Name.Name, uint32(pos))
 		}
 		return &TypeSyntaxBits{NamedBits: namedBits}
 

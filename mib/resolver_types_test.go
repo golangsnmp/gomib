@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func TestSyntaxToBaseType(t *testing.T) {
@@ -603,4 +604,35 @@ func TestResolveBaseFromChain(t *testing.T) {
 			t.Errorf("got %v, want %v", got, BaseOctetString)
 		}
 	})
+}
+
+func TestCreateUserTypes_Reference(t *testing.T) {
+	// A TEXTUAL-CONVENTION with a REFERENCE clause should have its
+	// Reference() populated on the resolved Type.
+	mod := module.NewModule("REF-TEST-MIB", types.Span{})
+	mod.Language = types.LanguageSMIv2
+	mod.Definitions = []module.Definition{
+		&module.TypeDef{
+			Name:                "MyTC",
+			Syntax:              &module.TypeSyntaxTypeRef{Name: "DisplayString"},
+			Status:              types.StatusCurrent,
+			Description:         "A test textual convention",
+			Reference:           "RFC 1234, Section 5",
+			IsTextualConvention: true,
+		},
+	}
+
+	m := Resolve([]*module.Module{mod}, nil, nil)
+	if m == nil {
+		t.Fatal("Resolve returned nil Mib")
+	}
+
+	typ := m.Type("MyTC")
+	if typ == nil {
+		t.Fatal("type MyTC not found after resolution")
+	}
+
+	if typ.Reference() != "RFC 1234, Section 5" {
+		t.Errorf("Type.Reference() = %q, want %q", typ.Reference(), "RFC 1234, Section 5")
+	}
 }
