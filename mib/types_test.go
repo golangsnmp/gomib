@@ -250,9 +250,9 @@ func TestBytesToHex(t *testing.T) {
 
 func TestModuleImportsDeepClone(t *testing.T) {
 	m := newModule("TEST-MIB")
-	m.imports = []Import{
+	m.setImports([]Import{
 		{Module: "SNMPv2-SMI", Symbols: []string{"MODULE-IDENTITY", "OBJECT-TYPE"}},
-	}
+	})
 
 	got := m.Imports()
 	got[0].Symbols[0] = "MUTATED"

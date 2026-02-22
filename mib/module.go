@@ -159,6 +159,7 @@ func (m *Module) setContactInfo(info string)   { m.contactInfo = info }
 func (m *Module) setDescription(desc string)   { m.description = desc }
 func (m *Module) setLastUpdated(s string)      { m.lastUpdated = s }
 func (m *Module) setRevisions(revs []Revision) { m.revisions = revs }
+func (m *Module) setImports(imports []Import)  { m.imports = imports }
 
 func (m *Module) addObject(obj *Object) {
 	m.objects = append(m.objects, obj)
