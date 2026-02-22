@@ -20,6 +20,7 @@ package module
 
 import (
 	"iter"
+	"slices"
 
 	"github.com/golangsnmp/gomib/internal/types"
 )
@@ -58,12 +59,9 @@ func NewModule(name string, span types.Span) *Module {
 
 // HasErrors reports whether this module has any error-level diagnostics.
 func (m *Module) HasErrors() bool {
-	for _, d := range m.Diagnostics {
-		if d.Severity.AtLeast(types.SeverityError) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(m.Diagnostics, func(d types.Diagnostic) bool {
+		return d.Severity.AtLeast(types.SeverityError)
+	})
 }
 
 // DefinitionNames returns an iterator over the names of all definitions.
