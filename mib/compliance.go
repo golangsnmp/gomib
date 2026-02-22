@@ -37,7 +37,13 @@ func (c *Compliance) Description() string { return c.desc }
 func (c *Compliance) Reference() string { return c.ref }
 
 // Modules returns the MODULE clauses within this compliance statement.
-func (c *Compliance) Modules() []ComplianceModule { return slices.Clone(c.modules) }
+func (c *Compliance) Modules() []ComplianceModule {
+	result := slices.Clone(c.modules)
+	for i := range result {
+		result[i] = result[i].clone()
+	}
+	return result
+}
 
 // OID returns the compliance statement's position in the OID tree, or nil if unresolved.
 func (c *Compliance) OID() OID {
