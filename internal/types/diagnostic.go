@@ -95,6 +95,15 @@ func PermissiveConfig() DiagnosticConfig {
 	}
 }
 
+// SilentConfig returns a silent configuration that suppresses all diagnostics.
+// Only fatal errors that prevent parsing are reported.
+func SilentConfig() DiagnosticConfig {
+	return DiagnosticConfig{
+		Level:  StrictnessSilent,
+		FailAt: SeverityFatal,
+	}
+}
+
 // ShouldReport returns true if a diagnostic with the given code and severity
 // should be reported under this configuration.
 //
