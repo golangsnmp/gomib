@@ -214,7 +214,7 @@ func findTypeDefiningModule(ctx *resolverContext, fromMod *module.Module, typeNa
 		return ctx.Snmpv2SMIModule.Name
 	}
 
-	if !ctx.diagConfig.AllowBestGuessFallbacks() {
+	if !ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
 		return ""
 	}
 
