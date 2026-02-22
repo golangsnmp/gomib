@@ -231,7 +231,7 @@ func (o *Object) String() string {
 	return o.name + " (" + o.OID().String() + ")"
 }
 
-func (o *Object) setNode(n *Node)                  { o.node = n }
+func (o *Object) setNode(nd *Node)                 { o.node = nd }
 func (o *Object) setModule(m *Module)              { o.module = m }
 func (o *Object) setType(t *Type)                  { o.typ = t }
 func (o *Object) setAccess(a Access)               { o.access = a }
