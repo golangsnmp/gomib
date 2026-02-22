@@ -57,6 +57,18 @@ func WithExtensions(exts ...string) SourceOption {
 	}
 }
 
+// validateDir checks that path exists and is a directory.
+func validateDir(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return &os.PathError{Op: "open", Path: path, Err: os.ErrInvalid}
+	}
+	return nil
+}
+
 type dirSource struct {
 	path   string
 	config sourceConfig
@@ -65,12 +77,8 @@ type dirSource struct {
 // Dir creates a Source that searches a single directory (no recursion).
 // Files are looked up lazily on each Find() call.
 func Dir(path string, opts ...SourceOption) (Source, error) {
-	info, err := os.Stat(path)
-	if err != nil {
+	if err := validateDir(path); err != nil {
 		return nil, err
-	}
-	if !info.IsDir() {
-		return nil, &os.PathError{Op: "open", Path: path, Err: os.ErrInvalid}
 	}
 	cfg := defaultSourceConfig()
 	for _, opt := range opts {
@@ -136,12 +144,8 @@ type treeSource struct {
 // It walks the tree once at construction and builds a name->path index.
 // First match wins for duplicate names.
 func DirTree(root string, opts ...SourceOption) (Source, error) {
-	info, err := os.Stat(root)
-	if err != nil {
+	if err := validateDir(root); err != nil {
 		return nil, err
-	}
-	if !info.IsDir() {
-		return nil, &os.PathError{Op: "open", Path: root, Err: os.ErrInvalid}
 	}
 
 	cfg := defaultSourceConfig()
