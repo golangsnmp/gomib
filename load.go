@@ -57,7 +57,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 		return mib.Resolve(nil, nil, nil), nil
 	}
 
-	if logEnabled(logger, slog.LevelInfo) {
+	if logEnabled(ctx, logger, slog.LevelInfo) {
 		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading",
 			slog.Int("modules", len(allModules)))
 	}
@@ -89,12 +89,12 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 			result, err := sm.source.Find(sm.name)
 			if err != nil {
 				if errors.Is(err, fs.ErrNotExist) {
-					if logEnabled(logger, slog.LevelDebug) {
+					if logEnabled(ctx, logger, slog.LevelDebug) {
 						logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
 							slog.String("module", sm.name),
 							slog.Any("error", err))
 					}
-				} else if logEnabled(logger, slog.LevelWarn) {
+				} else if logEnabled(ctx, logger, slog.LevelWarn) {
 					logger.LogAttrs(ctx, slog.LevelWarn, "module read error",
 						slog.String("module", sm.name),
 						slog.Any("error", err))
@@ -127,7 +127,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 
 	mods := collectModules(modules)
 
-	if logEnabled(logger, slog.LevelInfo) {
+	if logEnabled(ctx, logger, slog.LevelInfo) {
 		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading complete",
 			slog.Int("modules", len(mods)))
 	}
@@ -168,7 +168,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			if !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
-			if logEnabled(logger, slog.LevelDebug) {
+			if logEnabled(ctx, logger, slog.LevelDebug) {
 				logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
 					slog.String("module", name))
 			}
@@ -248,7 +248,7 @@ func collectModules(modules map[string]*module.Module) []*module.Module {
 // Returns nil if the content doesn't look like a MIB.
 func decodeModule(ctx context.Context, content []byte, sourcePath string, name string, logger *slog.Logger, cfg loadConfig) *module.Module {
 	if !looksLikeMIBContent(content) {
-		if logEnabled(logger, slog.LevelDebug) {
+		if logEnabled(ctx, logger, slog.LevelDebug) {
 			logger.LogAttrs(ctx, slog.LevelDebug, "content rejected by heuristic",
 				slog.String("module", name))
 		}

@@ -154,6 +154,6 @@ func checkLoadResult(m *mib.Mib, cfg loadConfig, requestedModules []string) erro
 	return errors.Join(errs...)
 }
 
-func logEnabled(logger *slog.Logger, level slog.Level) bool {
-	return logger != nil && logger.Enabled(context.Background(), level)
+func logEnabled(ctx context.Context, logger *slog.Logger, level slog.Level) bool {
+	return logger != nil && logger.Enabled(ctx, level)
 }
