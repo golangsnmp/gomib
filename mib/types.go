@@ -209,8 +209,10 @@ type ComplianceGroup struct {
 
 // ComplianceObject is an OBJECT refinement within MODULE-COMPLIANCE.
 type ComplianceObject struct {
-	Object      string  // object reference name
-	MinAccess   *Access // MIN-ACCESS restriction (nil if not specified)
+	Object      string             // object reference name
+	Syntax      *SyntaxConstraints // SYNTAX refinement (nil if not specified)
+	WriteSyntax *SyntaxConstraints // WRITE-SYNTAX refinement (nil if not specified)
+	MinAccess   *Access            // MIN-ACCESS restriction (nil if not specified)
 	Description string
 }
 
@@ -224,10 +226,13 @@ type CapabilitiesModule struct {
 
 // ObjectVariation is an object VARIATION within AGENT-CAPABILITIES.
 type ObjectVariation struct {
-	Object      string  // object reference name
-	Access      *Access // ACCESS restriction (nil if not specified)
-	DefVal      DefVal  // overridden default value (zero if not specified)
-	Description string
+	Object           string             // object reference name
+	Syntax           *SyntaxConstraints // SYNTAX refinement (nil if not specified)
+	WriteSyntax      *SyntaxConstraints // WRITE-SYNTAX refinement (nil if not specified)
+	Access           *Access            // ACCESS restriction (nil if not specified)
+	CreationRequires []string           // CREATION-REQUIRES columns (nil if not specified)
+	DefVal           DefVal             // overridden default value (zero if not specified)
+	Description      string
 }
 
 // NotificationVariation is a notification VARIATION within AGENT-CAPABILITIES.
@@ -235,6 +240,24 @@ type NotificationVariation struct {
 	Notification string  // notification reference name
 	Access       *Access // ACCESS restriction (nil if not specified)
 	Description  string
+}
+
+// SyntaxConstraints holds a resolved type reference and any inline
+// constraints from a VARIATION SYNTAX/WRITE-SYNTAX clause or
+// MODULE-COMPLIANCE OBJECT SYNTAX/WRITE-SYNTAX refinement.
+type SyntaxConstraints struct {
+	Type   *Type
+	Sizes  []Range
+	Ranges []Range
+	Enums  []NamedValue
+	Bits   []NamedValue
+}
+
+// TrapInfo holds SMIv1 TRAP-TYPE fields. Only present on notifications
+// originating from TRAP-TYPE definitions.
+type TrapInfo struct {
+	Enterprise string
+	TrapNumber uint32
 }
 
 // UnresolvedKind identifies the category of an unresolved reference.
