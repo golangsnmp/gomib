@@ -175,6 +175,7 @@ func (t *Type) setParent(p *Type)       { t.parent = p }
 func (t *Type) setStatus(s Status)      { t.status = s }
 func (t *Type) setDisplayHint(h string) { t.hint = h }
 func (t *Type) setDescription(d string) { t.desc = d }
+func (t *Type) setReference(r string)   { t.ref = r }
 func (t *Type) setSizes(s []Range)      { t.sizes = s }
 func (t *Type) setRanges(r []Range)     { t.ranges = r }
 func (t *Type) setEnums(e []NamedValue) { t.enums = e }

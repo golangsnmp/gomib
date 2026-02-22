@@ -441,6 +441,33 @@ func TestIsKeywordCoversAllKeywords(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsHaveCode(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{"unexpected character", "OBJECT \x01 TYPE"},
+		{"unterminated string", `"unterminated`},
+		{"unterminated hex string", "'0A1B"},
+		{"missing suffix at EOF", "'0A1B'"},
+		{"bad suffix", "'0A1B'X"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			lexer := New([]byte(tc.source), nil)
+			_, diagnostics := lexer.Tokenize()
+
+			testutil.Greater(t, len(diagnostics), 0, "expected at least one diagnostic")
+			for _, d := range diagnostics {
+				if d.Code == "" {
+					t.Errorf("diagnostic has empty Code field: %q", d.Message)
+				}
+			}
+		})
+	}
+}
+
 func TestKeywordLookup(t *testing.T) {
 	tests := []struct {
 		text     string

@@ -161,8 +161,9 @@ func (l *Lexer) skipToEOL() {
 	}
 }
 
-func (l *Lexer) error(span types.Span, message string) {
+func (l *Lexer) error(code string, span types.Span, message string) {
 	l.diagnostics = append(l.diagnostics, types.SpanDiagnostic{
+		Code:     code,
 		Severity: types.SeverityError,
 		Span:     span,
 		Message:  message,
@@ -285,7 +286,7 @@ func (l *Lexer) nextNormalToken() (Token, bool) {
 
 	l.advance()
 	span := l.spanFrom(start)
-	l.error(span, fmt.Sprintf("unexpected character: 0x%02x", b))
+	l.error(types.DiagUnexpectedCharacter, span, fmt.Sprintf("unexpected character: 0x%02x", b))
 	l.skipToEOL()
 	return Token{}, true
 }
@@ -516,7 +517,7 @@ func (l *Lexer) scanQuotedString() Token {
 		b, ok := l.peek()
 		if !ok {
 			span := l.spanFrom(start)
-			l.error(span, "unterminated string literal")
+			l.error(types.DiagUnterminatedString, span, "unterminated string literal")
 			return l.token(TokQuotedString, start)
 		}
 		if b == '"' {
@@ -541,7 +542,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 
 	if b, ok := l.peek(); !ok || b != '\'' {
 		span := l.spanFrom(start)
-		l.error(span, "unterminated hex/binary string")
+		l.error(types.DiagUnterminatedHexBinStr, span, "unterminated hex/binary string")
 		return l.token(TokError, start)
 	}
 	l.advance() // consume closing quote
@@ -549,7 +550,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 	suffix, ok := l.peek()
 	if !ok {
 		span := l.spanFrom(start)
-		l.error(span, "expected 'H' or 'B' suffix for hex/binary string")
+		l.error(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
 		return l.token(TokError, start)
 	}
 
@@ -565,7 +566,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 
 	default:
 		span := l.spanFrom(start)
-		l.error(span, "expected 'H' or 'B' suffix for hex/binary string")
+		l.error(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
 		kind = TokError
 	}
 

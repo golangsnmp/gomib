@@ -79,6 +79,7 @@ func createUserTypes(ctx *resolverContext) {
 			typ.setStatus(td.Status)
 			typ.setDisplayHint(td.DisplayHint)
 			typ.setDescription(td.Description)
+			typ.setReference(td.Reference)
 
 			namedValues := extractNamedValues(td.Syntax)
 			if base == BaseBits {

@@ -1,6 +1,7 @@
 package module
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/parser"
@@ -224,6 +225,58 @@ END
 		if d.Code == "missing-module-identity" {
 			t.Error("base module SNMPv2-SMI should not get missing-module-identity diagnostic")
 		}
+	}
+}
+
+func TestLower_NegativeBitsPosition(t *testing.T) {
+	// A BITS type with a negative position value should produce a diagnostic.
+	// Negative positions are invalid per RFC 2578.
+	source := []byte(`BITS-TEST DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE
+        FROM SNMPv2-SMI;
+
+bitsTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { 1 3 6 1 4 1 99999 }
+
+badBitsObject OBJECT-TYPE
+    SYNTAX      BITS { goodBit(0), badBit(-1) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test object with invalid negative BITS position"
+    ::= { bitsTest 1 }
+
+END
+`)
+
+	p := parser.New(source, nil, types.PermissiveConfig())
+	ast := p.ParseModule()
+	if ast == nil {
+		t.Fatal("parse returned nil")
+	}
+
+	mod := Lower(ast, source, nil, types.PermissiveConfig())
+	if mod == nil {
+		t.Fatal("lower returned nil")
+	}
+
+	// Should have a diagnostic for the negative BITS position
+	var found bool
+	for _, d := range mod.Diagnostics {
+		if strings.Contains(d.Message, "BITS") || strings.Contains(d.Message, "position") || strings.Contains(d.Message, "negative") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic for negative BITS position, got none")
 	}
 }
 

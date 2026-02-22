@@ -3,6 +3,14 @@ package types
 // Diagnostic codes emitted by the parser, lowering, and resolver phases.
 // Centralizing these prevents silent breakage from typos in string literals.
 
+// Lexer diagnostic codes.
+const (
+	DiagUnexpectedCharacter    = "unexpected-character"
+	DiagUnterminatedString     = "unterminated-string"
+	DiagUnterminatedHexBinStr  = "unterminated-hex-bin-string"
+	DiagMissingHexBinSuffix    = "missing-hex-bin-suffix"
+)
+
 // Parser diagnostic codes.
 const (
 	DiagIdentifierUnderscore = "identifier-underscore"
@@ -27,6 +35,7 @@ const (
 	DiagUnknownRangeValue     = "unknown-range-value"
 	DiagUnknownOidComponent   = "unknown-oid-component-type"
 	DiagUnknownDefvalType     = "unknown-defval-type"
+	DiagInvalidBitsPosition   = "invalid-bits-position"
 )
 
 // Resolver diagnostic codes.
@@ -47,6 +56,11 @@ const (
 // AllDiagnosticCodes returns all known diagnostic codes grouped by phase.
 func AllDiagnosticCodes() []DiagCodeInfo {
 	return []DiagCodeInfo{
+		// Lexer
+		{Code: DiagUnexpectedCharacter, Phase: "lexer"},
+		{Code: DiagUnterminatedString, Phase: "lexer"},
+		{Code: DiagUnterminatedHexBinStr, Phase: "lexer"},
+		{Code: DiagMissingHexBinSuffix, Phase: "lexer"},
 		// Parser
 		{Code: DiagIdentifierUnderscore, Phase: "parser"},
 		{Code: DiagIdentifierHyphenEnd, Phase: "parser"},
@@ -67,6 +81,7 @@ func AllDiagnosticCodes() []DiagCodeInfo {
 		{Code: DiagUnknownRangeValue, Phase: "lowering"},
 		{Code: DiagUnknownOidComponent, Phase: "lowering"},
 		{Code: DiagUnknownDefvalType, Phase: "lowering"},
+		{Code: DiagInvalidBitsPosition, Phase: "lowering"},
 		// Resolver
 		{Code: DiagImportNotFound, Phase: "resolver"},
 		{Code: DiagImportModuleNotFound, Phase: "resolver"},
