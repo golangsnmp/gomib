@@ -11,8 +11,8 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// analyzeSemantics is the semantic analysis phase entry point.
-func analyzeSemantics(ctx *resolverContext) {
+// resolveSemantics is the semantic analysis phase entry point.
+func resolveSemantics(ctx *resolverContext) {
 	objRefs := collectObjectTypeRefs(ctx)
 	inferNodeKinds(ctx, objRefs)
 	resolveTableSemantics(ctx, objRefs)

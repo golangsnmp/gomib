@@ -66,7 +66,7 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 		slog.Int("nodes", nodeCount))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "semantics"))
-	analyzeSemantics(ctx)
+	resolveSemantics(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "semantics"))
 
 	ctx.DropModules()
