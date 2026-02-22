@@ -684,24 +684,24 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 func lowerConstraint(constraint ast.Constraint, ctx *LoweringContext) Constraint {
 	switch c := constraint.(type) {
 	case *ast.ConstraintSize:
-		ranges := make([]Range, len(c.Ranges))
-		for i, r := range c.Ranges {
-			ranges[i] = lowerRange(r, ctx)
-		}
-		return &ConstraintSize{Ranges: ranges}
+		return &ConstraintSize{Ranges: lowerRanges(c.Ranges, ctx)}
 
 	case *ast.ConstraintRange:
-		ranges := make([]Range, len(c.Ranges))
-		for i, r := range c.Ranges {
-			ranges[i] = lowerRange(r, ctx)
-		}
-		return &ConstraintRange{Ranges: ranges}
+		return &ConstraintRange{Ranges: lowerRanges(c.Ranges, ctx)}
 
 	default:
 		ctx.emitDiagnostic(types.DiagUnknownConstraintType, types.SeverityWarning, ctx.moduleName, constraint.ConstraintSpan(),
 			fmt.Sprintf("unknown constraint type %T, defaulting to empty range", constraint))
 		return &ConstraintRange{}
 	}
+}
+
+func lowerRanges(astRanges []ast.Range, ctx *LoweringContext) []Range {
+	ranges := make([]Range, len(astRanges))
+	for i, r := range astRanges {
+		ranges[i] = lowerRange(r, ctx)
+	}
+	return ranges
 }
 
 func lowerRange(r ast.Range, ctx *LoweringContext) Range {
