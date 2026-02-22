@@ -98,6 +98,9 @@ func PermissiveConfig() DiagnosticConfig {
 // ShouldReport returns true if a diagnostic with the given code and severity
 // should be reported under this configuration.
 //
+// Evaluation order: Ignore is checked first, then Overrides, then Level.
+// A code in both Ignore and Overrides is always suppressed (Ignore wins).
+//
 // The Level controls reporting threshold:
 //   - Level 0 (Strict): Report all diagnostics (Info and above)
 //   - Level 3 (Normal): Report Minor and above (0-3)
