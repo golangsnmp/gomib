@@ -5,10 +5,10 @@ package types
 
 // Lexer diagnostic codes.
 const (
-	DiagUnexpectedCharacter    = "unexpected-character"
-	DiagUnterminatedString     = "unterminated-string"
-	DiagUnterminatedHexBinStr  = "unterminated-hex-bin-string"
-	DiagMissingHexBinSuffix    = "missing-hex-bin-suffix"
+	DiagUnexpectedCharacter   = "unexpected-character"
+	DiagUnterminatedString    = "unterminated-string"
+	DiagUnterminatedHexBinStr = "unterminated-hex-bin-string"
+	DiagMissingHexBinSuffix   = "missing-hex-bin-suffix"
 )
 
 // Parser diagnostic codes.

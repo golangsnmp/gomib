@@ -170,6 +170,8 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 		}
 		if resolveTypeParent(ctx, entry) {
 			resolved++
+		} else if baseName := getTypeRefBaseName(entry.td.Syntax); baseName != "" {
+			ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Span)
 		}
 	}
 
