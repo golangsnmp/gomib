@@ -287,6 +287,12 @@ func createResolvedNotifications(ctx *resolverContext) {
 		resolved.setStatus(notif.Status)
 		resolved.setDescription(notif.Description)
 		resolved.setReference(notif.Reference)
+		if notif.TrapInfo != nil {
+			resolved.setTrapInfo(&TrapInfo{
+				Enterprise: notif.TrapInfo.Enterprise,
+				TrapNumber: notif.TrapInfo.TrapNumber,
+			})
+		}
 
 		for _, objName := range notif.Objects {
 			var objNode *Node
@@ -459,7 +465,7 @@ func createResolvedCompliances(ctx *resolverContext) {
 		resolved.setStatus(comp.Status)
 		resolved.setDescription(comp.Description)
 		resolved.setReference(comp.Reference)
-		resolved.setModules(convertComplianceModules(comp.Modules))
+		resolved.setModules(convertComplianceModules(ctx, ref.mod, comp.Modules))
 
 		ctx.Mib.addCompliance(resolved)
 		node.setCompliance(resolved)
@@ -475,7 +481,7 @@ func createResolvedCompliances(ctx *resolverContext) {
 	}
 }
 
-func convertComplianceModules(modules []module.ComplianceModule) []ComplianceModule {
+func convertComplianceModules(ctx *resolverContext, mod *module.Module, modules []module.ComplianceModule) []ComplianceModule {
 	result := make([]ComplianceModule, len(modules))
 	for i, m := range modules {
 		result[i] = ComplianceModule{
@@ -499,6 +505,8 @@ func convertComplianceModules(modules []module.ComplianceModule) []ComplianceMod
 					Object:      o.Object,
 					Description: o.Description,
 				}
+				objects[j].Syntax = resolveSyntaxConstraints(ctx, o.Syntax, mod, o.Object, types.Span{})
+				objects[j].WriteSyntax = resolveSyntaxConstraints(ctx, o.WriteSyntax, mod, o.Object, types.Span{})
 				if o.MinAccess != nil {
 					objects[j].MinAccess = o.MinAccess
 				}
@@ -560,6 +568,11 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 					Object:      v.Object,
 					Description: v.Description,
 				}
+				vars[j].Syntax = resolveSyntaxConstraints(ctx, v.Syntax, mod, v.Object, types.Span{})
+				vars[j].WriteSyntax = resolveSyntaxConstraints(ctx, v.WriteSyntax, mod, v.Object, types.Span{})
+				if len(v.CreationRequires) > 0 {
+					vars[j].CreationRequires = slices.Clone(v.CreationRequires)
+				}
 				if v.Access != nil {
 					vars[j].Access = v.Access
 				}
@@ -603,6 +616,23 @@ func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*N
 		return node, ok
 	}
 	return nil, false
+}
+
+func resolveSyntaxConstraints(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, ownerName string, span types.Span) *SyntaxConstraints {
+	if syntax == nil {
+		return nil
+	}
+	sc := &SyntaxConstraints{}
+	if t, ok := resolveTypeSyntax(ctx, syntax, mod, ownerName, span); ok {
+		sc.Type = t
+	}
+	sc.Sizes, sc.Ranges = extractConstraints(syntax)
+	if _, isBits := syntax.(*module.TypeSyntaxBits); isBits {
+		sc.Bits = extractNamedValues(syntax)
+	} else {
+		sc.Enums = extractNamedValues(syntax)
+	}
+	return sc
 }
 
 func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, objectName string, span types.Span) (*Type, bool) {

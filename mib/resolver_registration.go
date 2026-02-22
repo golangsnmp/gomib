@@ -36,6 +36,7 @@ func registerModules(ctx *resolverContext) {
 				resolved.setOrganization(mi.Organization)
 				resolved.setContactInfo(mi.ContactInfo)
 				resolved.setDescription(mi.Description)
+				resolved.setLastUpdated(mi.LastUpdated)
 				resolved.setRevisions(convertRevisions(mi.Revisions))
 				break
 			}

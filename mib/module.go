@@ -11,6 +11,7 @@ type Module struct {
 	organization string
 	contactInfo  string
 	description  string
+	lastUpdated  string
 	revisions    []Revision
 	imports      []Import
 
@@ -53,6 +54,7 @@ func (m *Module) OID() OID              { return slices.Clone(m.oid) }
 func (m *Module) Organization() string  { return m.organization }
 func (m *Module) ContactInfo() string   { return m.contactInfo }
 func (m *Module) Description() string   { return m.description }
+func (m *Module) LastUpdated() string   { return m.lastUpdated }
 func (m *Module) Revisions() []Revision { return slices.Clone(m.revisions) }
 func (m *Module) Imports() []Import     { return slices.Clone(m.imports) }
 
@@ -103,6 +105,7 @@ func (m *Module) setOID(oid OID)               { m.oid = oid }
 func (m *Module) setOrganization(org string)   { m.organization = org }
 func (m *Module) setContactInfo(info string)   { m.contactInfo = info }
 func (m *Module) setDescription(desc string)   { m.description = desc }
+func (m *Module) setLastUpdated(s string)      { m.lastUpdated = s }
 func (m *Module) setRevisions(revs []Revision) { m.revisions = revs }
 
 func (m *Module) addObject(obj *Object) {

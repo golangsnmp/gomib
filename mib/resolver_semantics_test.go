@@ -791,7 +791,7 @@ func TestComputeEffectiveValues(t *testing.T) {
 
 func TestConvertComplianceModules(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		result := convertComplianceModules(nil)
+		result := convertComplianceModules(nil, nil, nil)
 		if len(result) != 0 {
 			t.Errorf("expected empty, got %d", len(result))
 		}
@@ -804,7 +804,7 @@ func TestConvertComplianceModules(t *testing.T) {
 				MandatoryGroups: []string{"ifGeneralGroup", "ifStackGroup"},
 			},
 		}
-		result := convertComplianceModules(input)
+		result := convertComplianceModules(nil, nil, input)
 		if len(result) != 1 {
 			t.Fatalf("expected 1, got %d", len(result))
 		}
@@ -825,7 +825,7 @@ func TestConvertComplianceModules(t *testing.T) {
 				},
 			},
 		}
-		result := convertComplianceModules(input)
+		result := convertComplianceModules(nil, nil, input)
 		if len(result[0].Groups) != 1 {
 			t.Fatalf("groups = %d, want 1", len(result[0].Groups))
 		}
@@ -848,7 +848,7 @@ func TestConvertComplianceModules(t *testing.T) {
 				},
 			},
 		}
-		result := convertComplianceModules(input)
+		result := convertComplianceModules(nil, nil, input)
 		if len(result[0].Objects) != 2 {
 			t.Fatalf("objects = %d, want 2", len(result[0].Objects))
 		}
@@ -873,12 +873,57 @@ func TestConvertComplianceModules(t *testing.T) {
 			{ModuleName: "IF-MIB"},
 			{ModuleName: "IP-MIB"},
 		}
-		result := convertComplianceModules(input)
+		result := convertComplianceModules(nil, nil, input)
 		if len(result) != 2 {
 			t.Fatalf("expected 2, got %d", len(result))
 		}
 		if result[0].ModuleName != "IF-MIB" || result[1].ModuleName != "IP-MIB" {
 			t.Errorf("module names = %q, %q", result[0].ModuleName, result[1].ModuleName)
+		}
+	})
+
+	t.Run("object with syntax constraints", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+
+		intType := newType("Integer32")
+		intType.setBase(BaseInteger32)
+		ctx.registerModuleTypeSymbol(mod, "Integer32", intType)
+
+		input := []module.ComplianceModule{
+			{
+				ModuleName: "TEST-MIB",
+				Objects: []module.ComplianceObject{
+					{
+						Object: "testObj",
+						Syntax: &module.TypeSyntaxConstrained{
+							Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
+							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(0, 100)}},
+						},
+						WriteSyntax: &module.TypeSyntaxConstrained{
+							Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
+							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(1, 50)}},
+						},
+					},
+				},
+			},
+		}
+		result := convertComplianceModules(ctx, mod, input)
+		obj := result[0].Objects[0]
+		if obj.Syntax == nil {
+			t.Fatal("expected non-nil Syntax")
+		}
+		if obj.Syntax.Type != intType {
+			t.Error("Syntax.Type does not match")
+		}
+		if len(obj.Syntax.Ranges) != 1 || obj.Syntax.Ranges[0].Min != 0 || obj.Syntax.Ranges[0].Max != 100 {
+			t.Errorf("Syntax.Ranges = %v, want [{0 100}]", obj.Syntax.Ranges)
+		}
+		if obj.WriteSyntax == nil {
+			t.Fatal("expected non-nil WriteSyntax")
+		}
+		if len(obj.WriteSyntax.Ranges) != 1 || obj.WriteSyntax.Ranges[0].Min != 1 || obj.WriteSyntax.Ranges[0].Max != 50 {
+			t.Errorf("WriteSyntax.Ranges = %v, want [{1 50}]", obj.WriteSyntax.Ranges)
 		}
 	})
 }
@@ -1017,6 +1062,50 @@ func TestConvertSupportsModules(t *testing.T) {
 		}
 		if len(result[0].NotificationVariations) != 1 {
 			t.Errorf("notification variations = %d", len(result[0].NotificationVariations))
+		}
+	})
+
+	t.Run("object variation with syntax and creation-requires", func(t *testing.T) {
+		intType := newType("Integer32")
+		intType.setBase(BaseInteger32)
+		ctx.registerModuleTypeSymbol(mod, "Integer32", intType)
+
+		input := []module.SupportsModule{
+			{
+				ModuleName: "IF-MIB",
+				ObjectVariations: []module.ObjectVariation{
+					{
+						Object: "ifAdminStatus",
+						Syntax: &module.TypeSyntaxConstrained{
+							Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
+							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(1, 2)}},
+						},
+						WriteSyntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
+						CreationRequires: []string{"ifType", "ifSpeed"},
+						Description:      "restricted",
+					},
+				},
+			},
+		}
+		result := convertSupportsModules(ctx, mod, input)
+		v := result[0].ObjectVariations[0]
+		if v.Syntax == nil {
+			t.Fatal("expected non-nil Syntax")
+		}
+		if v.Syntax.Type != intType {
+			t.Error("Syntax.Type does not match")
+		}
+		if len(v.Syntax.Ranges) != 1 || v.Syntax.Ranges[0].Min != 1 || v.Syntax.Ranges[0].Max != 2 {
+			t.Errorf("Syntax.Ranges = %v, want [{1 2}]", v.Syntax.Ranges)
+		}
+		if v.WriteSyntax == nil {
+			t.Fatal("expected non-nil WriteSyntax")
+		}
+		if v.WriteSyntax.Type != intType {
+			t.Error("WriteSyntax.Type does not match")
+		}
+		if len(v.CreationRequires) != 2 || v.CreationRequires[0] != "ifType" || v.CreationRequires[1] != "ifSpeed" {
+			t.Errorf("CreationRequires = %v, want [ifType ifSpeed]", v.CreationRequires)
 		}
 	})
 
