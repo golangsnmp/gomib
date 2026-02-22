@@ -884,8 +884,11 @@ func TestConvertComplianceModules(t *testing.T) {
 }
 
 func TestConvertSupportsModules(t *testing.T) {
+	ctx := newTestContext()
+	mod := &module.Module{Name: "TEST-MIB"}
+
 	t.Run("empty", func(t *testing.T) {
-		result := convertSupportsModules(nil)
+		result := convertSupportsModules(ctx, mod, nil)
 		if len(result) != 0 {
 			t.Errorf("expected empty, got %d", len(result))
 		}
@@ -898,7 +901,7 @@ func TestConvertSupportsModules(t *testing.T) {
 				Includes:   []string{"ifGeneralGroup"},
 			},
 		}
-		result := convertSupportsModules(input)
+		result := convertSupportsModules(ctx, mod, input)
 		if len(result) != 1 {
 			t.Fatalf("expected 1, got %d", len(result))
 		}
@@ -921,7 +924,7 @@ func TestConvertSupportsModules(t *testing.T) {
 				},
 			},
 		}
-		result := convertSupportsModules(input)
+		result := convertSupportsModules(ctx, mod, input)
 		vars := result[0].ObjectVariations
 		if len(vars) != 2 {
 			t.Fatalf("variations = %d, want 2", len(vars))
@@ -951,7 +954,7 @@ func TestConvertSupportsModules(t *testing.T) {
 				},
 			},
 		}
-		result := convertSupportsModules(input)
+		result := convertSupportsModules(ctx, mod, input)
 		vars := result[0].NotificationVariations
 		if len(vars) != 2 {
 			t.Fatalf("notification variations = %d, want 2", len(vars))
@@ -980,7 +983,7 @@ func TestConvertSupportsModules(t *testing.T) {
 				},
 			},
 		}
-		result := convertSupportsModules(input)
+		result := convertSupportsModules(ctx, mod, input)
 		vars := result[0].ObjectVariations
 		if len(vars) != 1 {
 			t.Fatalf("variations = %d, want 1", len(vars))
@@ -1008,12 +1011,43 @@ func TestConvertSupportsModules(t *testing.T) {
 				},
 			},
 		}
-		result := convertSupportsModules(input)
+		result := convertSupportsModules(ctx, mod, input)
 		if len(result[0].ObjectVariations) != 1 {
 			t.Errorf("object variations = %d", len(result[0].ObjectVariations))
 		}
 		if len(result[0].NotificationVariations) != 1 {
 			t.Errorf("notification variations = %d", len(result[0].NotificationVariations))
+		}
+	})
+
+	t.Run("object variation with defval", func(t *testing.T) {
+		input := []module.SupportsModule{
+			{
+				ModuleName: "IF-MIB",
+				ObjectVariations: []module.ObjectVariation{
+					{
+						Object:      "ifAdminStatus",
+						DefVal:      &module.DefValInteger{Value: 2},
+						Syntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
+						Description: "default down",
+					},
+				},
+			},
+		}
+		result := convertSupportsModules(ctx, mod, input)
+		vars := result[0].ObjectVariations
+		if len(vars) != 1 {
+			t.Fatalf("variations = %d, want 1", len(vars))
+		}
+		if vars[0].DefVal.IsZero() {
+			t.Fatal("expected non-zero DefVal")
+		}
+		if vars[0].DefVal.Kind() != DefValKindInt {
+			t.Errorf("defval kind = %v, want DefValKindInt", vars[0].DefVal.Kind())
+		}
+		v, ok := DefValAs[int64](vars[0].DefVal)
+		if !ok || v != 2 {
+			t.Errorf("defval value = %v (ok=%v), want 2", v, ok)
 		}
 	})
 }

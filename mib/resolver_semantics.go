@@ -530,7 +530,7 @@ func createResolvedCapabilities(ctx *resolverContext) {
 		resolved.setDescription(cap.Description)
 		resolved.setReference(cap.Reference)
 		resolved.setProductRelease(cap.ProductRelease)
-		resolved.setSupports(convertSupportsModules(cap.Supports))
+		resolved.setSupports(convertSupportsModules(ctx, ref.mod, cap.Supports))
 
 		ctx.Mib.addCapability(resolved)
 		node.setCapability(resolved)
@@ -546,7 +546,7 @@ func createResolvedCapabilities(ctx *resolverContext) {
 	}
 }
 
-func convertSupportsModules(modules []module.SupportsModule) []CapabilitiesModule {
+func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []module.SupportsModule) []CapabilitiesModule {
 	result := make([]CapabilitiesModule, len(modules))
 	for i, m := range modules {
 		result[i] = CapabilitiesModule{
@@ -562,6 +562,11 @@ func convertSupportsModules(modules []module.SupportsModule) []CapabilitiesModul
 				}
 				if v.Access != nil {
 					vars[j].Access = v.Access
+				}
+				if v.DefVal != nil {
+					if dv := convertDefVal(ctx, v.DefVal, mod, v.Syntax); dv != nil {
+						vars[j].DefVal = *dv
+					}
 				}
 			}
 			result[i].ObjectVariations = vars
