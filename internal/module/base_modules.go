@@ -1,6 +1,7 @@
 package module
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/golangsnmp/gomib/internal/types"
@@ -109,7 +110,7 @@ func AllBaseModules() []BaseModule {
 
 // BaseModuleNames returns the canonical names of all base modules.
 func BaseModuleNames() []string {
-	return baseModuleNames[:]
+	return slices.Clone(baseModuleNames[:])
 }
 
 // CreateBaseModules returns synthetic Module values for all base modules.
