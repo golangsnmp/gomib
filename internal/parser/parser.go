@@ -1828,14 +1828,8 @@ func (p *Parser) parseNotificationType() (ast.Definition, *types.SpanDiagnostic)
 	var objects []ast.Ident
 	if p.check(lexer.TokKwObjects) {
 		p.advance()
-		if _, err := p.expect(lexer.TokLBrace); err != nil {
-			return nil, err
-		}
-		objs, err := p.parseIdentifierList()
+		objs, err := p.parseBracedIdentifierList()
 		if err != nil {
-			return nil, err
-		}
-		if _, err := p.expect(lexer.TokRBrace); err != nil {
 			return nil, err
 		}
 		objects = objs
@@ -1908,14 +1902,8 @@ func (p *Parser) parseTrapType() (ast.Definition, *types.SpanDiagnostic) {
 	var variables []ast.Ident
 	if p.check(lexer.TokKwVariables) {
 		p.advance()
-		if _, err := p.expect(lexer.TokLBrace); err != nil {
-			return nil, err
-		}
-		vars, err := p.parseIdentifierList()
+		vars, err := p.parseBracedIdentifierList()
 		if err != nil {
-			return nil, err
-		}
-		if _, err := p.expect(lexer.TokRBrace); err != nil {
 			return nil, err
 		}
 		variables = vars
@@ -2085,14 +2073,8 @@ func (p *Parser) parseObjectGroup() (ast.Definition, *types.SpanDiagnostic) {
 	if _, err := p.expect(lexer.TokKwObjects); err != nil {
 		return nil, err
 	}
-	if _, err := p.expect(lexer.TokLBrace); err != nil {
-		return nil, err
-	}
-	objects, err := p.parseIdentifierList()
+	objects, err := p.parseBracedIdentifierList()
 	if err != nil {
-		return nil, err
-	}
-	if _, err := p.expect(lexer.TokRBrace); err != nil {
 		return nil, err
 	}
 
@@ -2153,14 +2135,8 @@ func (p *Parser) parseNotificationGroup() (ast.Definition, *types.SpanDiagnostic
 	if _, err := p.expect(lexer.TokKwNotifications); err != nil {
 		return nil, err
 	}
-	if _, err := p.expect(lexer.TokLBrace); err != nil {
-		return nil, err
-	}
-	notifications, err := p.parseIdentifierList()
+	notifications, err := p.parseBracedIdentifierList()
 	if err != nil {
-		return nil, err
-	}
-	if _, err := p.expect(lexer.TokRBrace); err != nil {
 		return nil, err
 	}
 
@@ -2334,17 +2310,7 @@ func (p *Parser) parseMandatoryGroups() ([]ast.Ident, *types.SpanDiagnostic) {
 	if _, err := p.expect(lexer.TokKwMandatoryGroups); err != nil {
 		return nil, err
 	}
-	if _, err := p.expect(lexer.TokLBrace); err != nil {
-		return nil, err
-	}
-	groups, err := p.parseIdentifierList()
-	if err != nil {
-		return nil, err
-	}
-	if _, err := p.expect(lexer.TokRBrace); err != nil {
-		return nil, err
-	}
-	return groups, nil
+	return p.parseBracedIdentifierList()
 }
 
 func (p *Parser) parseComplianceGroup() (*ast.ComplianceGroup, *types.SpanDiagnostic) {
@@ -2540,14 +2506,8 @@ func (p *Parser) parseSupportsModule() (ast.SupportsModule, *types.SpanDiagnosti
 	if _, err := p.expect(lexer.TokKwIncludes); err != nil {
 		return ast.SupportsModule{}, err
 	}
-	if _, err := p.expect(lexer.TokLBrace); err != nil {
-		return ast.SupportsModule{}, err
-	}
-	includes, err := p.parseIdentifierList()
+	includes, err := p.parseBracedIdentifierList()
 	if err != nil {
-		return ast.SupportsModule{}, err
-	}
-	if _, err := p.expect(lexer.TokRBrace); err != nil {
 		return ast.SupportsModule{}, err
 	}
 
@@ -2619,17 +2579,11 @@ func (p *Parser) parseVariationClause() (ast.Variation, *types.SpanDiagnostic) {
 	var creationRequires []ast.Ident
 	if p.check(lexer.TokKwCreationRequires) {
 		p.advance()
-		if _, err := p.expect(lexer.TokLBrace); err != nil {
-			return nil, err
-		}
-		objects, err := p.parseIdentifierList()
+		objs, err := p.parseBracedIdentifierList()
 		if err != nil {
 			return nil, err
 		}
-		if _, err := p.expect(lexer.TokRBrace); err != nil {
-			return nil, err
-		}
-		creationRequires = objects
+		creationRequires = objs
 	}
 
 	// Optional DEFVAL
@@ -2724,6 +2678,20 @@ func (p *Parser) parseIdentifierList() ([]ast.Ident, *types.SpanDiagnostic) {
 		}
 	}
 
+	return idents, nil
+}
+
+func (p *Parser) parseBracedIdentifierList() ([]ast.Ident, *types.SpanDiagnostic) {
+	if _, err := p.expect(lexer.TokLBrace); err != nil {
+		return nil, err
+	}
+	idents, err := p.parseIdentifierList()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(lexer.TokRBrace); err != nil {
+		return nil, err
+	}
 	return idents, nil
 }
 
