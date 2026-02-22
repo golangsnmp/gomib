@@ -207,7 +207,7 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 	case *ast.NotificationTypeDef:
 		return lowerNotificationType(d, ctx)
 	case *ast.TrapTypeDef:
-		return lowerTrapType(d)
+		return lowerTrapType(d, ctx)
 	case *ast.TextualConventionDef:
 		return lowerTextualConvention(d, ctx)
 	case *ast.TypeAssignmentDef:
@@ -328,7 +328,7 @@ func lowerNotificationType(def *ast.NotificationTypeDef, ctx *LoweringContext) *
 	}
 }
 
-func lowerTrapType(def *ast.TrapTypeDef) *Notification {
+func lowerTrapType(def *ast.TrapTypeDef, ctx *LoweringContext) *Notification {
 	return &Notification{
 		Name:        def.Name.Name,
 		Objects:     identNames(def.Variables),
@@ -497,7 +497,7 @@ func lowerSupportsModule(s ast.SupportsModule, ctx *LoweringContext) SupportsMod
 		case *ast.ObjectVariation:
 			objectVariations = append(objectVariations, lowerObjectVariation(variation, ctx))
 		case *ast.NotificationVariation:
-			notificationVariations = append(notificationVariations, lowerNotificationVariation(variation))
+			notificationVariations = append(notificationVariations, lowerNotificationVariation(variation, ctx))
 		}
 	}
 
@@ -541,7 +541,7 @@ func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVa
 	}
 }
 
-func lowerNotificationVariation(v *ast.NotificationVariation) NotificationVariation {
+func lowerNotificationVariation(v *ast.NotificationVariation, ctx *LoweringContext) NotificationVariation {
 	return NotificationVariation{
 		Notification: v.Notification.Name,
 		Access:       optionalAccess(v.Access),
