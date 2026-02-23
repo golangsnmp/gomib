@@ -18,7 +18,7 @@ import (
 // Exit codes.
 const (
 	exitOK              = 0 // success
-	exitError           = 1 // user error, processing failure, or severe diagnostic
+	exitError           = 1 // user error, processing failure, or error-severity diagnostic
 	exitStrictViolation = 2 // strict mode found errors or unresolved refs
 )
 
@@ -82,13 +82,13 @@ func run() int {
 			}
 		case arg == "-vv":
 			c.verbose = 2
-		case arg == "--no-color":
-			// reserved for future use
 		case arg == "-p" || arg == "--path":
-			if i+1 < len(args) {
-				i++
-				c.paths = append(c.paths, args[i])
+			if i+1 >= len(args) {
+				printError("%s requires a value", arg)
+				return exitError
 			}
+			i++
+			c.paths = append(c.paths, args[i])
 		case strings.HasPrefix(arg, "-p"):
 			c.paths = append(c.paths, arg[2:])
 		case strings.HasPrefix(arg, "--path="):

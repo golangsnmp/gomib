@@ -25,10 +25,6 @@ func componentLogger(logger *slog.Logger, component string) *slog.Logger {
 
 // loadAllModules loads all MIB files from sources in parallel.
 func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib.Mib, error) {
-	if len(sources) == 0 {
-		return nil, ErrNoSources
-	}
-
 	logger := cfg.logger
 
 	type sourceModule struct {
@@ -270,21 +266,11 @@ var (
 	sigAssign      = []byte("::=")
 )
 
-const (
-	heuristicBinaryCheckSize = 1024
-	heuristicMaxProbeSize    = 128 * 1024
-)
+const heuristicMaxProbeSize = 128 * 1024
 
 func looksLikeMIBContent(content []byte) bool {
 	if len(content) == 0 {
 		return false
-	}
-
-	checkLen := min(heuristicBinaryCheckSize, len(content))
-	for _, b := range content[:checkLen] {
-		if b == 0 {
-			return false
-		}
 	}
 
 	probeLen := min(heuristicMaxProbeSize, len(content))

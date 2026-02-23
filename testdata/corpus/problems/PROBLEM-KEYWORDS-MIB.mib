@@ -1,7 +1,7 @@
 -- Reserved keywords used as identifiers and in DEFVAL
 -- Replicates: CISCO-DOT11-IF-MIB, various vendor MIBs
 -- Tests parser keyword acceptance in DEFVAL and identifier contexts
--- gomib: internal/parser/parser.go parseDefValContent(), expectIdentifier()
+-- gomib: internal/parser/parser.go parseDefVal(), expectIdentifier()
 
 PROBLEM-KEYWORDS-MIB DEFINITIONS ::= BEGIN
 
@@ -36,7 +36,7 @@ ProblemAccessLevel ::= TEXTUAL-CONVENTION
 
 -- DEFVAL using `mandatory` keyword as enum value
 -- Real: CISCO-DOT11-IF-MIB cd11IfVlanWepEncryptOptions DEFVAL { mandatory }
--- gomib: parser.go parseDefValContent() accepts keyword tokens
+-- gomib: parser.go parseDefVal() accepts keyword tokens
 problemDefvalMandatory OBJECT-TYPE
     SYNTAX      ProblemAccessLevel
     MAX-ACCESS  read-write

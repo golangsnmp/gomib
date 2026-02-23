@@ -747,10 +747,10 @@ func lowerIndexClause(clause ast.IndexClause) []IndexItem {
 }
 
 func lowerDefVal(clause *ast.DefValClause, ctx *LoweringContext) DefVal {
-	return lowerDefValContent(clause.Value, ctx)
+	return lowerDefValValue(clause.Value, ctx)
 }
 
-func lowerDefValContent(content ast.DefValContent, ctx *LoweringContext) DefVal {
+func lowerDefValValue(content ast.DefVal, ctx *LoweringContext) DefVal {
 	switch c := content.(type) {
 	case *ast.DefValContentInteger:
 		return &DefValInteger{Value: c.Value}

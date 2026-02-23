@@ -49,7 +49,11 @@ func main() {
 }
 
 func run() int {
-	flags, cmd, cmdArgs := cliutil.ParseCGOArgs(os.Args[1:])
+	flags, cmd, cmdArgs, errMsg := cliutil.ParseCGOArgs(os.Args[1:])
+	if errMsg != "" {
+		cliutil.PrintError("%s", errMsg)
+		return 1
+	}
 	paths = flags.Paths
 	outputFile = flags.OutputFile
 	jsonOutput = flags.JSONOutput

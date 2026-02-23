@@ -314,7 +314,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 				resolved.addObject(objNode.Object())
 			} else if !ok {
 				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
-			} else if ok {
+			} else {
 				// Node exists but has no object definition (intermediate node
 				// or non-object definition).
 				ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, SeverityMinor, ref.mod, notif.Span,

@@ -383,9 +383,9 @@ func logCycles(ctx *resolverContext, cycles [][]graph.Symbol, msg string) {
 }
 
 // recordUnresolved appends an entry to a typed slice and emits a diagnostic.
-func recordUnresolved[T any](c *resolverContext, list *[]T, entry T, mod *module.Module, span types.Span, code, msg string) {
+func recordUnresolved[T any](ctx *resolverContext, list *[]T, entry T, mod *module.Module, span types.Span, code, msg string) {
 	*list = append(*list, entry)
-	c.EmitDiagnostic(code, SeverityError, mod, span, msg)
+	ctx.EmitDiagnostic(code, SeverityError, mod, span, msg)
 }
 
 // RecordUnresolvedImport tracks a symbol that could not be resolved from its source module.

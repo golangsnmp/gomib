@@ -18,7 +18,8 @@ type CGOFlags struct {
 // ParseCGOArgs parses global flags and extracts the subcommand from args.
 // Flags handled: -p/--path, -o/--output, -json, -h/--help.
 // Unrecognized flags are passed through to the subcommand.
-func ParseCGOArgs(args []string) (flags CGOFlags, cmd string, cmdArgs []string) {
+// Returns a non-empty error string if a flag is missing its required value.
+func ParseCGOArgs(args []string) (flags CGOFlags, cmd string, cmdArgs []string, errMsg string) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
@@ -27,19 +28,23 @@ func ParseCGOArgs(args []string) (flags CGOFlags, cmd string, cmdArgs []string) 
 		case arg == "-json":
 			flags.JSONOutput = true
 		case arg == "-p" || arg == "--path":
-			if i+1 < len(args) {
-				i++
-				flags.Paths = append(flags.Paths, args[i])
+			if i+1 >= len(args) {
+				errMsg = arg + " requires a value"
+				return
 			}
+			i++
+			flags.Paths = append(flags.Paths, args[i])
 		case strings.HasPrefix(arg, "-p"):
 			flags.Paths = append(flags.Paths, arg[2:])
 		case strings.HasPrefix(arg, "--path="):
 			flags.Paths = append(flags.Paths, arg[7:])
 		case arg == "-o" || arg == "--output":
-			if i+1 < len(args) {
-				i++
-				flags.OutputFile = args[i]
+			if i+1 >= len(args) {
+				errMsg = arg + " requires a value"
+				return
 			}
+			i++
+			flags.OutputFile = args[i]
 		case strings.HasPrefix(arg, "-o"):
 			flags.OutputFile = arg[2:]
 		case strings.HasPrefix(arg, "--output="):
@@ -64,7 +69,7 @@ func GetOutput(outputFile string) (*os.File, func(), error) {
 	}
 	f, err := os.Create(outputFile)
 	if err != nil {
-		return nil, nil, err
+		return nil, func() {}, err
 	}
 	return f, func() { _ = f.Close() }, nil
 }

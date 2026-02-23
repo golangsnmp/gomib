@@ -2,6 +2,7 @@ package mib
 
 import (
 	"slices"
+	"sync"
 	"testing"
 )
 
@@ -124,4 +125,23 @@ func TestWalkOID(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSortedChildrenConcurrent(t *testing.T) {
+	root := buildTree()
+
+	// Access Children() concurrently from multiple goroutines.
+	// Run with -race to verify no data race on sortedCache.
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			children := root.Children()
+			if len(children) != 2 {
+				t.Errorf("got %d children, want 2", len(children))
+			}
+		}()
+	}
+	wg.Wait()
 }

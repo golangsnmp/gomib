@@ -51,9 +51,13 @@ func defaultSourceConfig() sourceConfig {
 }
 
 // WithExtensions overrides the default file extensions used to match MIB files.
+// Extensions are normalized to lowercase for consistent matching.
 func WithExtensions(exts ...string) SourceOption {
 	return func(c *sourceConfig) {
-		c.extensions = exts
+		c.extensions = make([]string, len(exts))
+		for i, ext := range exts {
+			c.extensions[i] = strings.ToLower(ext)
+		}
 	}
 }
 

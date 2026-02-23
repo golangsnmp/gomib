@@ -9,6 +9,8 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
+var endKeyword = []byte("END")
+
 type lexerState int
 
 const (
@@ -68,7 +70,7 @@ func (l *Lexer) Tokenize() ([]Token, []types.SpanDiagnostic) {
 	l.Log(slog.LevelDebug, "tokenization complete",
 		slog.Int("tokens", len(tokens)),
 		slog.Int("diagnostics", len(l.diagnostics)))
-	return tokens, l.diagnostics
+	return tokens, slices.Clone(l.diagnostics)
 }
 
 // NextToken advances the lexer and returns the next token.
@@ -161,10 +163,10 @@ func (l *Lexer) skipToEOL() {
 	}
 }
 
-func (l *Lexer) error(code string, span types.Span, message string) {
+func (l *Lexer) emitDiagnostic(code string, severity types.Severity, span types.Span, message string) {
 	l.diagnostics = append(l.diagnostics, types.SpanDiagnostic{
 		Code:     code,
-		Severity: types.SeverityError,
+		Severity: severity,
 		Span:     span,
 		Message:  message,
 	})
@@ -286,7 +288,7 @@ func (l *Lexer) nextNormalToken() (Token, bool) {
 
 	l.advance()
 	span := l.spanFrom(start)
-	l.error(types.DiagUnexpectedCharacter, span, fmt.Sprintf("unexpected character: 0x%02x", b))
+	l.emitDiagnostic(types.DiagUnexpectedCharacter, types.SeverityError, span, fmt.Sprintf("unexpected character: 0x%02x", b))
 	l.skipToEOL()
 	return Token{}, true
 }
@@ -319,36 +321,12 @@ func (l *Lexer) tryConsumeTripleDashEOL() bool {
 // consumeComment skips over comment text and sets state back to normal.
 // Called from the NextToken loop when state is stateInComment.
 func (l *Lexer) consumeComment() {
-	for {
-		b, ok := l.peek()
-		if !ok {
-			l.state = stateNormal
-			return
-		}
-
-		if b == '\n' || b == '\r' {
-			l.skipLineEnding()
-			l.state = stateNormal
-			return
-		}
-
-		if b == '-' {
-			if l.tryConsumeTripleDashEOL() {
-				l.state = stateNormal
-				return
-			}
-			if next, ok := l.peekAt(1); ok && next == '-' {
-				l.advance()
-				l.advance()
-				l.state = stateNormal
-				return
-			}
-			l.advance()
-			continue
-		}
-
-		l.advance()
+	l.skipCommentBody(true)
+	// Consume trailing newline if present.
+	if b, ok := l.peek(); ok && (b == '\n' || b == '\r') {
+		l.skipLineEnding()
 	}
+	l.state = stateNormal
 }
 
 func (l *Lexer) skipMacroBody() Token {
@@ -361,16 +339,24 @@ func (l *Lexer) skipMacroBody() Token {
 			return l.token(TokEOF, start)
 		}
 
-		if l.matchesKeyword([]byte("END")) {
-			start := l.pos
-			l.pos += 3
-			b, ok := l.peek()
-			isDelimiter := !ok ||
-				(b == '-' && l.peekAtEquals(1, '-')) ||
-				(!isAlphanumeric(b) && b != '-')
-			if isDelimiter {
-				l.state = stateNormal
-				return l.token(TokKwEnd, start)
+		if l.matchesKeyword(endKeyword) {
+			// Check that the preceding character is not alphanumeric or hyphen,
+			// so we don't match "END" at the tail of identifiers like "PRETEND".
+			prevIsDelimiter := l.pos == 0 ||
+				(!isAlphanumeric(l.source[l.pos-1]) && l.source[l.pos-1] != '-')
+			if prevIsDelimiter {
+				saved := l.pos
+				l.pos += 3
+				b, ok := l.peek()
+				isDelimiter := !ok ||
+					(b == '-' && l.peekAtEquals(1, '-')) ||
+					(!isAlphanumeric(b) && b != '-')
+				if isDelimiter {
+					l.state = stateNormal
+					return l.token(TokKwEnd, saved)
+				}
+				// Restore position on failed match so we don't skip bytes.
+				l.pos = saved
 			}
 		}
 
@@ -406,14 +392,25 @@ func (l *Lexer) skipExportsBody() Token {
 }
 
 func (l *Lexer) skipCommentInline() {
-	l.advance()
-	l.advance()
+	l.advance() // consume first '-'
+	l.advance() // consume second '-'
+	l.skipCommentBody(false)
+}
+
+// skipCommentBody scans forward past comment text. It stops at EOF, a newline
+// (without consuming either), or a "--" terminator (consuming both dashes).
+// When handleTripleDash is true, "---" followed by EOL is also treated as a
+// terminator (consuming the three dashes and the line ending).
+func (l *Lexer) skipCommentBody(handleTripleDash bool) {
 	for {
 		b, ok := l.peek()
 		if !ok || b == '\n' || b == '\r' {
 			return
 		}
 		if b == '-' {
+			if handleTripleDash && l.tryConsumeTripleDashEOL() {
+				return
+			}
 			if next, ok := l.peekAt(1); ok && next == '-' {
 				l.advance()
 				l.advance()
@@ -511,7 +508,7 @@ func (l *Lexer) scanQuotedString() Token {
 		b, ok := l.peek()
 		if !ok {
 			span := l.spanFrom(start)
-			l.error(types.DiagUnterminatedString, span, "unterminated string literal")
+			l.emitDiagnostic(types.DiagUnterminatedString, types.SeverityError, span, "unterminated string literal")
 			return l.token(TokQuotedString, start)
 		}
 		if b == '"' {
@@ -536,7 +533,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 
 	if b, ok := l.peek(); !ok || b != '\'' {
 		span := l.spanFrom(start)
-		l.error(types.DiagUnterminatedHexBinStr, span, "unterminated hex/binary string")
+		l.emitDiagnostic(types.DiagUnterminatedHexBinStr, types.SeverityError, span, "unterminated hex/binary string")
 		return l.token(TokError, start)
 	}
 	l.advance() // consume closing quote
@@ -544,7 +541,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 	suffix, ok := l.peek()
 	if !ok {
 		span := l.spanFrom(start)
-		l.error(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
+		l.emitDiagnostic(types.DiagMissingHexBinSuffix, types.SeverityError, span, "expected 'H' or 'B' suffix for hex/binary string")
 		return l.token(TokError, start)
 	}
 
@@ -560,7 +557,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 
 	default:
 		span := l.spanFrom(start)
-		l.error(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
+		l.emitDiagnostic(types.DiagMissingHexBinSuffix, types.SeverityError, span, "expected 'H' or 'B' suffix for hex/binary string")
 		kind = TokError
 	}
 

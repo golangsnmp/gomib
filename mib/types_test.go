@@ -18,6 +18,7 @@ func TestDefValString(t *testing.T) {
 		{"uint zero", newDefValUint(0, "0"), "0"},
 		{"string", newDefValString("hello", `"hello"`), `"hello"`},
 		{"string empty", newDefValString("", `""`), `""`},
+		{"string with quotes", newDefValString(`say "hi"`, `"say \"hi\""`), `"say \"hi\""`},
 		{"enum label", newDefValEnum("active", "active"), "active"},
 		{"bits multiple", newDefValBits([]string{"read", "write"}, "{ read, write }"), "{ read, write }"},
 		{"bits empty", newDefValBits([]string{}, "{ }"), "{ }"},
@@ -46,6 +47,7 @@ func TestDefValKindString(t *testing.T) {
 		kind DefValKind
 		want string
 	}{
+		{DefValKindUnset, "unset"},
 		{DefValKindInt, "int"},
 		{DefValKindUint, "uint"},
 		{DefValKindString, "string"},
@@ -69,6 +71,9 @@ func TestDefValIsZero(t *testing.T) {
 	var zero DefVal
 	if !zero.IsZero() {
 		t.Error("zero DefVal should report IsZero() true")
+	}
+	if zero.Kind() != DefValKindUnset {
+		t.Errorf("zero DefVal Kind() = %v, want DefValKindUnset", zero.Kind())
 	}
 
 	nonZero := newDefValInt(0, "0")

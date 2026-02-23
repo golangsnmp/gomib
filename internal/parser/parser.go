@@ -541,76 +541,12 @@ func (p *Parser) parseOidAssignment() (ast.OidAssignment, *types.SpanDiagnostic)
 	for !p.check(lexer.TokRBrace) && !p.isEOF() {
 		compStart := p.currentSpan().Start
 
-		if p.check(lexer.TokNumber) {
-			// Numeric: 1, 3, 6, ...
-			token := p.advance()
-			value := p.parseU32(token.Span, "OID component")
-			components = append(components, &ast.OidComponentNumber{
-				Value: value,
-				Span:  token.Span,
-			})
-		} else if p.check(lexer.TokLowercaseIdent) || p.check(lexer.TokUppercaseIdent) {
-			// Name, possibly followed by (number) or .name (qualified)
-			firstToken := p.advance()
-			firstName := p.makeIdent(firstToken)
-
-			if p.check(lexer.TokDot) {
-				// Qualified reference: Module.name or Module.name(number)
-				p.advance() // consume dot
-
-				nameToken, err := p.expect(lexer.TokLowercaseIdent)
-				if err != nil {
-					return ast.OidAssignment{}, err
-				}
-				qname := p.makeIdent(nameToken)
-
-				if p.check(lexer.TokLParen) {
-					// QualifiedNamedNumber: Module.name(123)
-					p.advance() // (
-					numToken, err := p.expect(lexer.TokNumber)
-					if err != nil {
-						return ast.OidAssignment{}, err
-					}
-					number := p.parseU32(numToken.Span, "OID component")
-					endToken, err := p.expect(lexer.TokRParen)
-					if err != nil {
-						return ast.OidAssignment{}, err
-					}
-					components = append(components, &ast.OidComponentQualifiedNamedNumber{
-						ModuleName: firstName,
-						Name:       qname,
-						Num:        number,
-						Span:       types.NewSpan(compStart, endToken.Span.End),
-					})
-				} else {
-					// QualifiedName: Module.name
-					components = append(components, &ast.OidComponentQualifiedName{
-						ModuleName: firstName,
-						Name:       qname,
-						Span:       types.NewSpan(compStart, nameToken.Span.End),
-					})
-				}
-			} else if p.check(lexer.TokLParen) {
-				// Named number: iso(1), org(3)
-				p.advance() // (
-				numToken, err := p.expect(lexer.TokNumber)
-				if err != nil {
-					return ast.OidAssignment{}, err
-				}
-				number := p.parseU32(numToken.Span, "OID component")
-				endToken, err := p.expect(lexer.TokRParen)
-				if err != nil {
-					return ast.OidAssignment{}, err
-				}
-				components = append(components, &ast.OidComponentNamedNumber{
-					Name: firstName,
-					Num:  number,
-					Span: types.NewSpan(compStart, endToken.Span.End),
-				})
-			} else {
-				// Just name: internet, ifEntry
-				components = append(components, &ast.OidComponentName{Name: firstName})
+		if p.check(lexer.TokNumber) || p.check(lexer.TokLowercaseIdent) || p.check(lexer.TokUppercaseIdent) {
+			comp, err := p.parseOidComponent(compStart)
+			if err != nil {
+				return ast.OidAssignment{}, err
 			}
+			components = append(components, comp)
 		} else {
 			diag := p.makeError("expected OID component")
 			return ast.OidAssignment{}, &diag
@@ -622,6 +558,79 @@ func (p *Parser) parseOidAssignment() (ast.OidAssignment, *types.SpanDiagnostic)
 		return ast.OidAssignment{}, err
 	}
 	return ast.NewOidAssignment(components, types.NewSpan(start, endToken.Span.End)), nil
+}
+
+// parseOidComponent parses a single OID component: a number, name, name(number),
+// or a qualified reference (Module.name or Module.name(number)).
+// The caller must have verified the current token is a Number or identifier.
+func (p *Parser) parseOidComponent(compStart types.ByteOffset) (ast.OidComponent, *types.SpanDiagnostic) {
+	if p.check(lexer.TokNumber) {
+		token := p.advance()
+		value := p.parseU32(token.Span, "OID component")
+		return &ast.OidComponentNumber{Value: value, Span: token.Span}, nil
+	}
+
+	firstToken := p.advance()
+	firstName := p.makeIdent(firstToken)
+
+	if p.check(lexer.TokDot) {
+		// Qualified reference: Module.name or Module.name(number)
+		p.advance() // consume dot
+
+		nameToken, err := p.expect(lexer.TokLowercaseIdent)
+		if err != nil {
+			return nil, err
+		}
+		qname := p.makeIdent(nameToken)
+
+		if p.check(lexer.TokLParen) {
+			// QualifiedNamedNumber: Module.name(123)
+			p.advance() // (
+			numToken, err := p.expect(lexer.TokNumber)
+			if err != nil {
+				return nil, err
+			}
+			number := p.parseU32(numToken.Span, "OID component")
+			endToken, err := p.expect(lexer.TokRParen)
+			if err != nil {
+				return nil, err
+			}
+			return &ast.OidComponentQualifiedNamedNumber{
+				ModuleName: firstName,
+				Name:       qname,
+				Num:        number,
+				Span:       types.NewSpan(compStart, endToken.Span.End),
+			}, nil
+		}
+		// QualifiedName: Module.name
+		return &ast.OidComponentQualifiedName{
+			ModuleName: firstName,
+			Name:       qname,
+			Span:       types.NewSpan(compStart, nameToken.Span.End),
+		}, nil
+	}
+
+	if p.check(lexer.TokLParen) {
+		// Named number: iso(1), org(3)
+		p.advance() // (
+		numToken, err := p.expect(lexer.TokNumber)
+		if err != nil {
+			return nil, err
+		}
+		number := p.parseU32(numToken.Span, "OID component")
+		endToken, err := p.expect(lexer.TokRParen)
+		if err != nil {
+			return nil, err
+		}
+		return &ast.OidComponentNamedNumber{
+			Name: firstName,
+			Num:  number,
+			Span: types.NewSpan(compStart, endToken.Span.End),
+		}, nil
+	}
+
+	// Just name: internet, ifEntry
+	return &ast.OidComponentName{Name: firstName}, nil
 }
 
 // parseObjectType parses an OBJECT-TYPE macro invocation.
@@ -1338,7 +1347,7 @@ func (p *Parser) parseDefValClause() (ast.DefValClause, *types.SpanDiagnostic) {
 		return ast.DefValClause{}, err
 	}
 
-	value, err := p.parseDefValContent()
+	value, err := p.parseDefVal()
 	if err != nil {
 		return ast.DefValClause{}, err
 	}
@@ -1352,8 +1361,8 @@ func (p *Parser) parseDefValClause() (ast.DefValClause, *types.SpanDiagnostic) {
 	return ast.DefValClause{Value: value, Span: span}, nil
 }
 
-// parseDefValContent parses the value inside DEFVAL { ... } braces.
-func (p *Parser) parseDefValContent() (ast.DefValContent, *types.SpanDiagnostic) {
+// parseDefVal parses the value inside DEFVAL { ... } braces.
+func (p *Parser) parseDefVal() (ast.DefVal, *types.SpanDiagnostic) {
 	contentStart := p.currentSpan().Start
 
 	kind := p.peek().Kind
@@ -1383,7 +1392,7 @@ func (p *Parser) parseDefValContent() (ast.DefValContent, *types.SpanDiagnostic)
 	}
 }
 
-func (p *Parser) parseDefValNumber() ast.DefValContent {
+func (p *Parser) parseDefValNumber() ast.DefVal {
 	token := p.advance()
 	if token.Kind == lexer.TokNegativeNumber {
 		value := p.parseI64(token.Span, "DEFVAL integer")
@@ -1401,7 +1410,7 @@ func (p *Parser) parseDefValNumber() ast.DefValContent {
 	return &ast.DefValContentInteger{Value: value}
 }
 
-func (p *Parser) parseDefValString() (ast.DefValContent, *types.SpanDiagnostic) {
+func (p *Parser) parseDefValString() (ast.DefVal, *types.SpanDiagnostic) {
 	qs, err := p.parseQuotedString()
 	if err != nil {
 		return nil, err
@@ -1409,13 +1418,13 @@ func (p *Parser) parseDefValString() (ast.DefValContent, *types.SpanDiagnostic) 
 	return &ast.DefValContentString{Value: qs}, nil
 }
 
-func (p *Parser) parseDefValHexString() ast.DefValContent {
+func (p *Parser) parseDefValHexString() ast.DefVal {
 	token := p.advance()
 	content := stripQuotedLiteral(p.text(token.Span))
 	return &ast.DefValContentHexString{Content: content, Span: token.Span}
 }
 
-func (p *Parser) parseDefValBinaryString() ast.DefValContent {
+func (p *Parser) parseDefValBinaryString() ast.DefVal {
 	token := p.advance()
 	content := stripQuotedLiteral(p.text(token.Span))
 	return &ast.DefValContentBinaryString{Content: content, Span: token.Span}
@@ -1440,7 +1449,7 @@ func stripQuotedLiteral(s string) string {
 	return s
 }
 
-func (p *Parser) parseDefValBracedContent() (ast.DefValContent, *types.SpanDiagnostic) {
+func (p *Parser) parseDefValBracedContent() (ast.DefVal, *types.SpanDiagnostic) {
 	p.advance() // consume opening brace
 	innerStart := p.currentSpan().Start
 
@@ -1466,7 +1475,7 @@ func (p *Parser) parseDefValBracedContent() (ast.DefValContent, *types.SpanDiagn
 	}
 }
 
-func (p *Parser) parseDefValBracedIdent(innerStart types.ByteOffset) (ast.DefValContent, *types.SpanDiagnostic) {
+func (p *Parser) parseDefValBracedIdent(innerStart types.ByteOffset) (ast.DefVal, *types.SpanDiagnostic) {
 	identToken := p.advance()
 	ident := p.makeIdent(identToken)
 
@@ -1478,7 +1487,7 @@ func (p *Parser) parseDefValBracedIdent(innerStart types.ByteOffset) (ast.DefVal
 	return p.parseDefValOidWithFirstIdent(ident, identToken, innerStart)
 }
 
-func (p *Parser) parseDefValBitsLabels(first ast.Ident, innerStart types.ByteOffset) (ast.DefValContent, *types.SpanDiagnostic) {
+func (p *Parser) parseDefValBitsLabels(first ast.Ident, innerStart types.ByteOffset) (ast.DefVal, *types.SpanDiagnostic) {
 	labels := []ast.Ident{first}
 	for p.check(lexer.TokComma) {
 		p.advance()
@@ -1497,7 +1506,7 @@ func (p *Parser) parseDefValBitsLabels(first ast.Ident, innerStart types.ByteOff
 	return &ast.DefValContentBits{Labels: labels, Span: span}, nil
 }
 
-func (p *Parser) parseDefValOidWithFirstIdent(ident ast.Ident, identToken lexer.Token, innerStart types.ByteOffset) (ast.DefValContent, *types.SpanDiagnostic) {
+func (p *Parser) parseDefValOidWithFirstIdent(ident ast.Ident, identToken lexer.Token, innerStart types.ByteOffset) (ast.DefVal, *types.SpanDiagnostic) {
 	var components []ast.OidComponent
 
 	// First component is the identifier we already parsed
@@ -1536,7 +1545,7 @@ func (p *Parser) parseDefValOidWithFirstIdent(ident ast.Ident, identToken lexer.
 	return &ast.DefValContentObjectIdentifier{Components: components, Span: span}, nil
 }
 
-func (p *Parser) parseDefValOidNumeric(innerStart types.ByteOffset) (ast.DefValContent, *types.SpanDiagnostic) {
+func (p *Parser) parseDefValOidNumeric(innerStart types.ByteOffset) (ast.DefVal, *types.SpanDiagnostic) {
 	components, err := p.parseDefValOidComponents(nil)
 	if err != nil {
 		return nil, err
@@ -1552,43 +1561,20 @@ func (p *Parser) parseDefValOidNumeric(innerStart types.ByteOffset) (ast.DefValC
 
 func (p *Parser) parseDefValOidComponents(components []ast.OidComponent) ([]ast.OidComponent, *types.SpanDiagnostic) {
 	for !p.check(lexer.TokRBrace) && !p.isEOF() {
-		if p.check(lexer.TokNumber) {
-			token := p.advance()
-			value := p.parseU32(token.Span, "OID component")
-			components = append(components, &ast.OidComponentNumber{
-				Value: value,
-				Span:  token.Span,
-			})
-		} else if p.check(lexer.TokLowercaseIdent) || p.check(lexer.TokUppercaseIdent) {
-			token := p.advance()
-			name := p.makeIdent(token)
-			if p.check(lexer.TokLParen) {
-				p.advance()
-				numToken, err := p.expect(lexer.TokNumber)
-				if err != nil {
-					return components, err
-				}
-				number := p.parseU32(numToken.Span, "OID component")
-				endParen, err := p.expect(lexer.TokRParen)
-				if err != nil {
-					return components, err
-				}
-				components = append(components, &ast.OidComponentNamedNumber{
-					Name: name,
-					Num:  number,
-					Span: types.NewSpan(token.Span.Start, endParen.Span.End),
-				})
-			} else {
-				components = append(components, &ast.OidComponentName{Name: name})
-			}
-		} else {
+		if !p.check(lexer.TokNumber) && !p.check(lexer.TokLowercaseIdent) && !p.check(lexer.TokUppercaseIdent) {
 			break
 		}
+		compStart := p.currentSpan().Start
+		comp, err := p.parseOidComponent(compStart)
+		if err != nil {
+			return components, err
+		}
+		components = append(components, comp)
 	}
 	return components, nil
 }
 
-func (p *Parser) parseDefValSkipBraced(start types.ByteOffset) (ast.DefValContent, *types.SpanDiagnostic) {
+func (p *Parser) parseDefValSkipBraced(start types.ByteOffset) (ast.DefVal, *types.SpanDiagnostic) {
 	depth := 1
 	for depth > 0 && !p.isEOF() {
 		switch p.peek().Kind {
@@ -1612,7 +1598,7 @@ func (p *Parser) parseDefValSkipBraced(start types.ByteOffset) (ast.DefValConten
 	return &ast.DefValContentUnparsed{Span: span}, nil
 }
 
-func (p *Parser) parseDefValSkipUnknown(contentStart types.ByteOffset) ast.DefValContent {
+func (p *Parser) parseDefValSkipUnknown(contentStart types.ByteOffset) ast.DefVal {
 	depth := 0
 	for !p.isEOF() {
 		switch p.peek().Kind {

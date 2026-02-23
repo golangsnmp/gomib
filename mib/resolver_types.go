@@ -168,7 +168,7 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 		if !ok {
 			continue // External dependency (primitive or from another module)
 		}
-		if resolveTypeParent(ctx, entry) {
+		if tryResolveTypeParent(ctx, entry) {
 			resolved++
 		} else if baseName := getTypeRefBaseName(entry.td.Syntax); baseName != "" {
 			ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Span)
@@ -236,7 +236,7 @@ func findTypeDefiningModule(ctx *resolverContext, fromMod *module.Module, typeNa
 	return ""
 }
 
-func resolveTypeParent(ctx *resolverContext, entry typeResolutionEntry) bool {
+func tryResolveTypeParent(ctx *resolverContext, entry typeResolutionEntry) bool {
 	baseName := getTypeRefBaseName(entry.td.Syntax)
 	if baseName == "" {
 		return false

@@ -3,9 +3,12 @@
 // object definitions, type definitions, notifications, groups, compliance
 // statements, and agent capabilities extracted from one or more MIB files.
 //
-// All types in this package use unexported fields with exported accessor
-// methods. Slice-returning accessors return cloned copies, so callers may
-// freely modify the returned slices without affecting the model.
+// The main model types ([Mib], [Node], [Object], [Type], [Module],
+// [Notification], [Group], [Compliance], [Capability]) use unexported fields
+// with exported accessor methods. Small value structs ([Range], [NamedValue],
+// [Revision], [IndexEntry], [TrapInfo], etc.) use exported fields directly.
+// Slice-returning accessors return cloned copies, so callers may freely
+// modify the returned slices without affecting the model.
 package mib
 
 import (
