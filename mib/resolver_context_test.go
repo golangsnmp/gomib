@@ -1,6 +1,7 @@
 package mib
 
 import (
+	"sync/atomic"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
@@ -11,15 +12,16 @@ func newTestContext() *resolverContext {
 	return newResolverContext(nil, nil, DefaultConfig())
 }
 
-// testNodeArc is a counter for creating unique test nodes.
-var testNodeArc uint32
+// testNodeArc is an atomic counter for creating unique test nodes.
+// Atomic to avoid races if tests run in parallel.
+var testNodeArc atomic.Uint32
 
 // newTestNode creates a named *Node for testing. Each call returns
 // a distinct node (unique arc under a shared root).
 func newTestNode(name string) *Node {
-	testNodeArc++
+	arc := testNodeArc.Add(1)
 	m := newMib()
-	n := m.Root().getOrCreateChild(testNodeArc)
+	n := m.Root().getOrCreateChild(arc)
 	n.setName(name)
 	return n
 }

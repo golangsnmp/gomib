@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 
 	"github.com/golangsnmp/gomib"
 )
@@ -68,7 +68,7 @@ func (c *cli) cmdList(args []string) int {
 		return exitError
 	}
 
-	sort.Strings(names)
+	slices.Sort(names)
 
 	if *count {
 		fmt.Println(len(names))

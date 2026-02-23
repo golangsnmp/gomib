@@ -30,7 +30,7 @@ var ErrDiagnosticThreshold = errors.New("diagnostic threshold exceeded")
 // LevelTrace is a custom log level more verbose than Debug.
 // Use for per-item iteration logging (tokens, OID nodes, imports).
 // Enable with: &slog.HandlerOptions{Level: slog.Level(-8)}
-const LevelTrace = slog.Level(-8)
+const LevelTrace = types.LevelTrace
 
 // LoadOption configures Load.
 type LoadOption func(*loadConfig)

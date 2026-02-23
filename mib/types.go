@@ -57,7 +57,8 @@ type IndexEntry struct {
 type DefValKind int
 
 const (
-	DefValKindInt    DefValKind = iota // int64
+	DefValKindUnset  DefValKind = iota // zero value, no default set
+	DefValKindInt                      // int64
 	DefValKindUint                     // uint64
 	DefValKindString                   // string (quoted)
 	DefValKindBytes                    // []byte (from hex/binary string)
@@ -128,7 +129,7 @@ func (d DefVal) String() string {
 	case DefValKindUint:
 		return strconv.FormatUint(d.value.(uint64), 10)
 	case DefValKindString:
-		return `"` + d.value.(string) + `"`
+		return `"` + strings.ReplaceAll(d.value.(string), `"`, `\"`) + `"`
 	case DefValKindBytes:
 		b := d.value.([]byte)
 		if len(b) == 0 {
@@ -166,6 +167,8 @@ func (d DefVal) IsZero() bool {
 // (e.g. "int", "string", "enum").
 func (k DefValKind) String() string {
 	switch k {
+	case DefValKindUnset:
+		return "unset"
 	case DefValKindInt:
 		return "int"
 	case DefValKindUint:

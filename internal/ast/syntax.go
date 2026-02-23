@@ -238,13 +238,13 @@ type AugmentsClause struct {
 
 // DefValClause holds the default value for an OBJECT-TYPE.
 type DefValClause struct {
-	Value DefValContent
+	Value DefVal
 	Span  types.Span
 }
 
-// DefValContent represents the typed content within a DEFVAL { ... } clause.
-type DefValContent interface {
-	defValContent()
+// DefVal represents the typed content within a DEFVAL { ... } clause.
+type DefVal interface {
+	defVal()
 }
 
 // DefValContentInteger is a signed integer default value.
@@ -252,28 +252,28 @@ type DefValContentInteger struct {
 	Value int64
 }
 
-func (*DefValContentInteger) defValContent() {}
+func (*DefValContentInteger) defVal() {}
 
 // DefValContentUnsigned is an unsigned integer default value.
 type DefValContentUnsigned struct {
 	Value uint64
 }
 
-func (*DefValContentUnsigned) defValContent() {}
+func (*DefValContentUnsigned) defVal() {}
 
 // DefValContentString is a quoted string default value.
 type DefValContentString struct {
 	Value QuotedString
 }
 
-func (*DefValContentString) defValContent() {}
+func (*DefValContentString) defVal() {}
 
 // DefValContentIdentifier is a named default (enum label or OID reference).
 type DefValContentIdentifier struct {
 	Name Ident
 }
 
-func (*DefValContentIdentifier) defValContent() {}
+func (*DefValContentIdentifier) defVal() {}
 
 // DefValContentBits is a BITS default value with named bit labels.
 type DefValContentBits struct {
@@ -281,7 +281,7 @@ type DefValContentBits struct {
 	Span   types.Span
 }
 
-func (*DefValContentBits) defValContent() {}
+func (*DefValContentBits) defVal() {}
 
 // DefValContentHexString is a hex string default value ('...'H).
 type DefValContentHexString struct {
@@ -289,7 +289,7 @@ type DefValContentHexString struct {
 	Span    types.Span
 }
 
-func (*DefValContentHexString) defValContent() {}
+func (*DefValContentHexString) defVal() {}
 
 // DefValContentBinaryString is a binary string default value ('...'B).
 type DefValContentBinaryString struct {
@@ -297,7 +297,7 @@ type DefValContentBinaryString struct {
 	Span    types.Span
 }
 
-func (*DefValContentBinaryString) defValContent() {}
+func (*DefValContentBinaryString) defVal() {}
 
 // DefValContentObjectIdentifier is an OID default value.
 type DefValContentObjectIdentifier struct {
@@ -305,7 +305,7 @@ type DefValContentObjectIdentifier struct {
 	Span       types.Span
 }
 
-func (*DefValContentObjectIdentifier) defValContent() {}
+func (*DefValContentObjectIdentifier) defVal() {}
 
 // DefValContentUnparsed represents DEFVAL content that could not be parsed.
 // Used by error recovery when the parser skips over unrecognized content.
@@ -313,7 +313,7 @@ type DefValContentUnparsed struct {
 	Span types.Span
 }
 
-func (*DefValContentUnparsed) defValContent() {}
+func (*DefValContentUnparsed) defVal() {}
 
 // RevisionClause represents a REVISION clause within MODULE-IDENTITY.
 type RevisionClause struct {

@@ -160,6 +160,64 @@ func TestMacroSkip(t *testing.T) {
 	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
+func TestMacroSkipENDInsideIdentifier(t *testing.T) {
+	// END appearing as a suffix of an identifier (e.g. PRETEND) must not
+	// terminate the macro body early.
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{"suffix PRETEND", `OBJECT-TYPE MACRO ::= BEGIN PRETEND END` + "\n" + `ifIndex OBJECT-TYPE`},
+		{"prefix ENDORSE", `OBJECT-TYPE MACRO ::= BEGIN ENDORSE END` + "\n" + `ifIndex OBJECT-TYPE`},
+		{"prefix ENDING", `OBJECT-TYPE MACRO ::= BEGIN ENDING END` + "\n" + `ifIndex OBJECT-TYPE`},
+		{"prefix ENDS", `OBJECT-TYPE MACRO ::= BEGIN ENDS END` + "\n" + `ifIndex OBJECT-TYPE`},
+	}
+
+	expected := []TokenKind{
+		TokKwObjectType,
+		TokKwMacro,
+		TokKwEnd,
+		TokLowercaseIdent,
+		TokKwObjectType,
+		TokEOF,
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			kinds := tokenKinds(tc.source)
+			testutil.SliceEqual(t, expected, kinds, "token kinds")
+		})
+	}
+}
+
+func TestMacroSkipENDAtEOF(t *testing.T) {
+	// END at end of input (no trailing newline) should still match.
+	source := `OBJECT-TYPE MACRO ::= BEGIN stuff END`
+	kinds := tokenKinds(source)
+	expected := []TokenKind{
+		TokKwObjectType,
+		TokKwMacro,
+		TokKwEnd,
+		TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "END at EOF")
+}
+
+func TestMacroSkipENDBeforeComment(t *testing.T) {
+	// END immediately followed by a comment delimiter should match.
+	source := "OBJECT-TYPE MACRO ::= BEGIN stuff END-- comment\nifIndex OBJECT-TYPE"
+	kinds := tokenKinds(source)
+	expected := []TokenKind{
+		TokKwObjectType,
+		TokKwMacro,
+		TokKwEnd,
+		TokLowercaseIdent,
+		TokKwObjectType,
+		TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "END before comment")
+}
+
 func TestExportsSkip(t *testing.T) {
 	source := "EXPORTS foo, bar, baz;OBJECT-TYPE"
 	kinds := tokenKinds(source)
@@ -490,4 +548,102 @@ func TestKeywordLookup(t *testing.T) {
 			testutil.Equal(t, tc.expected, kind, "LookupKeyword(%q) kind", tc.text)
 		}
 	}
+}
+
+func TestDoubleColonWithoutEquals(t *testing.T) {
+	// "::" without "=" should produce two TokColon tokens, since
+	// the lexer only combines "::=" as a single token.
+	kinds := tokenKinds(":: OBJECT")
+	expected := []TokenKind{
+		TokColon, TokColon, TokKwObject, TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, ":: without =")
+}
+
+func TestDoubleColonFollowedByNonEquals(t *testing.T) {
+	// "::x" should produce two colons then the identifier
+	kinds := tokenKinds("::x")
+	expected := []TokenKind{
+		TokColon, TokColon, TokLowercaseIdent, TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "::x")
+}
+
+func TestSingleColon(t *testing.T) {
+	kinds := tokenKinds(": OBJECT")
+	expected := []TokenKind{
+		TokColon, TokKwObject, TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "single colon")
+}
+
+func TestMacroBodyWithComments(t *testing.T) {
+	// Comments inside a macro body should be skipped, and END should
+	// still be found after the comment.
+	source := `OBJECT-TYPE MACRO ::=
+BEGIN
+    TYPE NOTATION ::= -- this is a comment
+        type(Syntax)
+    VALUE NOTATION ::= -- another comment --
+        value(VALUE ObjectName)
+END
+
+ifIndex OBJECT-TYPE`
+
+	kinds := tokenKinds(source)
+	expected := []TokenKind{
+		TokKwObjectType,
+		TokKwMacro,
+		TokKwEnd,
+		TokLowercaseIdent,
+		TokKwObjectType,
+		TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "macro body with comments")
+}
+
+func TestMacroBodyWithCommentContainingEND(t *testing.T) {
+	// A comment inside a macro body that contains "END" should not
+	// cause the macro body to terminate early.
+	source := `OBJECT-TYPE MACRO ::=
+BEGIN
+    -- this comment mentions END but should not terminate
+    TYPE NOTATION ::= type(Syntax)
+END
+
+ifIndex OBJECT-TYPE`
+
+	kinds := tokenKinds(source)
+	expected := []TokenKind{
+		TokKwObjectType,
+		TokKwMacro,
+		TokKwEnd,
+		TokLowercaseIdent,
+		TokKwObjectType,
+		TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "macro body comment containing END")
+}
+
+func TestMacroBodyEOFWithoutEnd(t *testing.T) {
+	// Macro body that hits EOF without finding END should produce
+	// TokEOF without crashing.
+	source := `OBJECT-TYPE MACRO ::=
+BEGIN
+    TYPE NOTATION ::= type(Syntax)
+    VALUE NOTATION ::= value(VALUE ObjectName)`
+
+	kinds := tokenKinds(source)
+	// Should get exactly: OBJECT-TYPE, MACRO, EOF (no END found)
+	expected := []TokenKind{TokKwObjectType, TokKwMacro, TokEOF}
+	testutil.SliceEqual(t, expected, kinds, "macro body EOF without END")
+}
+
+func TestExportsEOFWithoutSemicolon(t *testing.T) {
+	// EXPORTS that hits EOF without a semicolon should produce TokEOF.
+	source := "EXPORTS foo, bar, baz"
+	kinds := tokenKinds(source)
+	// Should get exactly: EXPORTS, EOF (body is consumed without semicolon)
+	expected := []TokenKind{TokKwExports, TokEOF}
+	testutil.SliceEqual(t, expected, kinds, "exports EOF without semicolon")
 }

@@ -87,14 +87,11 @@ func (c *cli) cmdLoad(args []string) int {
 	}
 
 	diags := m.Diagnostics()
-	hasSevere := false
 	hasErrors := false
 	for _, d := range diags {
-		if d.Severity.AtLeast(mib.SeveritySevere) {
-			hasSevere = true
-		}
 		if d.Severity.AtLeast(mib.SeverityError) {
 			hasErrors = true
+			break
 		}
 	}
 
@@ -138,10 +135,10 @@ func (c *cli) cmdLoad(args []string) int {
 		printError("%v", loadErr)
 		return exitError
 	}
-	if hasSevere {
+	if hasErrors {
 		return exitError
 	}
-	if *strict && (hasErrors || len(unresolved) > 0) {
+	if *strict && len(unresolved) > 0 {
 		return exitStrictViolation
 	}
 	return exitOK

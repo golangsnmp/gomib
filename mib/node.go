@@ -5,6 +5,7 @@ import (
 	"iter"
 	"maps"
 	"slices"
+	"sync"
 )
 
 // Node is a point in the OID tree. Each node has a numeric arc relative to
@@ -24,7 +25,8 @@ type Node struct {
 	capability  *Capability
 	parent      *Node
 	children    map[uint32]*Node
-	sortedCache []*Node // lazily computed sorted children; nil = invalidated
+	sortedCache []*Node   // lazily computed sorted children; nil = invalidated
+	sortedOnce  sync.Once // ensures thread-safe lazy init of sortedCache
 }
 
 // Arc returns the numeric arc of this node relative to its parent.
@@ -111,11 +113,10 @@ func (n *Node) sortedChildren() []*Node {
 	if len(n.children) == 0 {
 		return nil
 	}
-	if n.sortedCache != nil {
-		return n.sortedCache
-	}
-	n.sortedCache = slices.SortedFunc(maps.Values(n.children), func(a, b *Node) int {
-		return cmp.Compare(a.arc, b.arc)
+	n.sortedOnce.Do(func() {
+		n.sortedCache = slices.SortedFunc(maps.Values(n.children), func(a, b *Node) int {
+			return cmp.Compare(a.arc, b.arc)
+		})
 	})
 	return n.sortedCache
 }
@@ -189,6 +190,7 @@ func (n *Node) getOrCreateChild(arc uint32) *Node {
 	}
 	n.children[arc] = child
 	n.sortedCache = nil
+	n.sortedOnce = sync.Once{}
 	return child
 }
 

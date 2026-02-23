@@ -66,7 +66,7 @@ func resolveOids(ctx *resolverContext) {
 		if !ok {
 			continue
 		}
-		if resolveOidDefinition(ctx, def) {
+		if tryResolveOidDefinition(ctx, def) {
 			resolved++
 		}
 	}
@@ -296,7 +296,7 @@ func collectOidDefinitions(ctx *resolverContext) collectedOidDefinitions {
 	return defs
 }
 
-func resolveOidDefinition(ctx *resolverContext, def oidDefinition) bool {
+func tryResolveOidDefinition(ctx *resolverContext, def oidDefinition) bool {
 	oid := def.oid()
 	if oid == nil {
 		return false
