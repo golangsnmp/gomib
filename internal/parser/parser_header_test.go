@@ -63,7 +63,7 @@ func TestParseMalformedHeaderBadDefinitionsKeyword(t *testing.T) {
 	p := New(source, nil, types.PermissiveConfig())
 	module := p.ParseModule()
 
-	// "DECALRATIONS" is an uppercase ident but not DEFINITIONS or PIB-DEFINITIONS
+	// "DECALRATIONS" is an uppercase ident but not DEFINITIONS
 	testutil.Equal(t, "UNKNOWN", module.Name.Name, "bad keyword should produce UNKNOWN module")
 	testutil.Greater(t, len(module.Diagnostics), 0, "should have diagnostics for bad keyword")
 	testutil.Equal(t, types.DiagParseError, module.Diagnostics[0].Code, "diagnostic code")

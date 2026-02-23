@@ -726,8 +726,6 @@ func lowerAccessKeyword(keyword ast.AccessKeyword) AccessKeyword {
 		return AccessKeywordMaxAccess
 	case ast.AccessKeywordMinAccess:
 		return AccessKeywordMinAccess
-	case ast.AccessKeywordPibAccess:
-		return AccessKeywordPibAccess
 	default:
 		return AccessKeywordAccess
 	}

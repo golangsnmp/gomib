@@ -597,7 +597,7 @@ func shouldPreferModule(ctx *resolverContext, newMod, currentMod *Module, srcMod
 }
 
 // languageRank returns a numeric rank for language preference.
-// Higher is better: SMIv2(2) > SMIv1(1) > Unknown/SPPI(0)
+// Higher is better: SMIv2(2) > SMIv1(1) > Unknown(0)
 func languageRank(lang types.Language) int {
 	switch lang {
 	case types.LanguageSMIv2:

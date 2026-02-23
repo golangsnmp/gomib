@@ -1018,7 +1018,7 @@ func TestConvertSupportsModules(t *testing.T) {
 		}
 	})
 
-	t.Run("SPPI access values preserved in variations", func(t *testing.T) {
+	t.Run("not-implemented access preserved in variations", func(t *testing.T) {
 		notImpl := types.AccessNotImplemented
 		input := []module.SupportsModule{
 			{

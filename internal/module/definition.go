@@ -11,7 +11,6 @@ const (
 	AccessKeywordAccess    AccessKeyword = iota // SMIv1: ACCESS
 	AccessKeywordMaxAccess                      // SMIv2: MAX-ACCESS
 	AccessKeywordMinAccess                      // SMIv2: MIN-ACCESS (compliance)
-	AccessKeywordPibAccess                      // SPPI: PIB-ACCESS
 )
 
 // Definition is a normalized MIB definition. SMIv1 and SMIv2 forms are
