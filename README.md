@@ -2,7 +2,7 @@
 
 Go library for parsing and querying SNMP MIB files.
 
-Supports SMIv1, SMIv2, and SPPI modules. Loads MIBs from directories, directory trees, or embedded filesystems. Resolves imports, builds the OID tree, and provides typed access to objects, types, notifications, and conformance definitions.
+Supports SMIv1 and SMIv2 modules. Loads MIBs from directories, directory trees, or embedded filesystems. Resolves imports, builds the OID tree, and provides typed access to objects, types, notifications, and conformance definitions.
 
 ## Install
 

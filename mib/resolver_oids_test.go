@@ -40,7 +40,6 @@ func TestLanguageRank(t *testing.T) {
 		{types.LanguageSMIv2, 2},
 		{types.LanguageSMIv1, 1},
 		{types.LanguageUnknown, 0},
-		{types.LanguageSPPI, 0},
 	}
 
 	for _, tt := range tests {

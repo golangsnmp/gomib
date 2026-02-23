@@ -44,7 +44,7 @@ const (
 )
 
 // Access represents the access level for OBJECT-TYPE definitions.
-// Includes SMIv1, SMIv2, SPPI (RFC 3159), and AGENT-CAPABILITIES values.
+// Includes SMIv1, SMIv2, and AGENT-CAPABILITIES values.
 type Access = types.Access
 
 const (
@@ -54,9 +54,6 @@ const (
 	AccessReadWrite           = types.AccessReadWrite
 	AccessReadCreate          = types.AccessReadCreate
 	AccessWriteOnly           = types.AccessWriteOnly
-	AccessInstall             = types.AccessInstall
-	AccessInstallNotify       = types.AccessInstallNotify
-	AccessReportOnly          = types.AccessReportOnly
 	AccessNotImplemented      = types.AccessNotImplemented
 )
 
@@ -79,7 +76,6 @@ const (
 	LanguageUnknown = types.LanguageUnknown
 	LanguageSMIv1   = types.LanguageSMIv1
 	LanguageSMIv2   = types.LanguageSMIv2
-	LanguageSPPI    = types.LanguageSPPI
 )
 
 // BaseType identifies the fundamental SMI type.

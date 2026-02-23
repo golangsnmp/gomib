@@ -9,8 +9,7 @@
 //
 // Lowering preserves values verbatim without normalization:
 //   - STATUS: mandatory, optional kept distinct (not mapped to current/deprecated)
-//   - ACCESS: SPPI values kept (install, install-notify, report-only)
-//   - ACCESS keyword kept (ACCESS vs MAX-ACCESS vs PIB-ACCESS)
+//   - ACCESS keyword kept (ACCESS vs MAX-ACCESS)
 //   - OID components kept as symbols (resolution is the resolver's job)
 //   - Type references kept as symbols (resolution is the resolver's job)
 //

@@ -124,9 +124,6 @@ func TestAccessString(t *testing.T) {
 		{AccessReadWrite, "read-write"},
 		{AccessReadCreate, "read-create"},
 		{AccessWriteOnly, "write-only"},
-		{AccessInstall, "install"},
-		{AccessInstallNotify, "install-notify"},
-		{AccessReportOnly, "report-only"},
 		{AccessNotImplemented, "not-implemented"},
 		{Access(99), "Access(99)"},
 	}
@@ -188,7 +185,6 @@ func TestLanguageString(t *testing.T) {
 		{LanguageUnknown, "unknown"},
 		{LanguageSMIv1, "SMIv1"},
 		{LanguageSMIv2, "SMIv2"},
-		{LanguageSPPI, "SPPI"},
 		{Language(99), "Language(99)"},
 	}
 

@@ -187,7 +187,6 @@ const (
 	AccessKeywordAccess AccessKeyword = iota
 	AccessKeywordMaxAccess
 	AccessKeywordMinAccess
-	AccessKeywordPibAccess
 )
 
 // StatusClause holds a parsed STATUS clause value and span.
@@ -196,7 +195,7 @@ type StatusClause struct {
 	Span  types.Span
 }
 
-// IndexClause represents an INDEX or PIB-INDEX clause in OBJECT-TYPE.
+// IndexClause represents an INDEX clause in OBJECT-TYPE.
 type IndexClause interface {
 	IndexClauseSpan() types.Span
 	Indexes() []IndexItem
@@ -212,16 +211,6 @@ type IndexClauseIndex struct {
 func (c *IndexClauseIndex) IndexClauseSpan() types.Span { return c.Span }
 func (c *IndexClauseIndex) Indexes() []IndexItem        { return c.Items }
 func (*IndexClauseIndex) indexClause()                  {}
-
-// IndexClausePibIndex is a PIB-INDEX { ... } clause (SPPI).
-type IndexClausePibIndex struct {
-	Items []IndexItem
-	Span  types.Span
-}
-
-func (c *IndexClausePibIndex) IndexClauseSpan() types.Span { return c.Span }
-func (c *IndexClausePibIndex) Indexes() []IndexItem        { return c.Items }
-func (*IndexClausePibIndex) indexClause()                  {}
 
 // IndexItem is a single entry in an INDEX clause, possibly IMPLIED.
 type IndexItem struct {

@@ -107,22 +107,21 @@ func (p *Parser) validateValueReference(name string, span types.Span) {
 func (p *Parser) ParseModule() *ast.Module {
 	start := p.currentSpan().Start
 
-	name, definitionsKind, err := p.parseModuleHeader()
+	name, err := p.parseModuleHeader()
 	if err != nil {
 		p.recordParseError(*err)
 		p.Log(slog.LevelDebug, "failed to parse module header")
 		span := types.NewSpan(start, p.currentSpan().End)
 		return &ast.Module{
-			Name:            ast.NewIdent("UNKNOWN", span),
-			DefinitionsKind: ast.DefinitionsKindDefinitions,
-			Span:            span,
-			Diagnostics:     append(p.lex.Diagnostics(), p.diagnostics...),
+			Name:        ast.NewIdent("UNKNOWN", span),
+			Span:        span,
+			Diagnostics: append(p.lex.Diagnostics(), p.diagnostics...),
 		}
 	}
 
 	p.Log(slog.LevelDebug, "parsing module", slog.String("module", name.Name))
 
-	module := ast.NewModule(name, definitionsKind, types.NewSpan(start, 0))
+	module := ast.NewModule(name, types.NewSpan(start, 0))
 
 	if p.check(lexer.TokKwImports) {
 		imports, err := p.parseImports()
@@ -258,10 +257,10 @@ func (p *Parser) parseI64(span types.Span, context string) int64 {
 }
 
 // parseModuleHeader parses: ModuleName [{ oid }] DEFINITIONS ::= BEGIN
-func (p *Parser) parseModuleHeader() (ast.Ident, ast.DefinitionsKind, *types.SpanDiagnostic) {
+func (p *Parser) parseModuleHeader() (ast.Ident, *types.SpanDiagnostic) {
 	nameToken, err := p.expectIdentifier()
 	if err != nil {
-		return ast.Ident{}, ast.DefinitionsKindDefinitions, err
+		return ast.Ident{}, err
 	}
 	name := p.makeIdentWithValidation(nameToken)
 
@@ -281,35 +280,22 @@ func (p *Parser) parseModuleHeader() (ast.Ident, ast.DefinitionsKind, *types.Spa
 		}
 	}
 
-	var definitionsKind ast.DefinitionsKind
-	if p.check(lexer.TokUppercaseIdent) {
-		token := p.advance()
-		text := p.text(token.Span)
-		if text == "PIB-DEFINITIONS" {
-			definitionsKind = ast.DefinitionsKindPibDefinitions
-		} else {
-			diag := p.makeError("expected DEFINITIONS or PIB-DEFINITIONS")
-			return ast.Ident{}, ast.DefinitionsKindDefinitions, &diag
-		}
-	} else {
-		_, err := p.expect(lexer.TokKwDefinitions)
-		if err != nil {
-			return ast.Ident{}, ast.DefinitionsKindDefinitions, err
-		}
-		definitionsKind = ast.DefinitionsKindDefinitions
+	_, err = p.expect(lexer.TokKwDefinitions)
+	if err != nil {
+		return ast.Ident{}, err
 	}
 
 	_, err = p.expect(lexer.TokColonColonEqual)
 	if err != nil {
-		return ast.Ident{}, ast.DefinitionsKindDefinitions, err
+		return ast.Ident{}, err
 	}
 
 	_, err = p.expect(lexer.TokKwBegin)
 	if err != nil {
-		return ast.Ident{}, ast.DefinitionsKindDefinitions, err
+		return ast.Ident{}, err
 	}
 
-	return name, definitionsKind, nil
+	return name, nil
 }
 
 func (p *Parser) expectIdentifier() (lexer.Token, *types.SpanDiagnostic) {

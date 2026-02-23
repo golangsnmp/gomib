@@ -14,7 +14,6 @@ func TestParseEmptyModule(t *testing.T) {
 	module := p.ParseModule()
 
 	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name")
-	testutil.Equal(t, ast.DefinitionsKindDefinitions, module.DefinitionsKind, "definitions kind")
 	testutil.Len(t, module.Body, 0, "body should be empty")
 }
 

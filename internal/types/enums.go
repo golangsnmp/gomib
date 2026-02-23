@@ -135,7 +135,7 @@ func (k Kind) IsConformance() bool {
 }
 
 // Access represents the access level for OBJECT-TYPE definitions.
-// Includes SMIv1, SMIv2, SPPI (RFC 3159), and AGENT-CAPABILITIES values.
+// Includes SMIv1, SMIv2, and AGENT-CAPABILITIES values.
 type Access int
 
 const (
@@ -145,10 +145,6 @@ const (
 	AccessReadWrite                         // both: GET and SET
 	AccessReadCreate                        // SMIv2: GET, SET, row creation
 	AccessWriteOnly                         // SMIv1: SET only (obsolete)
-	// SPPI-specific (RFC 3159)
-	AccessInstall       // SPPI: can be installed
-	AccessInstallNotify // SPPI: install + notify
-	AccessReportOnly    // SPPI: reporting only
 	// AGENT-CAPABILITIES specific
 	AccessNotImplemented // variation: not supported
 )
@@ -167,12 +163,6 @@ func (a Access) String() string {
 		return "read-create"
 	case AccessWriteOnly:
 		return "write-only"
-	case AccessInstall:
-		return "install"
-	case AccessInstallNotify:
-		return "install-notify"
-	case AccessReportOnly:
-		return "report-only"
 	case AccessNotImplemented:
 		return "not-implemented"
 	default:
@@ -221,7 +211,6 @@ const (
 	LanguageUnknown Language = iota
 	LanguageSMIv1
 	LanguageSMIv2
-	LanguageSPPI // Policy Information Base (RFC 3159)
 )
 
 func (l Language) String() string {
@@ -232,8 +221,6 @@ func (l Language) String() string {
 		return "SMIv1"
 	case LanguageSMIv2:
 		return "SMIv2"
-	case LanguageSPPI:
-		return "SPPI"
 	default:
 		return fmt.Sprintf("Language(%d)", l)
 	}
