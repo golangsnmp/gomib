@@ -5,6 +5,7 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/module"
+	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -25,9 +26,7 @@ func TestWellKnownRootArc(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := wellKnownRootArc(tt.name)
-			if got != tt.want {
-				t.Errorf("wellKnownRootArc(%q) = %d, want %d", tt.name, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "wellKnownRootArc()")
 		})
 	}
 }
@@ -45,9 +44,7 @@ func TestLanguageRank(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.lang.String(), func(t *testing.T) {
 			got := languageRank(tt.lang)
-			if got != tt.want {
-				t.Errorf("languageRank(%v) = %d, want %d", tt.lang, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "languageRank()")
 		})
 	}
 }
@@ -84,29 +81,19 @@ func TestCollectOidDefinitions(t *testing.T) {
 	defs := collectOidDefinitions(ctx)
 
 	// All OID-bearing definitions except TypeDef and the empty notification
-	if got := len(defs.oidDefs); got != 9 {
-		t.Errorf("got %d oid defs, want 9", got)
-	}
+	testutil.Len(t, defs.oidDefs, 9, "oid defs")
 
-	if got := len(defs.trapDefs); got != 1 {
-		t.Errorf("got %d trap defs, want 1", got)
-	}
+	testutil.Len(t, defs.trapDefs, 1, "trap defs")
 
-	if defs.trapDefs[0].defName() != "myTrap" {
-		t.Errorf("trap def name = %q, want %q", defs.trapDefs[0].defName(), "myTrap")
-	}
+	testutil.Equal(t, "myTrap", defs.trapDefs[0].defName(), "trap def name")
 }
 
 func TestCollectOidDefinitionsEmpty(t *testing.T) {
 	ctx := newResolverContext(nil, nil, DefaultConfig())
 	defs := collectOidDefinitions(ctx)
 
-	if len(defs.oidDefs) != 0 {
-		t.Errorf("expected no oid defs, got %d", len(defs.oidDefs))
-	}
-	if len(defs.trapDefs) != 0 {
-		t.Errorf("expected no trap defs, got %d", len(defs.trapDefs))
-	}
+	testutil.Len(t, defs.oidDefs, 0, "expected no oid defs, got")
+	testutil.Len(t, defs.trapDefs, 0, "expected no trap defs, got")
 }
 
 func TestGetOidParentSymbol(t *testing.T) {
@@ -129,17 +116,13 @@ func TestGetOidParentSymbol(t *testing.T) {
 			kind: defNotification,
 		}
 		_, ok := getOidParentSymbol(ctx, def)
-		if ok {
-			t.Error("expected false for nil oid")
-		}
+		testutil.False(t, ok, "expected false for nil oid")
 	})
 
 	t.Run("empty components", func(t *testing.T) {
 		def := makeOidDef(nil)
 		_, ok := getOidParentSymbol(ctx, def)
-		if ok {
-			t.Error("expected false for empty components")
-		}
+		testutil.False(t, ok, "expected false for empty components")
 	})
 
 	t.Run("OidComponentNumber", func(t *testing.T) {
@@ -147,9 +130,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 			&module.OidComponentNumber{Value: 1},
 		})
 		_, ok := getOidParentSymbol(ctx, def)
-		if ok {
-			t.Error("expected false for numeric root")
-		}
+		testutil.False(t, ok, "expected false for numeric root")
 	})
 
 	t.Run("OidComponentName well-known root", func(t *testing.T) {
@@ -157,9 +138,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 			&module.OidComponentName{NameValue: "iso"},
 		})
 		_, ok := getOidParentSymbol(ctx, def)
-		if ok {
-			t.Error("expected false for well-known root name")
-		}
+		testutil.False(t, ok, "expected false for well-known root name")
 	})
 
 	t.Run("OidComponentName local def", func(t *testing.T) {
@@ -187,9 +166,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 			kind: defValueAssignment,
 		}
 		sym, ok := getOidParentSymbol(localCtx, def)
-		if !ok {
-			t.Fatal("expected true for local definition")
-		}
+		testutil.True(t, ok, "expected true for local definition")
 		if sym.Module != "LOCAL-MIB" || sym.Name != "enterprises" {
 			t.Errorf("got %v, want {LOCAL-MIB, enterprises}", sym)
 		}
@@ -219,12 +196,8 @@ func TestGetOidParentSymbol(t *testing.T) {
 			kind: defValueAssignment,
 		}
 		sym, ok := getOidParentSymbol(localCtx, def)
-		if !ok {
-			t.Fatal("expected true")
-		}
-		if sym.Name != "org" {
-			t.Errorf("got name %q, want %q", sym.Name, "org")
-		}
+		testutil.True(t, ok, "expected true")
+		testutil.Equal(t, "org", sym.Name, "got name")
 	})
 
 	t.Run("OidComponentNamedNumber with well-known root", func(t *testing.T) {
@@ -232,9 +205,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 			&module.OidComponentNamedNumber{NameValue: "iso", NumberValue: 1},
 		})
 		_, ok := getOidParentSymbol(ctx, def)
-		if ok {
-			t.Error("expected false for well-known root named number")
-		}
+		testutil.False(t, ok, "expected false for well-known root named number")
 	})
 
 	t.Run("OidComponentNamedNumber unknown falls back to no dependency", func(t *testing.T) {
@@ -242,9 +213,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 			&module.OidComponentNamedNumber{NameValue: "unknown", NumberValue: 99},
 		})
 		_, ok := getOidParentSymbol(ctx, def)
-		if ok {
-			t.Error("expected false for unknown named number (has numeric fallback)")
-		}
+		testutil.False(t, ok, "expected false for unknown named number (has numeric fallback)")
 	})
 
 	t.Run("OidComponentQualifiedName", func(t *testing.T) {
@@ -252,9 +221,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 			&module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"},
 		})
 		sym, ok := getOidParentSymbol(ctx, def)
-		if !ok {
-			t.Fatal("expected true for qualified name")
-		}
+		testutil.True(t, ok, "expected true for qualified name")
 		if sym.Module != "SNMPv2-SMI" || sym.Name != "enterprises" {
 			t.Errorf("got %v, want {SNMPv2-SMI, enterprises}", sym)
 		}
@@ -265,9 +232,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 			&module.OidComponentQualifiedNamedNumber{ModuleValue: "RFC1155-SMI", NameValue: "private", NumberValue: 4},
 		})
 		sym, ok := getOidParentSymbol(ctx, def)
-		if !ok {
-			t.Fatal("expected true for qualified named number")
-		}
+		testutil.True(t, ok, "expected true for qualified named number")
 		if sym.Module != "RFC1155-SMI" || sym.Name != "private" {
 			t.Errorf("got %v, want {RFC1155-SMI, private}", sym)
 		}
@@ -292,17 +257,11 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 		for _, d := range ctx.Diagnostics() {
 			if d.Code == "identifier-hyphen-smiv2" {
 				found = true
-				if d.Severity != SeverityWarning {
-					t.Errorf("severity = %v, want SeverityWarning", d.Severity)
-				}
-				if d.Module != "MY-MIB" {
-					t.Errorf("module = %q, want %q", d.Module, "MY-MIB")
-				}
+				testutil.Equal(t, SeverityWarning, d.Severity, "severity")
+				testutil.Equal(t, "MY-MIB", d.Module, "module")
 			}
 		}
-		if !found {
-			t.Error("expected identifier-hyphen-smiv2 diagnostic")
-		}
+		testutil.True(t, found, "expected identifier-hyphen-smiv2 diagnostic")
 	})
 
 	t.Run("SMIv2 without hyphen emits nothing", func(t *testing.T) {
@@ -317,9 +276,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 		ctx := newResolverContext(nil, nil, DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
-		if len(ctx.Diagnostics()) != 0 {
-			t.Errorf("expected no diagnostics, got %d", len(ctx.Diagnostics()))
-		}
+		testutil.Len(t, ctx.Diagnostics(), 0, "expected no diagnostics, got")
 	})
 
 	t.Run("SMIv1 with hyphen emits nothing", func(t *testing.T) {
@@ -334,9 +291,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 		ctx := newResolverContext(nil, nil, DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
-		if len(ctx.Diagnostics()) != 0 {
-			t.Errorf("expected no diagnostics for SMIv1, got %d", len(ctx.Diagnostics()))
-		}
+		testutil.Len(t, ctx.Diagnostics(), 0, "expected no diagnostics for SMIv1, got")
 	})
 
 	t.Run("base module skipped", func(t *testing.T) {
@@ -351,9 +306,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 		ctx := newResolverContext(nil, nil, DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
-		if len(ctx.Diagnostics()) != 0 {
-			t.Errorf("expected no diagnostics for base module, got %d", len(ctx.Diagnostics()))
-		}
+		testutil.Len(t, ctx.Diagnostics(), 0, "expected no diagnostics for base module, got")
 	})
 }
 
@@ -361,33 +314,21 @@ func TestResolveNumericComponent(t *testing.T) {
 	t.Run("nil parent creates root-level node", func(t *testing.T) {
 		ctx := newTestContext()
 		node := resolveNumericComponent(ctx, nil, 1)
-		if node == nil {
-			t.Fatal("expected non-nil node")
-		}
-		if node.Arc() != 1 {
-			t.Errorf("arc = %d, want 1", node.Arc())
-		}
+		testutil.NotNil(t, node, "expected non-nil node")
+		testutil.Equal(t, 1, node.Arc(), "arc")
 		// The node is a child of the pseudo-root, so its parent is
 		// the pseudo-root (not nil). Verify it's the same node that
 		// Builder.GetOrCreateRoot returns.
-		if node != ctx.Mib.Root().getOrCreateChild(1) {
-			t.Error("expected same node as Builder.GetOrCreateRoot(1)")
-		}
+		testutil.Equal(t, ctx.Mib.Root().getOrCreateChild(1), node, "expected same node as Builder.GetOrCreateRoot(1)")
 	})
 
 	t.Run("creates child of existing parent", func(t *testing.T) {
 		ctx := newTestContext()
 		parent := ctx.Mib.Root().getOrCreateChild(1) // iso
 		child := resolveNumericComponent(ctx, parent, 3)
-		if child == nil {
-			t.Fatal("expected non-nil child")
-		}
-		if child.Arc() != 3 {
-			t.Errorf("arc = %d, want 3", child.Arc())
-		}
-		if child.IsRoot() {
-			t.Error("expected non-root (has parent)")
-		}
+		testutil.NotNil(t, child, "expected non-nil child")
+		testutil.Equal(t, 3, child.Arc(), "arc")
+		testutil.False(t, child.IsRoot(), "expected non-root (has parent)")
 	})
 
 	t.Run("returns same node on repeat", func(t *testing.T) {
@@ -395,9 +336,7 @@ func TestResolveNumericComponent(t *testing.T) {
 		parent := ctx.Mib.Root().getOrCreateChild(1)
 		child1 := resolveNumericComponent(ctx, parent, 3)
 		child2 := resolveNumericComponent(ctx, parent, 3)
-		if child1 != child2 {
-			t.Error("expected same node on repeated getOrCreateChild")
-		}
+		testutil.Equal(t, child2, child1, "expected same node on repeated getOrCreateChild")
 	})
 }
 
@@ -418,9 +357,7 @@ func TestLookupOrCreateWellKnownRoot(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := newTestContext()
 			node, ok := lookupOrCreateWellKnownRoot(ctx, tt.name)
-			if ok != tt.wantOk {
-				t.Fatalf("ok = %v, want %v", ok, tt.wantOk)
-			}
+			testutil.Equal(t, tt.wantOk, ok, "ok")
 			if ok && node.Arc() != tt.wantArc {
 				t.Errorf("arc = %d, want %d", node.Arc(), tt.wantArc)
 			}
@@ -438,12 +375,8 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 		ctx.registerModuleNodeSymbol(smiMod, "internet", node)
 
 		got, ok := lookupSmiGlobalOidRoot(ctx, "internet")
-		if !ok {
-			t.Fatal("expected true")
-		}
-		if got != node {
-			t.Error("expected same node")
-		}
+		testutil.True(t, ok, "expected true")
+		testutil.Equal(t, node, got, "expected same node")
 	})
 
 	t.Run("returns node when registered in RFC1155-SMI", func(t *testing.T) {
@@ -455,28 +388,20 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 		ctx.registerModuleNodeSymbol(rfc1155Mod, "internet", node)
 
 		got, ok := lookupSmiGlobalOidRoot(ctx, "internet")
-		if !ok {
-			t.Fatal("expected true")
-		}
-		if got != node {
-			t.Error("expected same node")
-		}
+		testutil.True(t, ok, "expected true")
+		testutil.Equal(t, node, got, "expected same node")
 	})
 
 	t.Run("returns false for non-global name", func(t *testing.T) {
 		ctx := newTestContext()
 		_, ok := lookupSmiGlobalOidRoot(ctx, "myCustomOid")
-		if ok {
-			t.Error("expected false for non-global name")
-		}
+		testutil.False(t, ok, "expected false for non-global name")
 	})
 
 	t.Run("returns false when module not loaded", func(t *testing.T) {
 		ctx := newTestContext()
 		_, ok := lookupSmiGlobalOidRoot(ctx, "internet")
-		if ok {
-			t.Error("expected false when module not loaded")
-		}
+		testutil.False(t, ok, "expected false when module not loaded")
 	})
 }
 
@@ -487,9 +412,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx := newTestContext()
 		ctx.ModuleToResolved = map[*module.Module]*Module{srcMod: newMod}
 
-		if !shouldPreferModule(ctx, newMod, nil, srcMod) {
-			t.Error("expected true when currentMod is nil")
-		}
+		testutil.True(t, shouldPreferModule(ctx, newMod, nil, srcMod), "expected true when currentMod is nil")
 	})
 
 	t.Run("nil currentSrcMod prefers new", func(t *testing.T) {
@@ -500,9 +423,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*Module{srcMod: newMod}
 		ctx.ResolvedToModule = map[*Module]*module.Module{} // currentMod not mapped
 
-		if !shouldPreferModule(ctx, newMod, currentMod, srcMod) {
-			t.Error("expected true when currentSrcMod lookup returns nil")
-		}
+		testutil.True(t, shouldPreferModule(ctx, newMod, currentMod, srcMod), "expected true when currentSrcMod lookup returns nil")
 	})
 
 	t.Run("SMIv2 preferred over SMIv1", func(t *testing.T) {
@@ -515,9 +436,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		if !shouldPreferModule(ctx, newMod, oldMod, newSrc) {
-			t.Error("expected SMIv2 to be preferred over SMIv1")
-		}
+		testutil.True(t, shouldPreferModule(ctx, newMod, oldMod, newSrc), "expected SMIv2 to be preferred over SMIv1")
 	})
 
 	t.Run("SMIv1 not preferred over SMIv2", func(t *testing.T) {
@@ -557,9 +476,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		if !shouldPreferModule(ctx, newMod, oldMod, newSrc) {
-			t.Error("expected newer LAST-UPDATED to win")
-		}
+		testutil.True(t, shouldPreferModule(ctx, newMod, oldMod, newSrc), "expected newer LAST-UPDATED to win")
 	})
 
 	t.Run("same language older LAST-UPDATED loses", func(t *testing.T) {
@@ -629,15 +546,9 @@ func TestFinalizeOidDefinition(t *testing.T) {
 
 			finalizeOidDefinition(ctx, def, node, "testNode")
 
-			if node.Kind() != tt.wantKind {
-				t.Errorf("kind = %v, want %v", node.Kind(), tt.wantKind)
-			}
-			if node.Name() != "testNode" {
-				t.Errorf("name = %q, want %q", node.Name(), "testNode")
-			}
-			if node.Module() != resolvedMod {
-				t.Error("expected module to be set to resolvedMod")
-			}
+			testutil.Equal(t, tt.wantKind, node.Kind(), "kind")
+			testutil.Equal(t, "testNode", node.Name(), "name")
+			testutil.Equal(t, resolvedMod, node.Module(), "expected module to be set to resolvedMod")
 		})
 	}
 }
@@ -653,9 +564,7 @@ func TestOidDefinitionDefName(t *testing.T) {
 		kind: defObjectType,
 	}
 
-	if got := def.defName(); got != "sysDescr" {
-		t.Errorf("defName() = %q, want %q", got, "sysDescr")
-	}
+	testutil.Equal(t, "sysDescr", def.defName(), "defName()")
 }
 
 func TestOidDefinitionOid(t *testing.T) {
@@ -671,12 +580,8 @@ func TestOidDefinitionOid(t *testing.T) {
 			kind: defValueAssignment,
 		}
 		got := def.oid()
-		if got == nil {
-			t.Fatal("expected non-nil oid")
-		}
-		if len(got.Components) != 2 {
-			t.Errorf("got %d components, want 2", len(got.Components))
-		}
+		testutil.NotNil(t, got, "expected non-nil oid")
+		testutil.Len(t, got.Components, 2, "components")
 	})
 
 	t.Run("returns nil for typedef", func(t *testing.T) {
@@ -685,9 +590,7 @@ func TestOidDefinitionOid(t *testing.T) {
 			def:  &module.TypeDef{Name: "MyType"},
 			kind: defValueAssignment,
 		}
-		if def.oid() != nil {
-			t.Error("expected nil oid for TypeDef")
-		}
+		testutil.Nil(t, def.oid(), "expected nil oid for TypeDef")
 	})
 }
 
@@ -728,9 +631,7 @@ func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
 	}
 
 	sym, ok := getOidParentSymbol(ctx, def)
-	if !ok {
-		t.Fatal("expected true in permissive mode for SMI global root")
-	}
+	testutil.True(t, ok, "expected true in permissive mode for SMI global root")
 	if sym.Module != "SNMPv2-SMI" || sym.Name != "enterprises" {
 		t.Errorf("got %v, want {SNMPv2-SMI, enterprises}", sym)
 	}
@@ -753,9 +654,7 @@ func TestGetOidParentSymbolStrictNoSmiGlobal(t *testing.T) {
 	}
 
 	_, ok := getOidParentSymbol(ctx, def)
-	if ok {
-		t.Error("expected false in strict mode for unimported SMI global")
-	}
+	testutil.False(t, ok, "expected false in strict mode for unimported SMI global")
 }
 
 func TestCollectOidDefinitionsKindMapping(t *testing.T) {
@@ -796,18 +695,12 @@ func TestCollectOidDefinitionsKindMapping(t *testing.T) {
 		{"cap", defAgentCapabilities},
 	}
 
-	if len(defs.oidDefs) != len(expected) {
-		t.Fatalf("got %d oid defs, want %d", len(defs.oidDefs), len(expected))
-	}
+	testutil.Len(t, defs.oidDefs, len(expected), "oid defs")
 
 	for i, exp := range expected {
 		d := defs.oidDefs[i]
-		if d.defName() != exp.name {
-			t.Errorf("[%d] name = %q, want %q", i, d.defName(), exp.name)
-		}
-		if d.kind != exp.kind {
-			t.Errorf("[%d] kind = %d, want %d", i, d.kind, exp.kind)
-		}
+		testutil.Equal(t, exp.name, d.defName(), "[] name")
+		testutil.Equal(t, exp.kind, d.kind, "[] kind")
 	}
 }
 
@@ -819,20 +712,12 @@ func TestTrapTypeRef(t *testing.T) {
 	}
 	ref := trapTypeRef{mod: &module.Module{Name: "TEST-MIB"}, notif: notif}
 
-	if got := ref.defName(); got != "myTrap" {
-		t.Errorf("defName() = %q, want %q", got, "myTrap")
-	}
+	testutil.Equal(t, "myTrap", ref.defName(), "defName()")
 
 	enterprise, trapNum, span, ok := ref.trapInfo()
-	if !ok {
-		t.Fatal("expected ok = true")
-	}
-	if enterprise != "enterprises" {
-		t.Errorf("enterprise = %q, want %q", enterprise, "enterprises")
-	}
-	if trapNum != 5 {
-		t.Errorf("trapNumber = %d, want 5", trapNum)
-	}
+	testutil.True(t, ok, "expected ok = true")
+	testutil.Equal(t, "enterprises", enterprise, "enterprise")
+	testutil.Equal(t, 5, trapNum, "trapNumber")
 	if span.Start != 10 || span.End != 20 {
 		t.Errorf("span = %v, want {10, 20}", span)
 	}
@@ -843,9 +728,7 @@ func TestTrapTypeRefNilTrapInfo(t *testing.T) {
 	ref := trapTypeRef{mod: &module.Module{Name: "TEST-MIB"}, notif: notif}
 
 	_, _, _, ok := ref.trapInfo()
-	if ok {
-		t.Error("expected ok = false for nil TrapInfo")
-	}
+	testutil.False(t, ok, "expected ok = false for nil TrapInfo")
 }
 
 func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
@@ -877,9 +760,7 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 	}
 	finalizeOidDefinition(ctx, v2Def, node, "newMIB")
 
-	if v2Mod.OID() == nil {
-		t.Fatal("preferred module should have OID set")
-	}
+	testutil.NotNil(t, v2Mod.OID(), "preferred module should have OID set")
 
 	// Second: finalize the non-preferred module (SMIv1) at the same node
 	v1Def := oidDefinition{
@@ -890,14 +771,10 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 	finalizeOidDefinition(ctx, v1Def, node, "oldMIB")
 
 	// The non-preferred module should NOT have its OID set
-	if v1Mod.OID() != nil {
-		t.Errorf("non-preferred module should not have OID set, got %v", v1Mod.OID())
-	}
+	testutil.Nil(t, v1Mod.OID(), "non-preferred module should not have OID set, got")
 
 	// The preferred module should still have OID set
-	if v2Mod.OID() == nil {
-		t.Error("preferred module OID should still be set")
-	}
+	testutil.NotNil(t, v2Mod.OID(), "preferred module OID should still be set")
 }
 
 func TestResolveTrapTypeDefinitions_GenericTraps(t *testing.T) {
@@ -965,12 +842,8 @@ func TestResolveTrapTypeDefinitions_GenericTraps(t *testing.T) {
 			continue
 		}
 		got := node.OID()
-		if !got.Equal(tt.wantOID) {
-			t.Errorf("%s: OID = %v, want %v", tt.name, got, tt.wantOID)
-		}
-		if node.Kind() != KindNotification {
-			t.Errorf("%s: kind = %v, want KindNotification", tt.name, node.Kind())
-		}
+		testutil.True(t, got.Equal(tt.wantOID), ": OID")
+		testutil.Equal(t, KindNotification, node.Kind(), ": kind")
 	}
 }
 
@@ -1003,18 +876,12 @@ func TestResolveTrapTypeDefinitions_EnterpriseSpecific(t *testing.T) {
 	resolveTrapTypeDefinitions(ctx, defs)
 
 	node, ok := ctx.LookupNodeForModule(srcMod, "vendorTrap")
-	if !ok {
-		t.Fatal("vendorTrap: not resolved")
-	}
+	testutil.True(t, ok, "vendorTrap: not resolved")
 	// enterprise.0.trapNumber = cisco.0.42
 	wantOID := OID{1, 3, 6, 1, 4, 1, 9, 0, 42}
 	got := node.OID()
-	if !got.Equal(wantOID) {
-		t.Errorf("vendorTrap: OID = %v, want %v", got, wantOID)
-	}
-	if node.Kind() != KindNotification {
-		t.Errorf("vendorTrap: kind = %v, want KindNotification", node.Kind())
-	}
+	testutil.True(t, got.Equal(wantOID), "vendorTrap: OID")
+	testutil.Equal(t, KindNotification, node.Kind(), "vendorTrap: kind")
 }
 
 func TestIsSnmpTrapsOID(t *testing.T) {
@@ -1033,9 +900,7 @@ func TestIsSnmpTrapsOID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isSnmpTrapsOID(tt.oid); got != tt.want {
-				t.Errorf("isSnmpTrapsOID(%v) = %v, want %v", tt.oid, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, isSnmpTrapsOID(tt.oid), "isSnmpTrapsOID()")
 		})
 	}
 }

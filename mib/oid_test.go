@@ -1,6 +1,10 @@
 package mib
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
+)
 
 func TestParseOID(t *testing.T) {
 	tests := []struct {
@@ -30,32 +34,22 @@ func TestParseOID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseOID(tt.input)
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("ParseOID(%q) expected error, got %v", tt.input, got)
-				}
+				testutil.Error(t, err, "ParseOID() expected error, got")
 				return
 			}
-			if err != nil {
-				t.Fatalf("ParseOID(%q) unexpected error: %v", tt.input, err)
-			}
+			testutil.NoError(t, err, "ParseOID(%q)", tt.input)
 			if tt.wantNil {
-				if got != nil {
-					t.Errorf("ParseOID(%q) expected nil, got %v", tt.input, got)
-				}
+				testutil.Nil(t, got, "ParseOID() expected nil, got")
 				return
 			}
-			if got.String() != tt.want {
-				t.Errorf("ParseOID(%q) = %q, want %q", tt.input, got.String(), tt.want)
-			}
+			testutil.Equal(t, tt.want, got.String(), "ParseOID()")
 		})
 	}
 }
 
 func TestParseOIDTrailingDot(t *testing.T) {
 	_, err := ParseOID("1.3.")
-	if err == nil {
-		t.Fatal("ParseOID(\"1.3.\") should return error for trailing dot")
-	}
+	testutil.Error(t, err, "ParseOID(\"1.3.\") should return error for trailing dot")
 }
 
 func TestOidString(t *testing.T) {
@@ -73,9 +67,7 @@ func TestOidString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.oid.String()
-			if got != tt.want {
-				t.Errorf("OID.String() = %q, want %q", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "OID.String()")
 		})
 	}
 }
@@ -97,14 +89,10 @@ func TestOidParent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.oid.Parent()
 			if tt.wantNil {
-				if got != nil {
-					t.Errorf("Parent() = %v, want nil", got)
-				}
+				testutil.Nil(t, got, "Parent()")
 				return
 			}
-			if got.String() != tt.want {
-				t.Errorf("Parent() = %q, want %q", got.String(), tt.want)
-			}
+			testutil.Equal(t, tt.want, got.String(), "Parent()")
 		})
 	}
 }
@@ -116,29 +104,21 @@ func TestOidParentDoesNotMutate(t *testing.T) {
 	if parent != nil {
 		parent[0] = 99
 	}
-	if original[0] != 1 {
-		t.Error("Parent() returned a slice that shares backing array with original")
-	}
+	testutil.Equal(t, 1, original[0], "Parent() returned a slice that shares backing array with original")
 }
 
 func TestOidChild(t *testing.T) {
 	oid := OID{1, 3, 6}
 	child := oid.Child(1)
-	if child.String() != "1.3.6.1" {
-		t.Errorf("Child(1) = %q, want 1.3.6.1", child.String())
-	}
+	testutil.Equal(t, "1.3.6.1", child.String(), "Child(1)")
 
 	// Original should be unchanged
-	if oid.String() != "1.3.6" {
-		t.Errorf("original mutated: got %q", oid.String())
-	}
+	testutil.Equal(t, "1.3.6", oid.String(), "original mutated: got")
 
 	// Nil oid
 	var nilOid OID
 	c := nilOid.Child(1)
-	if c.String() != "1" {
-		t.Errorf("nil.Child(1) = %q, want 1", c.String())
-	}
+	testutil.Equal(t, "1", c.String(), "nil.Child(1)")
 }
 
 func TestOidHasPrefix(t *testing.T) {
@@ -161,9 +141,7 @@ func TestOidHasPrefix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.oid.HasPrefix(tt.prefix)
-			if got != tt.want {
-				t.Errorf("HasPrefix() = %v, want %v", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "HasPrefix()")
 		})
 	}
 }
@@ -184,9 +162,7 @@ func TestOidEqual(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.a.Equal(tt.b)
-			if got != tt.want {
-				t.Errorf("Equal() = %v, want %v", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "Equal()")
 		})
 	}
 }
@@ -207,9 +183,7 @@ func TestOidCompare(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.a.Compare(tt.b)
-			if got != tt.want {
-				t.Errorf("Compare() = %d, want %d", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "Compare()")
 		})
 	}
 }
@@ -229,9 +203,7 @@ func TestOidLastArc(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.oid.LastArc()
-			if got != tt.want {
-				t.Errorf("LastArc() = %d, want %d", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "LastArc()")
 		})
 	}
 }

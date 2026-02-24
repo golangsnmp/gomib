@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
+	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -21,9 +22,7 @@ func TestIsMacroSymbol(t *testing.T) {
 		"TRAP-TYPE",
 	}
 	for _, name := range macros {
-		if !isMacroSymbol(name) {
-			t.Errorf("isMacroSymbol(%q) = false, want true", name)
-		}
+		testutil.True(t, isMacroSymbol(name), "isMacroSymbol() = false, want true")
 	}
 
 	nonMacros := []string{
@@ -57,9 +56,7 @@ func TestBaseModuleImportAlias(t *testing.T) {
 	}
 	for _, tt := range tests {
 		got := baseModuleImportAlias(tt.input)
-		if got != tt.want {
-			t.Errorf("baseModuleImportAlias(%q) = %q, want %q", tt.input, got, tt.want)
-		}
+		testutil.Equal(t, tt.want, got, "baseModuleImportAlias()")
 	}
 }
 
@@ -85,9 +82,7 @@ func TestNormalizeTimestamp(t *testing.T) {
 	}
 	for _, tt := range tests {
 		got := normalizeTimestamp(tt.input)
-		if got != tt.want {
-			t.Errorf("normalizeTimestamp(%q) = %q, want %q", tt.input, got, tt.want)
-		}
+		testutil.Equal(t, tt.want, got, "normalizeTimestamp()")
 	}
 }
 
@@ -103,9 +98,7 @@ func TestExtractLastUpdated(t *testing.T) {
 			},
 		}
 		got := extractLastUpdated(mod)
-		if got != "200210180000Z" {
-			t.Errorf("extractLastUpdated() = %q, want %q", got, "200210180000Z")
-		}
+		testutil.Equal(t, "200210180000Z", got, "extractLastUpdated()")
 	})
 
 	t.Run("module without ModuleIdentity", func(t *testing.T) {
@@ -116,9 +109,7 @@ func TestExtractLastUpdated(t *testing.T) {
 			},
 		}
 		got := extractLastUpdated(mod)
-		if got != "" {
-			t.Errorf("extractLastUpdated() = %q, want empty", got)
-		}
+		testutil.Equal(t, "", got, "extractLastUpdated()")
 	})
 
 	t.Run("module with empty LastUpdated", func(t *testing.T) {
@@ -132,17 +123,13 @@ func TestExtractLastUpdated(t *testing.T) {
 			},
 		}
 		got := extractLastUpdated(mod)
-		if got != "" {
-			t.Errorf("extractLastUpdated() = %q, want empty", got)
-		}
+		testutil.Equal(t, "", got, "extractLastUpdated()")
 	})
 
 	t.Run("no definitions", func(t *testing.T) {
 		mod := &module.Module{Name: "EMPTY-MIB"}
 		got := extractLastUpdated(mod)
-		if got != "" {
-			t.Errorf("extractLastUpdated() = %q, want empty", got)
-		}
+		testutil.Equal(t, "", got, "extractLastUpdated()")
 	})
 }
 
@@ -170,30 +157,22 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 	t.Run("no candidates", func(t *testing.T) {
 		ctx := newTestContext()
 		_, ok := findCandidateWithAllSymbols(ctx, nil, syms("foo"))
-		if ok {
-			t.Error("expected no match with empty candidates")
-		}
+		testutil.False(t, ok, "expected no match with empty candidates")
 	})
 
 	t.Run("single candidate with all symbols", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := makeTestModule(ctx, "MOD-A", []string{"foo", "bar"})
 		got, ok := findCandidateWithAllSymbols(ctx, []*module.Module{mod}, syms("foo", "bar"))
-		if !ok {
-			t.Fatal("expected match")
-		}
-		if got != mod {
-			t.Error("expected MOD-A")
-		}
+		testutil.True(t, ok, "expected match")
+		testutil.Equal(t, mod, got, "expected MOD-A")
 	})
 
 	t.Run("single candidate missing symbols", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := makeTestModule(ctx, "MOD-A", []string{"foo"})
 		_, ok := findCandidateWithAllSymbols(ctx, []*module.Module{mod}, syms("foo", "bar"))
-		if ok {
-			t.Error("expected no match when candidate is missing symbols")
-		}
+		testutil.False(t, ok, "expected no match when candidate is missing symbols")
 	})
 
 	t.Run("multiple candidates, pick one with all symbols", func(t *testing.T) {
@@ -201,12 +180,8 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 		modA := makeTestModule(ctx, "MOD-A", []string{"foo"})
 		modB := makeTestModule(ctx, "MOD-B", []string{"foo", "bar", "baz"})
 		got, ok := findCandidateWithAllSymbols(ctx, []*module.Module{modA, modB}, syms("foo", "bar"))
-		if !ok {
-			t.Fatal("expected match")
-		}
-		if got != modB {
-			t.Errorf("expected MOD-B, got %s", got.Name)
-		}
+		testutil.True(t, ok, "expected match")
+		testutil.Equal(t, modB, got, "expected MOD-B, got")
 	})
 
 	t.Run("tiebreak by LAST-UPDATED, prefer newer", func(t *testing.T) {
@@ -243,12 +218,8 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 		got, ok := findCandidateWithAllSymbols(ctx,
 			[]*module.Module{modOld, modNew},
 			syms("foo", "bar"))
-		if !ok {
-			t.Fatal("expected match")
-		}
-		if got != modNew {
-			t.Errorf("expected MOD-NEW (newer), got %s", got.Name)
-		}
+		testutil.True(t, ok, "expected match")
+		testutil.Equal(t, modNew, got, "expected MOD-NEW (newer), got")
 	})
 
 	t.Run("candidate with nil defNames is skipped", func(t *testing.T) {
@@ -257,12 +228,8 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 		// no defNames registered for modNil
 		modGood := makeTestModule(ctx, "MOD-GOOD", []string{"x"})
 		got, ok := findCandidateWithAllSymbols(ctx, []*module.Module{modNil, modGood}, syms("x"))
-		if !ok {
-			t.Fatal("expected match")
-		}
-		if got != modGood {
-			t.Errorf("expected MOD-GOOD, got %s", got.Name)
-		}
+		testutil.True(t, ok, "expected match")
+		testutil.Equal(t, modGood, got, "expected MOD-GOOD, got")
 	})
 
 	t.Run("no candidate has all symbols", func(t *testing.T) {
@@ -270,9 +237,7 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 		modA := makeTestModule(ctx, "A", []string{"x"})
 		modB := makeTestModule(ctx, "B", []string{"y"})
 		_, ok := findCandidateWithAllSymbols(ctx, []*module.Module{modA, modB}, syms("x", "y"))
-		if ok {
-			t.Error("expected no match when no single candidate has all symbols")
-		}
+		testutil.False(t, ok, "expected no match when no single candidate has all symbols")
 	})
 }
 
@@ -289,24 +254,16 @@ func TestTryPartialResolution(t *testing.T) {
 		ctx := newTestContext()
 		mod := makeTestModule(ctx, "SRC", []string{"a", "b", "c"})
 		resolved, unresolved := tryPartialResolution(ctx, []*module.Module{mod}, syms("a", "b"))
-		if len(resolved) != 2 {
-			t.Errorf("resolved count = %d, want 2", len(resolved))
-		}
-		if len(unresolved) != 0 {
-			t.Errorf("unresolved count = %d, want 0", len(unresolved))
-		}
+		testutil.Len(t, resolved, 2, "resolved count")
+		testutil.Len(t, unresolved, 0, "unresolved count")
 	})
 
 	t.Run("partial resolution", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := makeTestModule(ctx, "SRC", []string{"a", "c"})
 		resolved, unresolved := tryPartialResolution(ctx, []*module.Module{mod}, syms("a", "b", "c"))
-		if len(resolved) != 2 {
-			t.Errorf("resolved count = %d, want 2", len(resolved))
-		}
-		if len(unresolved) != 1 {
-			t.Errorf("unresolved count = %d, want 1", len(unresolved))
-		}
+		testutil.Len(t, resolved, 2, "resolved count")
+		testutil.Len(t, unresolved, 1, "unresolved count")
 		if len(unresolved) > 0 && unresolved[0].name != "b" {
 			t.Errorf("unresolved symbol = %q, want %q", unresolved[0].name, "b")
 		}
@@ -316,12 +273,8 @@ func TestTryPartialResolution(t *testing.T) {
 		ctx := newTestContext()
 		mod := makeTestModule(ctx, "SRC", []string{"x", "y"})
 		resolved, unresolved := tryPartialResolution(ctx, []*module.Module{mod}, syms("a", "b"))
-		if len(resolved) != 0 {
-			t.Errorf("resolved count = %d, want 0", len(resolved))
-		}
-		if len(unresolved) != 2 {
-			t.Errorf("unresolved count = %d, want 2", len(unresolved))
-		}
+		testutil.Len(t, resolved, 0, "resolved count")
+		testutil.Len(t, unresolved, 2, "unresolved count")
 	})
 
 	t.Run("multiple candidates, first match wins", func(t *testing.T) {
@@ -329,12 +282,8 @@ func TestTryPartialResolution(t *testing.T) {
 		mod1 := makeTestModule(ctx, "SRC-1", []string{"a"})
 		mod2 := makeTestModule(ctx, "SRC-2", []string{"a", "b"})
 		resolved, _ := tryPartialResolution(ctx, []*module.Module{mod1, mod2}, syms("a"))
-		if len(resolved) != 1 {
-			t.Fatalf("resolved count = %d, want 1", len(resolved))
-		}
-		if resolved[0].source != mod1 {
-			t.Errorf("expected symbol to resolve from SRC-1, got %s", resolved[0].source.Name)
-		}
+		testutil.Len(t, resolved, 1, "resolved count")
+		testutil.Equal(t, mod1, resolved[0].source, "expected symbol to resolve from SRC-1, got")
 	})
 
 	t.Run("candidate with nil defNames", func(t *testing.T) {
@@ -342,12 +291,8 @@ func TestTryPartialResolution(t *testing.T) {
 		modNil := &module.Module{Name: "NIL-MOD"}
 		modGood := makeTestModule(ctx, "GOOD", []string{"a"})
 		resolved, unresolved := tryPartialResolution(ctx, []*module.Module{modNil, modGood}, syms("a"))
-		if len(resolved) != 1 {
-			t.Errorf("resolved count = %d, want 1", len(resolved))
-		}
-		if len(unresolved) != 0 {
-			t.Errorf("unresolved count = %d, want 0", len(unresolved))
-		}
+		testutil.Len(t, resolved, 1, "resolved count")
+		testutil.Len(t, unresolved, 0, "unresolved count")
 	})
 }
 
@@ -364,13 +309,9 @@ func TestTryImportForwarding(t *testing.T) {
 		ctx := newTestContext()
 		candidate := makeTestModule(ctx, "BASE", []string{"foo", "bar"})
 		result := tryImportForwarding(ctx, []*module.Module{candidate}, syms("foo", "bar"))
-		if len(result) != 2 {
-			t.Fatalf("forwarded count = %d, want 2", len(result))
-		}
+		testutil.Len(t, result, 2, "forwarded count")
 		for _, fwd := range result {
-			if fwd.source != candidate {
-				t.Errorf("expected source BASE, got %s", fwd.source.Name)
-			}
+			testutil.Equal(t, candidate, fwd.source, "expected source BASE, got")
 		}
 	})
 
@@ -394,21 +335,15 @@ func TestTryImportForwarding(t *testing.T) {
 		ctx.ModuleIndex["REAL-SOURCE"] = []*module.Module{sourceMod}
 
 		result := tryImportForwarding(ctx, []*module.Module{candidate}, syms("foo", "bar"))
-		if len(result) != 2 {
-			t.Fatalf("forwarded count = %d, want 2", len(result))
-		}
+		testutil.Len(t, result, 2, "forwarded count")
 
 		// foo should come from candidate (direct), bar from sourceMod (forwarded)
 		symbolSources := make(map[string]*module.Module)
 		for _, fwd := range result {
 			symbolSources[fwd.symbol] = fwd.source
 		}
-		if symbolSources["foo"] != candidate {
-			t.Error("foo should come from INTERMEDIATE")
-		}
-		if symbolSources["bar"] != sourceMod {
-			t.Error("bar should come from REAL-SOURCE")
-		}
+		testutil.Equal(t, candidate, symbolSources["foo"], "foo should come from INTERMEDIATE")
+		testutil.Equal(t, sourceMod, symbolSources["bar"], "bar should come from REAL-SOURCE")
 	})
 
 	t.Run("forwarded symbol source module not found", func(t *testing.T) {
@@ -424,9 +359,7 @@ func TestTryImportForwarding(t *testing.T) {
 		}
 		// MISSING-MODULE is not in the module index
 		result := tryImportForwarding(ctx, []*module.Module{candidate}, syms("foo", "bar"))
-		if result != nil {
-			t.Errorf("expected nil when forwarded module is missing, got %d results", len(result))
-		}
+		testutil.Nil(t, result, "expected nil when forwarded module is missing, got  results")
 	})
 
 	t.Run("symbol not found anywhere", func(t *testing.T) {
@@ -434,17 +367,13 @@ func TestTryImportForwarding(t *testing.T) {
 		candidate := makeTestModule(ctx, "BASE", []string{"foo"})
 		candidate.Imports = nil
 		result := tryImportForwarding(ctx, []*module.Module{candidate}, syms("foo", "missing"))
-		if result != nil {
-			t.Errorf("expected nil when symbol is not found, got %d results", len(result))
-		}
+		testutil.Nil(t, result, "expected nil when symbol is not found, got  results")
 	})
 
 	t.Run("no candidates", func(t *testing.T) {
 		ctx := newTestContext()
 		result := tryImportForwarding(ctx, nil, syms("foo"))
-		if result != nil {
-			t.Errorf("expected nil with no candidates, got %d results", len(result))
-		}
+		testutil.Nil(t, result, "expected nil with no candidates, got  results")
 	})
 
 	t.Run("multiple candidates, second succeeds", func(t *testing.T) {
@@ -465,12 +394,8 @@ func TestTryImportForwarding(t *testing.T) {
 		ctx.ModuleDefNames[cand2] = map[string]struct{}{}
 
 		result := tryImportForwarding(ctx, []*module.Module{cand1, cand2}, syms("alpha"))
-		if len(result) != 1 {
-			t.Fatalf("forwarded count = %d, want 1", len(result))
-		}
-		if result[0].source != sourceMod {
-			t.Errorf("expected source SOURCE, got %s", result[0].source.Name)
-		}
+		testutil.Len(t, result, 1, "forwarded count")
+		testutil.Equal(t, sourceMod, result[0].source, "expected source SOURCE, got")
 	})
 }
 
@@ -494,12 +419,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "SNMPv2-SMI",
 			syms("MODULE-IDENTITY", "OBJECT-TYPE"))
 		// No imports registered, no unresolved recorded
-		if len(ctx.ModuleImports[importing]) != 0 {
-			t.Error("expected no imports for macro-only symbols")
-		}
-		if len(ctx.unresolvedImports) != 0 {
-			t.Error("expected no unresolved imports for macro-only symbols")
-		}
+		testutil.Equal(t, 0, len(ctx.ModuleImports[importing]), "expected no imports for macro-only symbols")
+		testutil.Len(t, ctx.unresolvedImports, 0, "expected no unresolved imports for macro-only symbols")
 	})
 
 	t.Run("direct resolution", func(t *testing.T) {
@@ -512,15 +433,9 @@ func TestResolveImportsFromModule(t *testing.T) {
 			syms("sysDescr", "sysName"))
 
 		imports := ctx.ModuleImports[importing]
-		if len(imports) != 2 {
-			t.Fatalf("import count = %d, want 2", len(imports))
-		}
-		if imports["sysDescr"] != source {
-			t.Error("sysDescr should resolve to SOURCE-MIB")
-		}
-		if imports["sysName"] != source {
-			t.Error("sysName should resolve to SOURCE-MIB")
-		}
+		testutil.Equal(t, 2, len(imports), "import count")
+		testutil.Equal(t, source, imports["sysDescr"], "sysDescr should resolve to SOURCE-MIB")
+		testutil.Equal(t, source, imports["sysName"], "sysName should resolve to SOURCE-MIB")
 	})
 
 	t.Run("macros filtered, non-macros resolved", func(t *testing.T) {
@@ -533,12 +448,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 			syms("OBJECT-TYPE", "sysDescr"))
 
 		imports := ctx.ModuleImports[importing]
-		if len(imports) != 1 {
-			t.Fatalf("import count = %d, want 1", len(imports))
-		}
-		if imports["sysDescr"] != source {
-			t.Error("sysDescr should resolve to SOURCE-MIB")
-		}
+		testutil.Equal(t, 1, len(imports), "import count")
+		testutil.Equal(t, source, imports["sysDescr"], "sysDescr should resolve to SOURCE-MIB")
 	})
 
 	t.Run("alias resolution", func(t *testing.T) {
@@ -553,12 +464,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 			syms("enterprises", "Counter32"))
 
 		imports := ctx.ModuleImports[importing]
-		if len(imports) != 2 {
-			t.Fatalf("import count = %d, want 2", len(imports))
-		}
-		if imports["enterprises"] != source {
-			t.Error("enterprises should resolve via alias to SNMPv2-SMI")
-		}
+		testutil.Equal(t, 2, len(imports), "import count")
+		testutil.Equal(t, source, imports["enterprises"], "enterprises should resolve via alias to SNMPv2-SMI")
 	})
 
 	t.Run("alias disabled in strict mode", func(t *testing.T) {
@@ -570,12 +477,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "SNMPv2-SMI-v1",
 			syms("enterprises"))
 
-		if len(ctx.ModuleImports[importing]) != 0 {
-			t.Error("alias should not be used in strict mode")
-		}
-		if len(ctx.unresolvedImports) != 1 {
-			t.Errorf("expected 1 unresolved, got %d", len(ctx.unresolvedImports))
-		}
+		testutil.Equal(t, 0, len(ctx.ModuleImports[importing]), "alias should not be used in strict mode")
+		testutil.Len(t, ctx.unresolvedImports, 1, "expected 1 unresolved, got")
 	})
 
 	t.Run("forwarding resolution", func(t *testing.T) {
@@ -602,15 +505,9 @@ func TestResolveImportsFromModule(t *testing.T) {
 			syms("localDef", "remoteSym"))
 
 		imports := ctx.ModuleImports[importing]
-		if len(imports) != 2 {
-			t.Fatalf("import count = %d, want 2", len(imports))
-		}
-		if imports["localDef"] != intermediate {
-			t.Error("localDef should come from INTERMEDIATE")
-		}
-		if imports["remoteSym"] != realSource {
-			t.Error("remoteSym should be forwarded from REAL-SOURCE")
-		}
+		testutil.Equal(t, 2, len(imports), "import count")
+		testutil.Equal(t, intermediate, imports["localDef"], "localDef should come from INTERMEDIATE")
+		testutil.Equal(t, realSource, imports["remoteSym"], "remoteSym should be forwarded from REAL-SOURCE")
 	})
 
 	t.Run("partial resolution", func(t *testing.T) {
@@ -625,21 +522,13 @@ func TestResolveImportsFromModule(t *testing.T) {
 			syms("found1", "found2", "missing1"))
 
 		imports := ctx.ModuleImports[importing]
-		if len(imports) != 2 {
-			t.Fatalf("import count = %d, want 2", len(imports))
-		}
+		testutil.Equal(t, 2, len(imports), "import count")
 		if imports["found1"] != source || imports["found2"] != source {
 			t.Error("found symbols should resolve to PARTIAL-MIB")
 		}
-		if len(ctx.unresolvedImports) != 1 {
-			t.Fatalf("unresolved count = %d, want 1", len(ctx.unresolvedImports))
-		}
-		if ctx.unresolvedImports[0].symbol != "missing1" {
-			t.Errorf("unresolved symbol = %q, want %q", ctx.unresolvedImports[0].symbol, "missing1")
-		}
-		if ctx.unresolvedImports[0].reason != reasonSymbolNotExported {
-			t.Errorf("unresolved reason = %q, want %q", ctx.unresolvedImports[0].reason, reasonSymbolNotExported)
-		}
+		testutil.Len(t, ctx.unresolvedImports, 1, "unresolved count")
+		testutil.Equal(t, "missing1", ctx.unresolvedImports[0].symbol, "unresolved symbol")
+		testutil.Equal(t, reasonSymbolNotExported, ctx.unresolvedImports[0].reason, "unresolved reason")
 	})
 
 	t.Run("module not found", func(t *testing.T) {
@@ -648,15 +537,9 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "NONEXISTENT-MIB",
 			syms("something"))
 
-		if len(ctx.ModuleImports[importing]) != 0 {
-			t.Error("expected no imports when module is not found")
-		}
-		if len(ctx.unresolvedImports) != 1 {
-			t.Fatalf("unresolved count = %d, want 1", len(ctx.unresolvedImports))
-		}
-		if ctx.unresolvedImports[0].reason != reasonModuleNotFound {
-			t.Errorf("reason = %q, want %q", ctx.unresolvedImports[0].reason, reasonModuleNotFound)
-		}
+		testutil.Equal(t, 0, len(ctx.ModuleImports[importing]), "expected no imports when module is not found")
+		testutil.Len(t, ctx.unresolvedImports, 1, "unresolved count")
+		testutil.Equal(t, reasonModuleNotFound, ctx.unresolvedImports[0].reason, "reason")
 	})
 
 	t.Run("module not found emits correct diagnostic code", func(t *testing.T) {
@@ -693,15 +576,9 @@ func TestResolveImportsFromModule(t *testing.T) {
 			syms("missing"))
 
 		// Strict mode disallows fallbacks, so it falls through to module_not_found
-		if len(ctx.ModuleImports[importing]) != 0 {
-			t.Error("expected no imports in strict mode with missing symbol")
-		}
-		if len(ctx.unresolvedImports) != 1 {
-			t.Fatalf("unresolved count = %d, want 1", len(ctx.unresolvedImports))
-		}
-		if ctx.unresolvedImports[0].reason != reasonModuleNotFound {
-			t.Errorf("reason = %q, want %q", ctx.unresolvedImports[0].reason, reasonModuleNotFound)
-		}
+		testutil.Equal(t, 0, len(ctx.ModuleImports[importing]), "expected no imports in strict mode with missing symbol")
+		testutil.Len(t, ctx.unresolvedImports, 1, "unresolved count")
+		testutil.Equal(t, reasonModuleNotFound, ctx.unresolvedImports[0].reason, "reason")
 	})
 
 	t.Run("forwarding disabled in strict mode", func(t *testing.T) {
@@ -722,9 +599,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 		importing := &module.Module{Name: "IMPORTER"}
 		resolveImportsFromModule(ctx, importing, "INTER", syms("sym"))
 
-		if len(ctx.ModuleImports[importing]) != 0 {
-			t.Error("forwarding should not be used in strict mode")
-		}
+		testutil.Equal(t, 0, len(ctx.ModuleImports[importing]), "forwarding should not be used in strict mode")
 	})
 }
 
@@ -739,9 +614,7 @@ func TestResolveTransitiveImports(t *testing.T) {
 
 		resolveTransitiveImports(ctx)
 
-		if ctx.ModuleImports[modA]["x"] != modB {
-			t.Error("direct definer should remain unchanged")
-		}
+		testutil.Equal(t, modB, ctx.ModuleImports[modA]["x"], "direct definer should remain unchanged")
 	})
 
 	t.Run("one-hop re-export resolved", func(t *testing.T) {
@@ -758,9 +631,7 @@ func TestResolveTransitiveImports(t *testing.T) {
 
 		resolveTransitiveImports(ctx)
 
-		if ctx.ModuleImports[modA]["x"] != modC {
-			t.Error("expected A's import of x to resolve transitively to C")
-		}
+		testutil.Equal(t, modC, ctx.ModuleImports[modA]["x"], "expected A's import of x to resolve transitively to C")
 	})
 
 	t.Run("multi-hop re-export resolved", func(t *testing.T) {
@@ -779,15 +650,9 @@ func TestResolveTransitiveImports(t *testing.T) {
 
 		resolveTransitiveImports(ctx)
 
-		if ctx.ModuleImports[modA]["x"] != modD {
-			t.Errorf("expected A->D, got A->%s", ctx.ModuleImports[modA]["x"].Name)
-		}
-		if ctx.ModuleImports[modB]["x"] != modD {
-			t.Errorf("expected B->D, got B->%s", ctx.ModuleImports[modB]["x"].Name)
-		}
-		if ctx.ModuleImports[modC]["x"] != modD {
-			t.Errorf("expected C->D, got C->%s", ctx.ModuleImports[modC]["x"].Name)
-		}
+		testutil.Equal(t, modD, ctx.ModuleImports[modA]["x"], "expected A->D, got A->")
+		testutil.Equal(t, modD, ctx.ModuleImports[modB]["x"], "expected B->D, got B->")
+		testutil.Equal(t, modD, ctx.ModuleImports[modC]["x"], "expected C->D, got C->")
 	})
 
 	t.Run("cycle does not panic", func(t *testing.T) {
@@ -815,9 +680,7 @@ func TestResolveTransitiveImports(t *testing.T) {
 
 		resolveTransitiveImports(ctx)
 
-		if ctx.ModuleImports[modA]["x"] != modB {
-			t.Error("dead end should keep the original target")
-		}
+		testutil.Equal(t, modB, ctx.ModuleImports[modA]["x"], "dead end should keep the original target")
 	})
 
 	t.Run("different symbols resolve independently", func(t *testing.T) {
@@ -835,12 +698,8 @@ func TestResolveTransitiveImports(t *testing.T) {
 
 		resolveTransitiveImports(ctx)
 
-		if ctx.ModuleImports[modA]["x"] != modC {
-			t.Error("x should resolve transitively to C")
-		}
-		if ctx.ModuleImports[modA]["y"] != modB {
-			t.Error("y should stay at B (direct definer)")
-		}
+		testutil.Equal(t, modC, ctx.ModuleImports[modA]["x"], "x should resolve transitively to C")
+		testutil.Equal(t, modB, ctx.ModuleImports[modA]["y"], "y should stay at B (direct definer)")
 	})
 }
 
@@ -866,15 +725,9 @@ func TestResolveImports(t *testing.T) {
 		resolveImports(ctx)
 
 		imports := ctx.ModuleImports[importing]
-		if len(imports) != 2 {
-			t.Fatalf("import count = %d, want 2 (macros filtered)", len(imports))
-		}
-		if imports["sysDescr"] != source {
-			t.Error("sysDescr should resolve to SOURCE-MIB")
-		}
-		if imports["sysName"] != source {
-			t.Error("sysName should resolve to SOURCE-MIB")
-		}
+		testutil.Equal(t, 2, len(imports), "import count")
+		testutil.Equal(t, source, imports["sysDescr"], "sysDescr should resolve to SOURCE-MIB")
+		testutil.Equal(t, source, imports["sysName"], "sysName should resolve to SOURCE-MIB")
 	})
 
 	t.Run("multiple source modules", func(t *testing.T) {
@@ -897,11 +750,7 @@ func TestResolveImports(t *testing.T) {
 		resolveImports(ctx)
 
 		imports := ctx.ModuleImports[importing]
-		if imports["alpha"] != sourceA {
-			t.Error("alpha should resolve to MOD-A")
-		}
-		if imports["beta"] != sourceB {
-			t.Error("beta should resolve to MOD-B")
-		}
+		testutil.Equal(t, sourceA, imports["alpha"], "alpha should resolve to MOD-A")
+		testutil.Equal(t, sourceB, imports["beta"], "beta should resolve to MOD-B")
 	})
 }

@@ -1,9 +1,10 @@
 package mib
 
 import (
-	"slices"
 	"sync"
 	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 // buildTree constructs:
@@ -36,18 +37,14 @@ func TestChildrenSortOrder(t *testing.T) {
 
 	// Root children should be sorted by arc: a(1), b(5)
 	children := root.Children()
-	if len(children) != 2 {
-		t.Fatalf("got %d children, want 2", len(children))
-	}
+	testutil.Len(t, children, 2, "children")
 	if children[0].name != "a" || children[1].name != "b" {
 		t.Errorf("got [%s, %s], want [a, b]", children[0].name, children[1].name)
 	}
 
 	// Node a's children: d(arc 1) before c(arc 3)
 	aChildren := children[0].Children()
-	if len(aChildren) != 2 {
-		t.Fatalf("got %d children for a, want 2", len(aChildren))
-	}
+	testutil.Len(t, aChildren, 2, "children for a")
 	if aChildren[0].name != "d" || aChildren[1].name != "c" {
 		t.Errorf("got [%s, %s], want [d, c]", aChildren[0].name, aChildren[1].name)
 	}
@@ -74,9 +71,7 @@ func TestSubtreeOrder(t *testing.T) {
 	// Pre-order DFS, children sorted by arc:
 	// root("") -> a(1) -> d(1) -> c(3) -> b(5) -> e(2)
 	want := []string{"", "a", "d", "c", "b", "e"}
-	if !slices.Equal(names, want) {
-		t.Errorf("got %v, want %v", names, want)
-	}
+	testutil.SliceEqual(t, want, names, "got")
 }
 
 func TestSubtreeEarlyStop(t *testing.T) {
@@ -91,9 +86,7 @@ func TestSubtreeEarlyStop(t *testing.T) {
 	}
 
 	want := []string{"", "a", "d"}
-	if !slices.Equal(names, want) {
-		t.Errorf("got %v, want %v", names, want)
-	}
+	testutil.SliceEqual(t, want, names, "got")
 }
 
 func TestWalkOID(t *testing.T) {
@@ -117,12 +110,8 @@ func TestWalkOID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			node, exact := root.walkOID(tt.oid)
-			if node.name != tt.wantName {
-				t.Errorf("node = %q, want %q", node.name, tt.wantName)
-			}
-			if exact != tt.wantExact {
-				t.Errorf("exact = %v, want %v", exact, tt.wantExact)
-			}
+			testutil.Equal(t, tt.wantName, node.name, "node")
+			testutil.Equal(t, tt.wantExact, exact, "exact")
 		})
 	}
 }
@@ -138,9 +127,7 @@ func TestSortedChildrenConcurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			children := root.Children()
-			if len(children) != 2 {
-				t.Errorf("got %d children, want 2", len(children))
-			}
+			testutil.Len(t, children, 2, "children")
 		}()
 	}
 	wg.Wait()

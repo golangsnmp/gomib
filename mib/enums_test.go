@@ -3,6 +3,8 @@ package mib
 import (
 	"strings"
 	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 func TestSeverityString(t *testing.T) {
@@ -23,9 +25,7 @@ func TestSeverityString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			got := tt.sev.String()
-			if got != tt.want {
-				t.Errorf("Severity(%d).String() = %q, want %q", tt.sev, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "Severity().String()")
 		})
 	}
 }
@@ -45,9 +45,7 @@ func TestStrictnessLevelString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			got := tt.level.String()
-			if got != tt.want {
-				t.Errorf("StrictnessLevel(%d).String() = %q, want %q", tt.level, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "StrictnessLevel().String()")
 		})
 	}
 }
@@ -74,9 +72,7 @@ func TestKindString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			got := tt.kind.String()
-			if got != tt.want {
-				t.Errorf("Kind(%d).String() = %q, want %q", tt.kind, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "Kind().String()")
 		})
 	}
 }
@@ -86,14 +82,10 @@ func TestKindIsObjectType(t *testing.T) {
 	nonObjectTypes := []Kind{KindUnknown, KindInternal, KindNode, KindNotification, KindGroup, KindCompliance, KindCapability}
 
 	for _, k := range objectTypes {
-		if !k.IsObjectType() {
-			t.Errorf("%s should be IsObjectType()", k)
-		}
+		testutil.True(t, k.IsObjectType(), "should be IsObjectType()")
 	}
 	for _, k := range nonObjectTypes {
-		if k.IsObjectType() {
-			t.Errorf("%s should not be IsObjectType()", k)
-		}
+		testutil.False(t, k.IsObjectType(), "should not be IsObjectType()")
 	}
 }
 
@@ -102,14 +94,10 @@ func TestKindIsConformance(t *testing.T) {
 	nonConformance := []Kind{KindUnknown, KindInternal, KindNode, KindScalar, KindTable, KindRow, KindColumn, KindNotification}
 
 	for _, k := range conformance {
-		if !k.IsConformance() {
-			t.Errorf("%s should be IsConformance()", k)
-		}
+		testutil.True(t, k.IsConformance(), "should be IsConformance()")
 	}
 	for _, k := range nonConformance {
-		if k.IsConformance() {
-			t.Errorf("%s should not be IsConformance()", k)
-		}
+		testutil.False(t, k.IsConformance(), "should not be IsConformance()")
 	}
 }
 
@@ -131,9 +119,7 @@ func TestAccessString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			got := tt.access.String()
-			if got != tt.want {
-				t.Errorf("Access(%d).String() = %q, want %q", tt.access, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "Access().String()")
 		})
 	}
 }
@@ -154,9 +140,7 @@ func TestStatusString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			got := tt.status.String()
-			if got != tt.want {
-				t.Errorf("Status(%d).String() = %q, want %q", tt.status, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "Status().String()")
 		})
 	}
 }
@@ -166,14 +150,10 @@ func TestStatusIsSMIv1(t *testing.T) {
 	notSMIv1 := []Status{StatusCurrent, StatusDeprecated, StatusObsolete}
 
 	for _, s := range smiv1 {
-		if !s.IsSMIv1() {
-			t.Errorf("%s should be IsSMIv1()", s)
-		}
+		testutil.True(t, s.IsSMIv1(), "should be IsSMIv1()")
 	}
 	for _, s := range notSMIv1 {
-		if s.IsSMIv1() {
-			t.Errorf("%s should not be IsSMIv1()", s)
-		}
+		testutil.False(t, s.IsSMIv1(), "should not be IsSMIv1()")
 	}
 }
 
@@ -191,9 +171,7 @@ func TestLanguageString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			got := tt.lang.String()
-			if got != tt.want {
-				t.Errorf("Language(%d).String() = %q, want %q", tt.lang, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "Language().String()")
 		})
 	}
 }
@@ -222,9 +200,7 @@ func TestBaseTypeString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(strings.ReplaceAll(tt.want, " ", "_"), func(t *testing.T) {
 			got := tt.bt.String()
-			if got != tt.want {
-				t.Errorf("BaseType(%d).String() = %q, want %q", tt.bt, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "BaseType().String()")
 		})
 	}
 }

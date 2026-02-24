@@ -1,17 +1,16 @@
 package mib
 
 import (
-	"slices"
 	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 func TestEffectiveBase(t *testing.T) {
 	t.Run("direct", func(t *testing.T) {
 		ty := newType("MyInt")
 		ty.setBase(BaseInteger32)
-		if got := ty.EffectiveBase(); got != BaseInteger32 {
-			t.Errorf("got %v, want %v", got, BaseInteger32)
-		}
+		testutil.Equal(t, BaseInteger32, ty.EffectiveBase(), "got")
 	})
 
 	t.Run("inherited from parent", func(t *testing.T) {
@@ -20,9 +19,7 @@ func TestEffectiveBase(t *testing.T) {
 		child := newType("Child")
 		child.setParent(parent)
 
-		if got := child.EffectiveBase(); got != BaseOctetString {
-			t.Errorf("got %v, want %v", got, BaseOctetString)
-		}
+		testutil.Equal(t, BaseOctetString, child.EffectiveBase(), "got")
 	})
 
 	t.Run("inherited from grandparent", func(t *testing.T) {
@@ -33,9 +30,7 @@ func TestEffectiveBase(t *testing.T) {
 		child := newType("Child")
 		child.setParent(parent)
 
-		if got := child.EffectiveBase(); got != BaseGauge32 {
-			t.Errorf("got %v, want %v", got, BaseGauge32)
-		}
+		testutil.Equal(t, BaseGauge32, child.EffectiveBase(), "got")
 	})
 
 	t.Run("child shadows parent", func(t *testing.T) {
@@ -45,9 +40,7 @@ func TestEffectiveBase(t *testing.T) {
 		child.setBase(BaseInteger32)
 		child.setParent(parent)
 
-		if got := child.EffectiveBase(); got != BaseInteger32 {
-			t.Errorf("got %v, want %v", got, BaseInteger32)
-		}
+		testutil.Equal(t, BaseInteger32, child.EffectiveBase(), "got")
 	})
 
 	t.Run("no base anywhere", func(t *testing.T) {
@@ -55,9 +48,7 @@ func TestEffectiveBase(t *testing.T) {
 		child := newType("Child")
 		child.setParent(parent)
 
-		if got := child.EffectiveBase(); got != 0 {
-			t.Errorf("got %v, want 0", got)
-		}
+		testutil.Equal(t, 0, child.EffectiveBase(), "got")
 	})
 }
 
@@ -72,9 +63,7 @@ func TestEffectiveEnums(t *testing.T) {
 		child.setParent(parent)
 
 		got := child.EffectiveEnums()
-		if !slices.Equal(got, parentEnums) {
-			t.Errorf("got %v, want %v", got, parentEnums)
-		}
+		testutil.SliceEqual(t, parentEnums, got, "got")
 	})
 
 	t.Run("child shadows parent", func(t *testing.T) {
@@ -85,18 +74,14 @@ func TestEffectiveEnums(t *testing.T) {
 		child.setParent(parent)
 
 		got := child.EffectiveEnums()
-		if !slices.Equal(got, childEnums) {
-			t.Errorf("got %v, want %v", got, childEnums)
-		}
+		testutil.SliceEqual(t, childEnums, got, "got")
 	})
 
 	t.Run("none anywhere", func(t *testing.T) {
 		child := newType("Child")
 		child.setParent(newType("Parent"))
 
-		if got := child.EffectiveEnums(); got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
+		testutil.Nil(t, child.EffectiveEnums(), "expected nil")
 	})
 
 	t.Run("returns clone", func(t *testing.T) {
@@ -115,26 +100,20 @@ func TestIsEnumeration(t *testing.T) {
 		ty := newType("Status")
 		ty.setBase(BaseInteger32)
 		ty.setEnums([]NamedValue{{Label: "active", Value: 1}})
-		if !ty.IsEnumeration() {
-			t.Error("want true")
-		}
+		testutil.True(t, ty.IsEnumeration(), "want true")
 	})
 
 	t.Run("integer without enums", func(t *testing.T) {
 		ty := newType("MyInt")
 		ty.setBase(BaseInteger32)
-		if ty.IsEnumeration() {
-			t.Error("want false")
-		}
+		testutil.False(t, ty.IsEnumeration(), "want false")
 	})
 
 	t.Run("non-integer with enums", func(t *testing.T) {
 		ty := newType("Weird")
 		ty.setBase(BaseOctetString)
 		ty.setEnums([]NamedValue{{Label: "x", Value: 1}})
-		if ty.IsEnumeration() {
-			t.Error("want false")
-		}
+		testutil.False(t, ty.IsEnumeration(), "want false")
 	})
 
 	t.Run("enums inherited from parent", func(t *testing.T) {
@@ -144,9 +123,7 @@ func TestIsEnumeration(t *testing.T) {
 		child := newType("Child")
 		child.setParent(parent)
 
-		if !child.IsEnumeration() {
-			t.Error("want true")
-		}
+		testutil.True(t, child.IsEnumeration(), "want true")
 	})
 }
 
@@ -154,24 +131,18 @@ func TestIsCounter(t *testing.T) {
 	t.Run("counter32", func(t *testing.T) {
 		ty := newType("C32")
 		ty.setBase(BaseCounter32)
-		if !ty.IsCounter() {
-			t.Error("want true for Counter32")
-		}
+		testutil.True(t, ty.IsCounter(), "want true for Counter32")
 	})
 
 	t.Run("counter64", func(t *testing.T) {
 		ty := newType("C64")
 		ty.setBase(BaseCounter64)
-		if !ty.IsCounter() {
-			t.Error("want true for Counter64")
-		}
+		testutil.True(t, ty.IsCounter(), "want true for Counter64")
 	})
 
 	t.Run("gauge is not counter", func(t *testing.T) {
 		ty := newType("G")
 		ty.setBase(BaseGauge32)
-		if ty.IsCounter() {
-			t.Error("want false for Gauge32")
-		}
+		testutil.False(t, ty.IsCounter(), "want false for Gauge32")
 	})
 }

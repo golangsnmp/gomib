@@ -1,8 +1,9 @@
 package mib
 
 import (
-	"slices"
 	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 func TestDefValString(t *testing.T) {
@@ -35,9 +36,7 @@ func TestDefValString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.dv.String()
-			if got != tt.want {
-				t.Errorf("DefVal.String() = %q, want %q", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "DefVal.String()")
 		})
 	}
 }
@@ -60,26 +59,18 @@ func TestDefValKindString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			got := tt.kind.String()
-			if got != tt.want {
-				t.Errorf("DefValKind(%d).String() = %q, want %q", int(tt.kind), got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "DefValKind().String()")
 		})
 	}
 }
 
 func TestDefValIsZero(t *testing.T) {
 	var zero DefVal
-	if !zero.IsZero() {
-		t.Error("zero DefVal should report IsZero() true")
-	}
-	if zero.Kind() != DefValKindUnset {
-		t.Errorf("zero DefVal Kind() = %v, want DefValKindUnset", zero.Kind())
-	}
+	testutil.True(t, zero.IsZero(), "zero DefVal should report IsZero() true")
+	testutil.Equal(t, DefValKindUnset, zero.Kind(), "zero DefVal Kind()")
 
 	nonZero := newDefValInt(0, "0")
-	if nonZero.IsZero() {
-		t.Error("newDefValInt(0) should not be IsZero (value is set, just happens to be 0)")
-	}
+	testutil.False(t, nonZero.IsZero(), "newDefValInt(0) should not be IsZero (value is set, just happens to be 0)")
 }
 
 func TestDefValKind(t *testing.T) {
@@ -99,9 +90,7 @@ func TestDefValKind(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.dv.Kind() != tt.want {
-				t.Errorf("Kind() = %v, want %v", tt.dv.Kind(), tt.want)
-			}
+			testutil.Equal(t, tt.want, tt.dv.Kind(), "Kind()")
 		})
 	}
 }
@@ -109,58 +98,40 @@ func TestDefValKind(t *testing.T) {
 func TestDefValValue(t *testing.T) {
 	dv := newDefValInt(42, "42")
 	v := dv.Value()
-	if v.(int64) != 42 {
-		t.Errorf("Value() = %v, want 42", v)
-	}
+	testutil.Equal(t, 42, v.(int64), "Value()")
 }
 
 func TestDefValRaw(t *testing.T) {
 	dv := newDefValInt(42, "42")
-	if dv.Raw() != "42" {
-		t.Errorf("Raw() = %q, want %q", dv.Raw(), "42")
-	}
+	testutil.Equal(t, "42", dv.Raw(), "Raw()")
 }
 
 func TestDefValAs(t *testing.T) {
 	t.Run("int64 match", func(t *testing.T) {
 		dv := newDefValInt(42, "42")
 		v, ok := DefValAs[int64](dv)
-		if !ok {
-			t.Fatal("DefValAs[int64] should succeed")
-		}
-		if v != 42 {
-			t.Errorf("got %d, want 42", v)
-		}
+		testutil.True(t, ok, "DefValAs[int64] should succeed")
+		testutil.Equal(t, 42, v, "got")
 	})
 
 	t.Run("uint64 match", func(t *testing.T) {
 		dv := newDefValUint(100, "100")
 		v, ok := DefValAs[uint64](dv)
-		if !ok {
-			t.Fatal("DefValAs[uint64] should succeed")
-		}
-		if v != 100 {
-			t.Errorf("got %d, want 100", v)
-		}
+		testutil.True(t, ok, "DefValAs[uint64] should succeed")
+		testutil.Equal(t, 100, v, "got")
 	})
 
 	t.Run("string match", func(t *testing.T) {
 		dv := newDefValString("hello", `"hello"`)
 		v, ok := DefValAs[string](dv)
-		if !ok {
-			t.Fatal("DefValAs[string] should succeed")
-		}
-		if v != "hello" {
-			t.Errorf("got %q, want %q", v, "hello")
-		}
+		testutil.True(t, ok, "DefValAs[string] should succeed")
+		testutil.Equal(t, "hello", v, "got")
 	})
 
 	t.Run("bytes match", func(t *testing.T) {
 		dv := newDefValBytes([]byte{0xAB}, "x")
 		v, ok := DefValAs[[]byte](dv)
-		if !ok {
-			t.Fatal("DefValAs[[]byte] should succeed")
-		}
+		testutil.True(t, ok, "DefValAs[[]byte] should succeed")
 		if len(v) != 1 || v[0] != 0xAB {
 			t.Errorf("got %x, want [AB]", v)
 		}
@@ -169,43 +140,29 @@ func TestDefValAs(t *testing.T) {
 	t.Run("type mismatch", func(t *testing.T) {
 		dv := newDefValInt(42, "42")
 		_, ok := DefValAs[string](dv)
-		if ok {
-			t.Error("DefValAs[string] on int DefVal should return false")
-		}
+		testutil.False(t, ok, "DefValAs[string] on int DefVal should return false")
 	})
 
 	t.Run("bits match", func(t *testing.T) {
 		dv := newDefValBits([]string{"a", "b"}, "x")
 		v, ok := DefValAs[[]string](dv)
-		if !ok {
-			t.Fatal("DefValAs[[]string] should succeed")
-		}
-		if len(v) != 2 {
-			t.Errorf("got %v, want [a b]", v)
-		}
+		testutil.True(t, ok, "DefValAs[[]string] should succeed")
+		testutil.Len(t, v, 2, "got")
 	})
 
 	t.Run("oid match", func(t *testing.T) {
 		dv := newDefValOID(OID{1, 3}, "1.3")
 		v, ok := DefValAs[OID](dv)
-		if !ok {
-			t.Fatal("DefValAs[OID] should succeed")
-		}
-		if v.String() != "1.3" {
-			t.Errorf("got %v, want 1.3", v)
-		}
+		testutil.True(t, ok, "DefValAs[OID] should succeed")
+		testutil.Equal(t, "1.3", v.String(), "got")
 	})
 }
 
 func TestDefValStringZeroValue(t *testing.T) {
 	var zero DefVal
-	if !zero.IsZero() {
-		t.Fatal("zero DefVal should report IsZero() true")
-	}
+	testutil.True(t, zero.IsZero(), "zero DefVal should report IsZero() true")
 	got := zero.String()
-	if got != "" {
-		t.Errorf("zero DefVal.String() = %q, want %q", got, "")
-	}
+	testutil.Equal(t, "", got, "zero DefVal.String()")
 }
 
 func TestRangeString(t *testing.T) {
@@ -223,9 +180,7 @@ func TestRangeString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.r.String()
-			if got != tt.want {
-				t.Errorf("Range.String() = %q, want %q", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "Range.String()")
 		})
 	}
 }
@@ -246,9 +201,7 @@ func TestBytesToHex(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := bytesToHex(tt.input)
-			if got != tt.want {
-				t.Errorf("bytesToHex(%x) = %q, want %q", tt.input, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "bytesToHex()")
 		})
 	}
 }
@@ -320,9 +273,7 @@ func TestComplianceModulesDeepClone(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := c.Modules()
 			tt.mutate(got)
-			if tt.wasMutated() {
-				t.Errorf("mutating Modules()[].%s should not affect internal state", tt.name)
-			}
+			testutil.False(t, tt.wasMutated(), "mutating Modules()[]. should not affect internal state")
 		})
 	}
 }
@@ -387,9 +338,7 @@ func TestCapabilitySupportsDeepClone(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := cap.Supports()
 			tt.mutate(got)
-			if tt.wasMutated() {
-				t.Errorf("mutating Supports()[].%s should not affect internal state", tt.name)
-			}
+			testutil.False(t, tt.wasMutated(), "mutating Supports()[]. should not affect internal state")
 		})
 	}
 }
@@ -405,12 +354,8 @@ func TestSyntaxConstraintsClone(t *testing.T) {
 	cloned := orig.clone()
 
 	// Verify cloned values match original
-	if !slices.Equal(cloned.Sizes, orig.Sizes) {
-		t.Error("cloned Sizes should equal original")
-	}
-	if !slices.Equal(cloned.Ranges, orig.Ranges) {
-		t.Error("cloned Ranges should equal original")
-	}
+	testutil.SliceEqual(t, orig.Sizes, cloned.Sizes, "cloned Sizes should equal original")
+	testutil.SliceEqual(t, orig.Ranges, cloned.Ranges, "cloned Ranges should equal original")
 
 	// Verify mutations to clone don't propagate to original
 	tests := []struct {
@@ -438,16 +383,12 @@ func TestSyntaxConstraintsClone(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := orig.clone()
 			tt.mutate(c)
-			if tt.wasMutated() {
-				t.Errorf("mutating cloned %s should not affect original", tt.name)
-			}
+			testutil.False(t, tt.wasMutated(), "mutating cloned  should not affect original")
 		})
 	}
 }
 
 func TestSyntaxConstraintsCloneNil(t *testing.T) {
 	var sc *SyntaxConstraints
-	if sc.clone() != nil {
-		t.Error("clone of nil SyntaxConstraints should return nil")
-	}
+	testutil.Nil(t, sc.clone(), "clone of nil SyntaxConstraints should return nil")
 }

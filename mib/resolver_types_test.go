@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
+	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -110,9 +111,7 @@ func TestGetTypeRefBaseName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := getTypeRefBaseName(tt.syntax)
-			if got != tt.want {
-				t.Errorf("getTypeRefBaseName() = %q, want %q", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "getTypeRefBaseName()")
 		})
 	}
 }
@@ -147,9 +146,7 @@ func TestGetPrimitiveParentName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := getPrimitiveParentName(tt.syntax)
-			if got != tt.want {
-				t.Errorf("getPrimitiveParentName() = %q, want %q", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "getPrimitiveParentName()")
 		})
 	}
 }
@@ -178,9 +175,7 @@ func TestIsApplicationBaseType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := isApplicationBaseType(tt.base)
-			if got != tt.want {
-				t.Errorf("isApplicationBaseType(%v) = %v, want %v", tt.base, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "isApplicationBaseType()")
 		})
 	}
 }
@@ -195,9 +190,7 @@ func TestExtractNamedValues(t *testing.T) {
 			},
 		}
 		got := extractNamedValues(syntax)
-		if len(got) != 3 {
-			t.Fatalf("got %d named values, want 3", len(got))
-		}
+		testutil.Len(t, got, 3, "named values")
 		assertNamedValue(t, got[0], "up", 1)
 		assertNamedValue(t, got[1], "down", 2)
 		assertNamedValue(t, got[2], "testing", 3)
@@ -206,9 +199,7 @@ func TestExtractNamedValues(t *testing.T) {
 	t.Run("IntegerEnum empty", func(t *testing.T) {
 		syntax := &module.TypeSyntaxIntegerEnum{}
 		got := extractNamedValues(syntax)
-		if len(got) != 0 {
-			t.Errorf("got %d named values, want 0", len(got))
-		}
+		testutil.Len(t, got, 0, "named values")
 	})
 
 	t.Run("Bits", func(t *testing.T) {
@@ -220,9 +211,7 @@ func TestExtractNamedValues(t *testing.T) {
 			},
 		}
 		got := extractNamedValues(syntax)
-		if len(got) != 3 {
-			t.Fatalf("got %d named values, want 3", len(got))
-		}
+		testutil.Len(t, got, 3, "named values")
 		assertNamedValue(t, got[0], "overflow", 0)
 		assertNamedValue(t, got[1], "underflow", 1)
 		assertNamedValue(t, got[2], "reserved", 7)
@@ -231,30 +220,22 @@ func TestExtractNamedValues(t *testing.T) {
 	t.Run("Bits empty", func(t *testing.T) {
 		syntax := &module.TypeSyntaxBits{}
 		got := extractNamedValues(syntax)
-		if len(got) != 0 {
-			t.Errorf("got %d named values, want 0", len(got))
-		}
+		testutil.Len(t, got, 0, "named values")
 	})
 
 	t.Run("TypeRef returns nil", func(t *testing.T) {
 		got := extractNamedValues(&module.TypeSyntaxTypeRef{Name: "Integer32"})
-		if got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
+		testutil.Nil(t, got, "expected nil")
 	})
 
 	t.Run("OctetString returns nil", func(t *testing.T) {
 		got := extractNamedValues(&module.TypeSyntaxOctetString{})
-		if got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
+		testutil.Nil(t, got, "expected nil")
 	})
 
 	t.Run("nil returns nil", func(t *testing.T) {
 		got := extractNamedValues(nil)
-		if got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
+		testutil.Nil(t, got, "expected nil")
 	})
 
 	t.Run("negative enum values", func(t *testing.T) {
@@ -265,9 +246,7 @@ func TestExtractNamedValues(t *testing.T) {
 			},
 		}
 		got := extractNamedValues(syntax)
-		if len(got) != 2 {
-			t.Fatalf("got %d named values, want 2", len(got))
-		}
+		testutil.Len(t, got, 2, "named values")
 		assertNamedValue(t, got[0], "neg", -1)
 		assertNamedValue(t, got[1], "zero", 0)
 	})
@@ -275,12 +254,8 @@ func TestExtractNamedValues(t *testing.T) {
 
 func assertNamedValue(t *testing.T, nv NamedValue, wantLabel string, wantValue int64) {
 	t.Helper()
-	if nv.Label != wantLabel {
-		t.Errorf("label = %q, want %q", nv.Label, wantLabel)
-	}
-	if nv.Value != wantValue {
-		t.Errorf("value = %d, want %d", nv.Value, wantValue)
-	}
+	testutil.Equal(t, nv.Label, wantLabel, "label")
+	testutil.Equal(t, nv.Value, wantValue, "value")
 }
 
 func TestExtractConstraints(t *testing.T) {
@@ -294,15 +269,11 @@ func TestExtractConstraints(t *testing.T) {
 			},
 		}
 		sizes, ranges := extractConstraints(syntax)
-		if len(sizes) != 1 {
-			t.Fatalf("got %d sizes, want 1", len(sizes))
-		}
+		testutil.Len(t, sizes, 1, "sizes")
 		if sizes[0].Min != 0 || sizes[0].Max != 255 {
 			t.Errorf("size = %v, want {0 255}", sizes[0])
 		}
-		if ranges != nil {
-			t.Errorf("ranges = %v, want nil", ranges)
-		}
+		testutil.Nil(t, ranges, "ranges")
 	})
 
 	t.Run("range constraint", func(t *testing.T) {
@@ -315,12 +286,8 @@ func TestExtractConstraints(t *testing.T) {
 			},
 		}
 		sizes, ranges := extractConstraints(syntax)
-		if sizes != nil {
-			t.Errorf("sizes = %v, want nil", sizes)
-		}
-		if len(ranges) != 1 {
-			t.Fatalf("got %d ranges, want 1", len(ranges))
-		}
+		testutil.Nil(t, sizes, "sizes")
+		testutil.Len(t, ranges, 1, "ranges")
 		if ranges[0].Min != -128 || ranges[0].Max != 127 {
 			t.Errorf("range = %v, want {-128 127}", ranges[0])
 		}
@@ -337,9 +304,7 @@ func TestExtractConstraints(t *testing.T) {
 			},
 		}
 		sizes, ranges := extractConstraints(syntax)
-		if len(sizes) != 2 {
-			t.Fatalf("got %d sizes, want 2", len(sizes))
-		}
+		testutil.Len(t, sizes, 2, "sizes")
 		// Single value: max = min
 		if sizes[0].Min != 0 || sizes[0].Max != 0 {
 			t.Errorf("sizes[0] = %v, want {0 0}", sizes[0])
@@ -347,9 +312,7 @@ func TestExtractConstraints(t *testing.T) {
 		if sizes[1].Min != 4 || sizes[1].Max != 255 {
 			t.Errorf("sizes[1] = %v, want {4 255}", sizes[1])
 		}
-		if ranges != nil {
-			t.Errorf("ranges = %v, want nil", ranges)
-		}
+		testutil.Nil(t, ranges, "ranges")
 	})
 
 	t.Run("non-constrained syntax returns nil", func(t *testing.T) {
@@ -373,9 +336,7 @@ func TestRangesToConstraint(t *testing.T) {
 			module.NewRangeSigned(-100, 100),
 		}
 		got := rangesToConstraint(ranges)
-		if len(got) != 1 {
-			t.Fatalf("got %d ranges, want 1", len(got))
-		}
+		testutil.Len(t, got, 1, "ranges")
 		if got[0].Min != -100 || got[0].Max != 100 {
 			t.Errorf("got %v, want {-100 100}", got[0])
 		}
@@ -386,9 +347,7 @@ func TestRangesToConstraint(t *testing.T) {
 			module.NewRangeSingleSigned(42),
 		}
 		got := rangesToConstraint(ranges)
-		if len(got) != 1 {
-			t.Fatalf("got %d ranges, want 1", len(got))
-		}
+		testutil.Len(t, got, 1, "ranges")
 		// Single value: Max is nil, so max = min
 		if got[0].Min != 42 || got[0].Max != 42 {
 			t.Errorf("got %v, want {42 42}", got[0])
@@ -401,9 +360,7 @@ func TestRangesToConstraint(t *testing.T) {
 			module.NewRangeSigned(100, 200),
 		}
 		got := rangesToConstraint(ranges)
-		if len(got) != 2 {
-			t.Fatalf("got %d ranges, want 2", len(got))
-		}
+		testutil.Len(t, got, 2, "ranges")
 		if got[0].Min != 0 || got[0].Max != 10 {
 			t.Errorf("got[0] = %v, want {0 10}", got[0])
 		}
@@ -414,9 +371,7 @@ func TestRangesToConstraint(t *testing.T) {
 
 	t.Run("empty ranges", func(t *testing.T) {
 		got := rangesToConstraint(nil)
-		if len(got) != 0 {
-			t.Errorf("got %d ranges, want 0", len(got))
-		}
+		testutil.Len(t, got, 0, "ranges")
 	})
 }
 
@@ -447,9 +402,7 @@ func TestRangeValueToI64(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := rangeValueToI64(tt.val)
-			if got != tt.want {
-				t.Errorf("rangeValueToI64() = %d, want %d", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "rangeValueToI64()")
 		})
 	}
 }
@@ -460,12 +413,8 @@ func TestResolveBaseFromChain(t *testing.T) {
 		typ.setBase(BaseOctetString)
 
 		got, ok := resolveBaseFromChain(typ)
-		if !ok {
-			t.Fatal("expected ok=true")
-		}
-		if got != BaseOctetString {
-			t.Errorf("got %v, want %v", got, BaseOctetString)
-		}
+		testutil.True(t, ok, "expected ok=true")
+		testutil.Equal(t, BaseOctetString, got, "got")
 	})
 
 	t.Run("walks chain to root", func(t *testing.T) {
@@ -481,12 +430,8 @@ func TestResolveBaseFromChain(t *testing.T) {
 		leaf.setParent(mid)
 
 		got, ok := resolveBaseFromChain(leaf)
-		if !ok {
-			t.Fatal("expected ok=true")
-		}
-		if got != BaseInteger32 {
-			t.Errorf("got %v, want %v", got, BaseInteger32)
-		}
+		testutil.True(t, ok, "expected ok=true")
+		testutil.Equal(t, BaseInteger32, got, "got")
 	})
 
 	t.Run("stops at application base type", func(t *testing.T) {
@@ -502,13 +447,9 @@ func TestResolveBaseFromChain(t *testing.T) {
 		myCounter.setParent(counter)
 
 		got, ok := resolveBaseFromChain(myCounter)
-		if !ok {
-			t.Fatal("expected ok=true")
-		}
+		testutil.True(t, ok, "expected ok=true")
 		// Should stop at Counter32 (application base type), not walk to INTEGER
-		if got != BaseCounter32 {
-			t.Errorf("got %v, want %v", got, BaseCounter32)
-		}
+		testutil.Equal(t, BaseCounter32, got, "got")
 	})
 
 	t.Run("stops at each application type", func(t *testing.T) {
@@ -529,12 +470,8 @@ func TestResolveBaseFromChain(t *testing.T) {
 			child.setParent(appType)
 
 			got, ok := resolveBaseFromChain(child)
-			if !ok {
-				t.Fatalf("expected ok=true for %v", appBase)
-			}
-			if got != appBase {
-				t.Errorf("for %v: got %v, want %v", appBase, got, appBase)
-			}
+			testutil.True(t, ok, "expected ok=true for")
+			testutil.Equal(t, appBase, got, "for")
 		}
 	})
 
@@ -550,9 +487,7 @@ func TestResolveBaseFromChain(t *testing.T) {
 		b.setParent(a)
 
 		_, ok := resolveBaseFromChain(a)
-		if ok {
-			t.Error("expected ok=false for cycle")
-		}
+		testutil.False(t, ok, "expected ok=false for cycle")
 	})
 
 	t.Run("self-referencing cycle", func(t *testing.T) {
@@ -561,9 +496,7 @@ func TestResolveBaseFromChain(t *testing.T) {
 		a.setParent(a)
 
 		_, ok := resolveBaseFromChain(a)
-		if ok {
-			t.Error("expected ok=false for self-referencing cycle")
-		}
+		testutil.False(t, ok, "expected ok=false for self-referencing cycle")
 	})
 
 	t.Run("long chain", func(t *testing.T) {
@@ -579,12 +512,8 @@ func TestResolveBaseFromChain(t *testing.T) {
 		}
 
 		got, ok := resolveBaseFromChain(prev)
-		if !ok {
-			t.Fatal("expected ok=true")
-		}
-		if got != BaseOctetString {
-			t.Errorf("got %v, want %v", got, BaseOctetString)
-		}
+		testutil.True(t, ok, "expected ok=true")
+		testutil.Equal(t, BaseOctetString, got, "got")
 	})
 
 	t.Run("inherits base from root of chain", func(t *testing.T) {
@@ -596,13 +525,9 @@ func TestResolveBaseFromChain(t *testing.T) {
 		displayString.setParent(root)
 
 		got, ok := resolveBaseFromChain(displayString)
-		if !ok {
-			t.Fatal("expected ok=true")
-		}
+		testutil.True(t, ok, "expected ok=true")
 		// Should return the root's base type
-		if got != BaseOctetString {
-			t.Errorf("got %v, want %v", got, BaseOctetString)
-		}
+		testutil.Equal(t, BaseOctetString, got, "got")
 	})
 }
 
@@ -623,16 +548,10 @@ func TestCreateUserTypes_Reference(t *testing.T) {
 	}
 
 	m := Resolve([]*module.Module{mod}, nil, nil)
-	if m == nil {
-		t.Fatal("Resolve returned nil Mib")
-	}
+	testutil.NotNil(t, m, "Resolve returned nil Mib")
 
 	typ := m.Type("MyTC")
-	if typ == nil {
-		t.Fatal("type MyTC not found after resolution")
-	}
+	testutil.NotNil(t, typ, "type MyTC not found after resolution")
 
-	if typ.Reference() != "RFC 1234, Section 5" {
-		t.Errorf("Type.Reference() = %q, want %q", typ.Reference(), "RFC 1234, Section 5")
-	}
+	testutil.Equal(t, "RFC 1234, Section 5", typ.Reference(), "Type.Reference()")
 }

@@ -4,22 +4,19 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
+	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func TestConvertRevisions(t *testing.T) {
 	t.Run("nil input", func(t *testing.T) {
 		got := convertRevisions(nil)
-		if len(got) != 0 {
-			t.Errorf("convertRevisions(nil) returned %d items, want 0", len(got))
-		}
+		testutil.Len(t, got, 0, "convertRevisions(nil) returned")
 	})
 
 	t.Run("empty input", func(t *testing.T) {
 		got := convertRevisions([]module.Revision{})
-		if len(got) != 0 {
-			t.Errorf("convertRevisions([]) returned %d items, want 0", len(got))
-		}
+		testutil.Len(t, got, 0, "convertRevisions([]) returned")
 	})
 
 	t.Run("single revision", func(t *testing.T) {
@@ -27,15 +24,9 @@ func TestConvertRevisions(t *testing.T) {
 			{Date: "2024-01-15", Description: "Initial version"},
 		}
 		got := convertRevisions(input)
-		if len(got) != 1 {
-			t.Fatalf("got %d revisions, want 1", len(got))
-		}
-		if got[0].Date != "2024-01-15" {
-			t.Errorf("Date = %q, want %q", got[0].Date, "2024-01-15")
-		}
-		if got[0].Description != "Initial version" {
-			t.Errorf("Description = %q, want %q", got[0].Description, "Initial version")
-		}
+		testutil.Len(t, got, 1, "revisions")
+		testutil.Equal(t, "2024-01-15", got[0].Date, "Date")
+		testutil.Equal(t, "Initial version", got[0].Description, "Description")
 	})
 
 	t.Run("multiple revisions", func(t *testing.T) {
@@ -45,16 +36,10 @@ func TestConvertRevisions(t *testing.T) {
 			{Date: "2023-12-01", Description: "Draft"},
 		}
 		got := convertRevisions(input)
-		if len(got) != 3 {
-			t.Fatalf("got %d revisions, want 3", len(got))
-		}
+		testutil.Len(t, got, 3, "revisions")
 		for i, r := range input {
-			if got[i].Date != r.Date {
-				t.Errorf("revision[%d].Date = %q, want %q", i, got[i].Date, r.Date)
-			}
-			if got[i].Description != r.Description {
-				t.Errorf("revision[%d].Description = %q, want %q", i, got[i].Description, r.Description)
-			}
+			testutil.Equal(t, r.Date, got[i].Date, "revision[].Date")
+			testutil.Equal(t, r.Description, got[i].Description, "revision[].Description")
 		}
 	})
 }
@@ -78,14 +63,10 @@ func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 			len(ctx.Modules), len(baseNames)+1, len(baseNames))
 	}
 	for i, name := range baseNames {
-		if ctx.Modules[i].Name != name {
-			t.Errorf("Modules[%d].Name = %q, want %q", i, ctx.Modules[i].Name, name)
-		}
+		testutil.Equal(t, name, ctx.Modules[i].Name, "Modules[].Name")
 	}
 	last := ctx.Modules[len(ctx.Modules)-1]
-	if last.Name != "MY-MIB" {
-		t.Errorf("last module = %q, want %q", last.Name, "MY-MIB")
-	}
+	testutil.Equal(t, "MY-MIB", last.Name, "last module")
 }
 
 func TestRegisterModules_UserModulesWithBaseNamesFiltered(t *testing.T) {
@@ -110,9 +91,7 @@ func TestRegisterModules_UserModulesWithBaseNamesFiltered(t *testing.T) {
 			count++
 		}
 	}
-	if count != 1 {
-		t.Errorf("found %d SNMPv2-SMI modules, want exactly 1 (base only)", count)
-	}
+	testutil.Equal(t, 1, count, "found")
 
 	// MY-MIB should still be present
 	found := false
@@ -122,9 +101,7 @@ func TestRegisterModules_UserModulesWithBaseNamesFiltered(t *testing.T) {
 			break
 		}
 	}
-	if !found {
-		t.Error("MY-MIB not found in ctx.Modules")
-	}
+	testutil.True(t, found, "MY-MIB not found in ctx.Modules")
 }
 
 func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
@@ -150,9 +127,7 @@ func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
 				break
 			}
 		}
-		if !found {
-			t.Errorf("ModuleIndex[%q] does not contain the module pointer", mod.Name)
-		}
+		testutil.True(t, found, "ModuleIndex[] does not contain the module pointer")
 	}
 }
 
@@ -201,14 +176,10 @@ func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 			break
 		}
 	}
-	if found == nil {
-		t.Fatal("MY-MIB not found in ctx.Modules")
-	}
+	testutil.NotNil(t, found, "MY-MIB not found in ctx.Modules")
 
 	defNames := ctx.ModuleDefNames[found]
-	if defNames == nil {
-		t.Fatal("ModuleDefNames[MY-MIB] is nil")
-	}
+	testutil.NotNil(t, defNames, "ModuleDefNames[MY-MIB] is nil")
 	if _, ok := defNames["fooObject"]; !ok {
 		t.Error("fooObject not in ModuleDefNames")
 	}
@@ -235,18 +206,14 @@ func TestRegisterModules_ModuleToResolvedMapping(t *testing.T) {
 			t.Errorf("ModuleToResolved missing entry for %q", mod.Name)
 			continue
 		}
-		if resolved.Name() != mod.Name {
-			t.Errorf("resolved name %q != module name %q", resolved.Name(), mod.Name)
-		}
+		testutil.Equal(t, mod.Name, resolved.Name(), "resolved name")
 		// Check reverse mapping
 		reverse, ok := ctx.ResolvedToModule[resolved]
 		if !ok {
 			t.Errorf("ResolvedToModule missing entry for %q", mod.Name)
 			continue
 		}
-		if reverse != mod {
-			t.Errorf("reverse mapping for %q points to wrong module", mod.Name)
-		}
+		testutil.Equal(t, mod, reverse, "reverse mapping for")
 	}
 }
 
@@ -266,17 +233,11 @@ func TestRegisterModules_LanguageSetOnResolved(t *testing.T) {
 			break
 		}
 	}
-	if found == nil {
-		t.Fatal("MY-MIB not found")
-	}
+	testutil.NotNil(t, found, "MY-MIB not found")
 
 	resolved := ctx.ModuleToResolved[found]
-	if resolved == nil {
-		t.Fatal("no resolved module for MY-MIB")
-	}
-	if resolved.Language() != LanguageSMIv1 {
-		t.Errorf("resolved language = %v, want SMIv1", resolved.Language())
-	}
+	testutil.NotNil(t, resolved, "no resolved module for MY-MIB")
+	testutil.Equal(t, LanguageSMIv1, resolved.Language(), "resolved language")
 }
 
 func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
@@ -312,28 +273,16 @@ func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
 			break
 		}
 	}
-	if found == nil {
-		t.Fatal("MY-MIB not found")
-	}
+	testutil.NotNil(t, found, "MY-MIB not found")
 
 	resolved := ctx.ModuleToResolved[found]
-	if resolved == nil {
-		t.Fatal("no resolved module for MY-MIB")
-	}
+	testutil.NotNil(t, resolved, "no resolved module for MY-MIB")
 
-	if resolved.Organization() != "ACME Corp" {
-		t.Errorf("Organization = %q, want %q", resolved.Organization(), "ACME Corp")
-	}
-	if resolved.ContactInfo() != "support@acme.example" {
-		t.Errorf("ContactInfo = %q, want %q", resolved.ContactInfo(), "support@acme.example")
-	}
-	if resolved.Description() != "Test MIB module" {
-		t.Errorf("Description = %q, want %q", resolved.Description(), "Test MIB module")
-	}
+	testutil.Equal(t, "ACME Corp", resolved.Organization(), "Organization")
+	testutil.Equal(t, "support@acme.example", resolved.ContactInfo(), "ContactInfo")
+	testutil.Equal(t, "Test MIB module", resolved.Description(), "Description")
 	revs := resolved.Revisions()
-	if len(revs) != 2 {
-		t.Fatalf("got %d revisions, want 2", len(revs))
-	}
+	testutil.Len(t, revs, 2, "revisions")
 	if revs[0].Date != "2024-06-01" || revs[0].Description != "Rev 2" {
 		t.Errorf("revision[0] = %+v, want Date=2024-06-01 Description=Rev 2", revs[0])
 	}
@@ -362,23 +311,13 @@ func TestRegisterModules_NoModuleIdentity(t *testing.T) {
 			break
 		}
 	}
-	if found == nil {
-		t.Fatal("MY-MIB not found")
-	}
+	testutil.NotNil(t, found, "MY-MIB not found")
 
 	resolved := ctx.ModuleToResolved[found]
-	if resolved.Organization() != "" {
-		t.Errorf("Organization = %q, want empty", resolved.Organization())
-	}
-	if resolved.ContactInfo() != "" {
-		t.Errorf("ContactInfo = %q, want empty", resolved.ContactInfo())
-	}
-	if resolved.Description() != "" {
-		t.Errorf("Description = %q, want empty", resolved.Description())
-	}
-	if len(resolved.Revisions()) != 0 {
-		t.Errorf("Revisions has %d entries, want 0", len(resolved.Revisions()))
-	}
+	testutil.Equal(t, "", resolved.Organization(), "Organization")
+	testutil.Equal(t, "", resolved.ContactInfo(), "ContactInfo")
+	testutil.Equal(t, "", resolved.Description(), "Description")
+	testutil.Len(t, resolved.Revisions(), 0, "Revisions has")
 }
 
 func TestRegisterModules_BuilderReceivesModules(t *testing.T) {
@@ -392,19 +331,13 @@ func TestRegisterModules_BuilderReceivesModules(t *testing.T) {
 
 	baseNames := module.BaseModuleNames()
 	wantCount := len(baseNames) + 1
-	if got := len(ctx.Mib.Modules()); got != wantCount {
-		t.Errorf("len(Builder.Modules()) = %d, want %d", got, wantCount)
-	}
+	testutil.Len(t, ctx.Mib.Modules(), wantCount, "len(Builder.Modules())")
 
 	// Verify the builder can look up each module by name
 	for _, name := range baseNames {
-		if ctx.Mib.Module(name) == nil {
-			t.Errorf("Builder.Module(%q) returned nil", name)
-		}
+		testutil.NotNil(t, ctx.Mib.Module(name), "Builder.Module() returned nil")
 	}
-	if ctx.Mib.Module("MY-MIB") == nil {
-		t.Error("Builder.Module(MY-MIB) returned nil")
-	}
+	testutil.NotNil(t, ctx.Mib.Module("MY-MIB"), "Builder.Module(MY-MIB) returned nil")
 }
 
 func TestRegisterModules_DiagnosticsForwarded(t *testing.T) {
@@ -430,9 +363,7 @@ func TestRegisterModules_DiagnosticsForwarded(t *testing.T) {
 			break
 		}
 	}
-	if !found {
-		t.Error("module diagnostic not forwarded to builder")
-	}
+	testutil.True(t, found, "module diagnostic not forwarded to builder")
 }
 
 func TestRegisterModules_AllBaseModulesFiltered(t *testing.T) {
@@ -459,13 +390,9 @@ func TestRegisterModules_AllBaseModulesFiltered(t *testing.T) {
 		nameCounts[mod.Name]++
 	}
 	for _, name := range baseNames {
-		if nameCounts[name] != 1 {
-			t.Errorf("module %q appears %d times, want 1", name, nameCounts[name])
-		}
+		testutil.Equal(t, 1, nameCounts[name], "module")
 	}
-	if nameCounts["REAL-MIB"] != 1 {
-		t.Errorf("REAL-MIB appears %d times, want 1", nameCounts["REAL-MIB"])
-	}
+	testutil.Equal(t, 1, nameCounts["REAL-MIB"], "REAL-MIB appears")
 }
 
 func TestRegisterModules_EmptyModuleList(t *testing.T) {
@@ -475,13 +402,9 @@ func TestRegisterModules_EmptyModuleList(t *testing.T) {
 	registerModules(ctx)
 
 	baseNames := module.BaseModuleNames()
-	if len(ctx.Modules) != len(baseNames) {
-		t.Fatalf("got %d modules, want %d (base only)", len(ctx.Modules), len(baseNames))
-	}
+	testutil.Len(t, ctx.Modules, len(baseNames), "modules")
 	for i, name := range baseNames {
-		if ctx.Modules[i].Name != name {
-			t.Errorf("Modules[%d].Name = %q, want %q", i, ctx.Modules[i].Name, name)
-		}
+		testutil.Equal(t, name, ctx.Modules[i].Name, "Modules[].Name")
 	}
 }
 
@@ -499,14 +422,10 @@ func TestRegisterModules_BaseModuleDefinitionNamesCached(t *testing.T) {
 			break
 		}
 	}
-	if snmpv2smi == nil {
-		t.Fatal("SNMPv2-SMI not found")
-	}
+	testutil.NotNil(t, snmpv2smi, "SNMPv2-SMI not found")
 
 	defNames := ctx.ModuleDefNames[snmpv2smi]
-	if defNames == nil {
-		t.Fatal("ModuleDefNames[SNMPv2-SMI] is nil")
-	}
+	testutil.NotNil(t, defNames, "ModuleDefNames[SNMPv2-SMI] is nil")
 	// Spot-check a few well-known names
 	for _, name := range []string{"internet", "Integer32", "Counter32", "enterprises"} {
 		if _, ok := defNames[name]; !ok {

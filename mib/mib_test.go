@@ -1,6 +1,10 @@
 package mib
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
+)
 
 func TestNodeLookupPriority(t *testing.T) {
 	m := newMib()
@@ -16,9 +20,7 @@ func TestNodeLookupPriority(t *testing.T) {
 
 	t.Run("prefers object over notification and bare", func(t *testing.T) {
 		got := m.Node("sysDescr")
-		if got != withObj {
-			t.Errorf("got %p, want node with object (%p)", got, withObj)
-		}
+		testutil.Equal(t, withObj, got, "got")
 	})
 
 	t.Run("falls back to notification when no object", func(t *testing.T) {
@@ -27,9 +29,7 @@ func TestNodeLookupPriority(t *testing.T) {
 		m2.registerNode("trap", withNotif)
 
 		got := m2.Node("trap")
-		if got != withNotif {
-			t.Errorf("got %p, want node with notification (%p)", got, withNotif)
-		}
+		testutil.Equal(t, withNotif, got, "got")
 	})
 
 	t.Run("falls back to bare node", func(t *testing.T) {
@@ -37,15 +37,11 @@ func TestNodeLookupPriority(t *testing.T) {
 		m2.registerNode("other", bare)
 
 		got := m2.Node("other")
-		if got != bare {
-			t.Errorf("got %p, want bare node (%p)", got, bare)
-		}
+		testutil.Equal(t, bare, got, "got")
 	})
 
 	t.Run("returns nil for unknown name", func(t *testing.T) {
-		if got := m.Node("nonexistent"); got != nil {
-			t.Errorf("got %p, want nil", got)
-		}
+		testutil.Nil(t, m.Node("nonexistent"), "expected nil")
 	})
 }
 
@@ -58,12 +54,8 @@ func TestAddTypeFirstWriteWins(t *testing.T) {
 	m.addType(first)
 	m.addType(second)
 
-	if got := m.Type("DisplayString"); got != first {
-		t.Errorf("got %p, want first registered type (%p)", got, first)
-	}
+	testutil.Equal(t, first, m.Type("DisplayString"), "got")
 
 	// Both are still in the full list.
-	if len(m.types) != 2 {
-		t.Errorf("got %d types, want 2", len(m.types))
-	}
+	testutil.Len(t, m.types, 2, "types")
 }

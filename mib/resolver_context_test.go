@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
+	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -113,9 +114,7 @@ func TestRecordUnresolvedSeverityConsistency(t *testing.T) {
 					}
 				}
 			}
-			if !found {
-				t.Errorf("no diagnostic with code %q emitted", tt.code)
-			}
+			testutil.True(t, found, "no diagnostic with code  emitted")
 		})
 	}
 }
@@ -123,9 +122,7 @@ func TestRecordUnresolvedSeverityConsistency(t *testing.T) {
 func TestIsASN1Primitive(t *testing.T) {
 	positives := []string{"INTEGER", "OCTET STRING", "OBJECT IDENTIFIER", "BITS"}
 	for _, name := range positives {
-		if !isASN1Primitive(name) {
-			t.Errorf("isASN1Primitive(%q) = false, want true", name)
-		}
+		testutil.True(t, isASN1Primitive(name), "isASN1Primitive() = false, want true")
 	}
 
 	negatives := []string{
@@ -145,9 +142,7 @@ func TestIsSmiGlobalType(t *testing.T) {
 		"Unsigned32", "TimeTicks", "IpAddress", "Opaque",
 	}
 	for _, name := range positives {
-		if !isSmiGlobalType(name) {
-			t.Errorf("isSmiGlobalType(%q) = false, want true", name)
-		}
+		testutil.True(t, isSmiGlobalType(name), "isSmiGlobalType() = false, want true")
 	}
 
 	negatives := []string{
@@ -164,9 +159,7 @@ func TestIsSmiGlobalType(t *testing.T) {
 func TestIsSmiV1GlobalType(t *testing.T) {
 	positives := []string{"Counter", "Gauge", "NetworkAddress"}
 	for _, name := range positives {
-		if !isSmiV1GlobalType(name) {
-			t.Errorf("isSmiV1GlobalType(%q) = false, want true", name)
-		}
+		testutil.True(t, isSmiV1GlobalType(name), "isSmiV1GlobalType() = false, want true")
 	}
 
 	negatives := []string{
@@ -189,9 +182,7 @@ func TestIsSNMPv2TCType(t *testing.T) {
 		"TDomain", "TAddress",
 	}
 	for _, name := range positives {
-		if !isSNMPv2TCType(name) {
-			t.Errorf("isSNMPv2TCType(%q) = false, want true", name)
-		}
+		testutil.True(t, isSNMPv2TCType(name), "isSNMPv2TCType() = false, want true")
 	}
 
 	negatives := []string{
@@ -260,9 +251,7 @@ func TestLookupInModuleScope_ImportTargetLacksSymbol(t *testing.T) {
 		func(m *module.Module) map[string]*Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
-	if ok {
-		t.Fatal("expected false when import target lacks the symbol")
-	}
+	testutil.False(t, ok, "expected false when import target lacks the symbol")
 }
 
 func TestLookupInModuleScope_NotFound(t *testing.T) {
@@ -275,9 +264,7 @@ func TestLookupInModuleScope_NotFound(t *testing.T) {
 		func(m *module.Module) map[string]*Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
-	if ok {
-		t.Fatal("expected not found for missing symbol")
-	}
+	testutil.False(t, ok, "expected not found for missing symbol")
 }
 
 func TestLookupNodeForModule(t *testing.T) {
@@ -296,9 +283,7 @@ func TestLookupNodeForModule(t *testing.T) {
 	}
 
 	_, ok = ctx.LookupNodeForModule(modA, "y")
-	if ok {
-		t.Fatal("LookupNodeForModule: expected false for unknown symbol")
-	}
+	testutil.False(t, ok, "LookupNodeForModule: expected false for unknown symbol")
 }
 
 func TestLookupNodeInModule(t *testing.T) {
@@ -315,9 +300,7 @@ func TestLookupNodeInModule(t *testing.T) {
 	}
 
 	_, ok = ctx.LookupNodeInModule("OTHER-MIB", "x")
-	if ok {
-		t.Fatal("LookupNodeInModule: expected false for unknown module")
-	}
+	testutil.False(t, ok, "LookupNodeInModule: expected false for unknown module")
 }
 
 func TestLookupNodeInModule_MultipleVersions(t *testing.T) {
@@ -357,9 +340,7 @@ func TestLookupNodeGlobal(t *testing.T) {
 	}
 
 	_, ok = ctx.LookupNodeGlobal("z")
-	if ok {
-		t.Fatal("LookupNodeGlobal(z): expected false")
-	}
+	testutil.False(t, ok, "LookupNodeGlobal(z): expected false")
 }
 
 func TestLookupNodeGlobal_DeterministicOrder(t *testing.T) {
@@ -460,9 +441,7 @@ func TestLookupTypeForModule_StrictNoFallback(t *testing.T) {
 
 	// Counter32 is not an ASN.1 primitive, so strict mode should not find it.
 	_, ok := ctx.LookupTypeForModule(modA, "Counter32")
-	if ok {
-		t.Fatal("expected strict mode to not resolve Counter32 without import")
-	}
+	testutil.False(t, ok, "expected strict mode to not resolve Counter32 without import")
 
 	// ASN.1 primitives should still resolve in strict mode.
 	intType := newType("INTEGER")
@@ -534,9 +513,7 @@ func TestLookupType_StrictOnlyPrimitives(t *testing.T) {
 	}
 
 	_, ok = ctx.LookupType("Counter32")
-	if ok {
-		t.Fatal("expected strict mode to not allow global search for Counter32")
-	}
+	testutil.False(t, ok, "expected strict mode to not allow global search for Counter32")
 }
 
 func TestLookupType_GlobalModuleScan(t *testing.T) {
@@ -562,19 +539,13 @@ func TestRegisterImport(t *testing.T) {
 	ctx.registerImport(modA, "foo", modB)
 
 	imports := ctx.ModuleImports[modA]
-	if imports == nil {
-		t.Fatal("expected imports map to be created")
-	}
-	if imports["foo"] != modB {
-		t.Fatal("expected import to point to modB")
-	}
+	testutil.NotNil(t, imports, "expected imports map to be created")
+	testutil.Equal(t, modB, imports["foo"], "expected import to point to modB")
 
 	// Register a second import in the same module.
 	modC := &module.Module{Name: "C"}
 	ctx.registerImport(modA, "bar", modC)
-	if ctx.ModuleImports[modA]["bar"] != modC {
-		t.Fatal("expected second import to point to modC")
-	}
+	testutil.Equal(t, modC, ctx.ModuleImports[modA]["bar"], "expected second import to point to modC")
 }
 
 func TestRegisterModuleNodeSymbol(t *testing.T) {
@@ -585,19 +556,13 @@ func TestRegisterModuleNodeSymbol(t *testing.T) {
 	ctx.registerModuleNodeSymbol(mod, "sysDescr", node)
 
 	symbols := ctx.ModuleSymbolToNode[mod]
-	if symbols == nil {
-		t.Fatal("expected symbol map to be created")
-	}
-	if symbols["sysDescr"] != node {
-		t.Fatal("expected registered node")
-	}
+	testutil.NotNil(t, symbols, "expected symbol map to be created")
+	testutil.Equal(t, node, symbols["sysDescr"], "expected registered node")
 
 	// Overwrite should succeed.
 	node2 := newTestNode("sysDescr")
 	ctx.registerModuleNodeSymbol(mod, "sysDescr", node2)
-	if ctx.ModuleSymbolToNode[mod]["sysDescr"] != node2 {
-		t.Fatal("expected overwritten node")
-	}
+	testutil.Equal(t, node2, ctx.ModuleSymbolToNode[mod]["sysDescr"], "expected overwritten node")
 }
 
 func TestRegisterModuleTypeSymbol(t *testing.T) {
@@ -608,12 +573,8 @@ func TestRegisterModuleTypeSymbol(t *testing.T) {
 	ctx.registerModuleTypeSymbol(mod, "MyType", typ)
 
 	symbols := ctx.ModuleSymbolToType[mod]
-	if symbols == nil {
-		t.Fatal("expected symbol map to be created")
-	}
-	if symbols["MyType"] != typ {
-		t.Fatal("expected registered type")
-	}
+	testutil.NotNil(t, symbols, "expected symbol map to be created")
+	testutil.Equal(t, typ, symbols["MyType"], "expected registered type")
 }
 
 func TestEmitDiagnostic(t *testing.T) {
@@ -687,9 +648,7 @@ func TestEmitDiagnostic(t *testing.T) {
 			mod := &module.Module{Name: "MOD"}
 			ctx.EmitDiagnostic("test-code", tt.severity, mod, types.Span{}, "test message")
 			got := len(ctx.Diagnostics())
-			if got != tt.want {
-				t.Errorf("got %d diagnostics, want %d", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "diagnostics")
 		})
 	}
 }
@@ -702,15 +661,11 @@ func TestEmitDiagnostic_IgnoredCode(t *testing.T) {
 	ctx := newResolverContext(nil, nil, config)
 	mod := &module.Module{Name: "MOD"}
 	ctx.EmitDiagnostic("test-foo", SeverityError, mod, types.Span{}, "ignored")
-	if len(ctx.Diagnostics()) != 0 {
-		t.Fatal("expected ignored code to produce no diagnostics")
-	}
+	testutil.Len(t, ctx.Diagnostics(), 0, "expected ignored code to produce no diagnostics")
 
 	// Non-matching code should still be reported.
 	ctx.EmitDiagnostic("other-code", SeverityError, mod, types.Span{}, "not ignored")
-	if len(ctx.Diagnostics()) != 1 {
-		t.Fatal("expected non-ignored code to produce a diagnostic")
-	}
+	testutil.Len(t, ctx.Diagnostics(), 1, "expected non-ignored code to produce a diagnostic")
 }
 
 func TestEmitDiagnostic_Fields(t *testing.T) {
@@ -733,28 +688,14 @@ func TestEmitDiagnostic_Fields(t *testing.T) {
 	ctx.EmitDiagnostic("my-code", SeverityMinor, mod, span, "something happened")
 
 	diags := ctx.Diagnostics()
-	if len(diags) != 1 {
-		t.Fatalf("expected 1 diagnostic, got %d", len(diags))
-	}
+	testutil.Len(t, diags, 1, "expected 1 diagnostic, got")
 	d := diags[0]
-	if d.Code != "my-code" {
-		t.Errorf("Code = %q, want %q", d.Code, "my-code")
-	}
-	if d.Severity != SeverityMinor {
-		t.Errorf("Severity = %d, want %d", d.Severity, SeverityMinor)
-	}
-	if d.Module != "TEST-MIB" {
-		t.Errorf("Module = %q, want %q", d.Module, "TEST-MIB")
-	}
-	if d.Line != 10 {
-		t.Errorf("Line = %d, want 10", d.Line)
-	}
-	if d.Column != 5 {
-		t.Errorf("Column = %d, want 5", d.Column)
-	}
-	if d.Message != "something happened" {
-		t.Errorf("Message = %q, want %q", d.Message, "something happened")
-	}
+	testutil.Equal(t, "my-code", d.Code, "Code")
+	testutil.Equal(t, SeverityMinor, d.Severity, "Severity")
+	testutil.Equal(t, "TEST-MIB", d.Module, "Module")
+	testutil.Equal(t, 10, d.Line, "Line")
+	testutil.Equal(t, 5, d.Column, "Column")
+	testutil.Equal(t, "something happened", d.Message, "Message")
 }
 
 func TestFinalizeUnresolved(t *testing.T) {
@@ -774,31 +715,23 @@ func TestFinalizeUnresolved(t *testing.T) {
 	unresolved := result.Unresolved()
 
 	// We expect 5 unresolved refs.
-	if len(unresolved) != 5 {
-		t.Fatalf("expected 5 unresolved refs, got %d", len(unresolved))
-	}
+	testutil.Len(t, unresolved, 5, "expected 5 unresolved refs, got")
 
 	// Verify each kind is present.
 	kindCounts := map[UnresolvedKind]int{}
 	for _, u := range unresolved {
 		kindCounts[u.Kind]++
-		if u.Module != "TEST-MIB" {
-			t.Errorf("unresolved ref kind=%s has module=%q, want TEST-MIB", u.Kind, u.Module)
-		}
+		testutil.Equal(t, "TEST-MIB", u.Module, "unresolved ref kind")
 	}
 
 	expectedKinds := []UnresolvedKind{UnresolvedImport, UnresolvedType, UnresolvedOID, UnresolvedIndex, UnresolvedNotificationObject}
 	for _, k := range expectedKinds {
-		if kindCounts[k] != 1 {
-			t.Errorf("expected 1 unresolved ref of kind %s, got %d", k, kindCounts[k])
-		}
+		testutil.Equal(t, 1, kindCounts[k], "expected 1 unresolved ref of kind , got")
 	}
 
 	// Diagnostics should also be copied.
 	diags := result.Diagnostics()
-	if len(diags) != 5 {
-		t.Errorf("expected 5 diagnostics, got %d", len(diags))
-	}
+	testutil.Len(t, diags, 5, "expected 5 diagnostics, got")
 }
 
 func TestFinalizeUnresolved_NilModule(t *testing.T) {
@@ -815,9 +748,7 @@ func TestFinalizeUnresolved_NilModule(t *testing.T) {
 
 	result := ctx.Mib
 	for _, u := range result.Unresolved() {
-		if u.Module != "" {
-			t.Errorf("unresolved ref kind=%q has module=%q, want empty string for nil module", u.Kind, u.Module)
-		}
+		testutil.Equal(t, "", u.Module, "unresolved ref kind")
 	}
 }
 
@@ -827,39 +758,23 @@ func TestDropModules(t *testing.T) {
 	ctx.ModuleIndex["A"] = []*module.Module{mod}
 	ctx.ModuleDefNames[mod] = map[string]struct{}{"foo": {}}
 
-	if ctx.Modules == nil {
-		t.Fatal("expected Modules to be set before DropModules")
-	}
+	testutil.NotNil(t, ctx.Modules, "expected Modules to be set before DropModules")
 
 	ctx.DropModules()
 
-	if ctx.Modules != nil {
-		t.Error("expected Modules to be nil after DropModules")
-	}
-	if ctx.ModuleIndex != nil {
-		t.Error("expected ModuleIndex to be nil after DropModules")
-	}
-	if ctx.ModuleDefNames != nil {
-		t.Error("expected ModuleDefNames to be nil after DropModules")
-	}
+	testutil.Nil(t, ctx.Modules, "expected Modules to be nil after DropModules")
+	testutil.Nil(t, ctx.ModuleIndex, "expected ModuleIndex to be nil after DropModules")
+	testutil.Nil(t, ctx.ModuleDefNames, "expected ModuleDefNames to be nil after DropModules")
 
 	// Other maps should be untouched.
-	if ctx.ModuleSymbolToNode == nil {
-		t.Error("expected ModuleSymbolToNode to survive DropModules")
-	}
-	if ctx.ModuleSymbolToType == nil {
-		t.Error("expected ModuleSymbolToType to survive DropModules")
-	}
-	if ctx.ModuleImports == nil {
-		t.Error("expected ModuleImports to survive DropModules")
-	}
+	testutil.NotNil(t, ctx.ModuleSymbolToNode, "expected ModuleSymbolToNode to survive DropModules")
+	testutil.NotNil(t, ctx.ModuleSymbolToType, "expected ModuleSymbolToType to survive DropModules")
+	testutil.NotNil(t, ctx.ModuleImports, "expected ModuleImports to survive DropModules")
 }
 
 func TestDiagnosticConfig_Getter(t *testing.T) {
 	config := PermissiveConfig()
 	ctx := newResolverContext(nil, nil, config)
 	got := ctx.DiagnosticConfig()
-	if got.Level != config.Level {
-		t.Errorf("DiagnosticConfig().Level = %v, want %v", got.Level, config.Level)
-	}
+	testutil.Equal(t, config.Level, got.Level, "DiagnosticConfig().Level")
 }
