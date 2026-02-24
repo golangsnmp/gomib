@@ -9,16 +9,17 @@ import (
 
 func TestParseMalformedHeaders(t *testing.T) {
 	tests := []struct {
-		name   string
-		source string
+		name       string
+		source     string
+		wantMsgSub string // substring expected in the first diagnostic message
 	}{
-		{"missing DEFINITIONS", `TEST-MIB ::= BEGIN END`},
-		{"missing ::=", `TEST-MIB DEFINITIONS BEGIN END`},
-		{"missing BEGIN", `TEST-MIB DEFINITIONS ::= END`},
-		{"empty input", ``},
-		{"garbage only", `{ } ; 42`},
-		{"bad DEFINITIONS keyword", `TEST-MIB DECALRATIONS ::= BEGIN END`},
-		{"module name only", `TEST-MIB`},
+		{"missing DEFINITIONS", `TEST-MIB ::= BEGIN END`, "DEFINITIONS"},
+		{"missing ::=", `TEST-MIB DEFINITIONS BEGIN END`, "COLON_COLON_EQUAL"},
+		{"missing BEGIN", `TEST-MIB DEFINITIONS ::= END`, "BEGIN"},
+		{"empty input", ``, "identifier"},
+		{"garbage only", `{ } ; 42`, "identifier"},
+		{"bad DEFINITIONS keyword", `TEST-MIB DECALRATIONS ::= BEGIN END`, "DEFINITIONS"},
+		{"module name only", `TEST-MIB`, "DEFINITIONS"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -26,6 +27,7 @@ func TestParseMalformedHeaders(t *testing.T) {
 			testutil.Equal(t, "UNKNOWN", module.Name.Name, "module name should be UNKNOWN on header failure")
 			testutil.Greater(t, len(module.Diagnostics), 0, "should have diagnostics")
 			testutil.Equal(t, types.DiagParseError, module.Diagnostics[0].Code, "diagnostic code")
+			testutil.Contains(t, module.Diagnostics[0].Message, tt.wantMsgSub, "diagnostic message should indicate the parse failure point")
 		})
 	}
 }
