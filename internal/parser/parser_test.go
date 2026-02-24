@@ -256,108 +256,107 @@ func TestParseErrorRecovery(t *testing.T) {
 // === SMIv1-specific constructs ===
 
 func TestParseTrapType(t *testing.T) {
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	tests := []struct {
+		name       string
+		source     string
+		wantName   string
+		wantNumber uint32
+		wantVars   int
+		wantDesc   bool
+		wantRef    bool
+	}{
+		{
+			name: "full",
+			source: `TEST-MIB DEFINITIONS ::= BEGIN
 		testTrap TRAP-TYPE
 			ENTERPRISE testEnterprise
 			VARIABLES { testObject1, testObject2 }
 			DESCRIPTION "Test trap"
 			REFERENCE "RFC 1215"
 			::= 5
-		END`)
-
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
-	}
-
-	def, ok := module.Body[0].(*ast.TrapTypeDef)
-	testutil.True(t, ok, "expected TrapTypeDef, got %T", module.Body[0])
-	testutil.Equal(t, "testTrap", def.Name.Name, "trap name")
-	testutil.Equal(t, "testEnterprise", def.Enterprise.Name, "enterprise")
-	testutil.Len(t, def.Variables, 2, "variables count")
-	testutil.NotNil(t, def.Description, "description should be set")
-	testutil.NotNil(t, def.Reference, "reference should be set")
-	testutil.Equal(t, uint32(5), def.TrapNumber, "trap number")
-}
-
-func TestParseTrapTypeMinimal(t *testing.T) {
-	// TRAP-TYPE with only required clauses (ENTERPRISE and trap number)
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		END`,
+			wantName:   "testTrap",
+			wantNumber: 5,
+			wantVars:   2,
+			wantDesc:   true,
+			wantRef:    true,
+		},
+		{
+			name: "minimal",
+			source: `TEST-MIB DEFINITIONS ::= BEGIN
 		minTrap TRAP-TYPE
 			ENTERPRISE testEnterprise
 			::= 1
-		END`)
-
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
+		END`,
+			wantName:   "minTrap",
+			wantNumber: 1,
+			wantVars:   0,
+		},
 	}
-
-	def, ok := module.Body[0].(*ast.TrapTypeDef)
-	testutil.True(t, ok, "expected TrapTypeDef, got %T", module.Body[0])
-	testutil.Equal(t, "minTrap", def.Name.Name, "trap name")
-	testutil.Equal(t, uint32(1), def.TrapNumber, "trap number")
-	testutil.Len(t, def.Variables, 0, "no variables")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			module := parseModule(tt.source)
+			if len(module.Body) == 0 {
+				t.Fatal("expected definitions in module body")
+			}
+			def, ok := module.Body[0].(*ast.TrapTypeDef)
+			testutil.True(t, ok, "expected TrapTypeDef, got %T", module.Body[0])
+			testutil.Equal(t, tt.wantName, def.Name.Name, "trap name")
+			testutil.Equal(t, "testEnterprise", def.Enterprise.Name, "enterprise")
+			testutil.Equal(t, tt.wantNumber, def.TrapNumber, "trap number")
+			testutil.Len(t, def.Variables, tt.wantVars, "variables count")
+			if tt.wantDesc {
+				testutil.NotNil(t, def.Description, "description should be set")
+			}
+			if tt.wantRef {
+				testutil.NotNil(t, def.Reference, "reference should be set")
+			}
+		})
+	}
 }
 
 // === Conformance constructs ===
 
 func TestParseNotificationType(t *testing.T) {
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	tests := []struct {
+		name        string
+		source      string
+		wantObjects int
+	}{
+		{
+			name: "with objects",
+			source: `TEST-MIB DEFINITIONS ::= BEGIN
 		testNotification NOTIFICATION-TYPE
 			OBJECTS { testObject1, testObject2 }
 			STATUS current
 			DESCRIPTION "Test notification"
 			::= { testNotifications 1 }
-		END`)
-
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
-	}
-
-	def, ok := module.Body[0].(*ast.NotificationTypeDef)
-	testutil.True(t, ok, "expected NotificationTypeDef, got %T", module.Body[0])
-	testutil.Equal(t, "testNotification", def.Name.Name, "notification name")
-	testutil.Len(t, def.Objects, 2, "objects count")
-	testutil.NotNil(t, def.Status, "status should be set")
-}
-
-func TestParseNotificationTypeNoObjects(t *testing.T) {
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		END`,
+			wantObjects: 2,
+		},
+		{
+			name: "no objects",
+			source: `TEST-MIB DEFINITIONS ::= BEGIN
 		testNotification NOTIFICATION-TYPE
 			STATUS current
 			DESCRIPTION "No objects"
 			::= { testNotifications 2 }
-		END`)
-
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
+		END`,
+			wantObjects: 0,
+		},
 	}
-
-	def, ok := module.Body[0].(*ast.NotificationTypeDef)
-	testutil.True(t, ok, "expected NotificationTypeDef, got %T", module.Body[0])
-	testutil.Equal(t, "testNotification", def.Name.Name, "notification name")
-	testutil.Len(t, def.Objects, 0, "no objects")
-}
-
-func TestParseModuleCompliance(t *testing.T) {
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
-		testCompliance MODULE-COMPLIANCE
-			STATUS current
-			DESCRIPTION "Test compliance"
-			MODULE
-				MANDATORY-GROUPS { testGroup1 }
-			::= { testConformance 1 }
-		END`)
-
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
-	}
-
-	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-	testutil.True(t, ok, "expected ModuleComplianceDef, got %T", module.Body[0])
-	testutil.Equal(t, "testCompliance", def.Name.Name, "compliance name")
-	testutil.Greater(t, len(def.Modules), 0, "should have at least one MODULE clause")
-	if len(def.Modules) > 0 {
-		testutil.Greater(t, len(def.Modules[0].MandatoryGroups), 0, "should have mandatory groups")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			module := parseModule(tt.source)
+			if len(module.Body) == 0 {
+				t.Fatal("expected definitions in module body")
+			}
+			def, ok := module.Body[0].(*ast.NotificationTypeDef)
+			testutil.True(t, ok, "expected NotificationTypeDef, got %T", module.Body[0])
+			testutil.Equal(t, "testNotification", def.Name.Name, "notification name")
+			testutil.Len(t, def.Objects, tt.wantObjects, "objects count")
+			testutil.NotNil(t, def.Status, "status should be set")
+		})
 	}
 }
 

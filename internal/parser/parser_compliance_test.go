@@ -9,6 +9,29 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
+func TestParseModuleComplianceBaseline(t *testing.T) {
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		testCompliance MODULE-COMPLIANCE
+			STATUS current
+			DESCRIPTION "Test compliance"
+			MODULE
+				MANDATORY-GROUPS { testGroup1 }
+			::= { testConformance 1 }
+		END`)
+
+	if len(module.Body) == 0 {
+		t.Fatal("expected definitions in module body")
+	}
+
+	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
+	testutil.True(t, ok, "expected ModuleComplianceDef, got %T", module.Body[0])
+	testutil.Equal(t, "testCompliance", def.Name.Name, "compliance name")
+	testutil.Greater(t, len(def.Modules), 0, "should have at least one MODULE clause")
+	if len(def.Modules) > 0 {
+		testutil.Greater(t, len(def.Modules[0].MandatoryGroups), 0, "should have mandatory groups")
+	}
+}
+
 func TestParseModuleComplianceRefinements(t *testing.T) {
 	tests := []struct {
 		name            string
