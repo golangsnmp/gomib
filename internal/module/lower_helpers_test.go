@@ -8,6 +8,35 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
+// lowerModule parses source and returns the lowered Module.
+func lowerModule(t *testing.T, source string) *Module {
+	t.Helper()
+	b := []byte(source)
+	p := parser.New(b, nil, types.PermissiveConfig())
+	ast := p.ParseModule()
+	testutil.NotNil(t, ast, "parse returned nil")
+	mod := Lower(ast, b, nil, types.PermissiveConfig())
+	testutil.NotNil(t, mod, "lower returned nil")
+	return mod
+}
+
+// findDef finds the first definition of the given type with the given name.
+// Fails the test if not found or wrong type.
+func findDef[T Definition](t *testing.T, mod *Module, name string) T {
+	t.Helper()
+	for _, d := range mod.Definitions {
+		if d.DefinitionName() == name {
+			v, ok := d.(T)
+			if !ok {
+				t.Fatalf("%s is %T, not %T", name, d, *new(T))
+			}
+			return v
+		}
+	}
+	t.Fatalf("definition %q not found", name)
+	return *new(T)
+}
+
 // lowerAndFindDiagnostic parses source, lowers the AST, and returns the
 // first diagnostic matching code. Returns nil if no matching diagnostic
 // is found.
