@@ -12,6 +12,16 @@ func newTestContext() *resolverContext {
 	return newResolverContext(nil, nil, DefaultConfig())
 }
 
+// buildOIDPath chains getOrCreateChild calls to build a node path from root.
+// For example, buildOIDPath(root, 1, 3, 6, 1) builds iso.org.dod.internet.
+func buildOIDPath(root *Node, arcs ...uint32) *Node {
+	n := root
+	for _, arc := range arcs {
+		n = n.getOrCreateChild(arc)
+	}
+	return n
+}
+
 // testNodeArc is an atomic counter for creating unique test nodes.
 // Atomic to avoid races if tests run in parallel.
 var testNodeArc atomic.Uint32

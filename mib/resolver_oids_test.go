@@ -434,7 +434,7 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 		ctx := newResolverContext([]*module.Module{smiMod}, nil, PermissiveConfig())
 		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
-		node := ctx.Mib.Root().getOrCreateChild(1).getOrCreateChild(3).getOrCreateChild(6).getOrCreateChild(1)
+		node := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1)
 		ctx.registerModuleNodeSymbol(smiMod, "internet", node)
 
 		got, ok := lookupSmiGlobalOidRoot(ctx, "internet")
@@ -451,7 +451,7 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 		ctx := newResolverContext([]*module.Module{rfc1155Mod}, nil, PermissiveConfig())
 		ctx.ModuleIndex["RFC1155-SMI"] = []*module.Module{rfc1155Mod}
 
-		node := ctx.Mib.Root().getOrCreateChild(1).getOrCreateChild(3).getOrCreateChild(6).getOrCreateChild(1)
+		node := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1)
 		ctx.registerModuleNodeSymbol(rfc1155Mod, "internet", node)
 
 		got, ok := lookupSmiGlobalOidRoot(ctx, "internet")
@@ -616,7 +616,7 @@ func TestFinalizeOidDefinition(t *testing.T) {
 			ctx.ModuleToResolved[srcMod] = resolvedMod
 			ctx.ResolvedToModule[resolvedMod] = srcMod
 
-			node := ctx.Mib.Root().getOrCreateChild(1).getOrCreateChild(3).getOrCreateChild(6)
+			node := buildOIDPath(ctx.Mib.Root(), 1, 3, 6)
 
 			oid := module.NewOidAssignment([]module.OidComponent{
 				&module.OidComponentNumber{Value: 1},
@@ -863,7 +863,7 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 	ctx.ResolvedToModule[v2Mod] = v2Src
 	ctx.ResolvedToModule[v1Mod] = v1Src
 
-	node := ctx.Mib.Root().getOrCreateChild(1).getOrCreateChild(3).getOrCreateChild(6).getOrCreateChild(1).getOrCreateChild(2)
+	node := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1, 2)
 
 	oid := module.NewOidAssignment([]module.OidComponent{
 		&module.OidComponentNumber{Value: 1},
@@ -986,14 +986,7 @@ func TestResolveTrapTypeDefinitions_EnterpriseSpecific(t *testing.T) {
 	ctx.ResolvedToModule[resolvedMod] = srcMod
 
 	// Build vendor enterprise node at 1.3.6.1.4.1.9 (e.g. Cisco)
-	enterpriseNode := ctx.Mib.Root().
-		getOrCreateChild(1). // iso
-		getOrCreateChild(3). // org
-		getOrCreateChild(6). // dod
-		getOrCreateChild(1). // internet
-		getOrCreateChild(4). // private
-		getOrCreateChild(1). // enterprises
-		getOrCreateChild(9)  // cisco
+	enterpriseNode := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1, 4, 1, 9)
 	enterpriseNode.setName("cisco")
 	ctx.registerModuleNodeSymbol(srcMod, "cisco", enterpriseNode)
 
