@@ -38,16 +38,14 @@ func TestChildrenSortOrder(t *testing.T) {
 	// Root children should be sorted by arc: a(1), b(5)
 	children := root.Children()
 	testutil.Len(t, children, 2, "children")
-	if children[0].name != "a" || children[1].name != "b" {
-		t.Errorf("got [%s, %s], want [a, b]", children[0].name, children[1].name)
-	}
+	testutil.Equal(t, "a", children[0].name, "children[0].name")
+	testutil.Equal(t, "b", children[1].name, "children[1].name")
 
 	// Node a's children: d(arc 1) before c(arc 3)
 	aChildren := children[0].Children()
 	testutil.Len(t, aChildren, 2, "children for a")
-	if aChildren[0].name != "d" || aChildren[1].name != "c" {
-		t.Errorf("got [%s, %s], want [d, c]", aChildren[0].name, aChildren[1].name)
-	}
+	testutil.Equal(t, "d", aChildren[0].name, "aChildren[0].name")
+	testutil.Equal(t, "c", aChildren[1].name, "aChildren[1].name")
 }
 
 func TestChildrenReturnsCopy(t *testing.T) {
@@ -55,9 +53,7 @@ func TestChildrenReturnsCopy(t *testing.T) {
 
 	c1 := root.Children()
 	c2 := root.Children()
-	if &c1[0] == &c2[0] {
-		t.Error("Children() should return a new slice each call")
-	}
+	testutil.True(t, &c1[0] != &c2[0], "Children() should return a new slice each call")
 }
 
 func TestSubtreeOrder(t *testing.T) {

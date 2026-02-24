@@ -104,14 +104,8 @@ func TestRecordUnresolvedSeverityConsistency(t *testing.T) {
 			for _, d := range diags {
 				if d.Code == tt.code {
 					found = true
-					if d.Severity != SeverityError {
-						t.Errorf("diagnostic %q has severity %d, want %d (SeverityError)",
-							tt.code, d.Severity, SeverityError)
-					}
-					if d.Module != "TEST-MIB" {
-						t.Errorf("diagnostic %q has module %q, want %q",
-							tt.code, d.Module, "TEST-MIB")
-					}
+					testutil.Equal(t, SeverityError, d.Severity, "diagnostic %q severity", tt.code)
+					testutil.Equal(t, "TEST-MIB", d.Module, "diagnostic %q module", tt.code)
 				}
 			}
 			testutil.True(t, found, "no diagnostic with code  emitted")
@@ -130,9 +124,7 @@ func TestIsASN1Primitive(t *testing.T) {
 		"OCTETSTRING", "OBJECT-IDENTIFIER", "", "Counter",
 	}
 	for _, name := range negatives {
-		if isASN1Primitive(name) {
-			t.Errorf("isASN1Primitive(%q) = true, want false", name)
-		}
+		testutil.False(t, isASN1Primitive(name), "isASN1Primitive(%q) = true, want false", name)
 	}
 }
 
@@ -150,9 +142,7 @@ func TestIsSmiGlobalType(t *testing.T) {
 		"integer32", "NetworkAddress", "",
 	}
 	for _, name := range negatives {
-		if isSmiGlobalType(name) {
-			t.Errorf("isSmiGlobalType(%q) = true, want false", name)
-		}
+		testutil.False(t, isSmiGlobalType(name), "isSmiGlobalType(%q) = true, want false", name)
 	}
 }
 
@@ -167,9 +157,7 @@ func TestIsSmiV1GlobalType(t *testing.T) {
 		"counter", "TimeTicks", "",
 	}
 	for _, name := range negatives {
-		if isSmiV1GlobalType(name) {
-			t.Errorf("isSmiV1GlobalType(%q) = true, want false", name)
-		}
+		testutil.False(t, isSmiV1GlobalType(name), "isSmiV1GlobalType(%q) = true, want false", name)
 	}
 }
 
@@ -190,9 +178,7 @@ func TestIsSNMPv2TCType(t *testing.T) {
 		"Counter", "Gauge32", "",
 	}
 	for _, name := range negatives {
-		if isSNMPv2TCType(name) {
-			t.Errorf("isSNMPv2TCType(%q) = true, want false", name)
-		}
+		testutil.False(t, isSNMPv2TCType(name), "isSNMPv2TCType(%q) = true, want false", name)
 	}
 }
 
@@ -210,9 +196,8 @@ func TestLookupInModuleScope_Direct(t *testing.T) {
 		func(m *module.Module) map[string]*Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
-	if !ok || got != nodeX {
-		t.Fatalf("expected to find nodeX directly, got ok=%v node=%v", ok, got)
-	}
+	testutil.True(t, ok, "expected to find nodeX directly")
+	testutil.Equal(t, nodeX, got, "expected nodeX directly")
 }
 
 func TestLookupInModuleScope_ImportChain(t *testing.T) {
@@ -232,9 +217,8 @@ func TestLookupInModuleScope_ImportChain(t *testing.T) {
 		func(m *module.Module) map[string]*Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
 	)
-	if !ok || got != nodeX {
-		t.Fatalf("expected to find nodeX via import chain, got ok=%v node=%v", ok, got)
-	}
+	testutil.True(t, ok, "expected to find nodeX via import chain")
+	testutil.Equal(t, nodeX, got, "expected nodeX via import chain")
 }
 
 func TestLookupInModuleScope_ImportTargetLacksSymbol(t *testing.T) {
@@ -278,9 +262,8 @@ func TestLookupNodeForModule(t *testing.T) {
 	ctx.ModuleImports[modA] = map[string]*module.Module{"x": modB}
 
 	got, ok := ctx.LookupNodeForModule(modA, "x")
-	if !ok || got != nodeX {
-		t.Fatalf("LookupNodeForModule: expected nodeX, got ok=%v", ok)
-	}
+	testutil.True(t, ok, "LookupNodeForModule: expected ok")
+	testutil.Equal(t, nodeX, got, "LookupNodeForModule: expected nodeX")
 
 	_, ok = ctx.LookupNodeForModule(modA, "y")
 	testutil.False(t, ok, "LookupNodeForModule: expected false for unknown symbol")
@@ -295,9 +278,8 @@ func TestLookupNodeInModule(t *testing.T) {
 	ctx.ModuleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
 
 	got, ok := ctx.LookupNodeInModule("MY-MIB", "x")
-	if !ok || got != nodeX {
-		t.Fatalf("LookupNodeInModule: expected nodeX, got ok=%v", ok)
-	}
+	testutil.True(t, ok, "LookupNodeInModule: expected ok")
+	testutil.Equal(t, nodeX, got, "LookupNodeInModule: expected nodeX")
 
 	_, ok = ctx.LookupNodeInModule("OTHER-MIB", "x")
 	testutil.False(t, ok, "LookupNodeInModule: expected false for unknown module")
@@ -314,9 +296,8 @@ func TestLookupNodeInModule_MultipleVersions(t *testing.T) {
 	ctx.ModuleSymbolToNode[modV2] = map[string]*Node{"x": nodeX}
 
 	got, ok := ctx.LookupNodeInModule("MY-MIB", "x")
-	if !ok || got != nodeX {
-		t.Fatalf("expected to find nodeX in second version, got ok=%v", ok)
-	}
+	testutil.True(t, ok, "expected to find nodeX in second version")
+	testutil.Equal(t, nodeX, got, "expected nodeX in second version")
 }
 
 func TestLookupNodeGlobal(t *testing.T) {
@@ -330,14 +311,12 @@ func TestLookupNodeGlobal(t *testing.T) {
 	ctx.ModuleSymbolToNode[modB] = map[string]*Node{"y": nodeY}
 
 	got, ok := ctx.LookupNodeGlobal("x")
-	if !ok || got != nodeX {
-		t.Fatalf("LookupNodeGlobal(x): expected nodeX, got ok=%v", ok)
-	}
+	testutil.True(t, ok, "LookupNodeGlobal(x): expected ok")
+	testutil.Equal(t, nodeX, got, "LookupNodeGlobal(x): expected nodeX")
 
 	got, ok = ctx.LookupNodeGlobal("y")
-	if !ok || got != nodeY {
-		t.Fatalf("LookupNodeGlobal(y): expected nodeY, got ok=%v", ok)
-	}
+	testutil.True(t, ok, "LookupNodeGlobal(y): expected ok")
+	testutil.Equal(t, nodeY, got, "LookupNodeGlobal(y): expected nodeY")
 
 	_, ok = ctx.LookupNodeGlobal("z")
 	testutil.False(t, ok, "LookupNodeGlobal(z): expected false")
@@ -355,9 +334,8 @@ func TestLookupNodeGlobal_DeterministicOrder(t *testing.T) {
 	ctx.ModuleSymbolToNode[modB] = map[string]*Node{"x": nodeB}
 
 	got, ok := ctx.LookupNodeGlobal("x")
-	if !ok || got != nodeA {
-		t.Fatal("LookupNodeGlobal should return the first module's node")
-	}
+	testutil.True(t, ok, "LookupNodeGlobal should find x")
+	testutil.Equal(t, nodeA, got, "LookupNodeGlobal should return the first module's node")
 }
 
 func TestLookupTypeForModule(t *testing.T) {
@@ -371,9 +349,8 @@ func TestLookupTypeForModule(t *testing.T) {
 	ctx.ModuleImports[modA] = map[string]*module.Module{"MyType": modB}
 
 	got, ok := ctx.LookupTypeForModule(modA, "MyType")
-	if !ok || got != typeX {
-		t.Fatalf("LookupTypeForModule: expected typeX, got ok=%v", ok)
-	}
+	testutil.True(t, ok, "LookupTypeForModule: expected ok")
+	testutil.Equal(t, typeX, got, "LookupTypeForModule: expected typeX")
 }
 
 func TestLookupTypeForModule_ASN1Fallback(t *testing.T) {
@@ -387,9 +364,8 @@ func TestLookupTypeForModule_ASN1Fallback(t *testing.T) {
 	ctx.ModuleSymbolToType[smiMod] = map[string]*Type{"INTEGER": intType}
 
 	got, ok := ctx.LookupTypeForModule(modA, "INTEGER")
-	if !ok || got != intType {
-		t.Fatalf("expected ASN.1 primitive fallback, got ok=%v", ok)
-	}
+	testutil.True(t, ok, "expected ASN.1 primitive fallback")
+	testutil.Equal(t, intType, got, "expected ASN.1 primitive fallback")
 }
 
 func TestLookupTypeForModule_PermissiveFallbacks(t *testing.T) {
@@ -422,9 +398,8 @@ func TestLookupTypeForModule_PermissiveFallbacks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		got, ok := ctx.LookupTypeForModule(modA, tt.name)
-		if !ok || got != tt.want {
-			t.Errorf("LookupTypeForModule(%q) permissive: ok=%v, got=%v", tt.name, ok, got)
-		}
+		testutil.True(t, ok, "LookupTypeForModule(%q) permissive: expected ok", tt.name)
+		testutil.Equal(t, tt.want, got, "LookupTypeForModule(%q) permissive", tt.name)
 	}
 }
 
@@ -448,9 +423,8 @@ func TestLookupTypeForModule_StrictNoFallback(t *testing.T) {
 	ctx.ModuleSymbolToType[smiMod]["INTEGER"] = intType
 
 	got, ok := ctx.LookupTypeForModule(modA, "INTEGER")
-	if !ok || got != intType {
-		t.Fatal("expected ASN.1 primitive to resolve even in strict mode")
-	}
+	testutil.True(t, ok, "expected ASN.1 primitive to resolve even in strict mode")
+	testutil.Equal(t, intType, got, "expected ASN.1 primitive to resolve even in strict mode")
 }
 
 func TestLookupType_Permissive(t *testing.T) {
@@ -487,9 +461,8 @@ func TestLookupType_Permissive(t *testing.T) {
 	}
 	for _, tt := range tests {
 		got, ok := ctx.LookupType(tt.name)
-		if !ok || got != tt.want {
-			t.Errorf("LookupType(%q): ok=%v, got=%v", tt.name, ok, got)
-		}
+		testutil.True(t, ok, "LookupType(%q): expected ok", tt.name)
+		testutil.Equal(t, tt.want, got, "LookupType(%q)", tt.name)
 	}
 }
 
@@ -508,9 +481,8 @@ func TestLookupType_StrictOnlyPrimitives(t *testing.T) {
 	}
 
 	got, ok := ctx.LookupType("INTEGER")
-	if !ok || got != intType {
-		t.Fatal("expected ASN.1 primitive to resolve in strict mode")
-	}
+	testutil.True(t, ok, "expected ASN.1 primitive to resolve in strict mode")
+	testutil.Equal(t, intType, got, "expected ASN.1 primitive to resolve in strict mode")
 
 	_, ok = ctx.LookupType("Counter32")
 	testutil.False(t, ok, "expected strict mode to not allow global search for Counter32")
@@ -526,9 +498,8 @@ func TestLookupType_GlobalModuleScan(t *testing.T) {
 	ctx.ModuleSymbolToType[modA] = map[string]*Type{"VendorSpecialType": vendorType}
 
 	got, ok := ctx.LookupType("VendorSpecialType")
-	if !ok || got != vendorType {
-		t.Fatal("expected global module scan to find vendor type in permissive mode")
-	}
+	testutil.True(t, ok, "expected global module scan to find vendor type in permissive mode")
+	testutil.Equal(t, vendorType, got, "expected global module scan to find vendor type in permissive mode")
 }
 
 func TestRegisterImport(t *testing.T) {

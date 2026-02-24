@@ -52,14 +52,10 @@ func TestDiagnosticConfigShouldReportIgnore(t *testing.T) {
 	}
 
 	// Exact match
-	if cfg.ShouldReport("identifier-underscore", SeverityStyle) {
-		t.Error("ignored code should not be reported")
-	}
+	testutil.False(t, cfg.ShouldReport("identifier-underscore", SeverityStyle), "ignored code should not be reported")
 
 	// Glob match
-	if cfg.ShouldReport("identifier-length-64", SeverityError) {
-		t.Error("glob-matched code should not be reported")
-	}
+	testutil.False(t, cfg.ShouldReport("identifier-length-64", SeverityError), "glob-matched code should not be reported")
 
 	// Non-matching code should be reported
 	testutil.True(t, cfg.ShouldReport("missing-import", SeverityError), "non-matching code should be reported")
@@ -75,9 +71,7 @@ func TestDiagnosticConfigShouldReportOverrides(t *testing.T) {
 	}
 
 	// Without override, style severity would not be reported at normal level
-	if cfg.ShouldReport("other-style", SeverityStyle) {
-		t.Error("style severity should not be reported at normal level")
-	}
+	testutil.False(t, cfg.ShouldReport("other-style", SeverityStyle), "style severity should not be reported at normal level")
 
 	// With override, the code is upgraded to Minor which IS reported
 	testutil.True(t, cfg.ShouldReport("my-style-check", SeverityStyle), "overridden code should be reported (upgraded to Minor)")

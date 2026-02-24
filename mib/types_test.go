@@ -132,9 +132,8 @@ func TestDefValAs(t *testing.T) {
 		dv := newDefValBytes([]byte{0xAB}, "x")
 		v, ok := DefValAs[[]byte](dv)
 		testutil.True(t, ok, "DefValAs[[]byte] should succeed")
-		if len(v) != 1 || v[0] != 0xAB {
-			t.Errorf("got %x, want [AB]", v)
-		}
+		testutil.Len(t, v, 1, "DefValAs[[]byte] length")
+		testutil.Equal(t, byte(0xAB), v[0], "DefValAs[[]byte] value")
 	})
 
 	t.Run("type mismatch", func(t *testing.T) {
@@ -215,9 +214,7 @@ func TestModuleImportsDeepClone(t *testing.T) {
 	got := m.Imports()
 	got[0].Symbols[0] = "MUTATED"
 
-	if m.imports[0].Symbols[0] == "MUTATED" {
-		t.Error("mutating Imports() return value should not affect module internal state")
-	}
+	testutil.True(t, m.imports[0].Symbols[0] != "MUTATED", "mutating Imports() return value should not affect module internal state")
 }
 
 func TestComplianceModulesDeepClone(t *testing.T) {

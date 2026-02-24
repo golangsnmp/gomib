@@ -167,9 +167,8 @@ func TestGetOidParentSymbol(t *testing.T) {
 		}
 		sym, ok := getOidParentSymbol(localCtx, def)
 		testutil.True(t, ok, "expected true for local definition")
-		if sym.Module != "LOCAL-MIB" || sym.Name != "enterprises" {
-			t.Errorf("got %v, want {LOCAL-MIB, enterprises}", sym)
-		}
+		testutil.Equal(t, "LOCAL-MIB", sym.Module, "module")
+		testutil.Equal(t, "enterprises", sym.Name, "name")
 	})
 
 	t.Run("OidComponentNamedNumber with known name", func(t *testing.T) {
@@ -222,9 +221,8 @@ func TestGetOidParentSymbol(t *testing.T) {
 		})
 		sym, ok := getOidParentSymbol(ctx, def)
 		testutil.True(t, ok, "expected true for qualified name")
-		if sym.Module != "SNMPv2-SMI" || sym.Name != "enterprises" {
-			t.Errorf("got %v, want {SNMPv2-SMI, enterprises}", sym)
-		}
+		testutil.Equal(t, "SNMPv2-SMI", sym.Module, "module")
+		testutil.Equal(t, "enterprises", sym.Name, "name")
 	})
 
 	t.Run("OidComponentQualifiedNamedNumber", func(t *testing.T) {
@@ -233,9 +231,8 @@ func TestGetOidParentSymbol(t *testing.T) {
 		})
 		sym, ok := getOidParentSymbol(ctx, def)
 		testutil.True(t, ok, "expected true for qualified named number")
-		if sym.Module != "RFC1155-SMI" || sym.Name != "private" {
-			t.Errorf("got %v, want {RFC1155-SMI, private}", sym)
-		}
+		testutil.Equal(t, "RFC1155-SMI", sym.Module, "module")
+		testutil.Equal(t, "private", sym.Name, "name")
 	})
 }
 
@@ -358,8 +355,8 @@ func TestLookupOrCreateWellKnownRoot(t *testing.T) {
 			ctx := newTestContext()
 			node, ok := lookupOrCreateWellKnownRoot(ctx, tt.name)
 			testutil.Equal(t, tt.wantOk, ok, "ok")
-			if ok && node.Arc() != tt.wantArc {
-				t.Errorf("arc = %d, want %d", node.Arc(), tt.wantArc)
+			if ok {
+				testutil.Equal(t, tt.wantArc, node.Arc(), "arc")
 			}
 		})
 	}
@@ -449,9 +446,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		if shouldPreferModule(ctx, newMod, oldMod, newSrc) {
-			t.Error("expected SMIv1 NOT to be preferred over SMIv2")
-		}
+		testutil.False(t, shouldPreferModule(ctx, newMod, oldMod, newSrc), "expected SMIv1 NOT to be preferred over SMIv2")
 	})
 
 	t.Run("same language uses LAST-UPDATED tiebreaker", func(t *testing.T) {
@@ -501,9 +496,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		if shouldPreferModule(ctx, newMod, oldMod, newSrc) {
-			t.Error("expected older LAST-UPDATED to lose")
-		}
+		testutil.False(t, shouldPreferModule(ctx, newMod, oldMod, newSrc), "expected older LAST-UPDATED to lose")
 	})
 }
 
@@ -603,14 +596,12 @@ func TestSmiGlobalOidRoots(t *testing.T) {
 	}
 
 	for _, name := range expected {
-		if _, ok := smiGlobalOidRoots[name]; !ok {
-			t.Errorf("expected %q in smiGlobalOidRoots", name)
-		}
+		_, ok := smiGlobalOidRoots[name]
+		testutil.True(t, ok, "expected %q in smiGlobalOidRoots", name)
 	}
 
-	if _, ok := smiGlobalOidRoots["iso"]; ok {
-		t.Error("iso should not be in smiGlobalOidRoots (it is a well-known root)")
-	}
+	_, ok := smiGlobalOidRoots["iso"]
+	testutil.False(t, ok, "iso should not be in smiGlobalOidRoots (it is a well-known root)")
 }
 
 func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
@@ -632,9 +623,8 @@ func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
 
 	sym, ok := getOidParentSymbol(ctx, def)
 	testutil.True(t, ok, "expected true in permissive mode for SMI global root")
-	if sym.Module != "SNMPv2-SMI" || sym.Name != "enterprises" {
-		t.Errorf("got %v, want {SNMPv2-SMI, enterprises}", sym)
-	}
+	testutil.Equal(t, "SNMPv2-SMI", sym.Module, "module")
+	testutil.Equal(t, "enterprises", sym.Name, "name")
 }
 
 func TestGetOidParentSymbolStrictNoSmiGlobal(t *testing.T) {
@@ -718,9 +708,8 @@ func TestTrapTypeRef(t *testing.T) {
 	testutil.True(t, ok, "expected ok = true")
 	testutil.Equal(t, "enterprises", enterprise, "enterprise")
 	testutil.Equal(t, 5, trapNum, "trapNumber")
-	if span.Start != 10 || span.End != 20 {
-		t.Errorf("span = %v, want {10, 20}", span)
-	}
+	testutil.Equal(t, types.ByteOffset(10), span.Start, "span.Start")
+	testutil.Equal(t, types.ByteOffset(20), span.End, "span.End")
 }
 
 func TestTrapTypeRefNilTrapInfo(t *testing.T) {
@@ -837,10 +826,7 @@ func TestResolveTrapTypeDefinitions_GenericTraps(t *testing.T) {
 
 	for _, tt := range genericTraps {
 		node, ok := ctx.LookupNodeForModule(srcMod, tt.name)
-		if !ok {
-			t.Errorf("%s: not resolved", tt.name)
-			continue
-		}
+		testutil.True(t, ok, "%s: not resolved", tt.name)
 		got := node.OID()
 		testutil.True(t, got.Equal(tt.wantOID), ": OID")
 		testutil.Equal(t, KindNotification, node.Kind(), ": kind")

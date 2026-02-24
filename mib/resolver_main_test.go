@@ -66,10 +66,7 @@ func TestResolveBaseModulePrimitiveTypes(t *testing.T) {
 
 	for _, p := range primitives {
 		typ := smiMod.Type(p.name)
-		if typ == nil {
-			t.Errorf("primitive type %q not found in SNMPv2-SMI", p.name)
-			continue
-		}
+		testutil.NotNil(t, typ, "primitive type %q not found in SNMPv2-SMI", p.name)
 		testutil.Equal(t, p.base, typ.Base(), "primitive type  base")
 	}
 }
@@ -91,10 +88,7 @@ func TestResolveBaseModuleNodes(t *testing.T) {
 	}
 	for _, name := range expectedNodes {
 		nd := m.Node(name)
-		if nd == nil {
-			t.Errorf("base node %q not found", name)
-			continue
-		}
+		testutil.NotNil(t, nd, "base node %q not found", name)
 		testutil.NotEmpty(t, nd.OID(), "base node  has empty OID")
 	}
 }
@@ -117,15 +111,9 @@ func TestResolveBaseModuleNodeOIDValues(t *testing.T) {
 
 	for _, tt := range tests {
 		nd := m.Node(tt.name)
-		if nd == nil {
-			t.Errorf("node %q not found", tt.name)
-			continue
-		}
+		testutil.NotNil(t, nd, "node %q not found", tt.name)
 		got := nd.OID()
-		if len(got) != len(tt.oid) {
-			t.Errorf("node %q OID length = %d, want %d", tt.name, len(got), len(tt.oid))
-			continue
-		}
+		testutil.Equal(t, len(tt.oid), len(got), "node %q OID length", tt.name)
 		for i := range got {
 			testutil.Equal(t, tt.oid[i], got[i], "node  OID[]")
 		}
@@ -152,10 +140,7 @@ func TestResolveBaseModuleSMITypes(t *testing.T) {
 
 	for _, tt := range smiTypes {
 		typ := m.Type(tt.name)
-		if typ == nil {
-			t.Errorf("SMI type %q not found", tt.name)
-			continue
-		}
+		testutil.NotNil(t, typ, "SMI type %q not found", tt.name)
 		testutil.Equal(t, tt.base, typ.Base(), "SMI type  base")
 	}
 }
@@ -211,17 +196,13 @@ func TestResolveNoUserModulesNodeCount(t *testing.T) {
 	m := Resolve(nil, nil, nil)
 	// Base modules define OID nodes (iso, org, dod, internet, etc.).
 	// There should be a reasonable number of nodes from base modules alone.
-	if m.NodeCount() == 0 {
-		t.Error("expected non-zero node count from base modules")
-	}
+	testutil.Greater(t, m.NodeCount(), 0, "expected non-zero node count from base modules")
 }
 
 func TestResolveNoUserModulesTypeCount(t *testing.T) {
 	m := Resolve(nil, nil, nil)
 	// At minimum: 4 ASN.1 primitives + SMI types + TCs
-	if len(m.Types()) < 4 {
-		t.Errorf("expected at least 4 types (ASN.1 primitives), got %d", len(m.Types()))
-	}
+	testutil.True(t, len(m.Types()) >= 4, "expected at least 4 types (ASN.1 primitives), got %d", len(m.Types()))
 }
 
 func TestResolveNoUserModulesHasNoUnresolved(t *testing.T) {

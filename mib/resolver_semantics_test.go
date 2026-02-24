@@ -207,9 +207,9 @@ func TestConvertDefValInteger(t *testing.T) {
 	dv := convertDefVal(ctx, &module.DefValInteger{Value: 42}, mod, syntax)
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindInt, dv.Kind(), "kind")
-	if v, ok := DefValAs[int64](*dv); !ok || v != 42 {
-		t.Errorf("value = %v (ok=%v), want 42", v, ok)
-	}
+	v, ok := DefValAs[int64](*dv)
+	testutil.True(t, ok, "DefValAs[int64] ok")
+	testutil.Equal(t, int64(42), v, "value")
 	testutil.Equal(t, "42", dv.Raw(), "raw")
 }
 
@@ -221,9 +221,9 @@ func TestConvertDefValNegativeInteger(t *testing.T) {
 	dv := convertDefVal(ctx, &module.DefValInteger{Value: -1}, mod, syntax)
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindInt, dv.Kind(), "kind")
-	if v, ok := DefValAs[int64](*dv); !ok || v != -1 {
-		t.Errorf("value = %v (ok=%v), want -1", v, ok)
-	}
+	v, ok := DefValAs[int64](*dv)
+	testutil.True(t, ok, "DefValAs[int64] ok")
+	testutil.Equal(t, int64(-1), v, "value")
 	testutil.Equal(t, "-1", dv.Raw(), "raw")
 }
 
@@ -235,9 +235,9 @@ func TestConvertDefValUnsigned(t *testing.T) {
 	dv := convertDefVal(ctx, &module.DefValUnsigned{Value: 12345}, mod, syntax)
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindUint, dv.Kind(), "kind")
-	if v, ok := DefValAs[uint64](*dv); !ok || v != 12345 {
-		t.Errorf("value = %v (ok=%v), want 12345", v, ok)
-	}
+	v, ok := DefValAs[uint64](*dv)
+	testutil.True(t, ok, "DefValAs[uint64] ok")
+	testutil.Equal(t, uint64(12345), v, "value")
 	testutil.Equal(t, "12345", dv.Raw(), "raw")
 }
 
@@ -249,9 +249,9 @@ func TestConvertDefValString(t *testing.T) {
 	dv := convertDefVal(ctx, &module.DefValString{Value: "public"}, mod, syntax)
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindString, dv.Kind(), "kind")
-	if v, ok := DefValAs[string](*dv); !ok || v != "public" {
-		t.Errorf("value = %v (ok=%v), want %q", v, ok, "public")
-	}
+	v, ok := DefValAs[string](*dv)
+	testutil.True(t, ok, "DefValAs[string] ok")
+	testutil.Equal(t, "public", v, "value")
 	testutil.Equal(t, `"public"`, dv.Raw(), "raw")
 }
 
@@ -283,9 +283,8 @@ func TestConvertDefValBinaryString(t *testing.T) {
 	testutil.Equal(t, DefValKindBytes, dv.Kind(), "kind")
 	bytes, ok := DefValAs[[]byte](*dv)
 	testutil.True(t, ok, "value is not []byte")
-	if len(bytes) != 1 || bytes[0] != 0xAA {
-		t.Errorf("bytes = %v, want [0xAA]", bytes)
-	}
+	testutil.Len(t, bytes, 1, "bytes len")
+	testutil.Equal(t, byte(0xAA), bytes[0], "bytes[0]")
 	testutil.Equal(t, "'10101010'B", dv.Raw(), "raw")
 }
 
@@ -302,9 +301,9 @@ func TestConvertDefValEnum(t *testing.T) {
 	dv := convertDefVal(ctx, &module.DefValEnum{Name: "enabled"}, mod, syntax)
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindEnum, dv.Kind(), "kind")
-	if v, ok := DefValAs[string](*dv); !ok || v != "enabled" {
-		t.Errorf("value = %v (ok=%v), want %q", v, ok, "enabled")
-	}
+	v, ok := DefValAs[string](*dv)
+	testutil.True(t, ok, "DefValAs[string] ok")
+	testutil.Equal(t, "enabled", v, "value")
 	testutil.Equal(t, "enabled", dv.Raw(), "raw")
 }
 
@@ -327,9 +326,9 @@ func TestConvertDefValEnumOnOIDType(t *testing.T) {
 	testutil.Equal(t, DefValKindOID, dv.Kind(), "kind")
 	oid, ok := DefValAs[OID](*dv)
 	testutil.True(t, ok, "value is not OID")
-	if len(oid) != 2 || oid[0] != 1 || oid[1] != 3 {
-		t.Errorf("oid = %v, want [1 3]", oid)
-	}
+	testutil.Len(t, oid, 2, "oid len")
+	testutil.Equal(t, uint32(1), oid[0], "oid[0]")
+	testutil.Equal(t, uint32(3), oid[1], "oid[1]")
 }
 
 func TestConvertDefValEnumOnOIDTypeFallback(t *testing.T) {
@@ -353,9 +352,9 @@ func TestConvertDefValBits(t *testing.T) {
 	testutil.Equal(t, DefValKindBits, dv.Kind(), "kind")
 	labels, ok := DefValAs[[]string](*dv)
 	testutil.True(t, ok, "value is not []string")
-	if len(labels) != 2 || labels[0] != "flag1" || labels[1] != "flag2" {
-		t.Errorf("labels = %v, want [flag1 flag2]", labels)
-	}
+	testutil.Len(t, labels, 2, "labels len")
+	testutil.Equal(t, "flag1", labels[0], "labels[0]")
+	testutil.Equal(t, "flag2", labels[1], "labels[1]")
 	testutil.Equal(t, "{ flag1, flag2 }", dv.Raw(), "raw")
 }
 
@@ -561,9 +560,9 @@ func TestComputeEffectiveValues(t *testing.T) {
 		computeEffectiveValues(obj)
 
 		sizes := obj.EffectiveSizes()
-		if len(sizes) != 1 || sizes[0].Min != 0 || sizes[0].Max != 255 {
-			t.Errorf("sizes = %v, want [{0 255}]", sizes)
-		}
+		testutil.Len(t, sizes, 1, "sizes len")
+		testutil.Equal(t, int64(0), sizes[0].Min, "sizes[0].Min")
+		testutil.Equal(t, int64(255), sizes[0].Max, "sizes[0].Max")
 	})
 
 	t.Run("object sizes take precedence", func(t *testing.T) {
@@ -576,9 +575,9 @@ func TestComputeEffectiveValues(t *testing.T) {
 		computeEffectiveValues(obj)
 
 		sizes := obj.EffectiveSizes()
-		if len(sizes) != 1 || sizes[0].Min != 1 || sizes[0].Max != 32 {
-			t.Errorf("sizes = %v, want [{1 32}]", sizes)
-		}
+		testutil.Len(t, sizes, 1, "sizes len")
+		testutil.Equal(t, int64(1), sizes[0].Min, "sizes[0].Min")
+		testutil.Equal(t, int64(32), sizes[0].Max, "sizes[0].Max")
 	})
 
 	t.Run("inherits ranges from ancestor", func(t *testing.T) {
@@ -596,9 +595,9 @@ func TestComputeEffectiveValues(t *testing.T) {
 		computeEffectiveValues(obj)
 
 		ranges := obj.EffectiveRanges()
-		if len(ranges) != 1 || ranges[0].Min != -128 || ranges[0].Max != 127 {
-			t.Errorf("ranges = %v, want [{-128 127}]", ranges)
-		}
+		testutil.Len(t, ranges, 1, "ranges len")
+		testutil.Equal(t, int64(-128), ranges[0].Min, "ranges[0].Min")
+		testutil.Equal(t, int64(127), ranges[0].Max, "ranges[0].Max")
 	})
 
 	t.Run("inherits enums from type", func(t *testing.T) {
@@ -613,9 +612,9 @@ func TestComputeEffectiveValues(t *testing.T) {
 		computeEffectiveValues(obj)
 
 		enums := obj.EffectiveEnums()
-		if len(enums) != 2 || enums[0].Label != "up" || enums[1].Label != "down" {
-			t.Errorf("enums = %v, want up/down", enums)
-		}
+		testutil.Len(t, enums, 2, "enums len")
+		testutil.Equal(t, "up", enums[0].Label, "enums[0].Label")
+		testutil.Equal(t, "down", enums[1].Label, "enums[1].Label")
 	})
 
 	t.Run("object enums take precedence over type enums", func(t *testing.T) {
@@ -633,9 +632,8 @@ func TestComputeEffectiveValues(t *testing.T) {
 		computeEffectiveValues(obj)
 
 		enums := obj.EffectiveEnums()
-		if len(enums) != 1 || enums[0].Label != "active" {
-			t.Errorf("enums = %v, want [active]", enums)
-		}
+		testutil.Len(t, enums, 1, "enums len")
+		testutil.Equal(t, "active", enums[0].Label, "enums[0].Label")
 	})
 
 	t.Run("inherits bits from type", func(t *testing.T) {
@@ -650,9 +648,8 @@ func TestComputeEffectiveValues(t *testing.T) {
 		computeEffectiveValues(obj)
 
 		bits := obj.EffectiveBits()
-		if len(bits) != 2 || bits[0].Label != "feature1" {
-			t.Errorf("bits = %v, want feature1/feature2", bits)
-		}
+		testutil.Len(t, bits, 2, "bits len")
+		testutil.Equal(t, "feature1", bits[0].Label, "bits[0].Label")
 	})
 }
 
@@ -705,9 +702,8 @@ func TestConvertComplianceModules(t *testing.T) {
 		testutil.Len(t, result[0].Objects, 2, "objects")
 		obj0 := result[0].Objects[0]
 		testutil.Equal(t, "ifAdminStatus", obj0.Object, "object")
-		if obj0.MinAccess == nil || *obj0.MinAccess != AccessReadOnly {
-			t.Errorf("min-access = %v, want read-only", obj0.MinAccess)
-		}
+		testutil.NotNil(t, obj0.MinAccess, "min-access")
+		testutil.Equal(t, AccessReadOnly, *obj0.MinAccess, "min-access")
 		testutil.Equal(t, "obj desc", obj0.Description, "desc")
 		obj1 := result[0].Objects[1]
 		testutil.Nil(t, obj1.MinAccess, "expected nil min-access for second object")
@@ -720,9 +716,8 @@ func TestConvertComplianceModules(t *testing.T) {
 		}
 		result := convertComplianceModules(nil, nil, input)
 		testutil.Len(t, result, 2, "expected 2, got")
-		if result[0].ModuleName != "IF-MIB" || result[1].ModuleName != "IP-MIB" {
-			t.Errorf("module names = %q, %q", result[0].ModuleName, result[1].ModuleName)
-		}
+		testutil.Equal(t, "IF-MIB", result[0].ModuleName, "result[0].ModuleName")
+		testutil.Equal(t, "IP-MIB", result[1].ModuleName, "result[1].ModuleName")
 	})
 
 	t.Run("object with syntax constraints", func(t *testing.T) {
@@ -755,13 +750,13 @@ func TestConvertComplianceModules(t *testing.T) {
 		obj := result[0].Objects[0]
 		testutil.NotNil(t, obj.Syntax, "expected non-nil Syntax")
 		testutil.Equal(t, intType, obj.Syntax.Type, "Syntax.Type does not match")
-		if len(obj.Syntax.Ranges) != 1 || obj.Syntax.Ranges[0].Min != 0 || obj.Syntax.Ranges[0].Max != 100 {
-			t.Errorf("Syntax.Ranges = %v, want [{0 100}]", obj.Syntax.Ranges)
-		}
+		testutil.Len(t, obj.Syntax.Ranges, 1, "Syntax.Ranges len")
+		testutil.Equal(t, int64(0), obj.Syntax.Ranges[0].Min, "Syntax.Ranges[0].Min")
+		testutil.Equal(t, int64(100), obj.Syntax.Ranges[0].Max, "Syntax.Ranges[0].Max")
 		testutil.NotNil(t, obj.WriteSyntax, "expected non-nil WriteSyntax")
-		if len(obj.WriteSyntax.Ranges) != 1 || obj.WriteSyntax.Ranges[0].Min != 1 || obj.WriteSyntax.Ranges[0].Max != 50 {
-			t.Errorf("WriteSyntax.Ranges = %v, want [{1 50}]", obj.WriteSyntax.Ranges)
-		}
+		testutil.Len(t, obj.WriteSyntax.Ranges, 1, "WriteSyntax.Ranges len")
+		testutil.Equal(t, int64(1), obj.WriteSyntax.Ranges[0].Min, "WriteSyntax.Ranges[0].Min")
+		testutil.Equal(t, int64(50), obj.WriteSyntax.Ranges[0].Max, "WriteSyntax.Ranges[0].Max")
 	})
 }
 
@@ -784,9 +779,8 @@ func TestConvertSupportsModules(t *testing.T) {
 		result := convertSupportsModules(ctx, mod, input)
 		testutil.Len(t, result, 1, "expected 1, got")
 		testutil.Equal(t, "IF-MIB", result[0].ModuleName, "module name")
-		if len(result[0].Includes) != 1 || result[0].Includes[0] != "ifGeneralGroup" {
-			t.Errorf("includes = %v", result[0].Includes)
-		}
+		testutil.Len(t, result[0].Includes, 1, "includes len")
+		testutil.Equal(t, "ifGeneralGroup", result[0].Includes[0], "includes[0]")
 	})
 
 	t.Run("object variations with access", func(t *testing.T) {
@@ -804,9 +798,8 @@ func TestConvertSupportsModules(t *testing.T) {
 		vars := result[0].ObjectVariations
 		testutil.Len(t, vars, 2, "variations")
 		testutil.Equal(t, "ifAdminStatus", vars[0].Object, "object")
-		if vars[0].Access == nil || *vars[0].Access != AccessReadOnly {
-			t.Errorf("access = %v, want read-only", vars[0].Access)
-		}
+		testutil.NotNil(t, vars[0].Access, "access")
+		testutil.Equal(t, AccessReadOnly, *vars[0].Access, "access")
 		testutil.Equal(t, "read only", vars[0].Description, "desc")
 		testutil.Nil(t, vars[1].Access, "expected nil access for second variation")
 	})
@@ -826,9 +819,8 @@ func TestConvertSupportsModules(t *testing.T) {
 		vars := result[0].NotificationVariations
 		testutil.Len(t, vars, 2, "notification variations")
 		testutil.Equal(t, "linkDown", vars[0].Notification, "notification")
-		if vars[0].Access == nil || *vars[0].Access != AccessReadOnly {
-			t.Errorf("access = %v, want read-only", vars[0].Access)
-		}
+		testutil.NotNil(t, vars[0].Access, "access")
+		testutil.Equal(t, AccessReadOnly, *vars[0].Access, "access")
 		testutil.Equal(t, "not supported", vars[0].Description, "desc")
 		testutil.Nil(t, vars[1].Access, "expected nil access for second variation")
 	})
@@ -896,14 +888,14 @@ func TestConvertSupportsModules(t *testing.T) {
 		v := result[0].ObjectVariations[0]
 		testutil.NotNil(t, v.Syntax, "expected non-nil Syntax")
 		testutil.Equal(t, intType, v.Syntax.Type, "Syntax.Type does not match")
-		if len(v.Syntax.Ranges) != 1 || v.Syntax.Ranges[0].Min != 1 || v.Syntax.Ranges[0].Max != 2 {
-			t.Errorf("Syntax.Ranges = %v, want [{1 2}]", v.Syntax.Ranges)
-		}
+		testutil.Len(t, v.Syntax.Ranges, 1, "Syntax.Ranges len")
+		testutil.Equal(t, int64(1), v.Syntax.Ranges[0].Min, "Syntax.Ranges[0].Min")
+		testutil.Equal(t, int64(2), v.Syntax.Ranges[0].Max, "Syntax.Ranges[0].Max")
 		testutil.NotNil(t, v.WriteSyntax, "expected non-nil WriteSyntax")
 		testutil.Equal(t, intType, v.WriteSyntax.Type, "WriteSyntax.Type does not match")
-		if len(v.CreationRequires) != 2 || v.CreationRequires[0] != "ifType" || v.CreationRequires[1] != "ifSpeed" {
-			t.Errorf("CreationRequires = %v, want [ifType ifSpeed]", v.CreationRequires)
-		}
+		testutil.Len(t, v.CreationRequires, 2, "CreationRequires len")
+		testutil.Equal(t, "ifType", v.CreationRequires[0], "CreationRequires[0]")
+		testutil.Equal(t, "ifSpeed", v.CreationRequires[1], "CreationRequires[1]")
 	})
 
 	t.Run("object variation with defval", func(t *testing.T) {
@@ -923,14 +915,11 @@ func TestConvertSupportsModules(t *testing.T) {
 		result := convertSupportsModules(ctx, mod, input)
 		vars := result[0].ObjectVariations
 		testutil.Len(t, vars, 1, "variations")
-		if vars[0].DefVal.IsZero() {
-			t.Fatal("expected non-zero DefVal")
-		}
+		testutil.False(t, vars[0].DefVal.IsZero(), "expected non-zero DefVal")
 		testutil.Equal(t, DefValKindInt, vars[0].DefVal.Kind(), "defval kind")
 		v, ok := DefValAs[int64](vars[0].DefVal)
-		if !ok || v != 2 {
-			t.Errorf("defval value = %v (ok=%v), want 2", v, ok)
-		}
+		testutil.True(t, ok, "DefValAs[int64] ok")
+		testutil.Equal(t, int64(2), v, "defval value")
 	})
 }
 
