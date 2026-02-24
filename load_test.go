@@ -11,10 +11,7 @@ import (
 )
 
 func TestLoadSingleMIB(t *testing.T) {
-	src, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree failed: %v", err)
-	}
+	src := mustDirTree(t, "testdata/corpus/primary")
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB"))
@@ -38,10 +35,7 @@ func TestLoadAllCorpus(t *testing.T) {
 		t.Skip("skipping corpus load in short mode")
 	}
 
-	src, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree failed: %v", err)
-	}
+	src := mustDirTree(t, "testdata/corpus/primary")
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src))
@@ -91,14 +85,8 @@ func TestDirTreeSource(t *testing.T) {
 }
 
 func TestMultiSource(t *testing.T) {
-	primary, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree primary failed: %v", err)
-	}
-	problems, err := DirTree("testdata/corpus/problems")
-	if err != nil {
-		t.Fatalf("DirTree problems failed: %v", err)
-	}
+	primary := mustDirTree(t, "testdata/corpus/primary")
+	problems := mustDirTree(t, "testdata/corpus/problems")
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(primary, problems), WithModules("IF-MIB"))
@@ -109,10 +97,7 @@ func TestMultiSource(t *testing.T) {
 }
 
 func TestLoadNonexistentModule(t *testing.T) {
-	src, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree failed: %v", err)
-	}
+	src := mustDirTree(t, "testdata/corpus/primary")
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST"))
@@ -125,10 +110,7 @@ func TestLoadNonexistentModule(t *testing.T) {
 }
 
 func TestLoadMissingModuleWithValidModule(t *testing.T) {
-	src, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree failed: %v", err)
-	}
+	src := mustDirTree(t, "testdata/corpus/primary")
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB", "NONEXISTENT-MIB"))
@@ -229,14 +211,8 @@ func TestTablesAndScalars(t *testing.T) {
 }
 
 func TestStrictMIBsPassAtStrictLevel(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	strict, err := DirTree("testdata/strictness/strict")
-	if err != nil {
-		t.Fatalf("DirTree strict failed: %v", err)
-	}
+	corpus := mustDirTree(t, "testdata/corpus/primary")
+	strict := mustDirTree(t, "testdata/strictness/strict")
 
 	tests := []string{"STRICT-TEST-MIB", "STRICT-TABLE-MIB"}
 	for _, name := range tests {
@@ -258,103 +234,34 @@ func TestStrictMIBsPassAtStrictLevel(t *testing.T) {
 }
 
 func TestUnderscoreViolationEmitsDiagnostic(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	violations, err := DirTree("testdata/strictness/violations")
-	if err != nil {
-		t.Fatalf("DirTree violations failed: %v", err)
-	}
+	m := loadViolationMIB(t, "UNDERSCORE-TEST-MIB", mib.StrictnessStrict)
 
-	ctx := context.Background()
-
-	m, err := Load(ctx, WithSource(corpus, violations), WithModules("UNDERSCORE-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
-
-	var underscoreDiags int
-	for _, d := range m.Diagnostics() {
-		if d.Code == "identifier-underscore" {
-			underscoreDiags++
-		}
-	}
+	underscoreDiags := countDiagnostics(m, "identifier-underscore")
 	testutil.Equal(t, 2, underscoreDiags, "expected 2 identifier-underscore diagnostics")
 
-	m, err = Load(ctx, WithSource(corpus, violations), WithModules("UNDERSCORE-TEST-MIB"), WithStrictness(mib.StrictnessPermissive))
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
+	m = loadViolationMIB(t, "UNDERSCORE-TEST-MIB", mib.StrictnessPermissive)
 
-	underscoreDiags = 0
-	for _, d := range m.Diagnostics() {
-		if d.Code == "identifier-underscore" {
-			underscoreDiags++
-		}
-	}
+	underscoreDiags = countDiagnostics(m, "identifier-underscore")
 	testutil.Equal(t, 0, underscoreDiags, "expected no identifier-underscore diagnostics in permissive mode")
 }
 
 func TestHyphenEndViolationEmitsDiagnostic(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	violations, err := DirTree("testdata/strictness/violations")
-	if err != nil {
-		t.Fatalf("DirTree violations failed: %v", err)
-	}
+	m := loadViolationMIB(t, "HYPHEN-END-TEST-MIB", mib.StrictnessStrict)
 
-	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus, violations), WithModules("HYPHEN-END-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
-
-	var hyphenDiags int
-	for _, d := range m.Diagnostics() {
-		if d.Code == "identifier-hyphen-end" {
-			hyphenDiags++
-		}
-	}
+	hyphenDiags := countDiagnostics(m, "identifier-hyphen-end")
 	testutil.Equal(t, 1, hyphenDiags, "expected 1 identifier-hyphen-end diagnostic")
 }
 
 func TestLongIdentifierViolationEmitsDiagnostic(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	violations, err := DirTree("testdata/strictness/violations")
-	if err != nil {
-		t.Fatalf("DirTree violations failed: %v", err)
-	}
+	m := loadViolationMIB(t, "LONG-IDENT-TEST-MIB", mib.StrictnessStrict)
 
-	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus, violations), WithModules("LONG-IDENT-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
-
-	var lengthDiags int
-	for _, d := range m.Diagnostics() {
-		if d.Code == "identifier-length-64" {
-			lengthDiags++
-		}
-	}
+	lengthDiags := countDiagnostics(m, "identifier-length-64")
 	testutil.Equal(t, 1, lengthDiags, "expected 1 identifier-length-64 diagnostic")
 }
 
 func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	problems, err := DirTree("testdata/corpus/problems")
-	if err != nil {
-		t.Fatalf("DirTree problems failed: %v", err)
-	}
+	corpus := mustDirTree(t, "testdata/corpus/primary")
+	problems := mustDirTree(t, "testdata/corpus/problems")
 
 	ctx := context.Background()
 
@@ -363,12 +270,7 @@ func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	var caseDiags int
-	for _, d := range m.Diagnostics() {
-		if d.Code == "bad-identifier-case" {
-			caseDiags++
-		}
-	}
+	caseDiags := countDiagnostics(m, "bad-identifier-case")
 	testutil.Equal(t, 4, caseDiags, "expected 4 bad-identifier-case diagnostics in normal mode")
 
 	node := m.Node("NetEngine8000SysOid")
@@ -379,56 +281,19 @@ func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	caseDiags = 0
-	for _, d := range m.Diagnostics() {
-		if d.Code == "bad-identifier-case" {
-			caseDiags++
-		}
-	}
+	caseDiags = countDiagnostics(m, "bad-identifier-case")
 	testutil.Equal(t, 0, caseDiags, "expected no bad-identifier-case diagnostics in permissive mode")
 }
 
 func TestMissingModuleIdentityEmitsDiagnostic(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	violations, err := DirTree("testdata/strictness/violations")
-	if err != nil {
-		t.Fatalf("DirTree violations failed: %v", err)
-	}
+	m := loadViolationMIB(t, "MISSING-IDENTITY-MIB", mib.StrictnessStrict)
 
-	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IDENTITY-MIB"), WithStrictness(mib.StrictnessStrict))
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
-
-	var identityDiags int
-	for _, d := range m.Diagnostics() {
-		if d.Code == "missing-module-identity" {
-			identityDiags++
-		}
-	}
+	identityDiags := countDiagnostics(m, "missing-module-identity")
 	testutil.Equal(t, 1, identityDiags, "expected 1 missing-module-identity diagnostic")
 }
 
 func TestMissingImportFailsInStrictMode(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	violations, err := DirTree("testdata/strictness/violations")
-	if err != nil {
-		t.Fatalf("DirTree violations failed: %v", err)
-	}
-
-	ctx := context.Background()
-
-	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
+	m := loadViolationMIB(t, "MISSING-IMPORT-TEST-MIB", mib.StrictnessStrict)
 
 	unresolved := m.Unresolved()
 	var oidUnresolved int
@@ -444,21 +309,7 @@ func TestMissingImportFailsInStrictMode(t *testing.T) {
 }
 
 func TestMissingImportWorksInPermissiveMode(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	violations, err := DirTree("testdata/strictness/violations")
-	if err != nil {
-		t.Fatalf("DirTree violations failed: %v", err)
-	}
-
-	ctx := context.Background()
-
-	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessPermissive))
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
+	m := loadViolationMIB(t, "MISSING-IMPORT-TEST-MIB", mib.StrictnessPermissive)
 
 	unresolved := m.Unresolved()
 	var oidUnresolved int
@@ -474,21 +325,7 @@ func TestMissingImportWorksInPermissiveMode(t *testing.T) {
 }
 
 func TestMissingImportFailsInNormalMode(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	violations, err := DirTree("testdata/strictness/violations")
-	if err != nil {
-		t.Fatalf("DirTree violations failed: %v", err)
-	}
-
-	ctx := context.Background()
-
-	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessNormal))
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
+	m := loadViolationMIB(t, "MISSING-IMPORT-TEST-MIB", mib.StrictnessNormal)
 
 	unresolved := m.Unresolved()
 	var oidUnresolved int
@@ -501,14 +338,8 @@ func TestMissingImportFailsInNormalMode(t *testing.T) {
 }
 
 func TestDiagnosticThresholdEnforced(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	violations, err := DirTree("testdata/strictness/violations")
-	if err != nil {
-		t.Fatalf("DirTree violations failed: %v", err)
-	}
+	corpus := mustDirTree(t, "testdata/corpus/primary")
+	violations := mustDirTree(t, "testdata/strictness/violations")
 
 	ctx := context.Background()
 
@@ -526,21 +357,9 @@ func TestDiagnosticThresholdEnforced(t *testing.T) {
 }
 
 func TestDiagnosticThresholdNotTriggered(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	violations, err := DirTree("testdata/strictness/violations")
-	if err != nil {
-		t.Fatalf("DirTree violations failed: %v", err)
-	}
-
-	ctx := context.Background()
-
 	// Same MIB but with default FailAt=SeveritySevere.
 	// Error-level diagnostics should not trigger failure.
-	m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(mib.StrictnessStrict))
-	testutil.NoError(t, err, "Load should not error when diagnostics are below FailAt threshold")
+	m := loadViolationMIB(t, "MISSING-IMPORT-TEST-MIB", mib.StrictnessStrict)
 	testutil.NotNil(t, m, "Mib should be returned")
 }
 
@@ -677,14 +496,8 @@ func TestFindModulePropagatesFindError(t *testing.T) {
 
 func loadInvalidMIB(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
 	t.Helper()
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	invalid, err := DirTree("testdata/strictness/invalid")
-	if err != nil {
-		t.Fatalf("DirTree invalid failed: %v", err)
-	}
+	corpus := mustDirTree(t, "testdata/corpus/primary")
+	invalid := mustDirTree(t, "testdata/strictness/invalid")
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(corpus, invalid), WithModules(name), WithStrictness(level))
 	if err != nil {

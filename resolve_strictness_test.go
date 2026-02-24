@@ -13,7 +13,6 @@ package gomib
 // (which fails on unknown module names like SNMPv2-SMI-v1).
 
 import (
-	"context"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
@@ -273,26 +272,8 @@ func TestModuleAliasNormalAndAbove(t *testing.T) {
 // Note: load_test.go already tests this scenario; this test adds explicit
 // OID value verification and unresolved ref checking.
 func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	violations, err := DirTree("testdata/strictness/violations")
-	if err != nil {
-		t.Fatalf("DirTree violations failed: %v", err)
-	}
-	load := func(t *testing.T, level mib.StrictnessLevel) *mib.Mib {
-		t.Helper()
-		ctx := context.Background()
-		m, err := Load(ctx, WithSource(corpus, violations), WithModules("MISSING-IMPORT-TEST-MIB"), WithStrictness(level))
-		if err != nil {
-			t.Fatalf("Load failed: %v", err)
-		}
-		return m
-	}
-
 	t.Run("strict", func(t *testing.T) {
-		m := load(t, mib.StrictnessStrict)
+		m := loadViolationMIB(t, "MISSING-IMPORT-TEST-MIB", mib.StrictnessStrict)
 		unresolvedOids := unresolvedSymbols(m, "MISSING-IMPORT-TEST-MIB", mib.UnresolvedOID)
 
 		testutil.True(t, unresolvedOids["enterprises"],
@@ -302,7 +283,7 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 	})
 
 	t.Run("normal", func(t *testing.T) {
-		m := load(t, mib.StrictnessNormal)
+		m := loadViolationMIB(t, "MISSING-IMPORT-TEST-MIB", mib.StrictnessNormal)
 		unresolvedOids := unresolvedSymbols(m, "MISSING-IMPORT-TEST-MIB", mib.UnresolvedOID)
 
 		// Normal mode has safe fallbacks but NOT best-guess fallbacks.
@@ -314,7 +295,7 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 	})
 
 	t.Run("permissive", func(t *testing.T) {
-		m := load(t, mib.StrictnessPermissive)
+		m := loadViolationMIB(t, "MISSING-IMPORT-TEST-MIB", mib.StrictnessPermissive)
 		unresolvedOids := unresolvedSymbols(m, "MISSING-IMPORT-TEST-MIB", mib.UnresolvedOID)
 
 		testutil.Equal(t, 0, len(unresolvedOids),

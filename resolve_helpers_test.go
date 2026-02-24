@@ -95,15 +95,33 @@ func requireFixtureObject(t *testing.T, m *mib.Mib, fn *testutil.FixtureNode) *m
 	return obj
 }
 
+// mustDirTree calls DirTree and fails the test on error.
+func mustDirTree(t testing.TB, path string) Source {
+	t.Helper()
+	src, err := DirTree(path)
+	if err != nil {
+		t.Fatalf("DirTree(%s) failed: %v", path, err)
+	}
+	return src
+}
+
+// countDiagnostics returns the number of diagnostics with the given code.
+func countDiagnostics(m *mib.Mib, code string) int {
+	var n int
+	for _, d := range m.Diagnostics() {
+		if d.Code == code {
+			n++
+		}
+	}
+	return n
+}
+
 // loadCorpusMIB loads a single module from the primary corpus with optional
 // Load options (e.g. WithStrictness). Used for tests that need real MIBs but
 // not the synthetic problem corpus.
 func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
 	t.Helper()
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
+	corpus := mustDirTree(t, "testdata/corpus/primary")
 	allOpts := append([]LoadOption{WithSource(corpus), WithModules(name)}, opts...)
 	m, err := Load(context.Background(), allOpts...)
 	if err != nil {
@@ -116,15 +134,22 @@ func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
 // problems directory at a specific strictness level.
 func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
 	t.Helper()
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	problems, err := DirTree("testdata/corpus/problems")
-	if err != nil {
-		t.Fatalf("DirTree problems failed: %v", err)
-	}
+	corpus := mustDirTree(t, "testdata/corpus/primary")
+	problems := mustDirTree(t, "testdata/corpus/problems")
 	m, err := Load(context.Background(), WithSource(corpus, problems), WithModules(name), WithStrictness(level))
+	if err != nil {
+		t.Fatalf("Load(%s, %s) failed: %v", name, level, err)
+	}
+	return m
+}
+
+// loadViolationMIB loads a module from the primary corpus and the strictness
+// violations directory at a specific strictness level.
+func loadViolationMIB(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
+	t.Helper()
+	corpus := mustDirTree(t, "testdata/corpus/primary")
+	violations := mustDirTree(t, "testdata/strictness/violations")
+	m, err := Load(context.Background(), WithSource(corpus, violations), WithModules(name), WithStrictness(level))
 	if err != nil {
 		t.Fatalf("Load(%s, %s) failed: %v", name, level, err)
 	}
