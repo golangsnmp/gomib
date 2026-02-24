@@ -6,10 +6,7 @@ import (
 )
 
 func BenchmarkLoadAllCorpus(b *testing.B) {
-	src, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		b.Fatalf("DirTree failed: %v", err)
-	}
+	src := mustDirTree(b, "testdata/corpus/primary")
 
 	ctx := context.Background()
 
@@ -24,10 +21,7 @@ func BenchmarkLoadAllCorpus(b *testing.B) {
 }
 
 func BenchmarkLoadSingleMIB(b *testing.B) {
-	src, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		b.Fatalf("DirTree failed: %v", err)
-	}
+	src := mustDirTree(b, "testdata/corpus/primary")
 
 	ctx := context.Background()
 
