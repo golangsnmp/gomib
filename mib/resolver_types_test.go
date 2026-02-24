@@ -77,10 +77,8 @@ func TestSyntaxToBaseType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, gotOK := syntaxToBaseType(tt.syntax)
-			if got != tt.want || gotOK != tt.wantOK {
-				t.Errorf("syntaxToBaseType() = (%v, %v), want (%v, %v)",
-					got, gotOK, tt.want, tt.wantOK)
-			}
+			testutil.Equal(t, tt.want, got, "base type")
+			testutil.Equal(t, tt.wantOK, gotOK, "ok")
 		})
 	}
 }
@@ -254,8 +252,8 @@ func TestExtractNamedValues(t *testing.T) {
 
 func assertNamedValue(t *testing.T, nv NamedValue, wantLabel string, wantValue int64) {
 	t.Helper()
-	testutil.Equal(t, nv.Label, wantLabel, "label")
-	testutil.Equal(t, nv.Value, wantValue, "value")
+	testutil.Equal(t, wantLabel, nv.Label, "label")
+	testutil.Equal(t, wantValue, nv.Value, "value")
 }
 
 func TestExtractConstraints(t *testing.T) {
@@ -270,9 +268,8 @@ func TestExtractConstraints(t *testing.T) {
 		}
 		sizes, ranges := extractConstraints(syntax)
 		testutil.Len(t, sizes, 1, "sizes")
-		if sizes[0].Min != 0 || sizes[0].Max != 255 {
-			t.Errorf("size = %v, want {0 255}", sizes[0])
-		}
+		testutil.Equal(t, int64(0), sizes[0].Min, "min")
+		testutil.Equal(t, int64(255), sizes[0].Max, "max")
 		testutil.Nil(t, ranges, "ranges")
 	})
 
@@ -288,9 +285,8 @@ func TestExtractConstraints(t *testing.T) {
 		sizes, ranges := extractConstraints(syntax)
 		testutil.Nil(t, sizes, "sizes")
 		testutil.Len(t, ranges, 1, "ranges")
-		if ranges[0].Min != -128 || ranges[0].Max != 127 {
-			t.Errorf("range = %v, want {-128 127}", ranges[0])
-		}
+		testutil.Equal(t, int64(-128), ranges[0].Min, "min")
+		testutil.Equal(t, int64(127), ranges[0].Max, "max")
 	})
 
 	t.Run("multiple size ranges", func(t *testing.T) {
@@ -306,27 +302,23 @@ func TestExtractConstraints(t *testing.T) {
 		sizes, ranges := extractConstraints(syntax)
 		testutil.Len(t, sizes, 2, "sizes")
 		// Single value: max = min
-		if sizes[0].Min != 0 || sizes[0].Max != 0 {
-			t.Errorf("sizes[0] = %v, want {0 0}", sizes[0])
-		}
-		if sizes[1].Min != 4 || sizes[1].Max != 255 {
-			t.Errorf("sizes[1] = %v, want {4 255}", sizes[1])
-		}
+		testutil.Equal(t, int64(0), sizes[0].Min, "sizes[0] min")
+		testutil.Equal(t, int64(0), sizes[0].Max, "sizes[0] max")
+		testutil.Equal(t, int64(4), sizes[1].Min, "sizes[1] min")
+		testutil.Equal(t, int64(255), sizes[1].Max, "sizes[1] max")
 		testutil.Nil(t, ranges, "ranges")
 	})
 
 	t.Run("non-constrained syntax returns nil", func(t *testing.T) {
 		sizes, ranges := extractConstraints(&module.TypeSyntaxTypeRef{Name: "Integer32"})
-		if sizes != nil || ranges != nil {
-			t.Errorf("got sizes=%v ranges=%v, want nil nil", sizes, ranges)
-		}
+		testutil.Nil(t, sizes, "sizes")
+		testutil.Nil(t, ranges, "ranges")
 	})
 
 	t.Run("nil syntax returns nil", func(t *testing.T) {
 		sizes, ranges := extractConstraints(nil)
-		if sizes != nil || ranges != nil {
-			t.Errorf("got sizes=%v ranges=%v, want nil nil", sizes, ranges)
-		}
+		testutil.Nil(t, sizes, "sizes")
+		testutil.Nil(t, ranges, "ranges")
 	})
 }
 
@@ -337,9 +329,8 @@ func TestRangesToConstraint(t *testing.T) {
 		}
 		got := rangesToConstraint(ranges)
 		testutil.Len(t, got, 1, "ranges")
-		if got[0].Min != -100 || got[0].Max != 100 {
-			t.Errorf("got %v, want {-100 100}", got[0])
-		}
+		testutil.Equal(t, int64(-100), got[0].Min, "min")
+		testutil.Equal(t, int64(100), got[0].Max, "max")
 	})
 
 	t.Run("single value range", func(t *testing.T) {
@@ -349,9 +340,8 @@ func TestRangesToConstraint(t *testing.T) {
 		got := rangesToConstraint(ranges)
 		testutil.Len(t, got, 1, "ranges")
 		// Single value: Max is nil, so max = min
-		if got[0].Min != 42 || got[0].Max != 42 {
-			t.Errorf("got %v, want {42 42}", got[0])
-		}
+		testutil.Equal(t, int64(42), got[0].Min, "min")
+		testutil.Equal(t, int64(42), got[0].Max, "max")
 	})
 
 	t.Run("multiple ranges", func(t *testing.T) {
@@ -361,12 +351,10 @@ func TestRangesToConstraint(t *testing.T) {
 		}
 		got := rangesToConstraint(ranges)
 		testutil.Len(t, got, 2, "ranges")
-		if got[0].Min != 0 || got[0].Max != 10 {
-			t.Errorf("got[0] = %v, want {0 10}", got[0])
-		}
-		if got[1].Min != 100 || got[1].Max != 200 {
-			t.Errorf("got[1] = %v, want {100 200}", got[1])
-		}
+		testutil.Equal(t, int64(0), got[0].Min, "got[0] min")
+		testutil.Equal(t, int64(10), got[0].Max, "got[0] max")
+		testutil.Equal(t, int64(100), got[1].Min, "got[1] min")
+		testutil.Equal(t, int64(200), got[1].Max, "got[1] max")
 	})
 
 	t.Run("empty ranges", func(t *testing.T) {

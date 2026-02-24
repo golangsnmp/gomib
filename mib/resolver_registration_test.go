@@ -58,10 +58,7 @@ func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 
 	// Base modules should come first, user module last
 	baseNames := module.BaseModuleNames()
-	if len(ctx.Modules) != len(baseNames)+1 {
-		t.Fatalf("got %d modules, want %d (base=%d + user=1)",
-			len(ctx.Modules), len(baseNames)+1, len(baseNames))
-	}
+	testutil.Equal(t, len(baseNames)+1, len(ctx.Modules), "module count (base=%d + user=1)", len(baseNames))
 	for i, name := range baseNames {
 		testutil.Equal(t, name, ctx.Modules[i].Name, "Modules[].Name")
 	}
@@ -116,10 +113,7 @@ func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
 	// Every module should be indexed by name
 	for _, mod := range ctx.Modules {
 		entries, ok := ctx.ModuleIndex[mod.Name]
-		if !ok {
-			t.Errorf("ModuleIndex missing entry for %q", mod.Name)
-			continue
-		}
+		testutil.True(t, ok, "ModuleIndex missing entry for %q", mod.Name)
 		found := false
 		for _, entry := range entries {
 			if entry == mod {
@@ -136,23 +130,14 @@ func TestRegisterModules_BaseModulePointersCached(t *testing.T) {
 
 	registerModules(ctx)
 
-	if ctx.Snmpv2SMIModule == nil {
-		t.Error("Snmpv2SMIModule is nil")
-	} else if ctx.Snmpv2SMIModule.Name != "SNMPv2-SMI" {
-		t.Errorf("Snmpv2SMIModule.Name = %q, want %q", ctx.Snmpv2SMIModule.Name, "SNMPv2-SMI")
-	}
+	testutil.NotNil(t, ctx.Snmpv2SMIModule, "Snmpv2SMIModule")
+	testutil.Equal(t, "SNMPv2-SMI", ctx.Snmpv2SMIModule.Name, "Snmpv2SMIModule.Name")
 
-	if ctx.Rfc1155SMIModule == nil {
-		t.Error("Rfc1155SMIModule is nil")
-	} else if ctx.Rfc1155SMIModule.Name != "RFC1155-SMI" {
-		t.Errorf("Rfc1155SMIModule.Name = %q, want %q", ctx.Rfc1155SMIModule.Name, "RFC1155-SMI")
-	}
+	testutil.NotNil(t, ctx.Rfc1155SMIModule, "Rfc1155SMIModule")
+	testutil.Equal(t, "RFC1155-SMI", ctx.Rfc1155SMIModule.Name, "Rfc1155SMIModule.Name")
 
-	if ctx.Snmpv2TCModule == nil {
-		t.Error("Snmpv2TCModule is nil")
-	} else if ctx.Snmpv2TCModule.Name != "SNMPv2-TC" {
-		t.Errorf("Snmpv2TCModule.Name = %q, want %q", ctx.Snmpv2TCModule.Name, "SNMPv2-TC")
-	}
+	testutil.NotNil(t, ctx.Snmpv2TCModule, "Snmpv2TCModule")
+	testutil.Equal(t, "SNMPv2-TC", ctx.Snmpv2TCModule.Name, "Snmpv2TCModule.Name")
 }
 
 func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
@@ -180,15 +165,12 @@ func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 
 	defNames := ctx.ModuleDefNames[found]
 	testutil.NotNil(t, defNames, "ModuleDefNames[MY-MIB] is nil")
-	if _, ok := defNames["fooObject"]; !ok {
-		t.Error("fooObject not in ModuleDefNames")
-	}
-	if _, ok := defNames["BarType"]; !ok {
-		t.Error("BarType not in ModuleDefNames")
-	}
-	if _, ok := defNames["nonExistent"]; ok {
-		t.Error("nonExistent should not be in ModuleDefNames")
-	}
+	_, hasFoo := defNames["fooObject"]
+	testutil.True(t, hasFoo, "fooObject not in ModuleDefNames")
+	_, hasBar := defNames["BarType"]
+	testutil.True(t, hasBar, "BarType not in ModuleDefNames")
+	_, hasNonExistent := defNames["nonExistent"]
+	testutil.False(t, hasNonExistent, "nonExistent should not be in ModuleDefNames")
 }
 
 func TestRegisterModules_ModuleToResolvedMapping(t *testing.T) {
@@ -202,17 +184,11 @@ func TestRegisterModules_ModuleToResolvedMapping(t *testing.T) {
 
 	for _, mod := range ctx.Modules {
 		resolved, ok := ctx.ModuleToResolved[mod]
-		if !ok {
-			t.Errorf("ModuleToResolved missing entry for %q", mod.Name)
-			continue
-		}
+		testutil.True(t, ok, "ModuleToResolved missing entry for %q", mod.Name)
 		testutil.Equal(t, mod.Name, resolved.Name(), "resolved name")
 		// Check reverse mapping
 		reverse, ok := ctx.ResolvedToModule[resolved]
-		if !ok {
-			t.Errorf("ResolvedToModule missing entry for %q", mod.Name)
-			continue
-		}
+		testutil.True(t, ok, "ResolvedToModule missing entry for %q", mod.Name)
 		testutil.Equal(t, mod, reverse, "reverse mapping for")
 	}
 }
@@ -283,12 +259,10 @@ func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
 	testutil.Equal(t, "Test MIB module", resolved.Description(), "Description")
 	revs := resolved.Revisions()
 	testutil.Len(t, revs, 2, "revisions")
-	if revs[0].Date != "2024-06-01" || revs[0].Description != "Rev 2" {
-		t.Errorf("revision[0] = %+v, want Date=2024-06-01 Description=Rev 2", revs[0])
-	}
-	if revs[1].Date != "2024-01-15" || revs[1].Description != "Rev 1" {
-		t.Errorf("revision[1] = %+v, want Date=2024-01-15 Description=Rev 1", revs[1])
-	}
+	testutil.Equal(t, "2024-06-01", revs[0].Date, "revision[0].Date")
+	testutil.Equal(t, "Rev 2", revs[0].Description, "revision[0].Description")
+	testutil.Equal(t, "2024-01-15", revs[1].Date, "revision[1].Date")
+	testutil.Equal(t, "Rev 1", revs[1].Description, "revision[1].Description")
 }
 
 func TestRegisterModules_NoModuleIdentity(t *testing.T) {
@@ -428,8 +402,7 @@ func TestRegisterModules_BaseModuleDefinitionNamesCached(t *testing.T) {
 	testutil.NotNil(t, defNames, "ModuleDefNames[SNMPv2-SMI] is nil")
 	// Spot-check a few well-known names
 	for _, name := range []string{"internet", "Integer32", "Counter32", "enterprises"} {
-		if _, ok := defNames[name]; !ok {
-			t.Errorf("%q not in SNMPv2-SMI definition names", name)
-		}
+		_, ok := defNames[name]
+		testutil.True(t, ok, "%q not in SNMPv2-SMI definition names", name)
 	}
 }

@@ -79,17 +79,15 @@ func TestTableNavigation(t *testing.T) {
 		cols := tableObj.Columns()
 		testutil.Len(t, cols, 2, "columns")
 		// sortedChildren orders by arc
-		if cols[0] != col1Obj || cols[1] != col2Obj {
-			t.Errorf("got [%v, %v], want [%v, %v]", cols[0], cols[1], col1Obj, col2Obj)
-		}
+		testutil.Equal(t, col1Obj, cols[0], "col 0")
+		testutil.Equal(t, col2Obj, cols[1], "col 1")
 	})
 
 	t.Run("Columns from row", func(t *testing.T) {
 		cols := rowObj.Columns()
 		testutil.Len(t, cols, 2, "columns")
-		if cols[0] != col1Obj || cols[1] != col2Obj {
-			t.Errorf("got [%v, %v], want [%v, %v]", cols[0], cols[1], col1Obj, col2Obj)
-		}
+		testutil.Equal(t, col1Obj, cols[0], "col 0")
+		testutil.Equal(t, col2Obj, cols[1], "col 1")
 	})
 
 	t.Run("Columns from column is nil", func(t *testing.T) {
@@ -111,9 +109,8 @@ func TestEffectiveIndexes(t *testing.T) {
 	t.Run("row with own indexes", func(t *testing.T) {
 		row := makeRow("directRow", idx)
 		got := row.EffectiveIndexes()
-		if len(got) != 1 || got[0].Object != sentinel {
-			t.Errorf("got %v, want index pointing to %v", got, sentinel)
-		}
+		testutil.Len(t, got, 1, "effective indexes")
+		testutil.Equal(t, sentinel, got[0].Object, "index object")
 	})
 
 	t.Run("row inherits via augments", func(t *testing.T) {
@@ -122,9 +119,8 @@ func TestEffectiveIndexes(t *testing.T) {
 		augmenting.augments = base
 
 		got := augmenting.EffectiveIndexes()
-		if len(got) != 1 || got[0].Object != sentinel {
-			t.Errorf("got %v, want inherited index pointing to %v", got, sentinel)
-		}
+		testutil.Len(t, got, 1, "effective indexes via augments")
+		testutil.Equal(t, sentinel, got[0].Object, "inherited index object")
 	})
 
 	t.Run("augments cycle terminates", func(t *testing.T) {

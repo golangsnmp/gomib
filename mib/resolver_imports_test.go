@@ -35,9 +35,7 @@ func TestIsMacroSymbol(t *testing.T) {
 		"module-identity",
 	}
 	for _, name := range nonMacros {
-		if isMacroSymbol(name) {
-			t.Errorf("isMacroSymbol(%q) = true, want false", name)
-		}
+		testutil.False(t, isMacroSymbol(name), "isMacroSymbol(%q) = true, want false", name)
 	}
 }
 
@@ -264,9 +262,7 @@ func TestTryPartialResolution(t *testing.T) {
 		resolved, unresolved := tryPartialResolution(ctx, []*module.Module{mod}, syms("a", "b", "c"))
 		testutil.Len(t, resolved, 2, "resolved count")
 		testutil.Len(t, unresolved, 1, "unresolved count")
-		if len(unresolved) > 0 && unresolved[0].name != "b" {
-			t.Errorf("unresolved symbol = %q, want %q", unresolved[0].name, "b")
-		}
+		testutil.Equal(t, "b", unresolved[0].name, "unresolved symbol")
 	})
 
 	t.Run("no symbols resolved", func(t *testing.T) {
@@ -523,9 +519,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 
 		imports := ctx.ModuleImports[importing]
 		testutil.Equal(t, 2, len(imports), "import count")
-		if imports["found1"] != source || imports["found2"] != source {
-			t.Error("found symbols should resolve to PARTIAL-MIB")
-		}
+		testutil.Equal(t, source, imports["found1"], "found1 should resolve to PARTIAL-MIB")
+		testutil.Equal(t, source, imports["found2"], "found2 should resolve to PARTIAL-MIB")
 		testutil.Len(t, ctx.unresolvedImports, 1, "unresolved count")
 		testutil.Equal(t, "missing1", ctx.unresolvedImports[0].symbol, "unresolved symbol")
 		testutil.Equal(t, reasonSymbolNotExported, ctx.unresolvedImports[0].reason, "unresolved reason")
@@ -556,13 +551,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 				break
 			}
 		}
-		if !found {
-			codes := make([]string, len(diags))
-			for i, d := range diags {
-				codes[i] = d.Code
-			}
-			t.Errorf("expected diagnostic code %q, got codes: %v", "import-module-not-found", codes)
-		}
+		testutil.True(t, found, "expected diagnostic code %q for module IMPORTER in %v", "import-module-not-found", diags)
 	})
 
 	t.Run("module not found in strict mode", func(t *testing.T) {

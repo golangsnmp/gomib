@@ -89,9 +89,7 @@ func TestEffectiveEnums(t *testing.T) {
 		ty.setEnums(parentEnums)
 		got := ty.EffectiveEnums()
 		got[0].Label = "mutated"
-		if ty.EffectiveEnums()[0].Label == "mutated" {
-			t.Error("EffectiveEnums returned a reference to internal slice")
-		}
+		testutil.True(t, ty.EffectiveEnums()[0].Label != "mutated", "EffectiveEnums returned a reference to internal slice")
 	})
 }
 

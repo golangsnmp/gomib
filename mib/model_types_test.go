@@ -34,9 +34,8 @@ func TestNotificationAccessors(t *testing.T) {
 	testutil.Equal(t, "RFC 2863", n.Reference(), "Reference()")
 	objs := n.Objects()
 	testutil.Len(t, objs, 2, "Objects() len")
-	if objs[0] != obj1 || objs[1] != obj2 {
-		t.Error("Objects() returned wrong objects")
-	}
+	testutil.Equal(t, obj1, objs[0], "Objects()[0]")
+	testutil.Equal(t, obj2, objs[1], "Objects()[1]")
 }
 
 func TestNotificationOID(t *testing.T) {
