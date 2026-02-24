@@ -20,24 +20,6 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
-	t.Helper()
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	problems, err := DirTree("testdata/corpus/problems")
-	if err != nil {
-		t.Fatalf("DirTree problems failed: %v", err)
-	}
-	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus, problems), WithModules(name), WithStrictness(level))
-	if err != nil {
-		t.Fatalf("Load(%s, %s) failed: %v", name, level, err)
-	}
-	return m
-}
-
 func unresolvedSymbols(m *mib.Mib, module string, kind mib.UnresolvedKind) map[string]bool {
 	result := make(map[string]bool)
 	for _, u := range m.Unresolved() {

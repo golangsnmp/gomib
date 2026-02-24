@@ -7,7 +7,6 @@ package gomib
 // SMIv1/v2 mixing, index edge cases, DEFVAL variants, module aliases, and naming.
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -19,20 +18,7 @@ import (
 // (for dependencies like SNMPv2-SMI, SNMPv2-TC) and the problems directory.
 func loadProblemMIB(t testing.TB, name string) *mib.Mib {
 	t.Helper()
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-	problems, err := DirTree("testdata/corpus/problems")
-	if err != nil {
-		t.Fatalf("DirTree problems failed: %v", err)
-	}
-	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus, problems), WithModules(name), WithStrictness(mib.StrictnessPermissive))
-	if err != nil {
-		t.Fatalf("Load(%s) failed: %v", name, err)
-	}
-	return m
+	return loadAtStrictness(t, name, mib.StrictnessPermissive)
 }
 
 // TestProblemHexStrings verifies hex and binary string DEFVAL parsing.
@@ -1011,16 +997,7 @@ func TestProblemNamingHyphens(t *testing.T) {
 }
 
 func TestHexLiteralRanges(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-
-	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus), WithModules("INTEGRATED-SERVICES-MIB"))
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
+	m := loadCorpusMIB(t, "INTEGRATED-SERVICES-MIB")
 
 	for _, d := range m.Diagnostics() {
 		if d.Module == "INTEGRATED-SERVICES-MIB" && d.Severity <= mib.SeverityError {
@@ -1052,16 +1029,7 @@ func TestHexLiteralRanges(t *testing.T) {
 }
 
 func TestHexLiteralDefval(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-
-	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus), WithModules("RIPv2-MIB"))
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
+	m := loadCorpusMIB(t, "RIPv2-MIB")
 
 	for _, d := range m.Diagnostics() {
 		if d.Module == "RIPv2-MIB" && d.Severity <= mib.SeverityError {
@@ -1077,18 +1045,8 @@ func TestHexLiteralDefval(t *testing.T) {
 }
 
 func TestModuleIdentityPermissive(t *testing.T) {
-	corpus, err := DirTree("testdata/corpus/primary")
-	if err != nil {
-		t.Fatalf("DirTree corpus failed: %v", err)
-	}
-
-	ctx := context.Background()
-
 	t.Run("IPV6-TC", func(t *testing.T) {
-		m, err := Load(ctx, WithSource(corpus), WithModules("IPV6-TC"), WithStrictness(mib.StrictnessPermissive))
-		if err != nil {
-			t.Fatalf("Load failed: %v", err)
-		}
+		m := loadCorpusMIB(t, "IPV6-TC", WithStrictness(mib.StrictnessPermissive))
 
 		for _, d := range m.Diagnostics() {
 			if d.Module == "IPV6-TC" && d.Severity <= mib.SeverityError {
@@ -1102,10 +1060,7 @@ func TestModuleIdentityPermissive(t *testing.T) {
 	})
 
 	t.Run("IPV6-MIB", func(t *testing.T) {
-		m, err := Load(ctx, WithSource(corpus), WithModules("IPV6-MIB"), WithStrictness(mib.StrictnessPermissive))
-		if err != nil {
-			t.Fatalf("Load failed: %v", err)
-		}
+		m := loadCorpusMIB(t, "IPV6-MIB", WithStrictness(mib.StrictnessPermissive))
 
 		for _, d := range m.Diagnostics() {
 			if d.Module == "IPV6-MIB" && d.Severity <= mib.SeverityError {
