@@ -71,16 +71,12 @@ func TestParseModuleComplianceRefinements(t *testing.T) {
 				t.Fatal("expected definitions in module body")
 			}
 			def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-			if !ok {
-				t.Fatalf("expected ModuleComplianceDef, got %T", module.Body[0])
-			}
+			testutil.True(t, ok, "expected ModuleComplianceDef, got %T", module.Body[0])
 			testutil.Equal(t, 1, len(def.Modules), "module clauses count")
 			mod := def.Modules[0]
 			testutil.Equal(t, 1, len(mod.Compliances), "compliances count")
 			obj, ok := mod.Compliances[0].(*ast.ComplianceObject)
-			if !ok {
-				t.Fatalf("expected ComplianceObject, got %T", mod.Compliances[0])
-			}
+			testutil.True(t, ok, "expected ComplianceObject, got %T", mod.Compliances[0])
 
 			if tt.wantSyntax {
 				testutil.NotNil(t, obj.Syntax, "SYNTAX should be set")
@@ -122,9 +118,7 @@ func TestParseModuleComplianceGroupAndObject(t *testing.T) {
 	}
 
 	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-	if !ok {
-		t.Fatalf("expected ModuleComplianceDef, got %T", module.Body[0])
-	}
+	testutil.True(t, ok, "expected ModuleComplianceDef, got %T", module.Body[0])
 
 	mod := def.Modules[0]
 	testutil.Equal(t, 2, len(mod.Compliances), "compliances count (GROUP + OBJECT)")
@@ -151,9 +145,7 @@ func TestParseModuleComplianceNamedModule(t *testing.T) {
 	}
 
 	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-	if !ok {
-		t.Fatalf("expected ModuleComplianceDef, got %T", module.Body[0])
-	}
+	testutil.True(t, ok, "expected ModuleComplianceDef, got %T", module.Body[0])
 
 	testutil.Equal(t, 1, len(def.Modules), "module clauses count")
 	mod := def.Modules[0]

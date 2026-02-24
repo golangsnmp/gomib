@@ -21,15 +21,11 @@ func TestParseDefValOidNamed(t *testing.T) {
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
-	if !ok {
-		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
-	}
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 
 	oidVal, ok := def.DefVal.Value.(*ast.DefValContentObjectIdentifier)
-	if !ok {
-		t.Fatalf("expected DefValContentObjectIdentifier, got %T", def.DefVal.Value)
-	}
+	testutil.True(t, ok, "expected DefValContentObjectIdentifier, got %T", def.DefVal.Value)
 	testutil.Equal(t, 2, len(oidVal.Components), "OID component count")
 }
 
@@ -47,15 +43,11 @@ func TestParseDefValOidNumeric(t *testing.T) {
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
-	if !ok {
-		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
-	}
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 
 	oidVal, ok := def.DefVal.Value.(*ast.DefValContentObjectIdentifier)
-	if !ok {
-		t.Fatalf("expected DefValContentObjectIdentifier, got %T", def.DefVal.Value)
-	}
+	testutil.True(t, ok, "expected DefValContentObjectIdentifier, got %T", def.DefVal.Value)
 	testutil.Equal(t, 4, len(oidVal.Components), "OID component count")
 }
 
@@ -73,15 +65,11 @@ func TestParseDefValOidNamedNumber(t *testing.T) {
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
-	if !ok {
-		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
-	}
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 
 	oidVal, ok := def.DefVal.Value.(*ast.DefValContentObjectIdentifier)
-	if !ok {
-		t.Fatalf("expected DefValContentObjectIdentifier, got %T", def.DefVal.Value)
-	}
+	testutil.True(t, ok, "expected DefValContentObjectIdentifier, got %T", def.DefVal.Value)
 	// First component is a name, next 3 are numbers
 	testutil.Equal(t, 4, len(oidVal.Components), "OID component count")
 
@@ -104,14 +92,10 @@ func TestParseDefValOidEmpty(t *testing.T) {
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
-	if !ok {
-		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
-	}
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 
 	bitsVal, ok := def.DefVal.Value.(*ast.DefValContentBits)
-	if !ok {
-		t.Fatalf("expected DefValContentBits for empty braces, got %T", def.DefVal.Value)
-	}
+	testutil.True(t, ok, "expected DefValContentBits for empty braces, got %T", def.DefVal.Value)
 	testutil.Len(t, bitsVal.Labels, 0, "empty braces should have no labels")
 }

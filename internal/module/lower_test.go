@@ -76,40 +76,23 @@ test_object OBJECT-TYPE
 END
 `)
 
-	p := parser.New(source, nil, types.StrictConfig())
-	ast := p.ParseModule()
-	if ast == nil {
-		t.Fatal("parse returned nil")
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagIdentifierUnderscore)
+	if d == nil {
+		t.Fatalf("expected %s diagnostic", types.DiagIdentifierUnderscore)
 	}
-
-	mod := Lower(ast, source, nil, types.StrictConfig())
-	if mod == nil {
-		t.Fatal("lower returned nil")
+	// test_object is on line 16, column 1 of the source
+	if d.Line != 16 {
+		t.Errorf("expected line 16 for identifier-underscore diagnostic, got %d", d.Line)
 	}
-
-	var found bool
-	for _, d := range mod.Diagnostics {
-		if d.Code == types.DiagIdentifierUnderscore {
-			found = true
-			// test_object is on line 16, column 1 of the source
-			if d.Line != 16 {
-				t.Errorf("expected line 16 for identifier-underscore diagnostic, got %d", d.Line)
-			}
-			if d.Column != 1 {
-				t.Errorf("expected column 1 for identifier-underscore diagnostic, got %d", d.Column)
-			}
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected %s diagnostic", types.DiagIdentifierUnderscore)
+	if d.Column != 1 {
+		t.Errorf("expected column 1 for identifier-underscore diagnostic, got %d", d.Column)
 	}
 }
 
 func TestLower_DiagnosticSourceLocation_Synthetic(t *testing.T) {
-	// Lowering-generated diagnostics (no span) should keep line/column 0.
-	// An SMIv2 module without MODULE-IDENTITY triggers a lowering diagnostic.
-	// Use permissive config so the warning-level diagnostic is visible.
+	// Lowering-generated diagnostics should include source location
+	// from the module span. An SMIv2 module without MODULE-IDENTITY
+	// triggers a lowering diagnostic.
 	source := []byte(`NO-IDENTITY-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
@@ -126,30 +109,12 @@ someObject OBJECT-TYPE
 END
 `)
 
-	p := parser.New(source, nil, types.PermissiveConfig())
-	ast := p.ParseModule()
-	if ast == nil {
-		t.Fatal("parse returned nil")
+	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagMissingModuleIdentity)
+	if d == nil {
+		t.Fatalf("expected %s diagnostic", types.DiagMissingModuleIdentity)
 	}
-
-	mod := Lower(ast, source, nil, types.PermissiveConfig())
-	if mod == nil {
-		t.Fatal("lower returned nil")
-	}
-
-	var found bool
-	for _, d := range mod.Diagnostics {
-		if d.Code == types.DiagMissingModuleIdentity {
-			found = true
-			// Lowering diagnostics now include source location from the module span
-			if d.Line == 0 || d.Column == 0 {
-				t.Errorf("expected non-zero line/column for lowering diagnostic, got line=%d, column=%d", d.Line, d.Column)
-			}
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected %s diagnostic", types.DiagMissingModuleIdentity)
+	if d.Line == 0 || d.Column == 0 {
+		t.Errorf("expected non-zero line/column for lowering diagnostic, got line=%d, column=%d", d.Line, d.Column)
 	}
 }
 
@@ -158,7 +123,6 @@ func TestLower_SNMPv2MIBNotTreatedAsBaseModule(t *testing.T) {
 	// without MODULE-IDENTITY should get the missing-module-identity diagnostic.
 	// This tests that language detection and base module checks use
 	// consistent definitions via BaseModuleFromName/IsBaseModule.
-	// Use permissive config so the warning-level diagnostic is visible.
 	source := []byte(`SNMPv2-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
@@ -175,26 +139,8 @@ sysDescr OBJECT-TYPE
 END
 `)
 
-	p := parser.New(source, nil, types.PermissiveConfig())
-	ast := p.ParseModule()
-	if ast == nil {
-		t.Fatal("parse returned nil")
-	}
-
-	mod := Lower(ast, source, nil, types.PermissiveConfig())
-	if mod == nil {
-		t.Fatal("lower returned nil")
-	}
-
-	// SNMPv2-MIB without MODULE-IDENTITY should get a diagnostic
-	var found bool
-	for _, d := range mod.Diagnostics {
-		if d.Code == types.DiagMissingModuleIdentity {
-			found = true
-			break
-		}
-	}
-	if !found {
+	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagMissingModuleIdentity)
+	if d == nil {
 		t.Errorf("SNMPv2-MIB without MODULE-IDENTITY should get %s diagnostic", types.DiagMissingModuleIdentity)
 	}
 }
@@ -210,21 +156,9 @@ IMPORTS
 END
 `)
 
-	p := parser.New(source, nil, types.DefaultConfig())
-	ast := p.ParseModule()
-	if ast == nil {
-		t.Fatal("parse returned nil")
-	}
-
-	mod := Lower(ast, source, nil, types.DefaultConfig())
-	if mod == nil {
-		t.Fatal("lower returned nil")
-	}
-
-	for _, d := range mod.Diagnostics {
-		if d.Code == types.DiagMissingModuleIdentity {
-			t.Errorf("base module SNMPv2-SMI should not get %s diagnostic", types.DiagMissingModuleIdentity)
-		}
+	d := lowerAndFindDiagnostic(t, source, types.DefaultConfig(), types.DiagMissingModuleIdentity)
+	if d != nil {
+		t.Errorf("base module SNMPv2-SMI should not get %s diagnostic", types.DiagMissingModuleIdentity)
 	}
 }
 
@@ -307,29 +241,12 @@ END
 		{"strict_config", types.StrictConfig()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			p := parser.New(source, nil, tc.config)
-			ast := p.ParseModule()
-			if ast == nil {
-				t.Fatal("parse returned nil")
+			d := lowerAndFindDiagnostic(t, source, tc.config, types.DiagMissingModuleIdentity)
+			if d == nil {
+				t.Fatalf("expected %s diagnostic", types.DiagMissingModuleIdentity)
 			}
-
-			mod := Lower(ast, source, nil, tc.config)
-			if mod == nil {
-				t.Fatal("lower returned nil")
-			}
-
-			var found bool
-			for _, d := range mod.Diagnostics {
-				if d.Code == types.DiagMissingModuleIdentity {
-					if d.Severity != types.SeverityWarning {
-						t.Errorf("expected SeverityWarning in %s, got %v", tc.name, d.Severity)
-					}
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("expected %s diagnostic", types.DiagMissingModuleIdentity)
+			if d.Severity != types.SeverityWarning {
+				t.Errorf("expected SeverityWarning in %s, got %v", tc.name, d.Severity)
 			}
 		})
 	}
