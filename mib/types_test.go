@@ -285,36 +285,45 @@ func TestComplianceModulesDeepClone(t *testing.T) {
 		},
 	})
 
-	got := c.Modules()
-
-	// Mutate the returned MandatoryGroups
-	got[0].MandatoryGroups[0] = "MUTATED"
-	if c.modules[0].MandatoryGroups[0] == "MUTATED" {
-		t.Error("mutating Modules()[].MandatoryGroups should not affect internal state")
+	tests := []struct {
+		name       string
+		mutate     func([]ComplianceModule)
+		wasMutated func() bool
+	}{
+		{
+			"MandatoryGroups",
+			func(m []ComplianceModule) { m[0].MandatoryGroups[0] = "X" },
+			func() bool { return c.modules[0].MandatoryGroups[0] == "X" },
+		},
+		{
+			"Groups",
+			func(m []ComplianceModule) { m[0].Groups[0].Group = "X" },
+			func() bool { return c.modules[0].Groups[0].Group == "X" },
+		},
+		{
+			"Objects",
+			func(m []ComplianceModule) { m[0].Objects[0].Object = "X" },
+			func() bool { return c.modules[0].Objects[0].Object == "X" },
+		},
+		{
+			"Syntax",
+			func(m []ComplianceModule) { m[0].Objects[0].Syntax.Sizes[0].Min = 999 },
+			func() bool { return c.modules[0].Objects[0].Syntax.Sizes[0].Min == 999 },
+		},
+		{
+			"WriteSyntax",
+			func(m []ComplianceModule) { m[0].Objects[0].WriteSyntax.Ranges[0].Min = 999 },
+			func() bool { return c.modules[0].Objects[0].WriteSyntax.Ranges[0].Min == 999 },
+		},
 	}
-
-	// Mutate the returned Groups
-	got[0].Groups[0].Group = "MUTATED"
-	if c.modules[0].Groups[0].Group == "MUTATED" {
-		t.Error("mutating Modules()[].Groups should not affect internal state")
-	}
-
-	// Mutate the returned Objects
-	got[0].Objects[0].Object = "MUTATED"
-	if c.modules[0].Objects[0].Object == "MUTATED" {
-		t.Error("mutating Modules()[].Objects should not affect internal state")
-	}
-
-	// Mutate the Syntax constraints through the returned value
-	got[0].Objects[0].Syntax.Sizes[0].Min = 999
-	if c.modules[0].Objects[0].Syntax.Sizes[0].Min == 999 {
-		t.Error("mutating Modules()[].Objects[].Syntax should not affect internal state")
-	}
-
-	// Mutate the WriteSyntax constraints
-	got[0].Objects[0].WriteSyntax.Ranges[0].Min = 999
-	if c.modules[0].Objects[0].WriteSyntax.Ranges[0].Min == 999 {
-		t.Error("mutating Modules()[].Objects[].WriteSyntax should not affect internal state")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := c.Modules()
+			tt.mutate(got)
+			if tt.wasMutated() {
+				t.Errorf("mutating Modules()[].%s should not affect internal state", tt.name)
+			}
+		})
 	}
 }
 
@@ -338,42 +347,50 @@ func TestCapabilitySupportsDeepClone(t *testing.T) {
 		},
 	})
 
-	got := cap.Supports()
-
-	// Mutate Includes
-	got[0].Includes[0] = "MUTATED"
-	if cap.supports[0].Includes[0] == "MUTATED" {
-		t.Error("mutating Supports()[].Includes should not affect internal state")
+	tests := []struct {
+		name       string
+		mutate     func([]CapabilitiesModule)
+		wasMutated func() bool
+	}{
+		{
+			"Includes",
+			func(m []CapabilitiesModule) { m[0].Includes[0] = "X" },
+			func() bool { return cap.supports[0].Includes[0] == "X" },
+		},
+		{
+			"ObjectVariations",
+			func(m []CapabilitiesModule) { m[0].ObjectVariations[0].Object = "X" },
+			func() bool { return cap.supports[0].ObjectVariations[0].Object == "X" },
+		},
+		{
+			"CreationRequires",
+			func(m []CapabilitiesModule) { m[0].ObjectVariations[0].CreationRequires[0] = "X" },
+			func() bool { return cap.supports[0].ObjectVariations[0].CreationRequires[0] == "X" },
+		},
+		{
+			"Syntax",
+			func(m []CapabilitiesModule) { m[0].ObjectVariations[0].Syntax.Enums[0].Label = "X" },
+			func() bool { return cap.supports[0].ObjectVariations[0].Syntax.Enums[0].Label == "X" },
+		},
+		{
+			"WriteSyntax",
+			func(m []CapabilitiesModule) { m[0].ObjectVariations[0].WriteSyntax.Bits[0].Label = "X" },
+			func() bool { return cap.supports[0].ObjectVariations[0].WriteSyntax.Bits[0].Label == "X" },
+		},
+		{
+			"NotificationVariations",
+			func(m []CapabilitiesModule) { m[0].NotificationVariations[0].Notification = "X" },
+			func() bool { return cap.supports[0].NotificationVariations[0].Notification == "X" },
+		},
 	}
-
-	// Mutate ObjectVariations
-	got[0].ObjectVariations[0].Object = "MUTATED"
-	if cap.supports[0].ObjectVariations[0].Object == "MUTATED" {
-		t.Error("mutating Supports()[].ObjectVariations should not affect internal state")
-	}
-
-	// Mutate CreationRequires
-	got[0].ObjectVariations[0].CreationRequires[0] = "MUTATED"
-	if cap.supports[0].ObjectVariations[0].CreationRequires[0] == "MUTATED" {
-		t.Error("mutating Supports()[].ObjectVariations[].CreationRequires should not affect internal state")
-	}
-
-	// Mutate Syntax through returned value
-	got[0].ObjectVariations[0].Syntax.Enums[0].Label = "MUTATED"
-	if cap.supports[0].ObjectVariations[0].Syntax.Enums[0].Label == "MUTATED" {
-		t.Error("mutating Supports()[].ObjectVariations[].Syntax should not affect internal state")
-	}
-
-	// Mutate WriteSyntax through returned value
-	got[0].ObjectVariations[0].WriteSyntax.Bits[0].Label = "MUTATED"
-	if cap.supports[0].ObjectVariations[0].WriteSyntax.Bits[0].Label == "MUTATED" {
-		t.Error("mutating Supports()[].ObjectVariations[].WriteSyntax should not affect internal state")
-	}
-
-	// Mutate NotificationVariations
-	got[0].NotificationVariations[0].Notification = "MUTATED"
-	if cap.supports[0].NotificationVariations[0].Notification == "MUTATED" {
-		t.Error("mutating Supports()[].NotificationVariations should not affect internal state")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cap.Supports()
+			tt.mutate(got)
+			if tt.wasMutated() {
+				t.Errorf("mutating Supports()[].%s should not affect internal state", tt.name)
+			}
+		})
 	}
 }
 
@@ -387,7 +404,7 @@ func TestSyntaxConstraintsClone(t *testing.T) {
 
 	cloned := orig.clone()
 
-	// Verify values match
+	// Verify cloned values match original
 	if !slices.Equal(cloned.Sizes, orig.Sizes) {
 		t.Error("cloned Sizes should equal original")
 	}
@@ -395,20 +412,36 @@ func TestSyntaxConstraintsClone(t *testing.T) {
 		t.Error("cloned Ranges should equal original")
 	}
 
-	// Mutate clone, verify original unchanged
-	cloned.Sizes[0].Min = 999
-	if orig.Sizes[0].Min == 999 {
-		t.Error("mutating cloned Sizes should not affect original")
+	// Verify mutations to clone don't propagate to original
+	tests := []struct {
+		name       string
+		mutate     func(*SyntaxConstraints)
+		wasMutated func() bool
+	}{
+		{
+			"Sizes",
+			func(c *SyntaxConstraints) { c.Sizes[0].Min = 999 },
+			func() bool { return orig.Sizes[0].Min == 999 },
+		},
+		{
+			"Enums",
+			func(c *SyntaxConstraints) { c.Enums[0].Label = "X" },
+			func() bool { return orig.Enums[0].Label == "X" },
+		},
+		{
+			"Bits",
+			func(c *SyntaxConstraints) { c.Bits[0].Label = "X" },
+			func() bool { return orig.Bits[0].Label == "X" },
+		},
 	}
-
-	cloned.Enums[0].Label = "MUTATED"
-	if orig.Enums[0].Label == "MUTATED" {
-		t.Error("mutating cloned Enums should not affect original")
-	}
-
-	cloned.Bits[0].Label = "MUTATED"
-	if orig.Bits[0].Label == "MUTATED" {
-		t.Error("mutating cloned Bits should not affect original")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := orig.clone()
+			tt.mutate(c)
+			if tt.wasMutated() {
+				t.Errorf("mutating cloned %s should not affect original", tt.name)
+			}
+		})
 	}
 }
 
