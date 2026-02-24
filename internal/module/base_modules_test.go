@@ -22,8 +22,8 @@ func TestBaseModuleNames_DefensiveCopy(t *testing.T) {
 
 // --- helpers for inspecting base module definitions ---
 
-// findDef returns the first definition with the given name, or nil.
-func findDef(defs []Definition, name string) Definition {
+// findDefByName returns the first definition with the given name, or nil.
+func findDefByName(defs []Definition, name string) Definition {
 	for _, d := range defs {
 		if d.DefinitionName() == name {
 			return d
@@ -35,7 +35,7 @@ func findDef(defs []Definition, name string) Definition {
 // requireValueAssignment finds a ValueAssignment by name or fails the test.
 func requireValueAssignment(t *testing.T, defs []Definition, name string) *ValueAssignment {
 	t.Helper()
-	d := findDef(defs, name)
+	d := findDefByName(defs, name)
 	if d == nil {
 		t.Fatalf("definition %q not found", name)
 	}
@@ -49,7 +49,7 @@ func requireValueAssignment(t *testing.T, defs []Definition, name string) *Value
 // requireTypeDef finds a TypeDef by name or fails the test.
 func requireTypeDef(t *testing.T, defs []Definition, name string) *TypeDef {
 	t.Helper()
-	d := findDef(defs, name)
+	d := findDefByName(defs, name)
 	if d == nil {
 		t.Fatalf("definition %q not found", name)
 	}
