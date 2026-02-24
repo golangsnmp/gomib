@@ -3,6 +3,8 @@ package module
 import (
 	"slices"
 	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 func TestBaseModuleNames_DefensiveCopy(t *testing.T) {
@@ -14,7 +16,5 @@ func TestBaseModuleNames_DefensiveCopy(t *testing.T) {
 
 	// A second call must still return the original names.
 	got := BaseModuleNames()
-	if !slices.Equal(got, saved) {
-		t.Errorf("BaseModuleNames() was mutated by caller:\n got %v\nwant %v", got, saved)
-	}
+	testutil.SliceEqual(t, saved, got, "BaseModuleNames() was mutated by caller")
 }

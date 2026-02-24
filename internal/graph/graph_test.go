@@ -1,8 +1,9 @@
 package graph
 
 import (
-	"slices"
 	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 func TestGraphBasic(t *testing.T) {
@@ -15,18 +16,10 @@ func TestGraphBasic(t *testing.T) {
 	g.AddNode(b)
 	g.AddEdge(a, b)
 
-	if !g.HasNode(a) {
-		t.Error("graph should have node a")
-	}
-	if !g.HasNode(b) {
-		t.Error("graph should have node b")
-	}
-	if len(g.Dependencies(a)) != 1 {
-		t.Errorf("a dependencies = %d, want 1", len(g.Dependencies(a)))
-	}
-	if g.Dependencies(a)[0] != b {
-		t.Errorf("a depends on %v, want %v", g.Dependencies(a)[0], b)
-	}
+	testutil.True(t, g.HasNode(a), "graph should have node a")
+	testutil.True(t, g.HasNode(b), "graph should have node b")
+	testutil.Len(t, g.Dependencies(a), 1, "a dependencies")
+	testutil.Equal(t, b, g.Dependencies(a)[0], "a depends on")
 }
 
 func TestAddEdgeCreatesNodes(t *testing.T) {
@@ -38,27 +31,17 @@ func TestAddEdgeCreatesNodes(t *testing.T) {
 	// No AddNode calls, only AddEdge.
 	g.AddEdge(a, b)
 
-	if !g.HasNode(a) {
-		t.Error("AddEdge should create 'from' node")
-	}
-	if !g.HasNode(b) {
-		t.Error("AddEdge should create 'to' node")
-	}
-	if len(g.Dependencies(a)) != 1 {
-		t.Errorf("a dependencies = %d, want 1", len(g.Dependencies(a)))
-	}
+	testutil.True(t, g.HasNode(a), "AddEdge should create 'from' node")
+	testutil.True(t, g.HasNode(b), "AddEdge should create 'to' node")
+	testutil.Len(t, g.Dependencies(a), 1, "a dependencies")
 }
 
 func TestHasNode(t *testing.T) {
 	g := New(0)
 	a := Symbol{Module: "M", Name: "a"}
-	if g.HasNode(a) {
-		t.Error("empty graph should not have node")
-	}
+	testutil.False(t, g.HasNode(a), "empty graph should not have node")
 	g.AddNode(a)
-	if !g.HasNode(a) {
-		t.Error("should have node after AddNode")
-	}
+	testutil.True(t, g.HasNode(a), "should have node after AddNode")
 }
 
 func TestDuplicateEdges(t *testing.T) {
@@ -71,28 +54,18 @@ func TestDuplicateEdges(t *testing.T) {
 	g.AddEdge(a, b)
 	g.AddEdge(a, b)
 
-	if len(g.Dependencies(a)) != 1 {
-		t.Errorf("dependencies = %d, want 1 (duplicate edges deduplicated)", len(g.Dependencies(a)))
-	}
+	testutil.Len(t, g.Dependencies(a), 1, "duplicate edges deduplicated")
 
 	order, cycles := g.ResolutionOrder()
-	if len(cycles) != 0 {
-		t.Errorf("cycles = %d, want 0", len(cycles))
-	}
-	if len(order) != 2 {
-		t.Errorf("order = %d, want 2", len(order))
-	}
+	testutil.Len(t, cycles, 0, "cycles")
+	testutil.Len(t, order, 2, "order")
 }
 
 func TestResolutionOrderEmpty(t *testing.T) {
 	g := New(0)
 	order, cycles := g.ResolutionOrder()
-	if len(order) != 0 {
-		t.Errorf("order = %d, want 0", len(order))
-	}
-	if len(cycles) != 0 {
-		t.Errorf("cycles = %d, want 0", len(cycles))
-	}
+	testutil.Len(t, order, 0, "order")
+	testutil.Len(t, cycles, 0, "cycles")
 }
 
 func TestResolutionOrderIsolatedNode(t *testing.T) {
@@ -101,15 +74,9 @@ func TestResolutionOrderIsolatedNode(t *testing.T) {
 	g.AddNode(a)
 
 	order, cycles := g.ResolutionOrder()
-	if len(cycles) != 0 {
-		t.Errorf("cycles = %d, want 0", len(cycles))
-	}
-	if len(order) != 1 {
-		t.Fatalf("order = %d, want 1", len(order))
-	}
-	if order[0] != a {
-		t.Errorf("order[0] = %v, want %v", order[0], a)
-	}
+	testutil.Len(t, cycles, 0, "cycles")
+	testutil.Len(t, order, 1, "order")
+	testutil.Equal(t, a, order[0], "order[0]")
 }
 
 func TestResolutionOrderChain(t *testing.T) {
@@ -123,15 +90,11 @@ func TestResolutionOrderChain(t *testing.T) {
 	g.AddEdge(b, c)
 
 	order, cycles := g.ResolutionOrder()
-	if len(cycles) != 0 {
-		t.Errorf("cycles = %d, want 0", len(cycles))
-	}
+	testutil.Len(t, cycles, 0, "cycles")
 
 	// Deterministic: c, b, a.
 	want := []Symbol{c, b, a}
-	if !slices.Equal(order, want) {
-		t.Errorf("order = %v, want %v", order, want)
-	}
+	testutil.SliceEqual(t, want, order, "order")
 }
 
 func TestResolutionOrderDiamond(t *testing.T) {
@@ -149,12 +112,8 @@ func TestResolutionOrderDiamond(t *testing.T) {
 	g.AddEdge(c, d)
 
 	order, cycles := g.ResolutionOrder()
-	if len(cycles) != 0 {
-		t.Errorf("cycles = %d, want 0", len(cycles))
-	}
-	if len(order) != 4 {
-		t.Fatalf("order = %d, want 4", len(order))
-	}
+	testutil.Len(t, cycles, 0, "cycles")
+	testutil.Len(t, order, 4, "order")
 
 	indexOf := func(s Symbol) int {
 		for i, sym := range order {
@@ -166,18 +125,10 @@ func TestResolutionOrderDiamond(t *testing.T) {
 	}
 
 	// d must come before b and c, both before a.
-	if indexOf(d) >= indexOf(b) {
-		t.Error("d should come before b")
-	}
-	if indexOf(d) >= indexOf(c) {
-		t.Error("d should come before c")
-	}
-	if indexOf(b) >= indexOf(a) {
-		t.Error("b should come before a")
-	}
-	if indexOf(c) >= indexOf(a) {
-		t.Error("c should come before a")
-	}
+	testutil.True(t, indexOf(d) < indexOf(b), "d should come before b")
+	testutil.True(t, indexOf(d) < indexOf(c), "d should come before c")
+	testutil.True(t, indexOf(b) < indexOf(a), "b should come before a")
+	testutil.True(t, indexOf(c) < indexOf(a), "c should come before a")
 }
 
 func TestResolutionOrderSimpleCycle(t *testing.T) {
@@ -190,15 +141,9 @@ func TestResolutionOrderSimpleCycle(t *testing.T) {
 	g.AddEdge(b, a)
 
 	order, cycles := g.ResolutionOrder()
-	if len(order) != 0 {
-		t.Errorf("order = %d, want 0 (all nodes in cycle)", len(order))
-	}
-	if len(cycles) != 1 {
-		t.Fatalf("cycles = %d, want 1", len(cycles))
-	}
-	if len(cycles[0]) != 2 {
-		t.Errorf("cycle length = %d, want 2", len(cycles[0]))
-	}
+	testutil.Len(t, order, 0, "all nodes in cycle")
+	testutil.Len(t, cycles, 1, "cycles")
+	testutil.Len(t, cycles[0], 2, "cycle length")
 }
 
 func TestResolutionOrderTriangleCycle(t *testing.T) {
@@ -213,12 +158,8 @@ func TestResolutionOrderTriangleCycle(t *testing.T) {
 	g.AddEdge(c, a)
 
 	_, cycles := g.ResolutionOrder()
-	if len(cycles) != 1 {
-		t.Fatalf("cycles = %d, want 1", len(cycles))
-	}
-	if len(cycles[0]) != 3 {
-		t.Errorf("cycle length = %d, want 3", len(cycles[0]))
-	}
+	testutil.Len(t, cycles, 1, "cycles")
+	testutil.Len(t, cycles[0], 3, "cycle length")
 }
 
 func TestResolutionOrderCycleDependents(t *testing.T) {
@@ -233,20 +174,12 @@ func TestResolutionOrderCycleDependents(t *testing.T) {
 	g.AddEdge(c, a)
 
 	order, cycles := g.ResolutionOrder()
-	if len(cycles) != 1 {
-		t.Fatalf("cycles = %d, want 1", len(cycles))
-	}
-	if len(cycles[0]) != 2 {
-		t.Errorf("cycle length = %d, want 2", len(cycles[0]))
-	}
+	testutil.Len(t, cycles, 1, "cycles")
+	testutil.Len(t, cycles[0], 2, "cycle length")
 
 	// c should still appear in the order despite depending on a cycle member.
-	if len(order) != 1 {
-		t.Fatalf("order = %d, want 1", len(order))
-	}
-	if order[0] != c {
-		t.Errorf("order[0] = %v, want %v", order[0], c)
-	}
+	testutil.Len(t, order, 1, "order")
+	testutil.Equal(t, c, order[0], "order[0]")
 }
 
 func TestSelfLoop(t *testing.T) {
@@ -259,23 +192,13 @@ func TestSelfLoop(t *testing.T) {
 	g.AddEdge(b, a)
 
 	order, cycles := g.ResolutionOrder()
-	if len(cycles) != 1 {
-		t.Fatalf("cycles = %d, want 1", len(cycles))
-	}
-	if len(cycles[0]) != 1 {
-		t.Errorf("self-loop cycle length = %d, want 1", len(cycles[0]))
-	}
-	if cycles[0][0] != a {
-		t.Errorf("self-loop node = %v, want %v", cycles[0][0], a)
-	}
+	testutil.Len(t, cycles, 1, "cycles")
+	testutil.Len(t, cycles[0], 1, "self-loop cycle length")
+	testutil.Equal(t, a, cycles[0][0], "self-loop node")
 
 	// b should still appear in the order.
-	if len(order) != 1 {
-		t.Fatalf("order = %d, want 1", len(order))
-	}
-	if order[0] != b {
-		t.Errorf("order[0] = %v, want %v", order[0], b)
-	}
+	testutil.Len(t, order, 1, "order")
+	testutil.Equal(t, b, order[0], "order[0]")
 }
 
 func TestResolutionOrderMultipleSCCs(t *testing.T) {
@@ -333,16 +256,12 @@ func TestResolutionOrderCrossModule(t *testing.T) {
 	g.AddEdge(b1, a1)
 
 	order, cycles := g.ResolutionOrder()
-	if len(cycles) != 0 {
-		t.Errorf("cycles = %d, want 0", len(cycles))
-	}
+	testutil.Len(t, cycles, 0, "cycles")
 
 	// Deterministic: A:x first (leaf), then A:y and B:x.
 	// A:y before B:x because "A" < "B" in module sort.
 	want := []Symbol{a1, a2, b1}
-	if !slices.Equal(order, want) {
-		t.Errorf("order = %v, want %v", order, want)
-	}
+	testutil.SliceEqual(t, want, order, "order")
 }
 
 func TestResolutionOrderDisconnected(t *testing.T) {
@@ -357,13 +276,9 @@ func TestResolutionOrderDisconnected(t *testing.T) {
 	g.AddNode(c)
 
 	order, cycles := g.ResolutionOrder()
-	if len(cycles) != 0 {
-		t.Errorf("cycles = %d, want 0", len(cycles))
-	}
+	testutil.Len(t, cycles, 0, "cycles")
 
 	// Deterministic: sorted by name since module is the same.
 	want := []Symbol{a, b, c}
-	if !slices.Equal(order, want) {
-		t.Errorf("order = %v, want %v", order, want)
-	}
+	testutil.SliceEqual(t, want, order, "order")
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/parser"
+	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -15,14 +16,10 @@ func lowerAndFindDiagnostic(t *testing.T, source []byte, config types.Diagnostic
 
 	p := parser.New(source, nil, config)
 	ast := p.ParseModule()
-	if ast == nil {
-		t.Fatal("parse returned nil")
-	}
+	testutil.NotNil(t, ast, "parse returned nil")
 
 	mod := Lower(ast, source, nil, config)
-	if mod == nil {
-		t.Fatal("lower returned nil")
-	}
+	testutil.NotNil(t, mod, "lower returned nil")
 
 	for _, d := range mod.Diagnostics {
 		if d.Code == code {

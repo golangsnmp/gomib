@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/parser"
+	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -28,24 +29,20 @@ func TestSpanToLineCol(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			line, col := spanToLineCol(source, tt.offset)
-			if line != tt.wantLine || col != tt.wantCol {
-				t.Errorf("spanToLineCol(source, %d) = (%d, %d), want (%d, %d)",
-					tt.offset, line, col, tt.wantLine, tt.wantCol)
-			}
+			testutil.Equal(t, tt.wantLine, line, "spanToLineCol(source, %d) line", tt.offset)
+			testutil.Equal(t, tt.wantCol, col, "spanToLineCol(source, %d) col", tt.offset)
 		})
 	}
 
 	// Nil source returns (0, 0)
 	line, col := spanToLineCol(nil, 5)
-	if line != 0 || col != 0 {
-		t.Errorf("spanToLineCol(nil, 5) = (%d, %d), want (0, 0)", line, col)
-	}
+	testutil.Equal(t, 0, line, "spanToLineCol(nil, 5) line")
+	testutil.Equal(t, 0, col, "spanToLineCol(nil, 5) col")
 
 	// Out of range offset returns (0, 0)
 	line, col = spanToLineCol(source, 100)
-	if line != 0 || col != 0 {
-		t.Errorf("spanToLineCol(source, 100) = (%d, %d), want (0, 0)", line, col)
-	}
+	testutil.Equal(t, 0, line, "spanToLineCol(source, 100) line")
+	testutil.Equal(t, 0, col, "spanToLineCol(source, 100) col")
 }
 
 func TestLower_DiagnosticSourceLocation(t *testing.T) {
@@ -77,16 +74,10 @@ END
 `)
 
 	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagIdentifierUnderscore)
-	if d == nil {
-		t.Fatalf("expected %s diagnostic", types.DiagIdentifierUnderscore)
-	}
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagIdentifierUnderscore)
 	// test_object is on line 16, column 1 of the source
-	if d.Line != 16 {
-		t.Errorf("expected line 16 for identifier-underscore diagnostic, got %d", d.Line)
-	}
-	if d.Column != 1 {
-		t.Errorf("expected column 1 for identifier-underscore diagnostic, got %d", d.Column)
-	}
+	testutil.Equal(t, 16, d.Line, "identifier-underscore diagnostic line")
+	testutil.Equal(t, 1, d.Column, "identifier-underscore diagnostic column")
 }
 
 func TestLower_DiagnosticSourceLocation_Synthetic(t *testing.T) {
@@ -110,12 +101,9 @@ END
 `)
 
 	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagMissingModuleIdentity)
-	if d == nil {
-		t.Fatalf("expected %s diagnostic", types.DiagMissingModuleIdentity)
-	}
-	if d.Line == 0 || d.Column == 0 {
-		t.Errorf("expected non-zero line/column for lowering diagnostic, got line=%d, column=%d", d.Line, d.Column)
-	}
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagMissingModuleIdentity)
+	testutil.True(t, d.Line != 0, "expected non-zero line for lowering diagnostic, got %d", d.Line)
+	testutil.True(t, d.Column != 0, "expected non-zero column for lowering diagnostic, got %d", d.Column)
 }
 
 func TestLower_SNMPv2MIBNotTreatedAsBaseModule(t *testing.T) {
@@ -140,9 +128,7 @@ END
 `)
 
 	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagMissingModuleIdentity)
-	if d == nil {
-		t.Errorf("SNMPv2-MIB without MODULE-IDENTITY should get %s diagnostic", types.DiagMissingModuleIdentity)
-	}
+	testutil.NotNil(t, d, "SNMPv2-MIB without MODULE-IDENTITY should get %s diagnostic", types.DiagMissingModuleIdentity)
 }
 
 func TestLower_BaseModuleSkipsModuleIdentityCheck(t *testing.T) {
@@ -157,9 +143,7 @@ END
 `)
 
 	d := lowerAndFindDiagnostic(t, source, types.DefaultConfig(), types.DiagMissingModuleIdentity)
-	if d != nil {
-		t.Errorf("base module SNMPv2-SMI should not get %s diagnostic", types.DiagMissingModuleIdentity)
-	}
+	testutil.Nil(t, d, "base module SNMPv2-SMI should not get %s diagnostic", types.DiagMissingModuleIdentity)
 }
 
 func TestLower_NegativeBitsPosition(t *testing.T) {
@@ -192,14 +176,10 @@ END
 
 	p := parser.New(source, nil, types.PermissiveConfig())
 	ast := p.ParseModule()
-	if ast == nil {
-		t.Fatal("parse returned nil")
-	}
+	testutil.NotNil(t, ast, "parse returned nil")
 
 	mod := Lower(ast, source, nil, types.PermissiveConfig())
-	if mod == nil {
-		t.Fatal("lower returned nil")
-	}
+	testutil.NotNil(t, mod, "lower returned nil")
 
 	// Should have a diagnostic for the negative BITS position
 	var found bool
@@ -209,9 +189,7 @@ END
 			break
 		}
 	}
-	if !found {
-		t.Error("expected diagnostic for negative BITS position, got none")
-	}
+	testutil.True(t, found, "expected diagnostic for negative BITS position, got none")
 }
 
 func TestLower_MissingModuleIdentity_AlwaysWarning(t *testing.T) {
@@ -242,12 +220,8 @@ END
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d := lowerAndFindDiagnostic(t, source, tc.config, types.DiagMissingModuleIdentity)
-			if d == nil {
-				t.Fatalf("expected %s diagnostic", types.DiagMissingModuleIdentity)
-			}
-			if d.Severity != types.SeverityWarning {
-				t.Errorf("expected SeverityWarning in %s, got %v", tc.name, d.Severity)
-			}
+			testutil.NotNil(t, d, "expected %s diagnostic", types.DiagMissingModuleIdentity)
+			testutil.Equal(t, types.SeverityWarning, d.Severity, "expected SeverityWarning in %s", tc.name)
 		})
 	}
 }
