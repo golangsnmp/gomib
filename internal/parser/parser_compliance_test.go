@@ -159,4 +159,6 @@ func TestParseModuleComplianceNamedModule(t *testing.T) {
 	mod := def.Modules[0]
 	testutil.NotNil(t, mod.ModuleName, "module name should be set")
 	testutil.Equal(t, "SNMPv2-MIB", mod.ModuleName.Name, "module name")
+	testutil.Len(t, mod.MandatoryGroups, 1, "mandatory groups count")
+	testutil.Equal(t, "systemGroup", mod.MandatoryGroups[0].Name, "mandatory group name")
 }
