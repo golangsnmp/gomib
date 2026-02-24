@@ -570,44 +570,68 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 			ModuleName: m.ModuleName,
 			Includes:   m.Includes,
 		}
-		if len(m.ObjectVariations) > 0 {
-			vars := make([]ObjectVariation, len(m.ObjectVariations))
-			for j, v := range m.ObjectVariations {
-				vars[j] = ObjectVariation{
-					Object:      v.Object,
-					Description: v.Description,
-				}
-				vars[j].Syntax = resolveSyntaxConstraints(ctx, v.Syntax, mod, v.Object, types.Span{})
-				vars[j].WriteSyntax = resolveSyntaxConstraints(ctx, v.WriteSyntax, mod, v.Object, types.Span{})
-				if len(v.CreationRequires) > 0 {
-					vars[j].CreationRequires = slices.Clone(v.CreationRequires)
-				}
-				if v.Access != nil {
-					vars[j].Access = v.Access
-				}
-				if v.DefVal != nil {
-					if dv := convertDefVal(ctx, v.DefVal, mod, v.Syntax); dv != nil {
-						vars[j].DefVal = *dv
-					}
-				}
-			}
-			result[i].ObjectVariations = vars
-		}
-		if len(m.NotificationVariations) > 0 {
-			vars := make([]NotificationVariation, len(m.NotificationVariations))
-			for j, v := range m.NotificationVariations {
-				vars[j] = NotificationVariation{
-					Notification: v.Notification,
+		for _, v := range m.Variations {
+			if isNotificationVariation(ctx, mod, m.ModuleName, v) {
+				nv := NotificationVariation{
+					Notification: v.Name,
 					Description:  v.Description,
 				}
 				if v.Access != nil {
-					vars[j].Access = v.Access
+					nv.Access = v.Access
+					if *v.Access != AccessNotImplemented {
+						ctx.EmitDiagnostic(types.DiagVariationAccessNotifOnly, SeverityMinor,
+							mod, types.Span{},
+							"notification variation "+v.Name+" ACCESS should be not-implemented per RFC 2580")
+					}
 				}
+				result[i].NotificationVariations = append(result[i].NotificationVariations, nv)
+			} else {
+				ov := ObjectVariation{
+					Object:      v.Name,
+					Description: v.Description,
+				}
+				ov.Syntax = resolveSyntaxConstraints(ctx, v.Syntax, mod, v.Name, types.Span{})
+				ov.WriteSyntax = resolveSyntaxConstraints(ctx, v.WriteSyntax, mod, v.Name, types.Span{})
+				if len(v.CreationRequires) > 0 {
+					ov.CreationRequires = slices.Clone(v.CreationRequires)
+				}
+				if v.Access != nil {
+					ov.Access = v.Access
+				}
+				if v.DefVal != nil {
+					if dv := convertDefVal(ctx, v.DefVal, mod, v.Syntax); dv != nil {
+						ov.DefVal = *dv
+					}
+				}
+				result[i].ObjectVariations = append(result[i].ObjectVariations, ov)
 			}
-			result[i].NotificationVariations = vars
 		}
 	}
 	return result
+}
+
+// isNotificationVariation determines whether a VARIATION clause references a
+// NOTIFICATION-TYPE. It looks up the referenced name in the SUPPORTS module,
+// the defining module's imports, and (permissively) globally. If the name
+// cannot be resolved, it falls back to a syntactic heuristic: variations with
+// SYNTAX, WRITE-SYNTAX, CREATION-REQUIRES, or DEFVAL are object variations.
+func isNotificationVariation(ctx *resolverContext, mod *module.Module, supportsModule string, v module.Variation) bool {
+	// Try the SUPPORTS module first (most correct per RFC 2580).
+	if node, ok := ctx.LookupNodeInModule(supportsModule, v.Name); ok {
+		return node.Kind() == KindNotification
+	}
+	// Try the defining module's import chain.
+	if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
+		return node.Kind() == KindNotification
+	}
+	// Permissive: try global lookup.
+	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+		if node, ok := ctx.LookupNodeGlobal(v.Name); ok {
+			return node.Kind() == KindNotification
+		}
+	}
+	// Cannot resolve; fall back to syntactic heuristic.
+	return v.Syntax == nil && v.WriteSyntax == nil && len(v.CreationRequires) == 0 && v.DefVal == nil
 }
 
 func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*Node, bool) {

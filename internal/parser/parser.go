@@ -2490,7 +2490,7 @@ func (p *Parser) parseSupportsModule() (ast.SupportsModule, *types.SpanDiagnosti
 		if err != nil {
 			return ast.SupportsModule{}, err
 		}
-		variations = append(variations, v)
+		variations = append(variations, *v)
 	}
 
 	end := p.currentSpan().Start
@@ -2503,7 +2503,7 @@ func (p *Parser) parseSupportsModule() (ast.SupportsModule, *types.SpanDiagnosti
 	}, nil
 }
 
-func (p *Parser) parseVariationClause() (ast.Variation, *types.SpanDiagnostic) {
+func (p *Parser) parseVariationClause() (*ast.Variation, *types.SpanDiagnostic) {
 	start := p.currentSpan().Start
 	if _, err := p.expect(lexer.TokKwVariation); err != nil {
 		return nil, err
@@ -2579,26 +2579,15 @@ func (p *Parser) parseVariationClause() (ast.Variation, *types.SpanDiagnostic) {
 
 	end := description.Span.End
 
-	// If any object-specific clauses are present, this is an ObjectVariation.
-	// Otherwise treat as NotificationVariation per RFC 2580.
-	if syntax != nil || writeSyntax != nil || len(creationRequires) > 0 || defval != nil {
-		return &ast.ObjectVariation{
-			Object:           name,
-			Syntax:           syntax,
-			WriteSyntax:      writeSyntax,
-			Access:           access,
-			CreationRequires: creationRequires,
-			DefVal:           defval,
-			Description:      description,
-			Span:             types.NewSpan(start, end),
-		}, nil
-	}
-
-	return &ast.NotificationVariation{
-		Notification: name,
-		Access:       access,
-		Description:  description,
-		Span:         types.NewSpan(start, end),
+	return &ast.Variation{
+		Name:             name,
+		Syntax:           syntax,
+		WriteSyntax:      writeSyntax,
+		Access:           access,
+		CreationRequires: creationRequires,
+		DefVal:           defval,
+		Description:      description,
+		Span:             types.NewSpan(start, end),
 	}, nil
 }
 

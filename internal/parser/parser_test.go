@@ -668,10 +668,9 @@ func TestParseUnterminatedStringPreservesContent(t *testing.T) {
 	testutil.Equal(t, "hello world", qs.Value, "unterminated string should preserve all content after opening quote")
 }
 
-func TestParseVariationNotification(t *testing.T) {
-	// A VARIATION clause with only ACCESS and DESCRIPTION (no SYNTAX,
-	// WRITE-SYNTAX, CREATION-REQUIRES, or DEFVAL) should produce a
-	// NotificationVariation, not an ObjectVariation.
+func TestParseVariationDescriptionOnly(t *testing.T) {
+	// A VARIATION clause with only DESCRIPTION should parse all fields
+	// as a unified Variation struct.
 	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testAgent AGENT-CAPABILITIES
 			PRODUCT-RELEASE "1.0"
@@ -697,13 +696,15 @@ func TestParseVariationNotification(t *testing.T) {
 		t.Fatal("expected VARIATION clause")
 	}
 
-	_, ok = def.Supports[0].Variations[0].(*ast.NotificationVariation)
-	testutil.True(t, ok, "variation with only DESCRIPTION should be NotificationVariation, got %T",
-		def.Supports[0].Variations[0])
+	v := def.Supports[0].Variations[0]
+	testutil.Equal(t, "ifLinkUpNotification", v.Name.Name, "variation name")
+	testutil.Nil(t, v.Syntax, "no SYNTAX clause")
+	testutil.Nil(t, v.Access, "no ACCESS clause")
+	testutil.Equal(t, "Supported", v.Description.Value, "description")
 }
 
-func TestParseVariationObject(t *testing.T) {
-	// A VARIATION clause with SYNTAX should produce an ObjectVariation.
+func TestParseVariationWithSyntax(t *testing.T) {
+	// A VARIATION clause with SYNTAX should store it in the unified struct.
 	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testAgent AGENT-CAPABILITIES
 			PRODUCT-RELEASE "1.0"
@@ -727,9 +728,10 @@ func TestParseVariationObject(t *testing.T) {
 		t.Fatal("expected SUPPORTS with VARIATION")
 	}
 
-	_, ok = def.Supports[0].Variations[0].(*ast.ObjectVariation)
-	testutil.True(t, ok, "variation with SYNTAX should be ObjectVariation, got %T",
-		def.Supports[0].Variations[0])
+	v := def.Supports[0].Variations[0]
+	testutil.Equal(t, "ifIndex", v.Name.Name, "variation name")
+	testutil.NotNil(t, v.Syntax, "SYNTAX clause should be present")
+	testutil.Equal(t, "Restricted range", v.Description.Value, "description")
 }
 
 func TestRecoverToUppercaseObjectType(t *testing.T) {
