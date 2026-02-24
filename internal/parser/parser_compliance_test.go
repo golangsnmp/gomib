@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/ast"
@@ -8,155 +9,101 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-func TestParseModuleComplianceObjectSyntax(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
-		testCompliance MODULE-COMPLIANCE
-			STATUS current
-			DESCRIPTION "Test compliance"
-			MODULE
-				MANDATORY-GROUPS { testGroup1 }
-				OBJECT testObj
+func TestParseModuleComplianceRefinements(t *testing.T) {
+	tests := []struct {
+		name            string
+		objectClause    string
+		wantSyntax      bool
+		wantWriteSyntax bool
+		wantMinAccess   bool
+		minAccessValue  types.Access
+	}{
+		{
+			name: "syntax only",
+			objectClause: `OBJECT testObj
 					SYNTAX Integer32 (0..100)
-					DESCRIPTION "Refined syntax"
-			::= { testConformance 1 }
-		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
-
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
-	}
-
-	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-	if !ok {
-		t.Fatalf("expected ModuleComplianceDef, got %T", module.Body[0])
-	}
-	testutil.Equal(t, "testCompliance", def.Name.Name, "compliance name")
-	testutil.Equal(t, 1, len(def.Modules), "module clauses count")
-
-	mod := def.Modules[0]
-	testutil.Equal(t, 1, len(mod.Compliances), "compliances count")
-
-	obj, ok := mod.Compliances[0].(*ast.ComplianceObject)
-	if !ok {
-		t.Fatalf("expected ComplianceObject, got %T", mod.Compliances[0])
-	}
-	testutil.Equal(t, "testObj", obj.Object.Name, "object name")
-	testutil.NotNil(t, obj.Syntax, "SYNTAX refinement should be set")
-	testutil.Nil(t, obj.WriteSyntax, "WRITE-SYNTAX should not be set")
-	testutil.Nil(t, obj.MinAccess, "MIN-ACCESS should not be set")
-}
-
-func TestParseModuleComplianceObjectWriteSyntax(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
-		testCompliance MODULE-COMPLIANCE
-			STATUS current
-			DESCRIPTION "Test compliance"
-			MODULE
-				MANDATORY-GROUPS { testGroup1 }
-				OBJECT testObj
+					DESCRIPTION "Refined syntax"`,
+			wantSyntax: true,
+		},
+		{
+			name: "write-syntax only",
+			objectClause: `OBJECT testObj
 					WRITE-SYNTAX Integer32 (1..50)
-					DESCRIPTION "Write-syntax refinement"
-			::= { testConformance 1 }
-		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
-
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
-	}
-
-	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-	if !ok {
-		t.Fatalf("expected ModuleComplianceDef, got %T", module.Body[0])
-	}
-
-	mod := def.Modules[0]
-	testutil.Equal(t, 1, len(mod.Compliances), "compliances count")
-
-	obj, ok := mod.Compliances[0].(*ast.ComplianceObject)
-	if !ok {
-		t.Fatalf("expected ComplianceObject, got %T", mod.Compliances[0])
-	}
-	testutil.Nil(t, obj.Syntax, "SYNTAX should not be set")
-	testutil.NotNil(t, obj.WriteSyntax, "WRITE-SYNTAX refinement should be set")
-}
-
-func TestParseModuleComplianceObjectMinAccess(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
-		testCompliance MODULE-COMPLIANCE
-			STATUS current
-			DESCRIPTION "Test compliance"
-			MODULE
-				MANDATORY-GROUPS { testGroup1 }
-				OBJECT testObj
+					DESCRIPTION "Write-syntax refinement"`,
+			wantWriteSyntax: true,
+		},
+		{
+			name: "min-access only",
+			objectClause: `OBJECT testObj
 					MIN-ACCESS read-only
-					DESCRIPTION "Min-access refinement"
-			::= { testConformance 1 }
-		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
-
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
-	}
-
-	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-	if !ok {
-		t.Fatalf("expected ModuleComplianceDef, got %T", module.Body[0])
-	}
-
-	mod := def.Modules[0]
-	testutil.Equal(t, 1, len(mod.Compliances), "compliances count")
-
-	obj, ok := mod.Compliances[0].(*ast.ComplianceObject)
-	if !ok {
-		t.Fatalf("expected ComplianceObject, got %T", mod.Compliances[0])
-	}
-	testutil.NotNil(t, obj.MinAccess, "MIN-ACCESS should be set")
-	testutil.Equal(t, types.AccessReadOnly, obj.MinAccess.Value, "MIN-ACCESS value")
-}
-
-func TestParseModuleComplianceAllRefinements(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
-		testCompliance MODULE-COMPLIANCE
-			STATUS current
-			DESCRIPTION "Test compliance"
-			MODULE
-				MANDATORY-GROUPS { testGroup1 }
-				OBJECT testObj
+					DESCRIPTION "Min-access refinement"`,
+			wantMinAccess:  true,
+			minAccessValue: types.AccessReadOnly,
+		},
+		{
+			name: "all refinements",
+			objectClause: `OBJECT testObj
 					SYNTAX Integer32 (0..100)
 					WRITE-SYNTAX Integer32 (1..50)
 					MIN-ACCESS read-only
-					DESCRIPTION "Full refinement"
+					DESCRIPTION "Full refinement"`,
+			wantSyntax:      true,
+			wantWriteSyntax: true,
+			wantMinAccess:   true,
+			minAccessValue:  types.AccessReadOnly,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source := fmt.Sprintf(`TEST-MIB DEFINITIONS ::= BEGIN
+		testCompliance MODULE-COMPLIANCE
+			STATUS current
+			DESCRIPTION "Test compliance"
+			MODULE
+				MANDATORY-GROUPS { testGroup1 }
+				%s
 			::= { testConformance 1 }
-		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
+		END`, tt.objectClause)
 
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
+			module := parseModule(source)
+
+			if len(module.Body) == 0 {
+				t.Fatal("expected definitions in module body")
+			}
+			def, ok := module.Body[0].(*ast.ModuleComplianceDef)
+			if !ok {
+				t.Fatalf("expected ModuleComplianceDef, got %T", module.Body[0])
+			}
+			testutil.Equal(t, 1, len(def.Modules), "module clauses count")
+			mod := def.Modules[0]
+			testutil.Equal(t, 1, len(mod.Compliances), "compliances count")
+			obj, ok := mod.Compliances[0].(*ast.ComplianceObject)
+			if !ok {
+				t.Fatalf("expected ComplianceObject, got %T", mod.Compliances[0])
+			}
+
+			if tt.wantSyntax {
+				testutil.NotNil(t, obj.Syntax, "SYNTAX should be set")
+			} else {
+				testutil.Nil(t, obj.Syntax, "SYNTAX should not be set")
+			}
+			if tt.wantWriteSyntax {
+				testutil.NotNil(t, obj.WriteSyntax, "WRITE-SYNTAX should be set")
+			} else {
+				testutil.Nil(t, obj.WriteSyntax, "WRITE-SYNTAX should not be set")
+			}
+			if tt.wantMinAccess {
+				testutil.NotNil(t, obj.MinAccess, "MIN-ACCESS should be set")
+				testutil.Equal(t, tt.minAccessValue, obj.MinAccess.Value, "MIN-ACCESS value")
+			} else {
+				testutil.Nil(t, obj.MinAccess, "MIN-ACCESS should not be set")
+			}
+		})
 	}
-
-	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-	if !ok {
-		t.Fatalf("expected ModuleComplianceDef, got %T", module.Body[0])
-	}
-
-	mod := def.Modules[0]
-	testutil.Equal(t, 1, len(mod.Compliances), "compliances count")
-
-	obj, ok := mod.Compliances[0].(*ast.ComplianceObject)
-	if !ok {
-		t.Fatalf("expected ComplianceObject, got %T", mod.Compliances[0])
-	}
-	testutil.NotNil(t, obj.Syntax, "SYNTAX should be set")
-	testutil.NotNil(t, obj.WriteSyntax, "WRITE-SYNTAX should be set")
-	testutil.NotNil(t, obj.MinAccess, "MIN-ACCESS should be set")
 }
 
 func TestParseModuleComplianceGroupAndObject(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testCompliance MODULE-COMPLIANCE
 			STATUS current
 			DESCRIPTION "Test compliance"
@@ -169,8 +116,6 @@ func TestParseModuleComplianceGroupAndObject(t *testing.T) {
 					DESCRIPTION "Refined object"
 			::= { testConformance 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -192,7 +137,7 @@ func TestParseModuleComplianceGroupAndObject(t *testing.T) {
 }
 
 func TestParseModuleComplianceNamedModule(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testCompliance MODULE-COMPLIANCE
 			STATUS current
 			DESCRIPTION "Test compliance"
@@ -200,8 +145,6 @@ func TestParseModuleComplianceNamedModule(t *testing.T) {
 				MANDATORY-GROUPS { systemGroup }
 			::= { testConformance 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")

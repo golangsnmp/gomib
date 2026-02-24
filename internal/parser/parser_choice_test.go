@@ -5,18 +5,15 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/ast"
 	"github.com/golangsnmp/gomib/internal/testutil"
-	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func TestParseChoiceTypeAssignment(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestChoice ::= CHOICE {
 			internet Integer32,
 			raw DisplayString
 		}
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.TypeAssignmentDef)
@@ -36,14 +33,12 @@ func TestParseChoiceTypeAssignment(t *testing.T) {
 
 func TestParseChoiceWithBuiltinTypes(t *testing.T) {
 	// Test CHOICE with builtin types like INTEGER and OCTET STRING
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestBuiltinChoice ::= CHOICE {
 			num INTEGER,
 			str OCTET STRING
 		}
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.TypeAssignmentDef)
@@ -61,13 +56,11 @@ func TestParseChoiceWithBuiltinTypes(t *testing.T) {
 }
 
 func TestParseChoiceSingleAlternative(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		SingleChoice ::= CHOICE {
 			only Integer32
 		}
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.TypeAssignmentDef)
@@ -85,15 +78,13 @@ func TestParseChoiceSingleAlternative(t *testing.T) {
 
 func TestParseChoiceAlternativeSyntax(t *testing.T) {
 	// Verify that alternative Syntax fields are populated correctly.
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestChoice ::= CHOICE {
 			num INTEGER,
 			str OCTET STRING,
 			ref DisplayString
 		}
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def := module.Body[0].(*ast.TypeAssignmentDef)
@@ -118,14 +109,12 @@ func TestParseChoiceAlternativeSyntax(t *testing.T) {
 
 func TestParseChoiceWithNamedNumbers(t *testing.T) {
 	// CHOICE alternative with INTEGER that has named number values.
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestChoice ::= CHOICE {
 			status INTEGER { up(1), down(2) },
 			name OCTET STRING
 		}
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def := module.Body[0].(*ast.TypeAssignmentDef)
@@ -142,7 +131,7 @@ func TestParseChoiceWithNamedNumbers(t *testing.T) {
 
 func TestParseChoiceNested(t *testing.T) {
 	// Nested CHOICE inside a CHOICE alternative.
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestChoice ::= CHOICE {
 			inner CHOICE {
 				x INTEGER,
@@ -151,8 +140,6 @@ func TestParseChoiceNested(t *testing.T) {
 			other Integer32
 		}
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def := module.Body[0].(*ast.TypeAssignmentDef)
@@ -170,7 +157,7 @@ func TestParseChoiceNested(t *testing.T) {
 }
 
 func TestParseChoiceInObjectTypeSyntax(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testObj OBJECT-TYPE
 			SYNTAX CHOICE {
 				alpha INTEGER,
@@ -181,8 +168,6 @@ func TestParseChoiceInObjectTypeSyntax(t *testing.T) {
 			DESCRIPTION "Test"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)

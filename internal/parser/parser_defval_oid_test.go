@@ -5,12 +5,11 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/ast"
 	"github.com/golangsnmp/gomib/internal/testutil"
-	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func TestParseDefValOidNamed(t *testing.T) {
 	// DEFVAL with named OID components: { sysName 0 }
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testObj OBJECT-TYPE
 			SYNTAX OBJECT IDENTIFIER
 			MAX-ACCESS read-write
@@ -19,8 +18,6 @@ func TestParseDefValOidNamed(t *testing.T) {
 			DEFVAL { { sysName 0 } }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -38,7 +35,7 @@ func TestParseDefValOidNamed(t *testing.T) {
 
 func TestParseDefValOidNumeric(t *testing.T) {
 	// DEFVAL with all-numeric OID: { 1 3 6 1 }
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testObj OBJECT-TYPE
 			SYNTAX OBJECT IDENTIFIER
 			MAX-ACCESS read-write
@@ -47,8 +44,6 @@ func TestParseDefValOidNumeric(t *testing.T) {
 			DEFVAL { { 1 3 6 1 } }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -66,7 +61,7 @@ func TestParseDefValOidNumeric(t *testing.T) {
 
 func TestParseDefValOidNamedNumber(t *testing.T) {
 	// DEFVAL with named-number OID components: { iso 3 6 1 }
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testObj OBJECT-TYPE
 			SYNTAX OBJECT IDENTIFIER
 			MAX-ACCESS read-write
@@ -75,8 +70,6 @@ func TestParseDefValOidNamedNumber(t *testing.T) {
 			DEFVAL { { iso 3 6 1 } }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -99,7 +92,7 @@ func TestParseDefValOidNamedNumber(t *testing.T) {
 
 func TestParseDefValOidEmpty(t *testing.T) {
 	// DEFVAL with empty braces treated as empty BITS, not OID
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testObj OBJECT-TYPE
 			SYNTAX BITS { a(0) }
 			MAX-ACCESS read-write
@@ -108,8 +101,6 @@ func TestParseDefValOidEmpty(t *testing.T) {
 			DEFVAL { { } }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)

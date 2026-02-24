@@ -9,22 +9,18 @@ import (
 )
 
 func TestParseEmptyModule(t *testing.T) {
-	source := []byte("TEST-MIB DEFINITIONS ::= BEGIN END")
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
+	module := parseModule("TEST-MIB DEFINITIONS ::= BEGIN END")
 
 	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name")
 	testutil.Len(t, module.Body, 0, "body should be empty")
 }
 
 func TestParseModuleWithImports(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		IMPORTS
 			MODULE-IDENTITY, OBJECT-TYPE FROM SNMPv2-SMI
 			DisplayString FROM SNMPv2-TC;
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name")
 	testutil.Len(t, module.Imports, 2, "imports count")
@@ -34,11 +30,9 @@ func TestParseModuleWithImports(t *testing.T) {
 }
 
 func TestParseValueAssignment(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testObject OBJECT IDENTIFIER ::= { iso 3 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ValueAssignmentDef)
@@ -48,7 +42,7 @@ func TestParseValueAssignment(t *testing.T) {
 }
 
 func TestParseSimpleObjectType(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testIndex OBJECT-TYPE
 			SYNTAX Integer32
 			MAX-ACCESS read-only
@@ -56,8 +50,6 @@ func TestParseSimpleObjectType(t *testing.T) {
 			DESCRIPTION "Test description"
 			::= { testEntry 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -71,7 +63,7 @@ func TestParseSimpleObjectType(t *testing.T) {
 }
 
 func TestParseIntegerEnum(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testStatus OBJECT-TYPE
 			SYNTAX INTEGER { up(1), down(2), testing(3) }
 			MAX-ACCESS read-only
@@ -79,8 +71,6 @@ func TestParseIntegerEnum(t *testing.T) {
 			DESCRIPTION "Test status"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -93,7 +83,7 @@ func TestParseIntegerEnum(t *testing.T) {
 }
 
 func TestParseModuleIdentity(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testMIB MODULE-IDENTITY
 			LAST-UPDATED "200001010000Z"
 			ORGANIZATION "Test Org"
@@ -101,8 +91,6 @@ func TestParseModuleIdentity(t *testing.T) {
 			DESCRIPTION "Test MIB"
 			::= { enterprises 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ModuleIdentityDef)
@@ -113,15 +101,13 @@ func TestParseModuleIdentity(t *testing.T) {
 }
 
 func TestParseTextualConvention(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestString TEXTUAL-CONVENTION
 			DISPLAY-HINT "255a"
 			STATUS current
 			DESCRIPTION "Test string type"
 			SYNTAX OCTET STRING (SIZE (0..255))
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.TextualConventionDef)
@@ -137,15 +123,13 @@ func TestParseTextualConvention(t *testing.T) {
 }
 
 func TestParseObjectGroup(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testGroup OBJECT-GROUP
 			OBJECTS { testObject1, testObject2 }
 			STATUS current
 			DESCRIPTION "Test group"
 			::= { testConformance 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectGroupDef)
@@ -155,14 +139,12 @@ func TestParseObjectGroup(t *testing.T) {
 }
 
 func TestParseTypeAssignment(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestEntry ::= SEQUENCE {
 			testIndex Integer32,
 			testName DisplayString
 		}
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.TypeAssignmentDef)
@@ -174,7 +156,7 @@ func TestParseTypeAssignment(t *testing.T) {
 }
 
 func TestParseDefVal(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testDefault OBJECT-TYPE
 			SYNTAX Integer32
 			MAX-ACCESS read-write
@@ -183,8 +165,6 @@ func TestParseDefVal(t *testing.T) {
 			DEFVAL { 42 }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -196,7 +176,7 @@ func TestParseDefVal(t *testing.T) {
 }
 
 func TestParseIndex(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testEntry OBJECT-TYPE
 			SYNTAX TestEntry
 			MAX-ACCESS not-accessible
@@ -205,8 +185,6 @@ func TestParseIndex(t *testing.T) {
 			INDEX { testIndex, IMPLIED testName }
 			::= { testTable 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -220,7 +198,7 @@ func TestParseIndex(t *testing.T) {
 }
 
 func TestParseIndexBareOctetString(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testEntry OBJECT-TYPE
 			SYNTAX TestEntry
 			MAX-ACCESS not-accessible
@@ -229,8 +207,6 @@ func TestParseIndexBareOctetString(t *testing.T) {
 			INDEX { OCTET STRING, testOther }
 			::= { testTable 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -245,7 +221,7 @@ func TestParseIndexBareOctetString(t *testing.T) {
 
 func TestParseErrorRecovery(t *testing.T) {
 	// This source has an error in the first definition but should parse the second
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		badObject OBJECT-TYPE
 			SYNTAX
 			MAX-ACCESS read-only
@@ -259,8 +235,6 @@ func TestParseErrorRecovery(t *testing.T) {
 			DESCRIPTION "Good"
 			::= { test 2 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	// Should have some diagnostics from the error
 	testutil.Greater(t, len(module.Diagnostics), 0, "expected diagnostics from parse error")
@@ -272,7 +246,7 @@ func TestParseErrorRecovery(t *testing.T) {
 // === SMIv1-specific constructs ===
 
 func TestParseTrapType(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testTrap TRAP-TYPE
 			ENTERPRISE testEnterprise
 			VARIABLES { testObject1, testObject2 }
@@ -280,8 +254,6 @@ func TestParseTrapType(t *testing.T) {
 			REFERENCE "RFC 1215"
 			::= 5
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -301,13 +273,11 @@ func TestParseTrapType(t *testing.T) {
 
 func TestParseTrapTypeMinimal(t *testing.T) {
 	// TRAP-TYPE with only required clauses (ENTERPRISE and trap number)
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		minTrap TRAP-TYPE
 			ENTERPRISE testEnterprise
 			::= 1
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -325,15 +295,13 @@ func TestParseTrapTypeMinimal(t *testing.T) {
 // === Conformance constructs ===
 
 func TestParseNotificationType(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testNotification NOTIFICATION-TYPE
 			OBJECTS { testObject1, testObject2 }
 			STATUS current
 			DESCRIPTION "Test notification"
 			::= { testNotifications 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -349,14 +317,12 @@ func TestParseNotificationType(t *testing.T) {
 }
 
 func TestParseNotificationTypeNoObjects(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testNotification NOTIFICATION-TYPE
 			STATUS current
 			DESCRIPTION "No objects"
 			::= { testNotifications 2 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -371,7 +337,7 @@ func TestParseNotificationTypeNoObjects(t *testing.T) {
 }
 
 func TestParseModuleCompliance(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testCompliance MODULE-COMPLIANCE
 			STATUS current
 			DESCRIPTION "Test compliance"
@@ -379,8 +345,6 @@ func TestParseModuleCompliance(t *testing.T) {
 				MANDATORY-GROUPS { testGroup1 }
 			::= { testConformance 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -398,7 +362,7 @@ func TestParseModuleCompliance(t *testing.T) {
 }
 
 func TestParseAgentCapabilities(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testAgent AGENT-CAPABILITIES
 			PRODUCT-RELEASE "Test Agent 1.0"
 			STATUS current
@@ -407,8 +371,6 @@ func TestParseAgentCapabilities(t *testing.T) {
 				INCLUDES { ifGeneralGroup }
 			::= { testCapabilities 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -424,15 +386,13 @@ func TestParseAgentCapabilities(t *testing.T) {
 }
 
 func TestParseNotificationGroup(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testNotifGroup NOTIFICATION-GROUP
 			NOTIFICATIONS { testNotif1, testNotif2 }
 			STATUS current
 			DESCRIPTION "Test notification group"
 			::= { testConformance 2 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -447,14 +407,12 @@ func TestParseNotificationGroup(t *testing.T) {
 }
 
 func TestParseObjectIdentity(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testIdentity OBJECT-IDENTITY
 			STATUS current
 			DESCRIPTION "Test identity"
 			::= { testObjects 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -470,22 +428,20 @@ func TestParseObjectIdentity(t *testing.T) {
 // === Boundary conditions ===
 
 func TestParseTruncatedModuleNoEnd(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testObject OBJECT-TYPE
 			SYNTAX Integer32
 			MAX-ACCESS read-only
 			STATUS current
 			DESCRIPTION "Test"
 			::= { test 1 }`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	// Should parse something without crashing, even without END
 	testutil.Equal(t, "TEST-MIB", module.Name.Name, "module name should be parsed")
 }
 
 func TestParseModuleWithMultipleDefinitions(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testRoot OBJECT IDENTIFIER ::= { iso 3 }
 		testScalar OBJECT-TYPE
 			SYNTAX Integer32
@@ -498,14 +454,12 @@ func TestParseModuleWithMultipleDefinitions(t *testing.T) {
 			DESCRIPTION "A type"
 			SYNTAX Integer32
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Equal(t, 3, len(module.Body), "should have 3 definitions")
 }
 
 func TestParseSyntaxWithRange(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testRange OBJECT-TYPE
 			SYNTAX Integer32 (0..100)
 			MAX-ACCESS read-only
@@ -513,8 +467,6 @@ func TestParseSyntaxWithRange(t *testing.T) {
 			DESCRIPTION "Ranged"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -533,7 +485,7 @@ func TestParseSyntaxWithRange(t *testing.T) {
 }
 
 func TestParseAugments(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testAugEntry OBJECT-TYPE
 			SYNTAX TestAugEntry
 			MAX-ACCESS not-accessible
@@ -542,8 +494,6 @@ func TestParseAugments(t *testing.T) {
 			AUGMENTS { testEntry }
 			::= { testAugTable 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -557,7 +507,7 @@ func TestParseAugments(t *testing.T) {
 }
 
 func TestParseBitsSyntax(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testBits OBJECT-TYPE
 			SYNTAX BITS { monday(0), tuesday(1), wednesday(2) }
 			MAX-ACCESS read-only
@@ -565,8 +515,6 @@ func TestParseBitsSyntax(t *testing.T) {
 			DESCRIPTION "Bit field"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -581,7 +529,7 @@ func TestParseBitsSyntax(t *testing.T) {
 }
 
 func TestParseDefValString(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testStr OBJECT-TYPE
 			SYNTAX OCTET STRING
 			MAX-ACCESS read-write
@@ -590,8 +538,6 @@ func TestParseDefValString(t *testing.T) {
 			DEFVAL { "default value" }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -607,7 +553,7 @@ func TestParseDefValString(t *testing.T) {
 }
 
 func TestParseDefValHex(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testHex OBJECT-TYPE
 			SYNTAX OCTET STRING
 			MAX-ACCESS read-write
@@ -616,8 +562,6 @@ func TestParseDefValHex(t *testing.T) {
 			DEFVAL { 'FF00'H }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -628,7 +572,7 @@ func TestParseDefValHex(t *testing.T) {
 }
 
 func TestParseDefValBits(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testBitsDefault OBJECT-TYPE
 			SYNTAX BITS { a(0), b(1), c(2) }
 			MAX-ACCESS read-write
@@ -637,8 +581,6 @@ func TestParseDefValBits(t *testing.T) {
 			DEFVAL { { a, c } }
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -649,7 +591,7 @@ func TestParseDefValBits(t *testing.T) {
 }
 
 func TestParseSequenceOf(t *testing.T) {
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testTable OBJECT-TYPE
 			SYNTAX SEQUENCE OF TestEntry
 			MAX-ACCESS not-accessible
@@ -657,8 +599,6 @@ func TestParseSequenceOf(t *testing.T) {
 			DESCRIPTION "Test table"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.ObjectTypeDef)
@@ -673,7 +613,7 @@ func TestParseSequenceOf(t *testing.T) {
 
 func TestParseSMIv1ObjectType(t *testing.T) {
 	// SMIv1 uses ACCESS instead of MAX-ACCESS
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testSMIv1 OBJECT-TYPE
 			SYNTAX INTEGER
 			ACCESS read-only
@@ -681,8 +621,6 @@ func TestParseSMIv1ObjectType(t *testing.T) {
 			DESCRIPTION "SMIv1 object"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -700,85 +638,40 @@ func TestParseSMIv1ObjectType(t *testing.T) {
 // === Strictness Tests ===
 
 func TestIdentifierUnderscoreDiagnostic(t *testing.T) {
-	source := []byte(`TEST_MIB DEFINITIONS ::= BEGIN
+	source := `TEST_MIB DEFINITIONS ::= BEGIN
 		test_object OBJECT IDENTIFIER ::= { iso 3 }
-		END`)
-	p := New(source, nil, types.StrictConfig())
-	module := p.ParseModule()
-
-	// Should have diagnostics for underscores in both module name and object name
-	var underscoreDiags int
-	for _, d := range module.Diagnostics {
-		if d.Code == "identifier-underscore" {
-			underscoreDiags++
-		}
+		END`
+	tests := []struct {
+		name   string
+		config types.DiagnosticConfig
+		want   int
+	}{
+		{"strict", types.StrictConfig(), 2},
+		{"permissive", types.PermissiveConfig(), 0},
 	}
-	testutil.Equal(t, 2, underscoreDiags, "expected 2 identifier-underscore diagnostics")
-}
-
-func TestIdentifierUnderscorePermissive(t *testing.T) {
-	source := []byte(`TEST_MIB DEFINITIONS ::= BEGIN
-		test_object OBJECT IDENTIFIER ::= { iso 3 }
-		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
-
-	// In permissive mode, underscore diagnostics should be suppressed
-	var underscoreDiags int
-	for _, d := range module.Diagnostics {
-		if d.Code == "identifier-underscore" {
-			underscoreDiags++
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			module := parseModuleWith(source, tt.config)
+			got := countDiagnostics(module.Diagnostics, "identifier-underscore")
+			testutil.Equal(t, tt.want, got, "identifier-underscore diagnostic count")
+		})
 	}
-	testutil.Equal(t, 0, underscoreDiags, "expected no identifier-underscore diagnostics in permissive mode")
 }
 
 func TestIdentifierLengthDiagnostic(t *testing.T) {
-	// Create an identifier that exceeds 64 characters
 	longName := "thisIsAReallyLongIdentifierNameThatExceedsSixtyFourCharactersTotal"
-	source := []byte(longName + ` DEFINITIONS ::= BEGIN END`)
-	p := New(source, nil, types.StrictConfig())
-	module := p.ParseModule()
-
-	// Should have diagnostic for identifier exceeding 64 chars
-	var lengthDiags int
-	for _, d := range module.Diagnostics {
-		if d.Code == "identifier-length-64" {
-			lengthDiags++
-		}
-	}
-	testutil.Equal(t, 1, lengthDiags, "expected identifier-length-64 diagnostic")
+	module := parseModuleWith(longName+` DEFINITIONS ::= BEGIN END`, types.StrictConfig())
+	testutil.Equal(t, 1, countDiagnostics(module.Diagnostics, "identifier-length-64"), "identifier-length-64 diagnostic count")
 }
 
 func TestIdentifierHyphenEndDiagnostic(t *testing.T) {
-	source := []byte(`TEST-MIB- DEFINITIONS ::= BEGIN END`)
-	p := New(source, nil, types.StrictConfig())
-	module := p.ParseModule()
-
-	// Should have diagnostic for identifier ending with hyphen
-	var hyphenDiags int
-	for _, d := range module.Diagnostics {
-		if d.Code == "identifier-hyphen-end" {
-			hyphenDiags++
-		}
-	}
-	testutil.Equal(t, 1, hyphenDiags, "expected identifier-hyphen-end diagnostic")
+	module := parseModuleWith(`TEST-MIB- DEFINITIONS ::= BEGIN END`, types.StrictConfig())
+	testutil.Equal(t, 1, countDiagnostics(module.Diagnostics, "identifier-hyphen-end"), "identifier-hyphen-end diagnostic count")
 }
 
 func TestReservedKeywordDiagnostic(t *testing.T) {
-	// "BOOLEAN" is a reserved ASN.1 keyword
-	source := []byte(`BOOLEAN DEFINITIONS ::= BEGIN END`)
-	p := New(source, nil, types.StrictConfig())
-	module := p.ParseModule()
-
-	// Should have diagnostic for reserved keyword
-	var keywordDiags int
-	for _, d := range module.Diagnostics {
-		if d.Code == "keyword-reserved" {
-			keywordDiags++
-		}
-	}
-	testutil.Equal(t, 1, keywordDiags, "expected keyword-reserved diagnostic")
+	module := parseModuleWith(`BOOLEAN DEFINITIONS ::= BEGIN END`, types.StrictConfig())
+	testutil.Equal(t, 1, countDiagnostics(module.Diagnostics, "keyword-reserved"), "keyword-reserved diagnostic count")
 }
 
 func TestParseUnterminatedStringPreservesContent(t *testing.T) {
@@ -798,7 +691,7 @@ func TestParseVariationNotification(t *testing.T) {
 	// A VARIATION clause with only ACCESS and DESCRIPTION (no SYNTAX,
 	// WRITE-SYNTAX, CREATION-REQUIRES, or DEFVAL) should produce a
 	// NotificationVariation, not an ObjectVariation.
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testAgent AGENT-CAPABILITIES
 			PRODUCT-RELEASE "1.0"
 			STATUS current
@@ -809,8 +702,6 @@ func TestParseVariationNotification(t *testing.T) {
 					DESCRIPTION "Supported"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -834,7 +725,7 @@ func TestParseVariationNotification(t *testing.T) {
 
 func TestParseVariationObject(t *testing.T) {
 	// A VARIATION clause with SYNTAX should produce an ObjectVariation.
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testAgent AGENT-CAPABILITIES
 			PRODUCT-RELEASE "1.0"
 			STATUS current
@@ -846,8 +737,6 @@ func TestParseVariationObject(t *testing.T) {
 					DESCRIPTION "Restricted range"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	if len(module.Body) == 0 {
 		t.Fatal("expected definitions in module body")
@@ -870,7 +759,7 @@ func TestRecoverToUppercaseObjectType(t *testing.T) {
 	// Tests that recoverToDefinition finds definitions starting with
 	// uppercase identifiers followed by macro keywords (e.g. vendor MIBs
 	// that use uppercase value references like "FooEntry OBJECT-TYPE").
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		badDef GARBAGE NONSENSE
 		FooCount OBJECT-TYPE
 			SYNTAX Counter32
@@ -879,8 +768,6 @@ func TestRecoverToUppercaseObjectType(t *testing.T) {
 			DESCRIPTION "Found after recovery"
 			::= { test 1 }
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	// Should recover and parse FooCount despite the uppercase identifier
 	var found bool
@@ -895,7 +782,7 @@ func TestRecoverToUppercaseObjectType(t *testing.T) {
 
 func TestParseTextualConventionWithAssignment(t *testing.T) {
 	// Verify the ::= form still works after TC dedup refactor
-	source := []byte(`TEST-MIB DEFINITIONS ::= BEGIN
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestDisplay ::= TEXTUAL-CONVENTION
 			DISPLAY-HINT "255a"
 			STATUS current
@@ -903,8 +790,6 @@ func TestParseTextualConventionWithAssignment(t *testing.T) {
 			REFERENCE "RFC 1213"
 			SYNTAX OCTET STRING (SIZE (0..255))
 		END`)
-	p := New(source, nil, types.PermissiveConfig())
-	module := p.ParseModule()
 
 	testutil.Len(t, module.Body, 1, "definitions count")
 	def, ok := module.Body[0].(*ast.TextualConventionDef)
