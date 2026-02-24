@@ -1,6 +1,10 @@
 package mib
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
+)
 
 func TestDiagnosticConfigShouldReport(t *testing.T) {
 	tests := []struct {
@@ -35,9 +39,7 @@ func TestDiagnosticConfigShouldReport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.config.ShouldReport(tt.code, tt.sev)
-			if got != tt.want {
-				t.Errorf("ShouldReport(%q, %v) = %v, want %v", tt.code, tt.sev, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "ShouldReport(, )")
 		})
 	}
 }
@@ -60,9 +62,7 @@ func TestDiagnosticConfigShouldReportIgnore(t *testing.T) {
 	}
 
 	// Non-matching code should be reported
-	if !cfg.ShouldReport("missing-import", SeverityError) {
-		t.Error("non-matching code should be reported")
-	}
+	testutil.True(t, cfg.ShouldReport("missing-import", SeverityError), "non-matching code should be reported")
 }
 
 func TestDiagnosticConfigShouldReportOverrides(t *testing.T) {
@@ -80,9 +80,7 @@ func TestDiagnosticConfigShouldReportOverrides(t *testing.T) {
 	}
 
 	// With override, the code is upgraded to Minor which IS reported
-	if !cfg.ShouldReport("my-style-check", SeverityStyle) {
-		t.Error("overridden code should be reported (upgraded to Minor)")
-	}
+	testutil.True(t, cfg.ShouldReport("my-style-check", SeverityStyle), "overridden code should be reported (upgraded to Minor)")
 }
 
 func TestDiagnosticConfigShouldFail(t *testing.T) {
@@ -104,9 +102,7 @@ func TestDiagnosticConfigShouldFail(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.config.ShouldFail(tt.sev)
-			if got != tt.want {
-				t.Errorf("ShouldFail(%v) = %v, want %v", tt.sev, got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "ShouldFail()")
 		})
 	}
 }
@@ -129,9 +125,7 @@ func TestDiagnosticConfigIsStrict(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DiagnosticConfig{Level: tt.level}
 			got := cfg.IsStrict()
-			if got != tt.want {
-				t.Errorf("IsStrict() = %v, want %v (level=%d)", got, tt.want, tt.level)
-			}
+			testutil.Equal(t, tt.want, got, "IsStrict()")
 		})
 	}
 }
@@ -153,9 +147,7 @@ func TestDiagnosticConfigAllowSafeFallbacks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DiagnosticConfig{Level: tt.level}
 			got := cfg.AllowSafeFallbacks()
-			if got != tt.want {
-				t.Errorf("AllowSafeFallbacks() = %v, want %v (level=%d)", got, tt.want, tt.level)
-			}
+			testutil.Equal(t, tt.want, got, "AllowSafeFallbacks()")
 		})
 	}
 }
@@ -177,9 +169,7 @@ func TestDiagnosticConfigAllowBestGuessFallbacks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DiagnosticConfig{Level: tt.level}
 			got := cfg.AllowBestGuessFallbacks()
-			if got != tt.want {
-				t.Errorf("AllowBestGuessFallbacks() = %v, want %v (level=%d)", got, tt.want, tt.level)
-			}
+			testutil.Equal(t, tt.want, got, "AllowBestGuessFallbacks()")
 		})
 	}
 }
@@ -237,9 +227,7 @@ func TestDiagnosticString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.diag.String()
-			if got != tt.want {
-				t.Errorf("Diagnostic.String() = %q, want %q", got, tt.want)
-			}
+			testutil.Equal(t, tt.want, got, "Diagnostic.String()")
 		})
 	}
 }

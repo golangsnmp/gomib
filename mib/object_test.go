@@ -1,6 +1,10 @@
 package mib
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
+)
 
 // buildTableTree constructs a table -> row -> columns fixture.
 //
@@ -41,55 +45,39 @@ func TestTableNavigation(t *testing.T) {
 
 	t.Run("Table from row", func(t *testing.T) {
 		got := rowObj.Table()
-		if got != tableObj {
-			t.Errorf("got %v, want %v", got, tableObj)
-		}
+		testutil.Equal(t, tableObj, got, "got")
 	})
 
 	t.Run("Table from column", func(t *testing.T) {
 		got := col1Obj.Table()
-		if got != tableObj {
-			t.Errorf("got %v, want %v", got, tableObj)
-		}
+		testutil.Equal(t, tableObj, got, "got")
 	})
 
 	t.Run("Table from table is nil", func(t *testing.T) {
-		if got := tableObj.Table(); got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
+		testutil.Nil(t, tableObj.Table(), "expected nil")
 	})
 
 	t.Run("Row from column", func(t *testing.T) {
 		got := col1Obj.Row()
-		if got != rowObj {
-			t.Errorf("got %v, want %v", got, rowObj)
-		}
+		testutil.Equal(t, rowObj, got, "got")
 	})
 
 	t.Run("Row from non-column is nil", func(t *testing.T) {
-		if got := rowObj.Row(); got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
+		testutil.Nil(t, rowObj.Row(), "expected nil")
 	})
 
 	t.Run("Entry from table", func(t *testing.T) {
 		got := tableObj.Entry()
-		if got != rowObj {
-			t.Errorf("got %v, want %v", got, rowObj)
-		}
+		testutil.Equal(t, rowObj, got, "got")
 	})
 
 	t.Run("Entry from non-table is nil", func(t *testing.T) {
-		if got := rowObj.Entry(); got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
+		testutil.Nil(t, rowObj.Entry(), "expected nil")
 	})
 
 	t.Run("Columns from table", func(t *testing.T) {
 		cols := tableObj.Columns()
-		if len(cols) != 2 {
-			t.Fatalf("got %d columns, want 2", len(cols))
-		}
+		testutil.Len(t, cols, 2, "columns")
 		// sortedChildren orders by arc
 		if cols[0] != col1Obj || cols[1] != col2Obj {
 			t.Errorf("got [%v, %v], want [%v, %v]", cols[0], cols[1], col1Obj, col2Obj)
@@ -98,18 +86,14 @@ func TestTableNavigation(t *testing.T) {
 
 	t.Run("Columns from row", func(t *testing.T) {
 		cols := rowObj.Columns()
-		if len(cols) != 2 {
-			t.Fatalf("got %d columns, want 2", len(cols))
-		}
+		testutil.Len(t, cols, 2, "columns")
 		if cols[0] != col1Obj || cols[1] != col2Obj {
 			t.Errorf("got [%v, %v], want [%v, %v]", cols[0], cols[1], col1Obj, col2Obj)
 		}
 	})
 
 	t.Run("Columns from column is nil", func(t *testing.T) {
-		if got := col1Obj.Columns(); got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
+		testutil.Nil(t, col1Obj.Columns(), "expected nil")
 	})
 }
 
@@ -150,8 +134,6 @@ func TestEffectiveIndexes(t *testing.T) {
 		b.augments = a
 
 		got := a.EffectiveIndexes()
-		if got != nil {
-			t.Errorf("got %v, want nil for cycle", got)
-		}
+		testutil.Nil(t, got, "got , want nil for cycle")
 	})
 }

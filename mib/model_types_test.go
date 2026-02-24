@@ -1,6 +1,10 @@
 package mib
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
+)
 
 // --- Notification ---
 
@@ -22,28 +26,14 @@ func TestNotificationAccessors(t *testing.T) {
 	n.addObject(obj1)
 	n.addObject(obj2)
 
-	if n.Name() != "linkDown" {
-		t.Errorf("Name() = %q, want %q", n.Name(), "linkDown")
-	}
-	if n.Node() != nd {
-		t.Error("Node() returned wrong node")
-	}
-	if n.Module() != mod {
-		t.Error("Module() returned wrong module")
-	}
-	if n.Status() != StatusCurrent {
-		t.Errorf("Status() = %v, want %v", n.Status(), StatusCurrent)
-	}
-	if n.Description() != "Link is down" {
-		t.Errorf("Description() = %q, want %q", n.Description(), "Link is down")
-	}
-	if n.Reference() != "RFC 2863" {
-		t.Errorf("Reference() = %q, want %q", n.Reference(), "RFC 2863")
-	}
+	testutil.Equal(t, "linkDown", n.Name(), "Name()")
+	testutil.Equal(t, nd, n.Node(), "Node() returned wrong node")
+	testutil.Equal(t, mod, n.Module(), "Module() returned wrong module")
+	testutil.Equal(t, StatusCurrent, n.Status(), "Status()")
+	testutil.Equal(t, "Link is down", n.Description(), "Description()")
+	testutil.Equal(t, "RFC 2863", n.Reference(), "Reference()")
 	objs := n.Objects()
-	if len(objs) != 2 {
-		t.Fatalf("Objects() len = %d, want 2", len(objs))
-	}
+	testutil.Len(t, objs, 2, "Objects() len")
 	if objs[0] != obj1 || objs[1] != obj2 {
 		t.Error("Objects() returned wrong objects")
 	}
@@ -58,17 +48,13 @@ func TestNotificationOID(t *testing.T) {
 	n.setNode(nd)
 
 	oid := n.OID()
-	if oid.String() != "3" {
-		t.Errorf("OID() = %v, want 3", oid)
-	}
+	testutil.Equal(t, "3", oid.String(), "OID()")
 }
 
 func TestNotificationOIDNilNode(t *testing.T) {
 	n := newNotification("noNode")
 	oid := n.OID()
-	if oid != nil {
-		t.Errorf("OID() = %v, want nil", oid)
-	}
+	testutil.Nil(t, oid, "OID()")
 }
 
 func TestNotificationString(t *testing.T) {
@@ -80,31 +66,23 @@ func TestNotificationString(t *testing.T) {
 	n.setNode(nd)
 
 	got := n.String()
-	if got != "testNotif (5)" {
-		t.Errorf("String() = %q, want %q", got, "testNotif (5)")
-	}
+	testutil.Equal(t, "testNotif (5)", got, "String()")
 }
 
 func TestNotificationStringNil(t *testing.T) {
 	var n *Notification
-	if n.String() != "<nil>" {
-		t.Errorf("nil String() = %q, want %q", n.String(), "<nil>")
-	}
+	testutil.Equal(t, "<nil>", n.String(), "nil String()")
 }
 
 func TestNotificationTrapInfo(t *testing.T) {
 	n := newNotification("coldStart")
 
-	if n.TrapInfo() != nil {
-		t.Error("TrapInfo() should be nil initially")
-	}
+	testutil.Nil(t, n.TrapInfo(), "TrapInfo() should be nil initially")
 
 	ti := &TrapInfo{Enterprise: "enterprises", TrapNumber: 0}
 	n.setTrapInfo(ti)
 
-	if n.TrapInfo() != ti {
-		t.Error("TrapInfo() should return the set value")
-	}
+	testutil.Equal(t, ti, n.TrapInfo(), "TrapInfo() should return the set value")
 }
 
 func TestNotificationObjectsClone(t *testing.T) {
@@ -115,9 +93,7 @@ func TestNotificationObjectsClone(t *testing.T) {
 	objs := n.Objects()
 	objs[0] = nil
 
-	if n.objects[0] == nil {
-		t.Error("mutating Objects() return should not affect internal state")
-	}
+	testutil.NotNil(t, n.objects[0], "mutating Objects() return should not affect internal state")
 }
 
 // --- Group ---
@@ -141,54 +117,32 @@ func TestGroupAccessors(t *testing.T) {
 	g.addMember(member1)
 	g.addMember(member2)
 
-	if g.Name() != "testGroup" {
-		t.Errorf("Name() = %q, want %q", g.Name(), "testGroup")
-	}
-	if g.Node() != nd {
-		t.Error("Node() returned wrong node")
-	}
-	if g.Module() != mod {
-		t.Error("Module() returned wrong module")
-	}
-	if g.Status() != StatusCurrent {
-		t.Errorf("Status() = %v, want %v", g.Status(), StatusCurrent)
-	}
-	if g.Description() != "Test group" {
-		t.Errorf("Description() = %q, want %q", g.Description(), "Test group")
-	}
-	if g.Reference() != "RFC 1234" {
-		t.Errorf("Reference() = %q, want %q", g.Reference(), "RFC 1234")
-	}
-	if g.IsNotificationGroup() {
-		t.Error("IsNotificationGroup() should be false")
-	}
+	testutil.Equal(t, "testGroup", g.Name(), "Name()")
+	testutil.Equal(t, nd, g.Node(), "Node() returned wrong node")
+	testutil.Equal(t, mod, g.Module(), "Module() returned wrong module")
+	testutil.Equal(t, StatusCurrent, g.Status(), "Status()")
+	testutil.Equal(t, "Test group", g.Description(), "Description()")
+	testutil.Equal(t, "RFC 1234", g.Reference(), "Reference()")
+	testutil.False(t, g.IsNotificationGroup(), "IsNotificationGroup() should be false")
 	members := g.Members()
-	if len(members) != 2 {
-		t.Fatalf("Members() len = %d, want 2", len(members))
-	}
+	testutil.Len(t, members, 2, "Members() len")
 }
 
 func TestGroupNotificationGroup(t *testing.T) {
 	g := newGroup("notifGroup")
 	g.setIsNotificationGroup(true)
 
-	if !g.IsNotificationGroup() {
-		t.Error("IsNotificationGroup() should be true")
-	}
+	testutil.True(t, g.IsNotificationGroup(), "IsNotificationGroup() should be true")
 }
 
 func TestGroupOIDNilNode(t *testing.T) {
 	g := newGroup("noNode")
-	if g.OID() != nil {
-		t.Errorf("OID() = %v, want nil", g.OID())
-	}
+	testutil.Nil(t, g.OID(), "OID()")
 }
 
 func TestGroupStringNil(t *testing.T) {
 	var g *Group
-	if g.String() != "<nil>" {
-		t.Errorf("nil String() = %q, want %q", g.String(), "<nil>")
-	}
+	testutil.Equal(t, "<nil>", g.String(), "nil String()")
 }
 
 func TestGroupMembersClone(t *testing.T) {
@@ -199,9 +153,7 @@ func TestGroupMembersClone(t *testing.T) {
 	members := g.Members()
 	members[0] = nil
 
-	if g.members[0] == nil {
-		t.Error("mutating Members() return should not affect internal state")
-	}
+	testutil.NotNil(t, g.members[0], "mutating Members() return should not affect internal state")
 }
 
 // --- Compliance ---
@@ -223,45 +175,25 @@ func TestComplianceAccessors(t *testing.T) {
 		{ModuleName: "IF-MIB", MandatoryGroups: []string{"ifGroup"}},
 	})
 
-	if c.Name() != "testCompliance" {
-		t.Errorf("Name() = %q, want %q", c.Name(), "testCompliance")
-	}
-	if c.Node() != nd {
-		t.Error("Node() returned wrong node")
-	}
-	if c.Module() != mod {
-		t.Error("Module() returned wrong module")
-	}
-	if c.Status() != StatusCurrent {
-		t.Errorf("Status() = %v, want %v", c.Status(), StatusCurrent)
-	}
-	if c.Description() != "Test compliance" {
-		t.Errorf("Description() = %q, want %q", c.Description(), "Test compliance")
-	}
-	if c.Reference() != "RFC 5678" {
-		t.Errorf("Reference() = %q, want %q", c.Reference(), "RFC 5678")
-	}
+	testutil.Equal(t, "testCompliance", c.Name(), "Name()")
+	testutil.Equal(t, nd, c.Node(), "Node() returned wrong node")
+	testutil.Equal(t, mod, c.Module(), "Module() returned wrong module")
+	testutil.Equal(t, StatusCurrent, c.Status(), "Status()")
+	testutil.Equal(t, "Test compliance", c.Description(), "Description()")
+	testutil.Equal(t, "RFC 5678", c.Reference(), "Reference()")
 	mods := c.Modules()
-	if len(mods) != 1 {
-		t.Fatalf("Modules() len = %d, want 1", len(mods))
-	}
-	if mods[0].ModuleName != "IF-MIB" {
-		t.Errorf("Modules()[0].ModuleName = %q, want %q", mods[0].ModuleName, "IF-MIB")
-	}
+	testutil.Len(t, mods, 1, "Modules() len")
+	testutil.Equal(t, "IF-MIB", mods[0].ModuleName, "Modules()[0].ModuleName")
 }
 
 func TestComplianceOIDNilNode(t *testing.T) {
 	c := newCompliance("noNode")
-	if c.OID() != nil {
-		t.Errorf("OID() = %v, want nil", c.OID())
-	}
+	testutil.Nil(t, c.OID(), "OID()")
 }
 
 func TestComplianceStringNil(t *testing.T) {
 	var c *Compliance
-	if c.String() != "<nil>" {
-		t.Errorf("nil String() = %q, want %q", c.String(), "<nil>")
-	}
+	testutil.Equal(t, "<nil>", c.String(), "nil String()")
 }
 
 // --- Capability ---
@@ -284,48 +216,26 @@ func TestCapabilityAccessors(t *testing.T) {
 		{ModuleName: "IF-MIB", Includes: []string{"ifGroup"}},
 	})
 
-	if cap.Name() != "testCap" {
-		t.Errorf("Name() = %q, want %q", cap.Name(), "testCap")
-	}
-	if cap.Node() != nd {
-		t.Error("Node() returned wrong node")
-	}
-	if cap.Module() != mod {
-		t.Error("Module() returned wrong module")
-	}
-	if cap.Status() != StatusCurrent {
-		t.Errorf("Status() = %v, want %v", cap.Status(), StatusCurrent)
-	}
-	if cap.Description() != "Test capabilities" {
-		t.Errorf("Description() = %q, want %q", cap.Description(), "Test capabilities")
-	}
-	if cap.Reference() != "RFC 9999" {
-		t.Errorf("Reference() = %q, want %q", cap.Reference(), "RFC 9999")
-	}
-	if cap.ProductRelease() != "Agent 1.0" {
-		t.Errorf("ProductRelease() = %q, want %q", cap.ProductRelease(), "Agent 1.0")
-	}
+	testutil.Equal(t, "testCap", cap.Name(), "Name()")
+	testutil.Equal(t, nd, cap.Node(), "Node() returned wrong node")
+	testutil.Equal(t, mod, cap.Module(), "Module() returned wrong module")
+	testutil.Equal(t, StatusCurrent, cap.Status(), "Status()")
+	testutil.Equal(t, "Test capabilities", cap.Description(), "Description()")
+	testutil.Equal(t, "RFC 9999", cap.Reference(), "Reference()")
+	testutil.Equal(t, "Agent 1.0", cap.ProductRelease(), "ProductRelease()")
 	supports := cap.Supports()
-	if len(supports) != 1 {
-		t.Fatalf("Supports() len = %d, want 1", len(supports))
-	}
-	if supports[0].ModuleName != "IF-MIB" {
-		t.Errorf("Supports()[0].ModuleName = %q, want %q", supports[0].ModuleName, "IF-MIB")
-	}
+	testutil.Len(t, supports, 1, "Supports() len")
+	testutil.Equal(t, "IF-MIB", supports[0].ModuleName, "Supports()[0].ModuleName")
 }
 
 func TestCapabilityOIDNilNode(t *testing.T) {
 	cap := newCapability("noNode")
-	if cap.OID() != nil {
-		t.Errorf("OID() = %v, want nil", cap.OID())
-	}
+	testutil.Nil(t, cap.OID(), "OID()")
 }
 
 func TestCapabilityStringNil(t *testing.T) {
 	var cap *Capability
-	if cap.String() != "<nil>" {
-		t.Errorf("nil String() = %q, want %q", cap.String(), "<nil>")
-	}
+	testutil.Equal(t, "<nil>", cap.String(), "nil String()")
 }
 
 // --- Module ---
@@ -346,36 +256,16 @@ func TestModuleAccessors(t *testing.T) {
 		{Module: "SNMPv2-SMI", Symbols: []string{"MODULE-IDENTITY"}},
 	})
 
-	if mod.Name() != "IF-MIB" {
-		t.Errorf("Name() = %q, want %q", mod.Name(), "IF-MIB")
-	}
-	if mod.Language() != LanguageSMIv2 {
-		t.Errorf("Language() = %v, want %v", mod.Language(), LanguageSMIv2)
-	}
-	if mod.SourcePath() != "/usr/share/snmp/mibs/IF-MIB.mib" {
-		t.Errorf("SourcePath() = %q", mod.SourcePath())
-	}
-	if mod.OID().String() != "1.3.6.1.2.1.31" {
-		t.Errorf("OID() = %v", mod.OID())
-	}
-	if mod.Organization() != "IETF" {
-		t.Errorf("Organization() = %q", mod.Organization())
-	}
-	if mod.ContactInfo() != "info@ietf.org" {
-		t.Errorf("ContactInfo() = %q", mod.ContactInfo())
-	}
-	if mod.Description() != "MIB for network interfaces" {
-		t.Errorf("Description() = %q", mod.Description())
-	}
-	if mod.LastUpdated() != "200006140000Z" {
-		t.Errorf("LastUpdated() = %q", mod.LastUpdated())
-	}
-	if len(mod.Revisions()) != 1 {
-		t.Fatalf("Revisions() len = %d, want 1", len(mod.Revisions()))
-	}
-	if len(mod.Imports()) != 1 {
-		t.Fatalf("Imports() len = %d, want 1", len(mod.Imports()))
-	}
+	testutil.Equal(t, "IF-MIB", mod.Name(), "Name()")
+	testutil.Equal(t, LanguageSMIv2, mod.Language(), "Language()")
+	testutil.Equal(t, "/usr/share/snmp/mibs/IF-MIB.mib", mod.SourcePath(), "SourcePath()")
+	testutil.Equal(t, "1.3.6.1.2.1.31", mod.OID().String(), "OID()")
+	testutil.Equal(t, "IETF", mod.Organization(), "Organization()")
+	testutil.Equal(t, "info@ietf.org", mod.ContactInfo(), "ContactInfo()")
+	testutil.Equal(t, "MIB for network interfaces", mod.Description(), "Description()")
+	testutil.Equal(t, "200006140000Z", mod.LastUpdated(), "LastUpdated()")
+	testutil.Len(t, mod.Revisions(), 1, "Revisions() len")
+	testutil.Len(t, mod.Imports(), 1, "Imports() len")
 }
 
 func TestModuleEntityLookups(t *testing.T) {
@@ -402,50 +292,22 @@ func TestModuleEntityLookups(t *testing.T) {
 	nd := &Node{name: "testNode"}
 	mod.addNode(nd)
 
-	if mod.Object("testObj") != obj {
-		t.Error("Object() lookup failed")
-	}
-	if mod.Type("TestType") != typ {
-		t.Error("Type() lookup failed")
-	}
-	if mod.Notification("testNotif") != notif {
-		t.Error("Notification() lookup failed")
-	}
-	if mod.Group("testGroup") != grp {
-		t.Error("Group() lookup failed")
-	}
-	if mod.Compliance("testComp") != comp {
-		t.Error("Compliance() lookup failed")
-	}
-	if mod.Capability("testCap") != cap {
-		t.Error("Capability() lookup failed")
-	}
-	if mod.Node("testNode") != nd {
-		t.Error("Node() lookup failed")
-	}
+	testutil.Equal(t, obj, mod.Object("testObj"), "Object() lookup failed")
+	testutil.Equal(t, typ, mod.Type("TestType"), "Type() lookup failed")
+	testutil.Equal(t, notif, mod.Notification("testNotif"), "Notification() lookup failed")
+	testutil.Equal(t, grp, mod.Group("testGroup"), "Group() lookup failed")
+	testutil.Equal(t, comp, mod.Compliance("testComp"), "Compliance() lookup failed")
+	testutil.Equal(t, cap, mod.Capability("testCap"), "Capability() lookup failed")
+	testutil.Equal(t, nd, mod.Node("testNode"), "Node() lookup failed")
 
 	// Not found
-	if mod.Object("missing") != nil {
-		t.Error("Object() should return nil for missing name")
-	}
-	if mod.Type("missing") != nil {
-		t.Error("Type() should return nil for missing name")
-	}
-	if mod.Notification("missing") != nil {
-		t.Error("Notification() should return nil for missing name")
-	}
-	if mod.Group("missing") != nil {
-		t.Error("Group() should return nil for missing name")
-	}
-	if mod.Compliance("missing") != nil {
-		t.Error("Compliance() should return nil for missing name")
-	}
-	if mod.Capability("missing") != nil {
-		t.Error("Capability() should return nil for missing name")
-	}
-	if mod.Node("missing") != nil {
-		t.Error("Node() should return nil for missing name")
-	}
+	testutil.Nil(t, mod.Object("missing"), "Object() should return nil for missing name")
+	testutil.Nil(t, mod.Type("missing"), "Type() should return nil for missing name")
+	testutil.Nil(t, mod.Notification("missing"), "Notification() should return nil for missing name")
+	testutil.Nil(t, mod.Group("missing"), "Group() should return nil for missing name")
+	testutil.Nil(t, mod.Compliance("missing"), "Compliance() should return nil for missing name")
+	testutil.Nil(t, mod.Capability("missing"), "Capability() should return nil for missing name")
+	testutil.Nil(t, mod.Node("missing"), "Node() should return nil for missing name")
 }
 
 func TestModuleCollections(t *testing.T) {
@@ -467,19 +329,9 @@ func TestModuleCollections(t *testing.T) {
 	mod.addObject(colObj)
 	mod.addObject(scalarObj)
 
-	if len(mod.Objects()) != 4 {
-		t.Errorf("Objects() len = %d, want 4", len(mod.Objects()))
-	}
-	if len(mod.Tables()) != 1 {
-		t.Errorf("Tables() len = %d, want 1", len(mod.Tables()))
-	}
-	if len(mod.Rows()) != 1 {
-		t.Errorf("Rows() len = %d, want 1", len(mod.Rows()))
-	}
-	if len(mod.Columns()) != 1 {
-		t.Errorf("Columns() len = %d, want 1", len(mod.Columns()))
-	}
-	if len(mod.Scalars()) != 1 {
-		t.Errorf("Scalars() len = %d, want 1", len(mod.Scalars()))
-	}
+	testutil.Len(t, mod.Objects(), 4, "Objects() len")
+	testutil.Len(t, mod.Tables(), 1, "Tables() len")
+	testutil.Len(t, mod.Rows(), 1, "Rows() len")
+	testutil.Len(t, mod.Columns(), 1, "Columns() len")
+	testutil.Len(t, mod.Scalars(), 1, "Scalars() len")
 }
