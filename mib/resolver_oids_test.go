@@ -891,5 +891,498 @@ func TestIsSnmpTrapsOID(t *testing.T) {
 	}
 }
 
+func TestResolveNamedNumberComponent(t *testing.T) {
+	t.Run("returns existing node when name is registered", func(t *testing.T) {
+		mod := &module.Module{Name: "TEST-MIB"}
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+
+		// Register a node under the name "org".
+		orgNode := buildOIDPath(ctx.Mib.Root(), 1, 3)
+		ctx.registerModuleNodeSymbol(mod, "org", orgNode)
+
+		parent := ctx.Mib.Root().getOrCreateChild(1)
+		def := oidDefinition{
+			mod:  mod,
+			def:  &module.ValueAssignment{Name: "test", Oid: module.NewOidAssignment(nil, types.Synthetic)},
+			kind: defValueAssignment,
+		}
+
+		got, ok := resolveNamedNumberComponent(ctx, def, parent, "org", 3, false)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, orgNode, got, "expected existing node")
+	})
+
+	t.Run("creates named child when name not registered", func(t *testing.T) {
+		mod := &module.Module{Name: "TEST-MIB"}
+		resolvedMod := newModule("TEST-MIB")
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.ModuleToResolved[mod] = resolvedMod
+
+		parent := ctx.Mib.Root().getOrCreateChild(1)
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  mod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		got, ok := resolveNamedNumberComponent(ctx, def, parent, "org", 3, false)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, uint32(3), got.Arc(), "arc")
+		testutil.Equal(t, "org", got.Name(), "name should be set for non-last component")
+		testutil.Equal(t, KindNode, got.Kind(), "kind should be set for non-last component")
+	})
+
+	t.Run("isLast does not set name on child", func(t *testing.T) {
+		mod := &module.Module{Name: "TEST-MIB"}
+		resolvedMod := newModule("TEST-MIB")
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.ModuleToResolved[mod] = resolvedMod
+
+		parent := ctx.Mib.Root().getOrCreateChild(1)
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNamedNumber{NameValue: "leaf", NumberValue: 5},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  mod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		got, ok := resolveNamedNumberComponent(ctx, def, parent, "leaf", 5, true)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, uint32(5), got.Arc(), "arc")
+		testutil.Equal(t, "", got.Name(), "name should not be set for last component")
+	})
+}
+
+func TestResolveQualifiedNameComponent(t *testing.T) {
+	t.Run("returns node from named module", func(t *testing.T) {
+		smiMod := &module.Module{Name: "SNMPv2-SMI"}
+		defMod := &module.Module{Name: "TEST-MIB"}
+		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, DefaultConfig())
+		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
+
+		entNode := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1, 4, 1)
+		ctx.registerModuleNodeSymbol(smiMod, "enterprises", entNode)
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  defMod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		got, ok := resolveQualifiedNameComponent(ctx, def, "SNMPv2-SMI", "enterprises")
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, entNode, got, "expected node from named module")
+	})
+
+	t.Run("records unresolved when not found", func(t *testing.T) {
+		defMod := &module.Module{Name: "TEST-MIB"}
+		ctx := newResolverContext([]*module.Module{defMod}, nil, DefaultConfig())
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentQualifiedName{ModuleValue: "UNKNOWN-MIB", NameValue: "foo"},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  defMod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		got, ok := resolveQualifiedNameComponent(ctx, def, "UNKNOWN-MIB", "foo")
+		testutil.False(t, ok, "expected false for missing module")
+		testutil.Nil(t, got, "expected nil node")
+
+		diags := ctx.Diagnostics()
+		testutil.Len(t, diags, 1, "expected 1 diagnostic")
+		testutil.Equal(t, types.DiagOidOrphan, diags[0].Code, "diagnostic code")
+		testutil.Contains(t, diags[0].Message, "UNKNOWN-MIB.foo", "diagnostic should reference qualified name")
+	})
+}
+
+func TestResolveQualifiedNamedNumberComponent(t *testing.T) {
+	t.Run("returns node from named module", func(t *testing.T) {
+		smiMod := &module.Module{Name: "SNMPv2-SMI"}
+		defMod := &module.Module{Name: "TEST-MIB"}
+		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, DefaultConfig())
+		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
+
+		entNode := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1, 4, 1)
+		ctx.registerModuleNodeSymbol(smiMod, "enterprises", entNode)
+
+		parent := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1, 4)
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentQualifiedNamedNumber{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises", NumberValue: 1},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  defMod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		got, ok := resolveQualifiedNamedNumberComponent(ctx, def, parent, "SNMPv2-SMI", "enterprises", 1, false)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, entNode, got, "expected node from named module")
+
+		// Verify symbol was registered in defMod.
+		regNode, regOk := ctx.LookupNodeForModule(defMod, "enterprises")
+		testutil.True(t, regOk, "expected symbol registered in defMod")
+		testutil.Equal(t, entNode, regNode, "registered node")
+	})
+
+	t.Run("falls back to createNamedChild when not found", func(t *testing.T) {
+		defMod := &module.Module{Name: "TEST-MIB"}
+		resolvedMod := newModule("TEST-MIB")
+		ctx := newResolverContext([]*module.Module{defMod}, nil, DefaultConfig())
+		ctx.ModuleToResolved[defMod] = resolvedMod
+
+		parent := ctx.Mib.Root().getOrCreateChild(1)
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentQualifiedNamedNumber{ModuleValue: "UNKNOWN-MIB", NameValue: "foo", NumberValue: 7},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  defMod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		got, ok := resolveQualifiedNamedNumberComponent(ctx, def, parent, "UNKNOWN-MIB", "foo", 7, false)
+		testutil.True(t, ok, "expected ok via numeric fallback")
+		testutil.Equal(t, uint32(7), got.Arc(), "arc")
+		testutil.Equal(t, "foo", got.Name(), "name should be set for non-last component")
+	})
+}
+
+func TestCreateNamedChild(t *testing.T) {
+	t.Run("non-last sets name and module and kind", func(t *testing.T) {
+		mod := &module.Module{Name: "TEST-MIB"}
+		resolvedMod := newModule("TEST-MIB")
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.ModuleToResolved[mod] = resolvedMod
+
+		parent := ctx.Mib.Root().getOrCreateChild(1)
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  mod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		child, ok := createNamedChild(ctx, def, parent, "org", 3, false)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, uint32(3), child.Arc(), "arc")
+		testutil.Equal(t, "org", child.Name(), "name")
+		testutil.Equal(t, resolvedMod, child.Module(), "module")
+		testutil.Equal(t, KindNode, child.Kind(), "kind")
+
+		// Verify symbol registered in module scope.
+		regNode, regOk := ctx.LookupNodeForModule(mod, "org")
+		testutil.True(t, regOk, "expected symbol registered")
+		testutil.Equal(t, child, regNode, "registered node")
+	})
+
+	t.Run("last component does not set name or kind", func(t *testing.T) {
+		mod := &module.Module{Name: "TEST-MIB"}
+		resolvedMod := newModule("TEST-MIB")
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.ModuleToResolved[mod] = resolvedMod
+
+		parent := ctx.Mib.Root().getOrCreateChild(1)
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNamedNumber{NameValue: "leaf", NumberValue: 5},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  mod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		child, ok := createNamedChild(ctx, def, parent, "leaf", 5, true)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, uint32(5), child.Arc(), "arc")
+		testutil.Equal(t, "", child.Name(), "name should not be set for last component")
+		testutil.Equal(t, KindInternal, child.Kind(), "kind should remain Internal for last component")
+	})
+
+	t.Run("does not override non-Internal kind", func(t *testing.T) {
+		mod := &module.Module{Name: "TEST-MIB"}
+		resolvedMod := newModule("TEST-MIB")
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.ModuleToResolved[mod] = resolvedMod
+
+		parent := ctx.Mib.Root().getOrCreateChild(1)
+		// Pre-create child and set its kind to something other than Internal.
+		existing := parent.getOrCreateChild(3)
+		existing.setKind(KindScalar)
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  mod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		child, ok := createNamedChild(ctx, def, parent, "org", 3, false)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, KindScalar, child.Kind(), "kind should not be overridden when not Internal")
+	})
+
+	t.Run("nil parent uses root", func(t *testing.T) {
+		mod := &module.Module{Name: "TEST-MIB"}
+		resolvedMod := newModule("TEST-MIB")
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.ModuleToResolved[mod] = resolvedMod
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNamedNumber{NameValue: "iso", NumberValue: 1},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  mod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		child, ok := createNamedChild(ctx, def, nil, "iso", 1, false)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, uint32(1), child.Arc(), "arc")
+		// Should be the same node as root's child.
+		testutil.Equal(t, ctx.Mib.Root().getOrCreateChild(1), child, "expected root child")
+	})
+}
+
+func TestRecordUnresolvedFirstComponent(t *testing.T) {
+	tests := []struct {
+		name          string
+		component     module.OidComponent
+		wantRecorded  bool
+		wantComponent string
+	}{
+		{
+			name:          "OidComponentName",
+			component:     &module.OidComponentName{NameValue: "enterprises"},
+			wantRecorded:  true,
+			wantComponent: "enterprises",
+		},
+		{
+			name:          "OidComponentNamedNumber",
+			component:     &module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+			wantRecorded:  true,
+			wantComponent: "org",
+		},
+		{
+			name:          "OidComponentQualifiedName",
+			component:     &module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"},
+			wantRecorded:  true,
+			wantComponent: "SNMPv2-SMI.enterprises",
+		},
+		{
+			name:          "OidComponentQualifiedNamedNumber",
+			component:     &module.OidComponentQualifiedNamedNumber{ModuleValue: "RFC1155-SMI", NameValue: "private", NumberValue: 4},
+			wantRecorded:  true,
+			wantComponent: "RFC1155-SMI.private",
+		},
+		{
+			name:         "OidComponentNumber produces no diagnostic",
+			component:    &module.OidComponentNumber{Value: 42},
+			wantRecorded: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mod := &module.Module{Name: "TEST-MIB"}
+			ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+
+			oid := module.NewOidAssignment([]module.OidComponent{tt.component}, types.Synthetic)
+			def := oidDefinition{
+				mod:  mod,
+				def:  &module.ValueAssignment{Name: "testDef", Oid: oid},
+				kind: defValueAssignment,
+			}
+
+			recordUnresolvedFirstComponent(ctx, def, &oid)
+
+			diags := ctx.Diagnostics()
+			if tt.wantRecorded {
+				testutil.Len(t, diags, 1, "expected 1 diagnostic")
+				testutil.Equal(t, types.DiagOidOrphan, diags[0].Code, "diagnostic code")
+				testutil.Contains(t, diags[0].Message, tt.wantComponent, "diagnostic should reference component")
+			} else {
+				testutil.Len(t, diags, 0, "expected no diagnostics")
+			}
+		})
+	}
+}
+
+func TestResolveOidComponentDispatch(t *testing.T) {
+	t.Run("NamedNumber dispatches correctly", func(t *testing.T) {
+		mod := &module.Module{Name: "TEST-MIB"}
+		resolvedMod := newModule("TEST-MIB")
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.ModuleToResolved[mod] = resolvedMod
+
+		parent := ctx.Mib.Root().getOrCreateChild(1)
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  mod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		comp := &module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3}
+		got, ok := resolveOidComponent(ctx, def, parent, comp, false)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, uint32(3), got.Arc(), "arc")
+	})
+
+	t.Run("QualifiedName dispatches correctly", func(t *testing.T) {
+		smiMod := &module.Module{Name: "SNMPv2-SMI"}
+		defMod := &module.Module{Name: "TEST-MIB"}
+		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, DefaultConfig())
+		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
+
+		entNode := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1, 4, 1)
+		ctx.registerModuleNodeSymbol(smiMod, "enterprises", entNode)
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  defMod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		comp := &module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"}
+		got, ok := resolveOidComponent(ctx, def, nil, comp, false)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, entNode, got, "expected enterprises node")
+	})
+
+	t.Run("QualifiedNamedNumber dispatches correctly", func(t *testing.T) {
+		smiMod := &module.Module{Name: "SNMPv2-SMI"}
+		defMod := &module.Module{Name: "TEST-MIB"}
+		resolvedDefMod := newModule("TEST-MIB")
+		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, DefaultConfig())
+		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
+		ctx.ModuleToResolved[defMod] = resolvedDefMod
+
+		entNode := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1, 4, 1)
+		ctx.registerModuleNodeSymbol(smiMod, "enterprises", entNode)
+
+		parent := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1, 4)
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentQualifiedNamedNumber{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises", NumberValue: 1},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  defMod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		comp := &module.OidComponentQualifiedNamedNumber{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises", NumberValue: 1}
+		got, ok := resolveOidComponent(ctx, def, parent, comp, false)
+		testutil.True(t, ok, "expected ok")
+		testutil.Equal(t, entNode, got, "expected enterprises node")
+	})
+}
+
+func TestResolveNameComponentBranches(t *testing.T) {
+	t.Run("well-known root iso", func(t *testing.T) {
+		mod := &module.Module{Name: "TEST-MIB"}
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "iso"},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  mod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		got, ok := resolveNameComponent(ctx, def, "iso")
+		testutil.True(t, ok, "expected ok for well-known root")
+		testutil.Equal(t, uint32(1), got.Arc(), "iso should be arc 1")
+	})
+
+	t.Run("permissive SMI global fallback", func(t *testing.T) {
+		smiMod := &module.Module{Name: "SNMPv2-SMI"}
+		defMod := &module.Module{Name: "VENDOR-MIB"}
+		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, PermissiveConfig())
+		ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
+
+		entNode := buildOIDPath(ctx.Mib.Root(), 1, 3, 6, 1, 4, 1)
+		ctx.registerModuleNodeSymbol(smiMod, "enterprises", entNode)
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "enterprises"},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  defMod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		got, ok := resolveNameComponent(ctx, def, "enterprises")
+		testutil.True(t, ok, "expected ok in permissive mode")
+		testutil.Equal(t, entNode, got, "expected enterprises node")
+	})
+
+	t.Run("strict mode rejects unimported SMI global", func(t *testing.T) {
+		defMod := &module.Module{Name: "VENDOR-MIB"}
+		ctx := newResolverContext([]*module.Module{defMod}, nil, StrictConfig())
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "enterprises"},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  defMod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		_, ok := resolveNameComponent(ctx, def, "enterprises")
+		testutil.False(t, ok, "expected false in strict mode")
+
+		diags := ctx.Diagnostics()
+		testutil.Len(t, diags, 1, "expected 1 diagnostic")
+		testutil.Equal(t, types.DiagOidOrphan, diags[0].Code, "diagnostic code")
+	})
+
+	t.Run("unknown name records unresolved", func(t *testing.T) {
+		defMod := &module.Module{Name: "TEST-MIB"}
+		ctx := newResolverContext([]*module.Module{defMod}, nil, DefaultConfig())
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "totallyUnknown"},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  defMod,
+			def:  &module.ValueAssignment{Name: "test", Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		_, ok := resolveNameComponent(ctx, def, "totallyUnknown")
+		testutil.False(t, ok, "expected false for unknown name")
+
+		diags := ctx.Diagnostics()
+		testutil.Len(t, diags, 1, "expected 1 diagnostic")
+		testutil.Contains(t, diags[0].Message, "totallyUnknown", "diagnostic should reference name")
+	})
+}
+
 // Ensure we use the graph.Symbol type correctly in tests.
 var _ = graph.Symbol{Module: "test", Name: "test"}
