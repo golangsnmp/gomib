@@ -63,6 +63,38 @@ func isNotificationNode(fn *testutil.FixtureNode) bool {
 	return fn.NodeType == "NOTIFICATION-TYPE" || fn.NodeType == "TRAP-TYPE"
 }
 
+// forEachFixtureNode iterates all fixture nodes across all fixture modules,
+// calling check for each node that passes the filter.
+// If filter is nil, all nodes are visited.
+func forEachFixtureNode(t *testing.T, filter func(*testutil.FixtureNode) bool, check func(t *testing.T, m *mib.Mib, fn *testutil.FixtureNode)) {
+	t.Helper()
+	m := loadTestMIB(t)
+	for _, mod := range fixtureModules {
+		t.Run(mod, func(t *testing.T) {
+			fixture := loadFixtureNodes(t, mod)
+			for _, fn := range fixture {
+				if filter != nil && !filter(fn) {
+					continue
+				}
+				t.Run(fn.Name, func(t *testing.T) {
+					check(t, m, fn)
+				})
+			}
+		})
+	}
+}
+
+// requireFixtureObject looks up an object by fixture node name and fails the
+// test if it is not found.
+func requireFixtureObject(t *testing.T, m *mib.Mib, fn *testutil.FixtureNode) *mib.Object {
+	t.Helper()
+	obj := m.Object(fn.Name)
+	if obj == nil {
+		t.Fatalf("divergence: gomib does not have object %q", fn.Name)
+	}
+	return obj
+}
+
 // loadCorpusMIB loads a single module from the primary corpus with optional
 // Load options (e.g. WithStrictness). Used for tests that need real MIBs but
 // not the synthetic problem corpus.
