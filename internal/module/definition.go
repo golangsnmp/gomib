@@ -231,27 +231,20 @@ func (d *AgentCapabilities) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // SupportsModule is a SUPPORTS clause in AGENT-CAPABILITIES.
 type SupportsModule struct {
-	ModuleName             string
-	Includes               []string
-	ObjectVariations       []ObjectVariation
-	NotificationVariations []NotificationVariation
+	ModuleName string
+	Includes   []string
+	Variations []Variation
 }
 
-// ObjectVariation is an object VARIATION in AGENT-CAPABILITIES.
-type ObjectVariation struct {
-	Object           string
+// Variation is a VARIATION clause in AGENT-CAPABILITIES. At the IR level,
+// object vs notification classification is deferred to the resolver, which
+// can look up the referenced name's node kind.
+type Variation struct {
+	Name             string
 	Syntax           TypeSyntax
 	WriteSyntax      TypeSyntax
 	Access           *types.Access
 	CreationRequires []string
 	DefVal           DefVal
 	Description      string
-}
-
-// NotificationVariation is a notification VARIATION in AGENT-CAPABILITIES.
-type NotificationVariation struct {
-	Notification string
-	// Access is only "not-implemented" per RFC 2580.
-	Access      *types.Access
-	Description string
 }

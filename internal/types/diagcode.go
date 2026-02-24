@@ -40,17 +40,18 @@ const (
 
 // Resolver diagnostic codes.
 const (
-	DiagImportNotFound       = "import-not-found"
-	DiagImportModuleNotFound = "import-module-not-found"
-	DiagTypeUnknown          = "type-unknown"
-	DiagOidOrphan            = "oid-orphan"
-	DiagIndexUnresolved      = "index-unresolved"
-	DiagObjectsUnresolved    = "objects-unresolved"
-	DiagIdentifierHyphenSMI  = "identifier-hyphen-smiv2"
-	DiagGroupNotAccessible   = "group-not-accessible"
-	DiagNotifObjectNotObject = "notification-object-not-object"
-	DiagMalformedHexDefval   = "malformed-hex-defval"
-	DiagDefvalUnresolved     = "defval-unresolved"
+	DiagImportNotFound           = "import-not-found"
+	DiagImportModuleNotFound     = "import-module-not-found"
+	DiagTypeUnknown              = "type-unknown"
+	DiagOidOrphan                = "oid-orphan"
+	DiagIndexUnresolved          = "index-unresolved"
+	DiagObjectsUnresolved        = "objects-unresolved"
+	DiagIdentifierHyphenSMI      = "identifier-hyphen-smiv2"
+	DiagGroupNotAccessible       = "group-not-accessible"
+	DiagNotifObjectNotObject     = "notification-object-not-object"
+	DiagMalformedHexDefval       = "malformed-hex-defval"
+	DiagDefvalUnresolved         = "defval-unresolved"
+	DiagVariationAccessNotifOnly = "variation-access-notification-only"
 )
 
 // AllDiagnosticCodes returns all known diagnostic codes grouped by phase.
@@ -94,6 +95,7 @@ func AllDiagnosticCodes() []DiagCodeInfo {
 		{Code: DiagNotifObjectNotObject, Phase: "resolver"},
 		{Code: DiagMalformedHexDefval, Phase: "resolver"},
 		{Code: DiagDefvalUnresolved, Phase: "resolver"},
+		{Code: DiagVariationAccessNotifOnly, Phase: "resolver"},
 	}
 }
 

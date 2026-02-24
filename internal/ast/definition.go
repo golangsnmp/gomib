@@ -185,13 +185,11 @@ type SupportsModule struct {
 }
 
 // Variation represents a VARIATION clause within AGENT-CAPABILITIES.
-type Variation interface {
-	variation()
-}
-
-// ObjectVariation represents an object VARIATION within AGENT-CAPABILITIES.
-type ObjectVariation struct {
-	Object           Ident
+// At parse time we cannot distinguish object vs notification variations
+// (that requires semantic analysis of the referenced name). All optional
+// clauses are stored here; the resolver classifies based on node kind.
+type Variation struct {
+	Name             Ident
 	Syntax           *SyntaxClause
 	WriteSyntax      *SyntaxClause
 	Access           *AccessClause
@@ -200,19 +198,6 @@ type ObjectVariation struct {
 	Description      QuotedString
 	Span             types.Span
 }
-
-func (*ObjectVariation) variation() {}
-
-// NotificationVariation represents a notification VARIATION within
-// AGENT-CAPABILITIES.
-type NotificationVariation struct {
-	Notification Ident
-	Access       *AccessClause
-	Description  QuotedString
-	Span         types.Span
-}
-
-func (*NotificationVariation) variation() {}
 
 // MacroDefinitionDef represents a MACRO definition whose body is skipped.
 type MacroDefinitionDef struct {

@@ -489,27 +489,19 @@ func lowerAgentCapabilities(def *ast.AgentCapabilitiesDef, ctx *LoweringContext)
 }
 
 func lowerSupportsModule(s ast.SupportsModule, ctx *LoweringContext) SupportsModule {
-	var objectVariations []ObjectVariation
-	var notificationVariations []NotificationVariation
-
+	var variations []Variation
 	for _, v := range s.Variations {
-		switch variation := v.(type) {
-		case *ast.ObjectVariation:
-			objectVariations = append(objectVariations, lowerObjectVariation(variation, ctx))
-		case *ast.NotificationVariation:
-			notificationVariations = append(notificationVariations, lowerNotificationVariation(variation, ctx))
-		}
+		variations = append(variations, lowerVariation(&v, ctx))
 	}
 
 	return SupportsModule{
-		ModuleName:             s.ModuleName.Name,
-		Includes:               identNames(s.Includes),
-		ObjectVariations:       objectVariations,
-		NotificationVariations: notificationVariations,
+		ModuleName: s.ModuleName.Name,
+		Includes:   identNames(s.Includes),
+		Variations: variations,
 	}
 }
 
-func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVariation {
+func lowerVariation(v *ast.Variation, ctx *LoweringContext) Variation {
 	var syntax TypeSyntax
 	if v.Syntax != nil {
 		syntax = lowerTypeSyntax(v.Syntax.Syntax, ctx)
@@ -530,22 +522,14 @@ func lowerObjectVariation(v *ast.ObjectVariation, ctx *LoweringContext) ObjectVa
 		defval = lowerDefVal(v.DefVal, ctx)
 	}
 
-	return ObjectVariation{
-		Object:           v.Object.Name,
+	return Variation{
+		Name:             v.Name.Name,
 		Syntax:           syntax,
 		WriteSyntax:      writeSyntax,
 		Access:           optionalAccess(v.Access),
 		CreationRequires: creationRequires,
 		DefVal:           defval,
 		Description:      v.Description.Value,
-	}
-}
-
-func lowerNotificationVariation(v *ast.NotificationVariation, ctx *LoweringContext) NotificationVariation {
-	return NotificationVariation{
-		Notification: v.Notification.Name,
-		Access:       optionalAccess(v.Access),
-		Description:  v.Description.Value,
 	}
 }
 

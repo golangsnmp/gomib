@@ -531,3 +531,69 @@ func TestShadowingModuleScalarResolves(t *testing.T) {
 	testutil.Equal(t, mib.BaseInteger32, typ.EffectiveBase(),
 		"Integer32 scalar should resolve normally")
 }
+
+func TestTypeRawVsEffectiveDisplayHint(t *testing.T) {
+	m := loadTypeChainsMIB(t)
+
+	t.Run("type with direct hint", func(t *testing.T) {
+		// MyString declares DISPLAY-HINT "255a"
+		typ := m.Type("MyString")
+		if typ == nil {
+			t.Fatal("MyString type not found")
+		}
+		testutil.Equal(t, "255a", typ.DisplayHint(),
+			"raw DisplayHint() should return directly declared hint")
+		testutil.Equal(t, "255a", typ.EffectiveDisplayHint(),
+			"EffectiveDisplayHint() should match when hint is declared directly")
+	})
+
+	t.Run("type inheriting hint", func(t *testing.T) {
+		// MyLabel inherits from MyString but declares no DISPLAY-HINT
+		typ := m.Type("MyLabel")
+		if typ == nil {
+			t.Fatal("MyLabel type not found")
+		}
+		testutil.Equal(t, "", typ.DisplayHint(),
+			"raw DisplayHint() should be empty when not declared directly")
+		testutil.Equal(t, "255a", typ.EffectiveDisplayHint(),
+			"EffectiveDisplayHint() should inherit from MyString parent")
+	})
+}
+
+func TestTypeRawVsEffectiveSizes(t *testing.T) {
+	m := loadTypeChainsMIB(t)
+
+	t.Run("type with direct sizes", func(t *testing.T) {
+		// MyString declares SIZE (0..64)
+		typ := m.Type("MyString")
+		if typ == nil {
+			t.Fatal("MyString type not found")
+		}
+		sizes := typ.Sizes()
+		testutil.Equal(t, 1, len(sizes), "raw Sizes() should have 1 range")
+		testutil.Equal(t, int64(0), sizes[0].Min, "size min")
+		testutil.Equal(t, int64(64), sizes[0].Max, "size max")
+
+		effective := typ.EffectiveSizes()
+		testutil.Equal(t, 1, len(effective), "EffectiveSizes() should match direct")
+		testutil.Equal(t, int64(0), effective[0].Min, "effective size min")
+		testutil.Equal(t, int64(64), effective[0].Max, "effective size max")
+	})
+
+	t.Run("type with own sizes overriding parent", func(t *testing.T) {
+		// MyLabel declares SIZE (0..32), parent MyString has SIZE (0..64)
+		typ := m.Type("MyLabel")
+		if typ == nil {
+			t.Fatal("MyLabel type not found")
+		}
+		sizes := typ.Sizes()
+		testutil.Equal(t, 1, len(sizes), "raw Sizes() should have 1 range")
+		testutil.Equal(t, int64(0), sizes[0].Min, "size min")
+		testutil.Equal(t, int64(32), sizes[0].Max, "size max")
+
+		// EffectiveSizes returns first non-empty in chain, which is this type's own
+		effective := typ.EffectiveSizes()
+		testutil.Equal(t, int64(0), effective[0].Min, "effective size min")
+		testutil.Equal(t, int64(32), effective[0].Max, "effective size max")
+	})
+}

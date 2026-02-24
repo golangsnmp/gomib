@@ -764,6 +764,16 @@ func TestConvertSupportsModules(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}
 
+	// registerSupportsNode registers a named node with a given kind in a
+	// SUPPORTS module so the resolver can classify variations correctly.
+	registerSupportsNode := func(moduleName, name string, kind Kind) {
+		supMod := &module.Module{Name: moduleName}
+		ctx.ModuleIndex[moduleName] = append(ctx.ModuleIndex[moduleName], supMod)
+		node := newTestNode(name)
+		node.setKind(kind)
+		ctx.registerModuleNodeSymbol(supMod, name, node)
+	}
+
 	t.Run("empty", func(t *testing.T) {
 		result := convertSupportsModules(ctx, mod, nil)
 		testutil.Len(t, result, 0, "expected empty, got")
@@ -784,13 +794,16 @@ func TestConvertSupportsModules(t *testing.T) {
 	})
 
 	t.Run("object variations with access", func(t *testing.T) {
+		registerSupportsNode("OBJ-MIB", "ifAdminStatus", KindColumn)
+		registerSupportsNode("OBJ-MIB", "ifOperStatus", KindColumn)
+
 		readOnly := types.AccessReadOnly
 		input := []module.SupportsModule{
 			{
-				ModuleName: "IF-MIB",
-				ObjectVariations: []module.ObjectVariation{
-					{Object: "ifAdminStatus", Access: &readOnly, Description: "read only"},
-					{Object: "ifOperStatus", Access: nil, Description: "full access"},
+				ModuleName: "OBJ-MIB",
+				Variations: []module.Variation{
+					{Name: "ifAdminStatus", Access: &readOnly, Description: "read only"},
+					{Name: "ifOperStatus", Access: nil, Description: "full access"},
 				},
 			},
 		}
@@ -805,13 +818,16 @@ func TestConvertSupportsModules(t *testing.T) {
 	})
 
 	t.Run("notification variations with access", func(t *testing.T) {
-		readOnly := types.AccessReadOnly
+		registerSupportsNode("NOTIF-MIB", "linkDown", KindNotification)
+		registerSupportsNode("NOTIF-MIB", "linkUp", KindNotification)
+
+		notImpl := types.AccessNotImplemented
 		input := []module.SupportsModule{
 			{
-				ModuleName: "IF-MIB",
-				NotificationVariations: []module.NotificationVariation{
-					{Notification: "linkDown", Access: &readOnly, Description: "not supported"},
-					{Notification: "linkUp", Access: nil},
+				ModuleName: "NOTIF-MIB",
+				Variations: []module.Variation{
+					{Name: "linkDown", Access: &notImpl, Description: "not supported"},
+					{Name: "linkUp", Access: nil},
 				},
 			},
 		}
@@ -820,18 +836,20 @@ func TestConvertSupportsModules(t *testing.T) {
 		testutil.Len(t, vars, 2, "notification variations")
 		testutil.Equal(t, "linkDown", vars[0].Notification, "notification")
 		testutil.NotNil(t, vars[0].Access, "access")
-		testutil.Equal(t, AccessReadOnly, *vars[0].Access, "access")
+		testutil.Equal(t, AccessNotImplemented, *vars[0].Access, "access")
 		testutil.Equal(t, "not supported", vars[0].Description, "desc")
 		testutil.Nil(t, vars[1].Access, "expected nil access for second variation")
 	})
 
 	t.Run("not-implemented access preserved in variations", func(t *testing.T) {
+		registerSupportsNode("IMPL-MIB", "testObj", KindScalar)
+
 		notImpl := types.AccessNotImplemented
 		input := []module.SupportsModule{
 			{
-				ModuleName: "TEST-MIB",
-				ObjectVariations: []module.ObjectVariation{
-					{Object: "testObj", Access: &notImpl, Description: "not implemented"},
+				ModuleName: "IMPL-MIB",
+				Variations: []module.Variation{
+					{Name: "testObj", Access: &notImpl, Description: "not implemented"},
 				},
 			},
 		}
@@ -843,17 +861,18 @@ func TestConvertSupportsModules(t *testing.T) {
 	})
 
 	t.Run("mixed object and notification variations", func(t *testing.T) {
+		registerSupportsNode("MIX-MIB", "ifAdminStatus", KindColumn)
+		registerSupportsNode("MIX-MIB", "linkDown", KindNotification)
+
 		readOnly := types.AccessReadOnly
-		readWrite := types.AccessReadWrite
+		notImpl := types.AccessNotImplemented
 		input := []module.SupportsModule{
 			{
-				ModuleName: "IF-MIB",
+				ModuleName: "MIX-MIB",
 				Includes:   []string{"ifGeneralGroup"},
-				ObjectVariations: []module.ObjectVariation{
-					{Object: "ifAdminStatus", Access: &readOnly},
-				},
-				NotificationVariations: []module.NotificationVariation{
-					{Notification: "linkDown", Access: &readWrite},
+				Variations: []module.Variation{
+					{Name: "ifAdminStatus", Access: &readOnly},
+					{Name: "linkDown", Access: &notImpl},
 				},
 			},
 		}
@@ -870,9 +889,9 @@ func TestConvertSupportsModules(t *testing.T) {
 		input := []module.SupportsModule{
 			{
 				ModuleName: "IF-MIB",
-				ObjectVariations: []module.ObjectVariation{
+				Variations: []module.Variation{
 					{
-						Object: "ifAdminStatus",
+						Name: "ifAdminStatus",
 						Syntax: &module.TypeSyntaxConstrained{
 							Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
 							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(1, 2)}},
@@ -902,9 +921,9 @@ func TestConvertSupportsModules(t *testing.T) {
 		input := []module.SupportsModule{
 			{
 				ModuleName: "IF-MIB",
-				ObjectVariations: []module.ObjectVariation{
+				Variations: []module.Variation{
 					{
-						Object:      "ifAdminStatus",
+						Name:        "ifAdminStatus",
 						DefVal:      &module.DefValInteger{Value: 2},
 						Syntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
 						Description: "default down",

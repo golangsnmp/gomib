@@ -623,3 +623,48 @@ func TestAugmentsEffectiveIndexes(t *testing.T) {
 	testutil.Equal(t, "problemSemIndex", indexes[0].Object.Name(),
 		"augmenting table should inherit indexes from augmented table")
 }
+
+func TestObjectsByType(t *testing.T) {
+	m := loadTestMIB(t)
+
+	// IF-MIB defines InterfaceIndex as a TEXTUAL-CONVENTION.
+	// ifIndex (and possibly others) use SYNTAX InterfaceIndex.
+	objs := m.ObjectsByType("InterfaceIndex")
+	testutil.Greater(t, len(objs), 0,
+		"should find at least one object typed InterfaceIndex")
+
+	for _, obj := range objs {
+		testutil.Equal(t, "InterfaceIndex", obj.Type().Name(),
+			"ObjectsByType result %s should have type name InterfaceIndex", obj.Name())
+	}
+}
+
+func TestObjectsByTypeNotFound(t *testing.T) {
+	m := loadTestMIB(t)
+
+	objs := m.ObjectsByType("NoSuchTypeName")
+	testutil.Equal(t, 0, len(objs),
+		"non-existent type name should return empty slice")
+}
+
+func TestObjectsByBaseType(t *testing.T) {
+	m := loadTestMIB(t)
+
+	intObjs := m.ObjectsByBaseType(mib.BaseInteger32)
+	testutil.Greater(t, len(intObjs), 0,
+		"should find Integer32-based objects")
+
+	for _, obj := range intObjs {
+		testutil.Equal(t, mib.BaseInteger32, obj.Type().Base(),
+			"ObjectsByBaseType result %s should have Base() == BaseInteger32", obj.Name())
+	}
+
+	octetObjs := m.ObjectsByBaseType(mib.BaseOctetString)
+	testutil.Greater(t, len(octetObjs), 0,
+		"should find OctetString-based objects")
+
+	for _, obj := range octetObjs {
+		testutil.Equal(t, mib.BaseOctetString, obj.Type().Base(),
+			"ObjectsByBaseType result %s should have Base() == BaseOctetString", obj.Name())
+	}
+}
