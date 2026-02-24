@@ -52,6 +52,14 @@ func TestLoadAllCorpus(t *testing.T) {
 	testutil.Greater(t, len(m.Modules()), 50, "should have loaded many modules")
 	testutil.Greater(t, len(m.Objects()), 1000, "should have resolved many objects")
 
+	// Semantic spot-checks: verify key modules and objects survived resolution
+	testutil.NotNil(t, m.Module("IF-MIB"), "IF-MIB should be present")
+	testutil.NotNil(t, m.Module("SNMPv2-MIB"), "SNMPv2-MIB should be present")
+	testutil.NotNil(t, m.Object("ifIndex"), "ifIndex should be resolved")
+	testutil.NotNil(t, m.Object("sysDescr"), "sysDescr should be resolved")
+	testutil.Equal(t, "1.3.6.1.2.1.1.1", m.Object("sysDescr").OID().String(),
+		"sysDescr OID should be correct")
+
 	t.Logf("Loaded %d modules, %d objects, %d types",
 		len(m.Modules()), len(m.Objects()), len(m.Types()))
 }

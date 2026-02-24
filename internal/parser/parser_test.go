@@ -241,6 +241,16 @@ func TestParseErrorRecovery(t *testing.T) {
 
 	// Should have recovered and parsed the second definition
 	testutil.Greater(t, len(module.Body), 0, "expected at least one definition after recovery")
+
+	// Verify the recovered definition is goodObject
+	var found bool
+	for _, def := range module.Body {
+		if objDef, ok := def.(*ast.ObjectTypeDef); ok && objDef.Name.Name == "goodObject" {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "goodObject should be parsed after error recovery")
 }
 
 // === SMIv1-specific constructs ===
@@ -526,6 +536,12 @@ func TestParseBitsSyntax(t *testing.T) {
 		t.Fatalf("expected TypeSyntaxBits, got %T", def.Syntax.Syntax)
 	}
 	testutil.Len(t, bits.NamedBits, 3, "named bits count")
+	testutil.Equal(t, "monday", bits.NamedBits[0].Name.Name, "first bit name")
+	testutil.Equal(t, int64(0), bits.NamedBits[0].Value, "first bit value")
+	testutil.Equal(t, "tuesday", bits.NamedBits[1].Name.Name, "second bit name")
+	testutil.Equal(t, int64(1), bits.NamedBits[1].Value, "second bit value")
+	testutil.Equal(t, "wednesday", bits.NamedBits[2].Name.Name, "third bit name")
+	testutil.Equal(t, int64(2), bits.NamedBits[2].Value, "third bit value")
 }
 
 func TestParseDefValString(t *testing.T) {
@@ -569,6 +585,11 @@ func TestParseDefValHex(t *testing.T) {
 		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
+	hexVal, ok := def.DefVal.Value.(*ast.DefValContentHexString)
+	if !ok {
+		t.Fatalf("expected DefValContentHexString, got %T", def.DefVal.Value)
+	}
+	testutil.Equal(t, "FF00", hexVal.Content, "DEFVAL hex content")
 }
 
 func TestParseDefValBits(t *testing.T) {
@@ -588,6 +609,13 @@ func TestParseDefValBits(t *testing.T) {
 		t.Fatalf("expected ObjectTypeDef, got %T", module.Body[0])
 	}
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
+	bitsVal, ok := def.DefVal.Value.(*ast.DefValContentBits)
+	if !ok {
+		t.Fatalf("expected DefValContentBits, got %T", def.DefVal.Value)
+	}
+	testutil.Len(t, bitsVal.Labels, 2, "BITS DEFVAL labels count")
+	testutil.Equal(t, "a", bitsVal.Labels[0].Name, "first BITS DEFVAL label")
+	testutil.Equal(t, "c", bitsVal.Labels[1].Name, "second BITS DEFVAL label")
 }
 
 func TestParseSequenceOf(t *testing.T) {

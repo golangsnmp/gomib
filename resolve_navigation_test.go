@@ -81,9 +81,9 @@ func TestNodeSubtree(t *testing.T) {
 	for range table.Subtree() {
 		count++
 	}
-	// ifTable -> ifEntry -> ifIndex, ifDescr, ifType, ... (22+ columns)
-	testutil.Greater(t, count, 5,
-		"ifTable should have many descendants")
+	// ifTable -> ifEntry -> 22 columns (ifIndex through ifCounterDiscontinuityTime)
+	testutil.Greater(t, count, 20,
+		"ifTable subtree should have 22+ descendants (entry + columns)")
 }
 
 func TestNodeArc(t *testing.T) {
@@ -411,10 +411,8 @@ func TestModuleFilteredCollections(t *testing.T) {
 	testutil.Greater(t, len(columns), 0, "IF-MIB should have columns")
 	testutil.Greater(t, len(rows), 0, "IF-MIB should have rows")
 
-	// IF-MIB has ifNumber (scalar) and ifTableLastChange (scalar)
-	if len(scalars) == 0 {
-		t.Log("IF-MIB has no scalars reported - may only count direct module objects")
-	}
+	// IF-MIB has scalar objects like ifNumber and ifTableLastChange
+	testutil.Greater(t, len(scalars), 0, "IF-MIB should have scalars (ifNumber, ifTableLastChange, etc.)")
 }
 
 func TestMibFilteredCollections(t *testing.T) {
