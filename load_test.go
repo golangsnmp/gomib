@@ -11,7 +11,7 @@ import (
 )
 
 func TestLoadSingleMIB(t *testing.T) {
-	src := mustDirTree(t, "testdata/corpus/primary")
+	src := mustDirTree(t, testutil.PrimaryCorpusDir())
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB"))
@@ -35,7 +35,7 @@ func TestLoadAllCorpus(t *testing.T) {
 		t.Skip("skipping corpus load in short mode")
 	}
 
-	src := mustDirTree(t, "testdata/corpus/primary")
+	src := mustDirTree(t, testutil.PrimaryCorpusDir())
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src))
@@ -59,7 +59,7 @@ func TestLoadAllCorpus(t *testing.T) {
 }
 
 func TestDirSource(t *testing.T) {
-	src, err := Dir("testdata/corpus/primary/ietf")
+	src, err := Dir(testutil.PrimaryCorpusDir() + "/ietf")
 	if err != nil {
 		t.Fatalf("Dir failed: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestDirSource(t *testing.T) {
 }
 
 func TestDirTreeSource(t *testing.T) {
-	src, err := DirTree("testdata/corpus/primary")
+	src, err := DirTree(testutil.PrimaryCorpusDir())
 	if err != nil {
 		t.Fatalf("DirTree failed: %v", err)
 	}
@@ -85,8 +85,8 @@ func TestDirTreeSource(t *testing.T) {
 }
 
 func TestMultiSource(t *testing.T) {
-	primary := mustDirTree(t, "testdata/corpus/primary")
-	problems := mustDirTree(t, "testdata/corpus/problems")
+	primary := mustDirTree(t, testutil.PrimaryCorpusDir())
+	problems := mustDirTree(t, testutil.ProblemsCorpusDir())
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(primary, problems), WithModules("IF-MIB"))
@@ -97,7 +97,7 @@ func TestMultiSource(t *testing.T) {
 }
 
 func TestLoadNonexistentModule(t *testing.T) {
-	src := mustDirTree(t, "testdata/corpus/primary")
+	src := mustDirTree(t, testutil.PrimaryCorpusDir())
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST"))
@@ -110,7 +110,7 @@ func TestLoadNonexistentModule(t *testing.T) {
 }
 
 func TestLoadMissingModuleWithValidModule(t *testing.T) {
-	src := mustDirTree(t, "testdata/corpus/primary")
+	src := mustDirTree(t, testutil.PrimaryCorpusDir())
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB", "NONEXISTENT-MIB"))
@@ -211,8 +211,8 @@ func TestTablesAndScalars(t *testing.T) {
 }
 
 func TestStrictMIBsPassAtStrictLevel(t *testing.T) {
-	corpus := mustDirTree(t, "testdata/corpus/primary")
-	strict := mustDirTree(t, "testdata/strictness/strict")
+	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
+	strict := mustDirTree(t, testutil.TestdataDir("strictness", "strict"))
 
 	tests := []string{"STRICT-TEST-MIB", "STRICT-TABLE-MIB"}
 	for _, name := range tests {
@@ -260,8 +260,8 @@ func TestLongIdentifierViolationEmitsDiagnostic(t *testing.T) {
 }
 
 func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
-	corpus := mustDirTree(t, "testdata/corpus/primary")
-	problems := mustDirTree(t, "testdata/corpus/problems")
+	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
+	problems := mustDirTree(t, testutil.ProblemsCorpusDir())
 
 	ctx := context.Background()
 
@@ -338,8 +338,8 @@ func TestMissingImportFailsInNormalMode(t *testing.T) {
 }
 
 func TestDiagnosticThresholdEnforced(t *testing.T) {
-	corpus := mustDirTree(t, "testdata/corpus/primary")
-	violations := mustDirTree(t, "testdata/strictness/violations")
+	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
+	violations := mustDirTree(t, testutil.TestdataDir("strictness", "violations"))
 
 	ctx := context.Background()
 
@@ -496,8 +496,8 @@ func TestFindModulePropagatesFindError(t *testing.T) {
 
 func loadInvalidMIB(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
 	t.Helper()
-	corpus := mustDirTree(t, "testdata/corpus/primary")
-	invalid := mustDirTree(t, "testdata/strictness/invalid")
+	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
+	invalid := mustDirTree(t, testutil.TestdataDir("strictness", "invalid"))
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(corpus, invalid), WithModules(name), WithStrictness(level))
 	if err != nil {

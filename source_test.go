@@ -17,7 +17,7 @@ func TestDirNonExistentPath(t *testing.T) {
 }
 
 func TestDirNotADirectory(t *testing.T) {
-	_, err := Dir("testdata/corpus/primary/ietf/IF-MIB.mib")
+	_, err := Dir(testutil.PrimaryCorpusDir() + "/ietf/IF-MIB.mib")
 	testutil.Error(t, err, "Dir with a file path should fail")
 }
 
@@ -32,7 +32,7 @@ func TestMustDirPanicsOnError(t *testing.T) {
 }
 
 func TestMustDirSucceeds(t *testing.T) {
-	src := MustDir("testdata/corpus/primary/ietf")
+	src := MustDir(testutil.PrimaryCorpusDir() + "/ietf")
 	names, err := src.ListModules()
 	testutil.NoError(t, err, "ListModules")
 	testutil.Greater(t, len(names), 0, "should list modules")
@@ -44,7 +44,7 @@ func TestDirTreeNonExistentPath(t *testing.T) {
 }
 
 func TestDirTreeNotADirectory(t *testing.T) {
-	_, err := DirTree("testdata/corpus/primary/ietf/IF-MIB.mib")
+	_, err := DirTree(testutil.PrimaryCorpusDir() + "/ietf/IF-MIB.mib")
 	testutil.Error(t, err, "DirTree with a file path should fail")
 }
 
@@ -59,14 +59,14 @@ func TestMustDirTreePanicsOnError(t *testing.T) {
 }
 
 func TestMustDirTreeSucceeds(t *testing.T) {
-	src := MustDirTree("testdata/corpus/primary")
+	src := MustDirTree(testutil.PrimaryCorpusDir())
 	names, err := src.ListModules()
 	testutil.NoError(t, err, "ListModules")
 	testutil.Greater(t, len(names), 10, "should list many modules")
 }
 
 func TestDirSourceFindExisting(t *testing.T) {
-	src, err := Dir("testdata/corpus/primary/ietf")
+	src, err := Dir(testutil.PrimaryCorpusDir() + "/ietf")
 	testutil.NoError(t, err, "Dir")
 
 	result, err := src.Find("IF-MIB")
@@ -76,7 +76,7 @@ func TestDirSourceFindExisting(t *testing.T) {
 }
 
 func TestDirSourceFindNotExist(t *testing.T) {
-	src, err := Dir("testdata/corpus/primary/ietf")
+	src, err := Dir(testutil.PrimaryCorpusDir() + "/ietf")
 	testutil.NoError(t, err, "Dir")
 
 	_, err = src.Find("TOTALLY-NONEXISTENT-MODULE")
@@ -87,7 +87,7 @@ func TestDirSourceFindNotExist(t *testing.T) {
 }
 
 func TestDirTreeSourceFindAcrossSubdirs(t *testing.T) {
-	src, err := DirTree("testdata/corpus/primary")
+	src, err := DirTree(testutil.PrimaryCorpusDir())
 	testutil.NoError(t, err, "DirTree")
 
 	result, err := src.Find("IF-MIB")
@@ -96,7 +96,7 @@ func TestDirTreeSourceFindAcrossSubdirs(t *testing.T) {
 }
 
 func TestDirTreeSourceFindNotExist(t *testing.T) {
-	src, err := DirTree("testdata/corpus/primary")
+	src, err := DirTree(testutil.PrimaryCorpusDir())
 	testutil.NoError(t, err, "DirTree")
 
 	_, err = src.Find("TOTALLY-NONEXISTENT-MODULE")
@@ -192,10 +192,10 @@ END
 }
 
 func TestMultiSourceFindOrder(t *testing.T) {
-	src1, err := Dir("testdata/corpus/primary/ietf")
+	src1, err := Dir(testutil.PrimaryCorpusDir() + "/ietf")
 	testutil.NoError(t, err, "Dir ietf")
 
-	src2, err := Dir("testdata/corpus/primary/iana")
+	src2, err := Dir(testutil.PrimaryCorpusDir() + "/iana")
 	testutil.NoError(t, err, "Dir iana")
 
 	multi := Multi(src1, src2)
@@ -206,10 +206,10 @@ func TestMultiSourceFindOrder(t *testing.T) {
 }
 
 func TestMultiSourceListModulesCombines(t *testing.T) {
-	src1, err := Dir("testdata/corpus/primary/ietf")
+	src1, err := Dir(testutil.PrimaryCorpusDir() + "/ietf")
 	testutil.NoError(t, err, "Dir ietf")
 
-	src2, err := Dir("testdata/corpus/primary/iana")
+	src2, err := Dir(testutil.PrimaryCorpusDir() + "/iana")
 	testutil.NoError(t, err, "Dir iana")
 
 	multi := Multi(src1, src2)
@@ -250,7 +250,7 @@ func TestMultiSourceListModulesDeduplicates(t *testing.T) {
 }
 
 func TestMultiSourceFindNotExist(t *testing.T) {
-	src1, err := Dir("testdata/corpus/primary/ietf")
+	src1, err := Dir(testutil.PrimaryCorpusDir() + "/ietf")
 	testutil.NoError(t, err, "Dir")
 
 	multi := Multi(src1)
@@ -287,7 +287,7 @@ END
 }
 
 func TestLoadContextCancellation(t *testing.T) {
-	src, err := DirTree("testdata/corpus/primary")
+	src, err := DirTree(testutil.PrimaryCorpusDir())
 	testutil.NoError(t, err, "DirTree")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -300,7 +300,7 @@ func TestLoadContextCancellation(t *testing.T) {
 }
 
 func TestLoadWithModulesContextCancellation(t *testing.T) {
-	src, err := DirTree("testdata/corpus/primary")
+	src, err := DirTree(testutil.PrimaryCorpusDir())
 	testutil.NoError(t, err, "DirTree")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -390,7 +390,7 @@ func TestLoadEmptyDirProducesEmptyMib(t *testing.T) {
 }
 
 func TestLoadMultipleModules(t *testing.T) {
-	src, err := DirTree("testdata/corpus/primary")
+	src, err := DirTree(testutil.PrimaryCorpusDir())
 	testutil.NoError(t, err, "DirTree")
 
 	ctx := context.Background()
@@ -402,7 +402,7 @@ func TestLoadMultipleModules(t *testing.T) {
 }
 
 func TestLoadModulesEmptyList(t *testing.T) {
-	src, err := DirTree("testdata/corpus/primary")
+	src, err := DirTree(testutil.PrimaryCorpusDir())
 	testutil.NoError(t, err, "DirTree")
 
 	ctx := context.Background()

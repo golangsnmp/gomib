@@ -2,15 +2,12 @@ package gomib
 
 import (
 	"context"
-	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/mib"
 )
-
-const fixtureDir = "testdata/fixtures/netsnmp"
 
 var (
 	fixtureModules = []string{"IF-MIB", "SNMPv2-MIB", "IP-MIB", "ENTITY-MIB", "BRIDGE-MIB"}
@@ -25,7 +22,7 @@ var (
 func loadTestMIB(t testing.TB) *mib.Mib {
 	t.Helper()
 	loadOnce.Do(func() {
-		src, err := DirTree("testdata/corpus/primary")
+		src, err := DirTree(testutil.PrimaryCorpusDir())
 		if err != nil {
 			loadErr = err
 			return
@@ -39,7 +36,7 @@ func loadTestMIB(t testing.TB) *mib.Mib {
 }
 
 func fixturePath(module string) string {
-	return filepath.Join(fixtureDir, module+".json")
+	return testutil.TestdataDir("fixtures", "netsnmp", module+".json")
 }
 
 func loadFixtureNodes(t testing.TB, module string) map[string]*testutil.FixtureNode {
@@ -121,7 +118,7 @@ func countDiagnostics(m *mib.Mib, code string) int {
 // not the synthetic problem corpus.
 func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
 	t.Helper()
-	corpus := mustDirTree(t, "testdata/corpus/primary")
+	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
 	allOpts := append([]LoadOption{WithSource(corpus), WithModules(name)}, opts...)
 	m, err := Load(context.Background(), allOpts...)
 	if err != nil {
@@ -134,8 +131,8 @@ func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
 // problems directory at a specific strictness level.
 func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
 	t.Helper()
-	corpus := mustDirTree(t, "testdata/corpus/primary")
-	problems := mustDirTree(t, "testdata/corpus/problems")
+	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
+	problems := mustDirTree(t, testutil.ProblemsCorpusDir())
 	m, err := Load(context.Background(), WithSource(corpus, problems), WithModules(name), WithStrictness(level))
 	if err != nil {
 		t.Fatalf("Load(%s, %s) failed: %v", name, level, err)
@@ -147,8 +144,8 @@ func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) *mib
 // violations directory at a specific strictness level.
 func loadViolationMIB(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
 	t.Helper()
-	corpus := mustDirTree(t, "testdata/corpus/primary")
-	violations := mustDirTree(t, "testdata/strictness/violations")
+	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
+	violations := mustDirTree(t, testutil.TestdataDir("strictness", "violations"))
 	m, err := Load(context.Background(), WithSource(corpus, violations), WithModules(name), WithStrictness(level))
 	if err != nil {
 		t.Fatalf("Load(%s, %s) failed: %v", name, level, err)
