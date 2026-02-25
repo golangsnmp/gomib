@@ -780,6 +780,210 @@ func TestParseTextualConventionWithAssignment(t *testing.T) {
 	testutil.Equal(t, "RFC 1213", def.Reference.Value, "reference value")
 }
 
+// === MACRO definition parsing ===
+
+func TestParseMacroDefinition(t *testing.T) {
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		FOOBAR MACRO ::=
+		BEGIN
+			TYPE NOTATION ::= empty
+			VALUE NOTATION ::= value(VALUE OBJECT IDENTIFIER)
+		END
+		END`)
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.MacroDefinitionDef)
+	testutil.True(t, ok, "expected MacroDefinitionDef, got %T", module.Body[0])
+	testutil.Equal(t, "FOOBAR", def.Name.Name, "macro name")
+}
+
+func TestParseMacroFollowedByDefinition(t *testing.T) {
+	// The critical risk: if parseMacroDefinition consumes the module's END
+	// instead of the macro's END, subsequent definitions would be lost.
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		FOOBAR MACRO ::=
+		BEGIN
+			TYPE NOTATION ::= empty
+			VALUE NOTATION ::= value(VALUE OBJECT IDENTIFIER)
+		END
+		testObject OBJECT IDENTIFIER ::= { iso 3 }
+		END`)
+
+	testutil.Len(t, module.Body, 2, "definitions count")
+	macro, ok := module.Body[0].(*ast.MacroDefinitionDef)
+	testutil.True(t, ok, "expected MacroDefinitionDef, got %T", module.Body[0])
+	testutil.Equal(t, "FOOBAR", macro.Name.Name, "macro name")
+
+	valAssign, ok := module.Body[1].(*ast.ValueAssignmentDef)
+	testutil.True(t, ok, "expected ValueAssignmentDef, got %T", module.Body[1])
+	testutil.Equal(t, "testObject", valAssign.Name.Name, "definition after macro")
+}
+
+func TestParseMultipleMacros(t *testing.T) {
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		ALPHA MACRO ::=
+		BEGIN
+			body content here
+		END
+		BETA MACRO ::=
+		BEGIN
+			more body content
+		END
+		END`)
+
+	testutil.Len(t, module.Body, 2, "definitions count")
+	first, ok := module.Body[0].(*ast.MacroDefinitionDef)
+	testutil.True(t, ok, "expected first MacroDefinitionDef, got %T", module.Body[0])
+	testutil.Equal(t, "ALPHA", first.Name.Name, "first macro name")
+	second, ok := module.Body[1].(*ast.MacroDefinitionDef)
+	testutil.True(t, ok, "expected second MacroDefinitionDef, got %T", module.Body[1])
+	testutil.Equal(t, "BETA", second.Name.Name, "second macro name")
+}
+
+func TestParseMacroMissingEnd(t *testing.T) {
+	// MACRO without END - should produce diagnostics, not crash
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		FOOBAR MACRO ::=
+		BEGIN
+			body content`)
+
+	testutil.Greater(t, len(module.Diagnostics), 0, "expected diagnostics for missing END")
+}
+
+// === DEFVAL error recovery (skip paths) ===
+
+func TestParseDefValSkipBraced(t *testing.T) {
+	// A quoted string inside inner braces is not recognized as BITS/OID,
+	// triggering parseDefValSkipBraced to skip to matching brace.
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		testObj OBJECT-TYPE
+			SYNTAX Integer32
+			MAX-ACCESS read-write
+			STATUS current
+			DESCRIPTION "Test"
+			DEFVAL { { "unexpected" } }
+			::= { test 1 }
+		END`)
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
+	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
+	_, ok = def.DefVal.Value.(*ast.DefValContentUnparsed)
+	testutil.True(t, ok, "expected DefValContentUnparsed, got %T", def.DefVal.Value)
+}
+
+func TestParseDefValSkipBracedNested(t *testing.T) {
+	// Nested braces inside DEFVAL content exercises brace depth counting.
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		testObj OBJECT-TYPE
+			SYNTAX Integer32
+			MAX-ACCESS read-write
+			STATUS current
+			DESCRIPTION "Test"
+			DEFVAL { { { x } } }
+			::= { test 1 }
+		END`)
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
+	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
+	_, ok = def.DefVal.Value.(*ast.DefValContentUnparsed)
+	testutil.True(t, ok, "expected DefValContentUnparsed, got %T", def.DefVal.Value)
+}
+
+func TestParseDefValSkipBracedRecovery(t *testing.T) {
+	// After skipping unrecognized DEFVAL content, the parser should
+	// continue and parse the next definition.
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		testBad OBJECT-TYPE
+			SYNTAX Integer32
+			MAX-ACCESS read-write
+			STATUS current
+			DESCRIPTION "Bad"
+			DEFVAL { { "unexpected" } }
+			::= { test 1 }
+		testGood OBJECT-TYPE
+			SYNTAX Integer32
+			MAX-ACCESS read-only
+			STATUS current
+			DESCRIPTION "Good"
+			::= { test 2 }
+		END`)
+
+	testutil.Equal(t, 2, len(module.Body), "both definitions should be parsed")
+	second, ok := module.Body[1].(*ast.ObjectTypeDef)
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[1])
+	testutil.Equal(t, "testGood", second.Name.Name, "second definition name")
+}
+
+func TestParseDefValSkipUnknown(t *testing.T) {
+	// A semicolon is not a valid DEFVAL token, triggering parseDefValSkipUnknown.
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		testObj OBJECT-TYPE
+			SYNTAX Integer32
+			MAX-ACCESS read-write
+			STATUS current
+			DESCRIPTION "Test"
+			DEFVAL { ; }
+			::= { test 1 }
+		END`)
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
+	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
+	_, ok = def.DefVal.Value.(*ast.DefValContentUnparsed)
+	testutil.True(t, ok, "expected DefValContentUnparsed, got %T", def.DefVal.Value)
+}
+
+func TestParseDefValSkipUnknownWithBraces(t *testing.T) {
+	// Unknown token followed by braced content exercises brace depth
+	// tracking in parseDefValSkipUnknown.
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		testObj OBJECT-TYPE
+			SYNTAX Integer32
+			MAX-ACCESS read-write
+			STATUS current
+			DESCRIPTION "Test"
+			DEFVAL { ; { nested } }
+			::= { test 1 }
+		END`)
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
+	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
+	_, ok = def.DefVal.Value.(*ast.DefValContentUnparsed)
+	testutil.True(t, ok, "expected DefValContentUnparsed, got %T", def.DefVal.Value)
+}
+
+func TestParseDefValSkipUnknownRecovery(t *testing.T) {
+	// After skipping unknown DEFVAL, the parser should continue
+	// and parse the next definition.
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		testBad OBJECT-TYPE
+			SYNTAX Integer32
+			MAX-ACCESS read-write
+			STATUS current
+			DESCRIPTION "Bad"
+			DEFVAL { ; { nested } }
+			::= { test 1 }
+		testGood OBJECT-TYPE
+			SYNTAX Integer32
+			MAX-ACCESS read-only
+			STATUS current
+			DESCRIPTION "Good"
+			::= { test 2 }
+		END`)
+
+	testutil.Equal(t, 2, len(module.Body), "both definitions should be parsed")
+	second, ok := module.Body[1].(*ast.ObjectTypeDef)
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[1])
+	testutil.Equal(t, "testGood", second.Name.Name, "second definition name")
+}
+
 func TestStripQuotedLiteral(t *testing.T) {
 	tests := []struct {
 		name  string
