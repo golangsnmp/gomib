@@ -1,0 +1,49 @@
+name: Fuzz
+
+on:
+  schedule:
+    - cron: '0 2 * * 1,4'  # Mon/Thu at 2am
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: ./internal/lexer/
+            target: FuzzTokenize
+          - package: ./internal/parser/
+            target: FuzzParseModule
+          - package: ./internal/parser/
+            target: FuzzConstraintParsing
+          - package: ./internal/graph/
+            target: FuzzResolutionOrder
+          - package: ./mib/
+            target: FuzzParseOID
+          - package: ./mib/
+            target: FuzzFormatOID
+          - package: .
+            target: FuzzLower
+          - package: .
+            target: FuzzPipeline
+          - package: .
+            target: FuzzMultiModule
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Restore fuzz corpus cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build/fuzz
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
+      - name: Fuzz ${{ matrix.target }}
+        run: go test -fuzz=${{ matrix.target }} -fuzztime=30m ${{ matrix.package }}

@@ -3,10 +3,12 @@ package gomib
 import (
 	"context"
 	"testing"
+
+	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 func BenchmarkLoadAllCorpus(b *testing.B) {
-	src := mustDirTree(b, "testdata/corpus/primary")
+	src := mustDirTree(b, testutil.PrimaryCorpusDir())
 
 	ctx := context.Background()
 
@@ -21,7 +23,7 @@ func BenchmarkLoadAllCorpus(b *testing.B) {
 }
 
 func BenchmarkLoadSingleMIB(b *testing.B) {
-	src := mustDirTree(b, "testdata/corpus/primary")
+	src := mustDirTree(b, testutil.PrimaryCorpusDir())
 
 	ctx := context.Background()
 

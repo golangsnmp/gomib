@@ -10,7 +10,7 @@ import (
 
 func loadCapabilityMIB(t testing.TB) *mib.Mib {
 	t.Helper()
-	corpus := mustDirTree(t, "testdata/corpus/primary")
+	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
 	// Load both JNX-SNMPv2-CAPABILITY and SNMPv2-MIB so the resolver can
 	// look up variation targets in the SUPPORTS module.
 	m, err := Load(context.Background(),
