@@ -22,44 +22,6 @@ func TestBaseModuleNames_DefensiveCopy(t *testing.T) {
 
 // --- helpers for inspecting base module definitions ---
 
-// findDefByName returns the first definition with the given name, or nil.
-func findDefByName(defs []Definition, name string) Definition {
-	for _, d := range defs {
-		if d.DefinitionName() == name {
-			return d
-		}
-	}
-	return nil
-}
-
-// requireValueAssignment finds a ValueAssignment by name or fails the test.
-func requireValueAssignment(t *testing.T, defs []Definition, name string) *ValueAssignment {
-	t.Helper()
-	d := findDefByName(defs, name)
-	if d == nil {
-		t.Fatalf("definition %q not found", name)
-	}
-	va, ok := d.(*ValueAssignment)
-	if !ok {
-		t.Fatalf("definition %q is %T, want *ValueAssignment", name, d)
-	}
-	return va
-}
-
-// requireTypeDef finds a TypeDef by name or fails the test.
-func requireTypeDef(t *testing.T, defs []Definition, name string) *TypeDef {
-	t.Helper()
-	d := findDefByName(defs, name)
-	if d == nil {
-		t.Fatalf("definition %q not found", name)
-	}
-	td, ok := d.(*TypeDef)
-	if !ok {
-		t.Fatalf("definition %q is %T, want *TypeDef", name, d)
-	}
-	return td
-}
-
 // defNames returns the names of all definitions.
 func defNames(defs []Definition) []string {
 	names := make([]string, len(defs))
@@ -194,7 +156,7 @@ func TestSNMPv2SMI_OIDTree(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			va := requireValueAssignment(t, mod.Definitions, tt.name)
+			va := findDef[*ValueAssignment](t, mod, tt.name)
 			testutil.Len(t, va.Oid.Components, 2, "%s component count", tt.name)
 
 			nameComp, ok := va.Oid.Components[0].(*OidComponentName)
@@ -223,7 +185,7 @@ func TestSNMPv2SMI_RootOIDs(t *testing.T) {
 
 	for _, tt := range roots {
 		t.Run(tt.name, func(t *testing.T) {
-			va := requireValueAssignment(t, mod.Definitions, tt.name)
+			va := findDef[*ValueAssignment](t, mod, tt.name)
 			testutil.Len(t, va.Oid.Components, 1, "%s component count", tt.name)
 
 			numComp, ok := va.Oid.Components[0].(*OidComponentNumber)
@@ -235,7 +197,7 @@ func TestSNMPv2SMI_RootOIDs(t *testing.T) {
 
 func TestSNMPv2SMI_ZeroDotZero(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-SMI")
-	va := requireValueAssignment(t, mod.Definitions, "zeroDotZero")
+	va := findDef[*ValueAssignment](t, mod, "zeroDotZero")
 	testutil.Len(t, va.Oid.Components, 2, "zeroDotZero component count")
 
 	c0, ok := va.Oid.Components[0].(*OidComponentNumber)
@@ -268,7 +230,7 @@ func TestSNMPv2SMI_BaseTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			td := requireTypeDef(t, mod.Definitions, tt.name)
+			td := findDef[*TypeDef](t, mod, tt.name)
 			testutil.NotNil(t, td.BaseType, "%s.BaseType should be set", tt.name)
 			testutil.Equal(t, tt.wantBase, *td.BaseType, "%s base type", tt.name)
 			testutil.False(t, td.IsTextualConvention, "%s should not be a TC", tt.name)
@@ -278,7 +240,7 @@ func TestSNMPv2SMI_BaseTypes(t *testing.T) {
 
 func TestSNMPv2SMI_Integer32Range(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-SMI")
-	td := requireTypeDef(t, mod.Definitions, "Integer32")
+	td := findDef[*TypeDef](t, mod, "Integer32")
 
 	constrained, ok := td.Syntax.(*TypeSyntaxConstrained)
 	testutil.True(t, ok, "Integer32 syntax should be constrained")
@@ -313,7 +275,7 @@ func TestSNMPv2SMI_UnsignedRanges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			td := requireTypeDef(t, mod.Definitions, tt.name)
+			td := findDef[*TypeDef](t, mod, tt.name)
 			constrained, ok := td.Syntax.(*TypeSyntaxConstrained)
 			testutil.True(t, ok, "%s syntax should be constrained", tt.name)
 
@@ -335,7 +297,7 @@ func TestSNMPv2SMI_UnsignedRanges(t *testing.T) {
 
 func TestSNMPv2SMI_IpAddress_SizeConstraint(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-SMI")
-	td := requireTypeDef(t, mod.Definitions, "IpAddress")
+	td := findDef[*TypeDef](t, mod, "IpAddress")
 
 	constrained, ok := td.Syntax.(*TypeSyntaxConstrained)
 	testutil.True(t, ok, "IpAddress syntax should be constrained")
@@ -356,7 +318,7 @@ func TestSNMPv2SMI_IpAddress_SizeConstraint(t *testing.T) {
 
 func TestSNMPv2SMI_Opaque_NoConstraint(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-SMI")
-	td := requireTypeDef(t, mod.Definitions, "Opaque")
+	td := findDef[*TypeDef](t, mod, "Opaque")
 
 	_, ok := td.Syntax.(*TypeSyntaxOctetString)
 	testutil.True(t, ok, "Opaque syntax should be plain OCTET STRING")
@@ -367,7 +329,7 @@ func TestSNMPv2SMI_OidTypes(t *testing.T) {
 
 	for _, name := range []string{"ObjectName", "NotificationName"} {
 		t.Run(name, func(t *testing.T) {
-			td := requireTypeDef(t, mod.Definitions, name)
+			td := findDef[*TypeDef](t, mod, name)
 			_, ok := td.Syntax.(*TypeSyntaxObjectIdentifier)
 			testutil.True(t, ok, "%s syntax should be OBJECT IDENTIFIER", name)
 			testutil.Nil(t, td.BaseType, "%s should have no explicit base type", name)
@@ -377,7 +339,7 @@ func TestSNMPv2SMI_OidTypes(t *testing.T) {
 
 func TestSNMPv2SMI_ExtUTCTime(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-SMI")
-	td := requireTypeDef(t, mod.Definitions, "ExtUTCTime")
+	td := findDef[*TypeDef](t, mod, "ExtUTCTime")
 
 	testutil.Equal(t, types.StatusObsolete, td.Status, "ExtUTCTime status")
 
@@ -456,7 +418,7 @@ func TestSNMPv2TC_DisplayHints(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			td := requireTypeDef(t, mod.Definitions, tt.name)
+			td := findDef[*TypeDef](t, mod, tt.name)
 			testutil.Equal(t, tt.hint, td.DisplayHint, "%s display hint", tt.name)
 		})
 	}
@@ -464,7 +426,7 @@ func TestSNMPv2TC_DisplayHints(t *testing.T) {
 
 func TestSNMPv2TC_TruthValue(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	td := requireTypeDef(t, mod.Definitions, "TruthValue")
+	td := findDef[*TypeDef](t, mod, "TruthValue")
 
 	enumSyntax, ok := td.Syntax.(*TypeSyntaxIntegerEnum)
 	testutil.True(t, ok, "TruthValue syntax should be IntegerEnum")
@@ -477,7 +439,7 @@ func TestSNMPv2TC_TruthValue(t *testing.T) {
 
 func TestSNMPv2TC_RowStatus(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	td := requireTypeDef(t, mod.Definitions, "RowStatus")
+	td := findDef[*TypeDef](t, mod, "RowStatus")
 
 	enumSyntax, ok := td.Syntax.(*TypeSyntaxIntegerEnum)
 	testutil.True(t, ok, "RowStatus syntax should be IntegerEnum")
@@ -502,7 +464,7 @@ func TestSNMPv2TC_RowStatus(t *testing.T) {
 
 func TestSNMPv2TC_StorageType(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	td := requireTypeDef(t, mod.Definitions, "StorageType")
+	td := findDef[*TypeDef](t, mod, "StorageType")
 
 	enumSyntax, ok := td.Syntax.(*TypeSyntaxIntegerEnum)
 	testutil.True(t, ok, "StorageType syntax should be IntegerEnum")
@@ -526,7 +488,7 @@ func TestSNMPv2TC_StorageType(t *testing.T) {
 
 func TestSNMPv2TC_DisplayString_SizeConstraint(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	td := requireTypeDef(t, mod.Definitions, "DisplayString")
+	td := findDef[*TypeDef](t, mod, "DisplayString")
 
 	constrained, ok := td.Syntax.(*TypeSyntaxConstrained)
 	testutil.True(t, ok, "DisplayString syntax should be constrained")
@@ -547,7 +509,7 @@ func TestSNMPv2TC_DisplayString_SizeConstraint(t *testing.T) {
 
 func TestSNMPv2TC_MacAddress_FixedSize(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	td := requireTypeDef(t, mod.Definitions, "MacAddress")
+	td := findDef[*TypeDef](t, mod, "MacAddress")
 
 	constrained, ok := td.Syntax.(*TypeSyntaxConstrained)
 	testutil.True(t, ok, "MacAddress syntax should be constrained")
@@ -565,7 +527,7 @@ func TestSNMPv2TC_MacAddress_FixedSize(t *testing.T) {
 
 func TestSNMPv2TC_DateAndTime_SizeConstraint(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	td := requireTypeDef(t, mod.Definitions, "DateAndTime")
+	td := findDef[*TypeDef](t, mod, "DateAndTime")
 
 	constrained, ok := td.Syntax.(*TypeSyntaxConstrained)
 	testutil.True(t, ok, "DateAndTime syntax should be constrained")
@@ -586,7 +548,7 @@ func TestSNMPv2TC_DateAndTime_SizeConstraint(t *testing.T) {
 
 func TestSNMPv2TC_TAddress_SizeConstraint(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	td := requireTypeDef(t, mod.Definitions, "TAddress")
+	td := findDef[*TypeDef](t, mod, "TAddress")
 
 	constrained, ok := td.Syntax.(*TypeSyntaxConstrained)
 	testutil.True(t, ok, "TAddress syntax should be constrained")
@@ -607,7 +569,7 @@ func TestSNMPv2TC_TAddress_SizeConstraint(t *testing.T) {
 
 func TestSNMPv2TC_TimeStamp_BasedOnTimeTicks(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	td := requireTypeDef(t, mod.Definitions, "TimeStamp")
+	td := findDef[*TypeDef](t, mod, "TimeStamp")
 
 	ref, ok := td.Syntax.(*TypeSyntaxTypeRef)
 	testutil.True(t, ok, "TimeStamp syntax should be TypeRef")
@@ -620,7 +582,7 @@ func TestSNMPv2TC_OidBasedTypes(t *testing.T) {
 	oidTypes := []string{"AutonomousType", "InstancePointer", "VariablePointer", "RowPointer", "TDomain"}
 	for _, name := range oidTypes {
 		t.Run(name, func(t *testing.T) {
-			td := requireTypeDef(t, mod.Definitions, name)
+			td := findDef[*TypeDef](t, mod, name)
 			_, ok := td.Syntax.(*TypeSyntaxObjectIdentifier)
 			testutil.True(t, ok, "%s syntax should be OBJECT IDENTIFIER", name)
 		})
@@ -629,13 +591,13 @@ func TestSNMPv2TC_OidBasedTypes(t *testing.T) {
 
 func TestSNMPv2TC_InstancePointer_Obsolete(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	td := requireTypeDef(t, mod.Definitions, "InstancePointer")
+	td := findDef[*TypeDef](t, mod, "InstancePointer")
 	testutil.Equal(t, types.StatusObsolete, td.Status, "InstancePointer status")
 }
 
 func TestSNMPv2TC_TimeInterval_Range(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	td := requireTypeDef(t, mod.Definitions, "TimeInterval")
+	td := findDef[*TypeDef](t, mod, "TimeInterval")
 
 	constrained, ok := td.Syntax.(*TypeSyntaxConstrained)
 	testutil.True(t, ok, "TimeInterval syntax should be constrained")
@@ -676,7 +638,7 @@ func TestSMIv1Base_TypeDefinitions(t *testing.T) {
 
 			for _, tt := range tests {
 				t.Run(tt.typeName, func(t *testing.T) {
-					td := requireTypeDef(t, mod.Definitions, tt.typeName)
+					td := findDef[*TypeDef](t, mod, tt.typeName)
 					testutil.NotNil(t, td.BaseType, "%s.BaseType", tt.typeName)
 					testutil.Equal(t, tt.wantBase, *td.BaseType, "%s base type", tt.typeName)
 					testutil.False(t, td.IsTextualConvention, "%s should not be TC", tt.typeName)
@@ -688,7 +650,7 @@ func TestSMIv1Base_TypeDefinitions(t *testing.T) {
 
 func TestSMIv1Base_NetworkAddress_RefsIpAddress(t *testing.T) {
 	mod := GetBaseModule("RFC1155-SMI")
-	td := requireTypeDef(t, mod.Definitions, "NetworkAddress")
+	td := findDef[*TypeDef](t, mod, "NetworkAddress")
 
 	ref, ok := td.Syntax.(*TypeSyntaxTypeRef)
 	testutil.True(t, ok, "NetworkAddress syntax should be TypeRef")
@@ -715,7 +677,7 @@ func TestSMIv1Base_OIDTree(t *testing.T) {
 
 func TestSMIv1Base_ObjectName(t *testing.T) {
 	mod := GetBaseModule("RFC1155-SMI")
-	td := requireTypeDef(t, mod.Definitions, "ObjectName")
+	td := findDef[*TypeDef](t, mod, "ObjectName")
 
 	_, ok := td.Syntax.(*TypeSyntaxObjectIdentifier)
 	testutil.True(t, ok, "ObjectName syntax should be OBJECT IDENTIFIER")
@@ -724,7 +686,7 @@ func TestSMIv1Base_ObjectName(t *testing.T) {
 
 func TestSMIv1Base_CounterRange(t *testing.T) {
 	mod := GetBaseModule("RFC1155-SMI")
-	td := requireTypeDef(t, mod.Definitions, "Counter")
+	td := findDef[*TypeDef](t, mod, "Counter")
 
 	constrained, ok := td.Syntax.(*TypeSyntaxConstrained)
 	testutil.True(t, ok, "Counter syntax should be constrained")
