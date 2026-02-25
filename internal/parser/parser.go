@@ -137,10 +137,17 @@ func (p *Parser) ParseModule() *ast.Module {
 	}
 
 	for !p.check(lexer.TokKwEnd) && !p.isEOF() {
+		posBefore := p.currentSpan().Start
 		def, err := p.parseDefinition()
 		if err != nil {
 			p.recordParseError(*err)
 			p.recoverToDefinition()
+			// If recovery didn't advance past the error, force progress
+			// to prevent an infinite loop when the current token pair
+			// looks like a definition start but can't actually be parsed.
+			if p.currentSpan().Start == posBefore {
+				p.advance()
+			}
 		} else {
 			module.Body = append(module.Body, def)
 		}
