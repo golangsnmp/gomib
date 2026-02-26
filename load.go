@@ -24,7 +24,7 @@ func componentLogger(logger *slog.Logger, component string) *slog.Logger {
 }
 
 // loadAllModules loads all MIB files from sources in parallel.
-func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib.Mib, error) {
+func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mib.Mib, error) {
 	logger := cfg.logger
 
 	type sourceModule struct {
@@ -132,7 +132,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg loadConfig) (*mib
 	return m, checkLoadResult(m, cfg, nil)
 }
 
-func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg loadConfig) (*mib.Mib, error) {
+func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg *loadConfig) (*mib.Mib, error) {
 	logger := cfg.logger
 
 	modules := make(map[string]*module.Module)
@@ -242,7 +242,7 @@ func collectModules(modules map[string]*module.Module) []*module.Module {
 
 // decodeModule runs the heuristic/parse/lower pipeline on raw MIB content.
 // Returns nil if the content doesn't look like a MIB.
-func decodeModule(ctx context.Context, content []byte, sourcePath string, name string, logger *slog.Logger, cfg loadConfig) *module.Module {
+func decodeModule(ctx context.Context, content []byte, sourcePath, name string, logger *slog.Logger, cfg *loadConfig) *module.Module {
 	if !looksLikeMIBContent(content) {
 		if logEnabled(ctx, logger, slog.LevelDebug) {
 			logger.LogAttrs(ctx, slog.LevelDebug, "content rejected by heuristic",

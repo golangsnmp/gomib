@@ -185,7 +185,7 @@ func parseLibSMILine(line string) (pathOp, []string, bool) {
 
 // parseColonSemantic interprets leading/trailing colon semantics.
 // Leading colon = append, trailing colon = prepend, neither = replace.
-func parseColonSemantic(value string) (pathOp, []string) {
+func parseColonSemantic(value string) (op pathOp, paths []string) {
 	if after, ok := strings.CutPrefix(value, ":"); ok {
 		return pathAppend, splitPaths(after)
 	}

@@ -283,6 +283,8 @@ func (p *Parser) parseModuleHeader() (ast.Ident, *types.SpanDiagnostic) {
 				depth++
 			case lexer.TokRBrace:
 				depth--
+			default:
+				// skip other tokens
 			}
 		}
 	}
@@ -370,14 +372,16 @@ func (p *Parser) parseImports() ([]ast.ImportClause, *types.SpanDiagnostic) {
 		start := p.currentSpan().Start
 		var symbols []ast.Ident
 
+	symbolLoop:
 		for {
 			kind := p.peek().Kind
-			if kind.IsMacroKeyword() || kind.IsTypeKeyword() || kind.IsIdentifier() {
+			switch {
+			case kind.IsMacroKeyword() || kind.IsTypeKeyword() || kind.IsIdentifier():
 				symToken := p.advance()
 				symbols = append(symbols, p.makeIdent(symToken))
-			} else if p.check(lexer.TokKwFrom) {
-				break
-			} else {
+			case p.check(lexer.TokKwFrom):
+				break symbolLoop
+			default:
 				diag := p.makeError("expected symbol or FROM")
 				return imports, &diag
 			}
@@ -576,7 +580,7 @@ func (p *Parser) parseOidComponent(compStart types.ByteOffset) (ast.OidComponent
 		qname := p.makeIdent(nameToken)
 
 		if p.check(lexer.TokLParen) {
-			// QualifiedNamedNumber: Module.name(123)
+			// Qualified named number, e.g. Module.name(123)
 			p.advance() // (
 			numToken, err := p.expect(lexer.TokNumber)
 			if err != nil {
@@ -1050,15 +1054,15 @@ func (p *Parser) parseRangeList() ([]ast.Range, *types.SpanDiagnostic) {
 
 	for {
 		start := p.currentSpan().Start
-		min, err := p.parseRangeValue()
+		lo, err := p.parseRangeValue()
 		if err != nil {
 			return nil, err
 		}
 
-		var max ast.RangeValue
+		var hi ast.RangeValue
 		if p.check(lexer.TokDotDot) {
 			p.advance()
-			max, err = p.parseRangeValue()
+			hi, err = p.parseRangeValue()
 			if err != nil {
 				return nil, err
 			}
@@ -1066,8 +1070,8 @@ func (p *Parser) parseRangeList() ([]ast.Range, *types.SpanDiagnostic) {
 
 		end := p.currentSpan().Start
 		ranges = append(ranges, ast.Range{
-			Min:  min,
-			Max:  max,
+			Min:  lo,
+			Max:  hi,
 			Span: types.NewSpan(start, end),
 		})
 
@@ -1171,16 +1175,17 @@ func (p *Parser) parseAccessClause() (ast.AccessClause, *types.SpanDiagnostic) {
 	start := p.currentSpan().Start
 
 	var keyword ast.AccessKeyword
-	if p.check(lexer.TokKwMaxAccess) {
+	switch {
+	case p.check(lexer.TokKwMaxAccess):
 		p.advance()
 		keyword = ast.AccessKeywordMaxAccess
-	} else if p.check(lexer.TokKwAccess) {
+	case p.check(lexer.TokKwAccess):
 		p.advance()
 		keyword = ast.AccessKeywordAccess
-	} else if p.check(lexer.TokKwMinAccess) {
+	case p.check(lexer.TokKwMinAccess):
 		p.advance()
 		keyword = ast.AccessKeywordMinAccess
-	} else {
+	default:
 		diag := p.makeError("expected MAX-ACCESS, MIN-ACCESS, or ACCESS")
 		return ast.AccessClause{}, &diag
 	}

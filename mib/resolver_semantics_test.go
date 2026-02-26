@@ -519,7 +519,7 @@ func TestResolveTypeSyntaxBaseTypes(t *testing.T) {
 }
 
 func TestComputeEffectiveValues(t *testing.T) {
-	t.Run("nil type is a no-op", func(t *testing.T) {
+	t.Run("nil type is a no-op", func(_ *testing.T) {
 		obj := newObject("testObj")
 		// No type set, should not panic
 		computeEffectiveValues(obj)
@@ -1162,7 +1162,7 @@ func TestInferNodeKinds(t *testing.T) {
 		testutil.Equal(t, KindColumn, col2.Kind(), "col2 kind")
 	})
 
-	t.Run("skips objects with unresolved nodes", func(t *testing.T) {
+	t.Run("skips objects with unresolved nodes", func(_ *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
 		ctx.Modules = append(ctx.Modules, mod)
@@ -1483,7 +1483,7 @@ func TestLinkObjectIndexes(t *testing.T) {
 		testutil.Len(t, rowObj.Index(), 0, "index entries should be empty when index node has no object")
 	})
 
-	t.Run("nil resolved module skipped", func(t *testing.T) {
+	t.Run("nil resolved module skipped", func(_ *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
 		ctx.Modules = append(ctx.Modules, mod)
@@ -1786,13 +1786,13 @@ func TestRegisterCapability(t *testing.T) {
 	ctx.ModuleToResolved[mod] = resolvedMod
 
 	node := buildOIDPath(ctx.Mib.Root(), 1, 1)
-	cap := newCapability("testCapability")
+	capability := newCapability("testCapability")
 
-	registerCapability(ctx, mod, node, cap)
+	registerCapability(ctx, mod, node, capability)
 
 	testutil.Len(t, ctx.Mib.Capabilities(), 1, "mib capabilities")
 	testutil.NotNil(t, node.Capability(), "node capability")
-	testutil.Equal(t, cap, node.Capability(), "node capability")
+	testutil.Equal(t, capability, node.Capability(), "node capability")
 	testutil.Len(t, resolvedMod.Capabilities(), 1, "module capabilities")
 }
 

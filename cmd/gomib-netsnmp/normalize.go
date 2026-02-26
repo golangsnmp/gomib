@@ -146,7 +146,7 @@ func findAllDirs(roots []string) ([]string, error) {
 
 		err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
-				return nil // skip inaccessible
+				return nil //nolint:nilerr // intentionally skip inaccessible entries
 			}
 			if d.IsDir() && !seen[path] {
 				seen[path] = true

@@ -111,7 +111,7 @@ func collectAndSort(nodes map[string]*NormalizedNode, include func(*NormalizedNo
 	return entries
 }
 
-func generateTableTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateTableTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "tableTests"
 	}
@@ -152,7 +152,7 @@ func generateTableTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 	return 0
 }
 
-func generateOIDTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateOIDTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "oidTests"
 	}
@@ -179,7 +179,7 @@ func generateOIDTests(w io.Writer, nodes map[string]*NormalizedNode, modules []s
 	return 0
 }
 
-func generateEnumTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateEnumTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "enumTests"
 	}
@@ -219,7 +219,7 @@ func generateEnumTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 	return 0
 }
 
-func generateAccessTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateAccessTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "accessTests"
 	}
@@ -247,7 +247,7 @@ func generateAccessTests(w io.Writer, nodes map[string]*NormalizedNode, modules 
 	return 0
 }
 
-func generateAugmentsTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateAugmentsTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "augmentsTests"
 	}
@@ -268,7 +268,7 @@ func generateAugmentsTests(w io.Writer, nodes map[string]*NormalizedNode, module
 	return 0
 }
 
-func generateRangeTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateRangeTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "rangeTests"
 	}
@@ -305,7 +305,7 @@ func generateRangeTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 	return 0
 }
 
-func generateBitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateBitsTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "bitsTests"
 	}
@@ -344,7 +344,7 @@ func generateBitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 	return 0
 }
 
-func generateHintTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateHintTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "hintTests"
 	}
@@ -371,7 +371,7 @@ func generateHintTests(w io.Writer, nodes map[string]*NormalizedNode, modules []
 	return 0
 }
 
-func generateUnitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateUnitsTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "unitsTests"
 	}
@@ -398,7 +398,7 @@ func generateUnitsTests(w io.Writer, nodes map[string]*NormalizedNode, modules [
 	return 0
 }
 
-func generateDefvalTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateDefvalTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "defvalTests"
 	}
@@ -425,7 +425,7 @@ func generateDefvalTests(w io.Writer, nodes map[string]*NormalizedNode, modules 
 	return 0
 }
 
-func generateNotificationTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateNotificationTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "notificationTests"
 	}
@@ -463,7 +463,7 @@ func generateNotificationTests(w io.Writer, nodes map[string]*NormalizedNode, mo
 	return 0
 }
 
-func generateTCTests(w io.Writer, nodes map[string]*NormalizedNode, modules []string, varName string) int {
+func generateTCTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string, varName string) int {
 	if varName == "" {
 		varName = "tcTests"
 	}

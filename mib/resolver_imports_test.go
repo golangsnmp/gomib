@@ -644,7 +644,7 @@ func TestResolveTransitiveImports(t *testing.T) {
 		testutil.Equal(t, modD, ctx.ModuleImports[modC]["x"], "expected C->D, got C->")
 	})
 
-	t.Run("cycle does not panic", func(t *testing.T) {
+	t.Run("cycle does not panic", func(_ *testing.T) {
 		ctx := newTestContext()
 		modA := &module.Module{Name: "A"}
 		modB := &module.Module{Name: "B"}

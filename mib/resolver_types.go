@@ -433,12 +433,12 @@ func syntaxToBaseType(syntax module.TypeSyntax) (BaseType, bool) {
 func rangesToConstraint(ranges []module.Range) []Range {
 	out := make([]Range, 0, len(ranges))
 	for _, r := range ranges {
-		min := rangeValueToI64(r.Min)
-		max := min
+		lo := rangeValueToI64(r.Min)
+		hi := lo
 		if r.Max != nil {
-			max = rangeValueToI64(r.Max)
+			hi = rangeValueToI64(r.Max)
 		}
-		out = append(out, Range{Min: min, Max: max})
+		out = append(out, Range{Min: lo, Max: hi})
 	}
 	return out
 }

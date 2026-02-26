@@ -261,9 +261,9 @@ func expandDirs(roots []string) []string {
 			continue
 		}
 
-		filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // error intentionally ignored
 			if err != nil {
-				return nil
+				return nil //nolint:nilerr // intentionally skip inaccessible entries
 			}
 			if d.IsDir() && !seen[path] {
 				seen[path] = true

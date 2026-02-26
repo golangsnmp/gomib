@@ -23,7 +23,7 @@ func registerModules(ctx *resolverContext) {
 		userModules = append(userModules, mod)
 	}
 
-	ctx.Modules = append(baseModules, userModules...)
+	ctx.Modules = slices.Concat(baseModules, userModules)
 
 	for _, mod := range ctx.Modules {
 		resolved := newModule(mod.Name)
@@ -32,14 +32,16 @@ func registerModules(ctx *resolverContext) {
 		resolved.setImports(groupImports(mod.Imports))
 
 		for _, def := range mod.Definitions {
-			if mi, ok := def.(*module.ModuleIdentity); ok {
-				resolved.setOrganization(mi.Organization)
-				resolved.setContactInfo(mi.ContactInfo)
-				resolved.setDescription(mi.Description)
-				resolved.setLastUpdated(mi.LastUpdated)
-				resolved.setRevisions(convertRevisions(mi.Revisions))
-				break
+			mi, ok := def.(*module.ModuleIdentity)
+			if !ok {
+				continue
 			}
+			resolved.setOrganization(mi.Organization)
+			resolved.setContactInfo(mi.ContactInfo)
+			resolved.setDescription(mi.Description)
+			resolved.setLastUpdated(mi.LastUpdated)
+			resolved.setRevisions(convertRevisions(mi.Revisions))
+			break
 		}
 
 		ctx.Mib.addModule(resolved)

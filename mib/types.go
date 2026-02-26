@@ -225,15 +225,16 @@ type ComplianceObject struct {
 }
 
 // clone returns a deep copy of the ComplianceModule.
-func (cm ComplianceModule) clone() ComplianceModule {
-	cm.MandatoryGroups = slices.Clone(cm.MandatoryGroups)
-	cm.Groups = slices.Clone(cm.Groups)
-	cm.Objects = slices.Clone(cm.Objects)
-	for i := range cm.Objects {
-		cm.Objects[i].Syntax = cm.Objects[i].Syntax.clone()
-		cm.Objects[i].WriteSyntax = cm.Objects[i].WriteSyntax.clone()
+func (cm *ComplianceModule) clone() ComplianceModule {
+	result := *cm
+	result.MandatoryGroups = slices.Clone(cm.MandatoryGroups)
+	result.Groups = slices.Clone(cm.Groups)
+	result.Objects = slices.Clone(cm.Objects)
+	for i := range result.Objects {
+		result.Objects[i].Syntax = result.Objects[i].Syntax.clone()
+		result.Objects[i].WriteSyntax = result.Objects[i].WriteSyntax.clone()
 	}
-	return cm
+	return result
 }
 
 // CapabilitiesModule is a SUPPORTS clause within an AGENT-CAPABILITIES definition.
@@ -245,16 +246,17 @@ type CapabilitiesModule struct {
 }
 
 // clone returns a deep copy of the CapabilitiesModule.
-func (cm CapabilitiesModule) clone() CapabilitiesModule {
-	cm.Includes = slices.Clone(cm.Includes)
-	cm.ObjectVariations = slices.Clone(cm.ObjectVariations)
-	for i := range cm.ObjectVariations {
-		cm.ObjectVariations[i].Syntax = cm.ObjectVariations[i].Syntax.clone()
-		cm.ObjectVariations[i].WriteSyntax = cm.ObjectVariations[i].WriteSyntax.clone()
-		cm.ObjectVariations[i].CreationRequires = slices.Clone(cm.ObjectVariations[i].CreationRequires)
+func (cm *CapabilitiesModule) clone() CapabilitiesModule {
+	result := *cm
+	result.Includes = slices.Clone(cm.Includes)
+	result.ObjectVariations = slices.Clone(cm.ObjectVariations)
+	for i := range result.ObjectVariations {
+		result.ObjectVariations[i].Syntax = result.ObjectVariations[i].Syntax.clone()
+		result.ObjectVariations[i].WriteSyntax = result.ObjectVariations[i].WriteSyntax.clone()
+		result.ObjectVariations[i].CreationRequires = slices.Clone(result.ObjectVariations[i].CreationRequires)
 	}
-	cm.NotificationVariations = slices.Clone(cm.NotificationVariations)
-	return cm
+	result.NotificationVariations = slices.Clone(cm.NotificationVariations)
+	return result
 }
 
 // ObjectVariation is an object VARIATION within AGENT-CAPABILITIES.

@@ -233,7 +233,7 @@ func (d trapTypeRef) defName() string {
 	return d.notif.Name
 }
 
-func (d trapTypeRef) trapInfo() (string, uint32, types.Span, bool) {
+func (d trapTypeRef) trapInfo() (enterprise string, trapNumber uint32, span types.Span, ok bool) {
 	if d.notif.TrapInfo == nil {
 		return "", 0, types.Span{}, false
 	}
@@ -266,12 +266,13 @@ func collectOidDefinitions(ctx *resolverContext) collectedOidDefinitions {
 			case *module.ObjectIdentity:
 				kind = defObjectIdentity
 			case *module.Notification:
-				if d.Oid != nil {
+				switch {
+				case d.Oid != nil:
 					kind = defNotification
-				} else if d.TrapInfo != nil {
+				case d.TrapInfo != nil:
 					defs.trapDefs = append(defs.trapDefs, trapTypeRef{mod: mod, notif: d})
 					continue
-				} else {
+				default:
 					continue
 				}
 			case *module.ValueAssignment:
@@ -439,6 +440,8 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 		switch def.kind {
 		case defValueAssignment, defObjectIdentity, defModuleIdentity:
 			newMod.addNode(node)
+		case defObjectType, defNotification, defObjectGroup, defNotificationGroup, defModuleCompliance, defAgentCapabilities:
+			// Handled in the semantics phase.
 		}
 		if def.kind == defModuleIdentity {
 			newMod.setOID(node.OID())
@@ -558,7 +561,7 @@ func wellKnownRootArc(name string) int {
 
 // shouldPreferModule determines if newMod should replace currentMod as the node's module.
 // Preference order: SMIv2 > SMIv1 > Unknown, with newer LAST-UPDATED as tiebreaker.
-func shouldPreferModule(ctx *resolverContext, newMod, currentMod *Module, srcMod *module.Module) bool {
+func shouldPreferModule(ctx *resolverContext, _, currentMod *Module, srcMod *module.Module) bool {
 	if currentMod == nil {
 		return true
 	}

@@ -1,0 +1,60 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - exhaustive
+    - gocritic
+    - gosec
+    - mirror
+    - modernize
+    - nakedret
+    - nilerr
+    - nolintlint
+    - perfsprint
+    - predeclared
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+    - intrange
+
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+    gocritic:
+      enabled-tags: [diagnostic, style, performance, opinionated]
+    exhaustive:
+      default-signifies-exhaustive: true
+    nakedret:
+      max-func-lines: 30
+
+  exclusions:
+    presets: [comments, std-error-handling, common-false-positives]
+    rules:
+      - path: _test\.go
+        linters: [gosec, gocritic]
+      - path: cmd/gomib-(netsnmp|libsmi)/
+        text: dupImport
+        linters: [gocritic]
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      extra-rules: true
+    goimports:
+      local-prefixes:
+        - github.com/golangsnmp/gomib
+
+run:
+  timeout: 5m

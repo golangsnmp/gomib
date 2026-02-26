@@ -113,7 +113,7 @@ func validateTestFiles(dir string, netsnmp map[string]*NormalizedNode) *Validati
 
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // intentionally skip inaccessible entries
 		}
 		if !d.IsDir() && strings.HasSuffix(path, "_test.go") {
 			result.FilesChecked++

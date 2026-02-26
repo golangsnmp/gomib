@@ -151,7 +151,7 @@ func (c *cli) cmdLint(args []string) int {
 		return 1
 	}
 
-	result := c.runLint(modules, cfg)
+	result := c.runLint(modules, &cfg)
 
 	if !cfg.quiet {
 		var err error
@@ -161,9 +161,9 @@ func (c *cli) cmdLint(args []string) int {
 		case "sarif":
 			err = printLintSARIF(result)
 		case "compact":
-			printLintCompact(result, cfg)
+			printLintCompact(result, &cfg)
 		default:
-			printLintText(result, cfg)
+			printLintText(result, &cfg)
 		}
 		if err != nil {
 			printError("output encoding failed: %v", err)
@@ -174,7 +174,7 @@ func (c *cli) cmdLint(args []string) int {
 	return result.ExitCode
 }
 
-func (c *cli) runLint(modules []string, cfg lintConfig) *lintResult {
+func (c *cli) runLint(modules []string, cfg *lintConfig) *lintResult {
 	diagCfg := mib.DiagnosticConfig{
 		Level:  mib.StrictnessLevel(cfg.level),
 		FailAt: mib.SeverityFatal, // We handle failure ourselves
@@ -242,7 +242,7 @@ func matchesAny(code string, patterns []string) bool {
 	return false
 }
 
-func printLintText(result *lintResult, cfg lintConfig) {
+func printLintText(result *lintResult, cfg *lintConfig) {
 	if cfg.summary {
 		printLintSummary(result)
 		return
@@ -268,8 +268,8 @@ func printLintText(result *lintResult, cfg lintConfig) {
 }
 
 func printLintFlat(result *lintResult) {
-	for _, d := range result.Diagnostics {
-		printLintDiagLine(d)
+	for i := range result.Diagnostics {
+		printLintDiagLine(&result.Diagnostics[i])
 	}
 }
 
@@ -291,9 +291,9 @@ func printLintByModule(result *lintResult) {
 
 	for _, mod := range mods {
 		fmt.Printf("\n%s:\n", mod)
-		for _, d := range byMod[mod] {
+		for i := range byMod[mod] {
 			fmt.Printf("  ")
-			printLintDiagLine(d)
+			printLintDiagLine(&byMod[mod][i])
 		}
 	}
 }
@@ -347,15 +347,15 @@ func printLintBySeverity(result *lintResult) {
 		diags := bySev[sev]
 		if len(diags) > 0 {
 			fmt.Printf("\n%s (%d):\n", diags[0].Severity, len(diags))
-			for _, d := range diags {
+			for i := range diags {
 				fmt.Printf("  ")
-				printLintDiagLineNoSeverity(d)
+				printLintDiagLineNoSeverity(&diags[i])
 			}
 		}
 	}
 }
 
-func printLintDiagLine(d lintDiagnostic) {
+func printLintDiagLine(d *lintDiagnostic) {
 	parts := []string{d.Severity + ":"}
 	if d.Code != "" {
 		parts = append(parts, "["+d.Code+"]")
@@ -371,7 +371,7 @@ func printLintDiagLine(d lintDiagnostic) {
 	fmt.Println(strings.Join(parts, " "))
 }
 
-func printLintDiagLineNoSeverity(d lintDiagnostic) {
+func printLintDiagLineNoSeverity(d *lintDiagnostic) {
 	parts := []string{}
 	if d.Code != "" {
 		parts = append(parts, "["+d.Code+"]")
@@ -398,7 +398,7 @@ func printLintSummary(result *lintResult) {
 	}
 }
 
-func printLintCompact(result *lintResult, cfg lintConfig) {
+func printLintCompact(result *lintResult, cfg *lintConfig) {
 	if cfg.summary {
 		fmt.Printf("%d issues", result.Summary.Total)
 		parts := []string{}

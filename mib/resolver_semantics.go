@@ -310,11 +310,12 @@ func createResolvedNotifications(ctx *resolverContext) {
 				}
 			}
 
-			if ok && objNode.Object() != nil {
+			switch {
+			case ok && objNode.Object() != nil:
 				resolved.addObject(objNode.Object())
-			} else if !ok {
+			case !ok:
 				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
-			} else {
+			default:
 				// Node exists but has no object definition (intermediate node
 				// or non-object definition).
 				ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, SeverityMinor, ref.mod, notif.Span,
@@ -519,8 +520,8 @@ func convertComplianceModules(ctx *resolverContext, mod *module.Module, modules 
 					Object:      o.Object,
 					Description: o.Description,
 				}
-				objects[j].Syntax = resolveSyntaxConstraints(ctx, o.Syntax, mod, o.Object, types.Span{})
-				objects[j].WriteSyntax = resolveSyntaxConstraints(ctx, o.WriteSyntax, mod, o.Object, types.Span{})
+				objects[j].Syntax = resolveSyntaxConstraints(ctx, o.Syntax, mod, o.Object)
+				objects[j].WriteSyntax = resolveSyntaxConstraints(ctx, o.WriteSyntax, mod, o.Object)
 				if o.MinAccess != nil {
 					objects[j].MinAccess = o.MinAccess
 				}
@@ -534,25 +535,25 @@ func convertComplianceModules(ctx *resolverContext, mod *module.Module, modules 
 func createResolvedCapabilities(ctx *resolverContext) {
 	created := 0
 	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (capabilitiesRef, bool) {
-		if cap, ok := def.(*module.AgentCapabilities); ok {
-			return capabilitiesRef{mod: mod, cap: cap}, true
+		if ac, ok := def.(*module.AgentCapabilities); ok {
+			return capabilitiesRef{mod: mod, cap: ac}, true
 		}
 		return capabilitiesRef{}, false
 	}) {
-		cap := ref.cap
-		node, ok := ctx.LookupNodeForModule(ref.mod, cap.Name)
+		ac := ref.cap
+		node, ok := ctx.LookupNodeForModule(ref.mod, ac.Name)
 		if !ok {
 			continue
 		}
 
-		resolved := newCapability(cap.Name)
+		resolved := newCapability(ac.Name)
 		resolved.setNode(node)
 		resolved.setModule(ctx.ModuleToResolved[ref.mod])
-		resolved.setStatus(cap.Status)
-		resolved.setDescription(cap.Description)
-		resolved.setReference(cap.Reference)
-		resolved.setProductRelease(cap.ProductRelease)
-		resolved.setSupports(convertSupportsModules(ctx, ref.mod, cap.Supports))
+		resolved.setStatus(ac.Status)
+		resolved.setDescription(ac.Description)
+		resolved.setReference(ac.Reference)
+		resolved.setProductRelease(ac.ProductRelease)
+		resolved.setSupports(convertSupportsModules(ctx, ref.mod, ac.Supports))
 
 		registerCapability(ctx, ref.mod, node, resolved)
 		created++
@@ -571,7 +572,7 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 			Includes:   m.Includes,
 		}
 		for _, v := range m.Variations {
-			if isNotificationVariation(ctx, mod, m.ModuleName, v) {
+			if isNotificationVariation(ctx, mod, m.ModuleName, &v) {
 				nv := NotificationVariation{
 					Notification: v.Name,
 					Description:  v.Description,
@@ -590,8 +591,8 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 					Object:      v.Name,
 					Description: v.Description,
 				}
-				ov.Syntax = resolveSyntaxConstraints(ctx, v.Syntax, mod, v.Name, types.Span{})
-				ov.WriteSyntax = resolveSyntaxConstraints(ctx, v.WriteSyntax, mod, v.Name, types.Span{})
+				ov.Syntax = resolveSyntaxConstraints(ctx, v.Syntax, mod, v.Name)
+				ov.WriteSyntax = resolveSyntaxConstraints(ctx, v.WriteSyntax, mod, v.Name)
 				if len(v.CreationRequires) > 0 {
 					ov.CreationRequires = slices.Clone(v.CreationRequires)
 				}
@@ -615,7 +616,7 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 // the defining module's imports, and (permissively) globally. If the name
 // cannot be resolved, it falls back to a syntactic heuristic: variations with
 // SYNTAX, WRITE-SYNTAX, CREATION-REQUIRES, or DEFVAL are object variations.
-func isNotificationVariation(ctx *resolverContext, mod *module.Module, supportsModule string, v module.Variation) bool {
+func isNotificationVariation(ctx *resolverContext, mod *module.Module, supportsModule string, v *module.Variation) bool {
 	// Try the SUPPORTS module first (most correct per RFC 2580).
 	if node, ok := ctx.LookupNodeInModule(supportsModule, v.Name); ok {
 		return node.Kind() == KindNotification
@@ -651,12 +652,12 @@ func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*N
 	return nil, false
 }
 
-func resolveSyntaxConstraints(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, ownerName string, span types.Span) *SyntaxConstraints {
+func resolveSyntaxConstraints(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, ownerName string) *SyntaxConstraints {
 	if syntax == nil {
 		return nil
 	}
 	sc := &SyntaxConstraints{}
-	if t, ok := resolveTypeSyntax(ctx, syntax, mod, ownerName, span); ok {
+	if t, ok := resolveTypeSyntax(ctx, syntax, mod, ownerName, types.Span{}); ok {
 		sc.Type = t
 	}
 	sc.Sizes, sc.Ranges = extractConstraints(syntax)

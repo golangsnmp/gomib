@@ -33,21 +33,22 @@ func ParseOID(s string) (OID, error) {
 	var hasDigit bool
 	for i := range len(s) {
 		c := s[i]
-		if c >= '0' && c <= '9' {
+		switch {
+		case c >= '0' && c <= '9':
 			digit := uint32(c - '0')
 			if current > math.MaxUint32/10 || (current == math.MaxUint32/10 && digit > math.MaxUint32%10) {
 				return nil, fmt.Errorf("arc value overflow in OID: %s", s)
 			}
 			current = current*10 + digit
 			hasDigit = true
-		} else if c == '.' {
+		case c == '.':
 			if !hasDigit {
 				return nil, fmt.Errorf("empty arc in OID: %s", s)
 			}
 			arcs = append(arcs, current)
 			current = 0
 			hasDigit = false
-		} else {
+		default:
 			return nil, fmt.Errorf("invalid character in OID: %c", c)
 		}
 	}
