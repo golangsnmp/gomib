@@ -328,7 +328,7 @@ func lowerNotificationType(def *ast.NotificationTypeDef, ctx *LoweringContext) *
 	}
 }
 
-func lowerTrapType(def *ast.TrapTypeDef, ctx *LoweringContext) *Notification {
+func lowerTrapType(def *ast.TrapTypeDef, _ *LoweringContext) *Notification {
 	return &Notification{
 		Name:        def.Name.Name,
 		Objects:     identNames(def.Variables),
@@ -472,8 +472,8 @@ func lowerComplianceObject(o *ast.ComplianceObject, ctx *LoweringContext) Compli
 
 func lowerAgentCapabilities(def *ast.AgentCapabilitiesDef, ctx *LoweringContext) *AgentCapabilities {
 	supports := make([]SupportsModule, len(def.Supports))
-	for i, s := range def.Supports {
-		supports[i] = lowerSupportsModule(s, ctx)
+	for i := range def.Supports {
+		supports[i] = lowerSupportsModule(&def.Supports[i], ctx)
 	}
 
 	return &AgentCapabilities{
@@ -488,7 +488,7 @@ func lowerAgentCapabilities(def *ast.AgentCapabilitiesDef, ctx *LoweringContext)
 	}
 }
 
-func lowerSupportsModule(s ast.SupportsModule, ctx *LoweringContext) SupportsModule {
+func lowerSupportsModule(s *ast.SupportsModule, ctx *LoweringContext) SupportsModule {
 	var variations []Variation
 	for _, v := range s.Variations {
 		variations = append(variations, lowerVariation(&v, ctx))

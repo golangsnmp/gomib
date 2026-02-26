@@ -191,9 +191,9 @@ func findAllModules(mibPaths []string) []string {
 	}
 
 	for _, root := range mibPaths {
-		filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // error intentionally ignored
 			if err != nil || d.IsDir() {
-				return nil
+				return nil //nolint:nilerr // intentionally skip inaccessible entries
 			}
 
 			ext := strings.ToLower(filepath.Ext(path))

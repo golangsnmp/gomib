@@ -348,8 +348,8 @@ type LibsmiNode struct {
 // level (0=fatal through 6=info).
 func InitLibsmi(mibPath string, errorLevel int) {
 	cPath := C.CString(mibPath)
-	defer C.free(unsafe.Pointer(cPath))
 	C.init_libsmi(cPath, C.int(errorLevel))
+	C.free(unsafe.Pointer(cPath))
 }
 
 // CleanupLibsmi frees all collected data and calls smiExit.
@@ -426,8 +426,8 @@ func GetModuleInfo(name string) *LibsmiModule {
 // internal collection. Call GetNodes to retrieve and ClearNodes to reset.
 func CollectNodes(moduleName string) {
 	cName := C.CString(moduleName)
-	defer C.free(unsafe.Pointer(cName))
 	C.collect_all_nodes_from_module(cName)
+	C.free(unsafe.Pointer(cName))
 }
 
 // GetNodes returns all nodes accumulated by CollectNodes calls.

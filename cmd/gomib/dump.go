@@ -367,20 +367,20 @@ func buildComplianceJSON(comp *mib.Compliance, opts JSONOptions) ComplianceJSON 
 	return c
 }
 
-func buildCapabilityJSON(cap *mib.Capability, opts JSONOptions) CapabilityJSON {
+func buildCapabilityJSON(capability *mib.Capability, opts JSONOptions) CapabilityJSON {
 	c := CapabilityJSON{
-		Name:           cap.Name(),
-		OID:            cap.OID().String(),
-		Status:         cap.Status().String(),
-		ProductRelease: cap.ProductRelease(),
+		Name:           capability.Name(),
+		OID:            capability.OID().String(),
+		Status:         capability.Status().String(),
+		ProductRelease: capability.ProductRelease(),
 	}
-	if cap.Module() != nil {
-		c.Module = cap.Module().Name()
+	if capability.Module() != nil {
+		c.Module = capability.Module().Name()
 	}
 	if opts.IncludeDescr {
-		c.Description = cap.Description()
+		c.Description = capability.Description()
 	}
-	for _, s := range cap.Supports() {
+	for _, s := range capability.Supports() {
 		c.Supports = append(c.Supports, CapabilitiesModuleJSON{
 			Module:   s.ModuleName,
 			Includes: s.Includes,
@@ -389,7 +389,7 @@ func buildCapabilityJSON(cap *mib.Capability, opts JSONOptions) CapabilityJSON {
 	return c
 }
 
-func buildTreeJSON(node *mib.Node, opts JSONOptions) *TreeNodeJSON {
+func buildTreeJSON(node *mib.Node, opts JSONOptions) *TreeNodeJSON { //nolint:unparam // kept for API consistency
 	t := &TreeNodeJSON{
 		Arc:   node.Arc(),
 		OID:   node.OID().String(),

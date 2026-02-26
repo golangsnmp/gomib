@@ -474,7 +474,7 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 // net-snmp does not directly expose table/row/column/scalar, so we
 // use heuristics: nodes with INDEX or AUGMENTS are rows; the rest
 // cannot be reliably classified without tree context.
-func inferNetSnmpKind(nodeType C.int, indexCount int, augments string) string {
+func inferNetSnmpKind(_ C.int, indexCount int, augments string) string {
 	if indexCount > 0 || augments != "" {
 		return "row"
 	}

@@ -62,12 +62,12 @@ Options:
 		}
 
 		if outDir != "" {
-			if err := os.MkdirAll(outDir, 0o755); err != nil {
+			if err := os.MkdirAll(outDir, 0o750); err != nil {
 				printError("cannot create output directory: %v", err)
 				return 1
 			}
 			path := filepath.Join(outDir, mod+".json")
-			if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+			if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
 				printError("cannot write %s: %v", path, err)
 				return 1
 			}

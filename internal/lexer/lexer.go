@@ -163,10 +163,10 @@ func (l *Lexer) skipToEOL() {
 	}
 }
 
-func (l *Lexer) emitDiagnostic(code string, severity types.Severity, span types.Span, message string) {
+func (l *Lexer) emitDiagnostic(code string, span types.Span, message string) {
 	l.diagnostics = append(l.diagnostics, types.SpanDiagnostic{
 		Code:     code,
-		Severity: severity,
+		Severity: types.SeverityError,
 		Span:     span,
 		Message:  message,
 	})
@@ -288,7 +288,7 @@ func (l *Lexer) nextNormalToken() (Token, bool) {
 
 	l.advance()
 	span := l.spanFrom(start)
-	l.emitDiagnostic(types.DiagUnexpectedCharacter, types.SeverityError, span, fmt.Sprintf("unexpected character: 0x%02x", b))
+	l.emitDiagnostic(types.DiagUnexpectedCharacter, span, fmt.Sprintf("unexpected character: 0x%02x", b))
 	l.skipToEOL()
 	return Token{}, true
 }
@@ -435,20 +435,22 @@ func (l *Lexer) scanIdentifierOrKeyword() Token {
 	firstChar, _ := l.advance()
 	isUppercase := isUpperAlpha(firstChar)
 
+loop:
 	for {
 		b, ok := l.peek()
 		if !ok {
 			break
 		}
-		if isAlphanumeric(b) || b == '_' {
+		switch {
+		case isAlphanumeric(b) || b == '_':
 			l.advance()
-		} else if b == '-' {
+		case b == '-':
 			if next, ok := l.peekAt(1); ok && next == '-' {
-				break
+				break loop
 			}
 			l.advance()
-		} else {
-			break
+		default:
+			break loop
 		}
 	}
 
@@ -462,6 +464,8 @@ func (l *Lexer) scanIdentifierOrKeyword() Token {
 		case TokKwExports:
 			l.state = stateInExports
 			l.Log(slog.LevelDebug, "entering exports", slog.Int("offset", start))
+		default:
+			// no state transition needed for other keywords
 		}
 		return l.token(kind, start)
 	}
@@ -508,7 +512,7 @@ func (l *Lexer) scanQuotedString() Token {
 		b, ok := l.peek()
 		if !ok {
 			span := l.spanFrom(start)
-			l.emitDiagnostic(types.DiagUnterminatedString, types.SeverityError, span, "unterminated string literal")
+			l.emitDiagnostic(types.DiagUnterminatedString, span, "unterminated string literal")
 			return l.token(TokQuotedString, start)
 		}
 		if b == '"' {
@@ -533,7 +537,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 
 	if b, ok := l.peek(); !ok || b != '\'' {
 		span := l.spanFrom(start)
-		l.emitDiagnostic(types.DiagUnterminatedHexBinStr, types.SeverityError, span, "unterminated hex/binary string")
+		l.emitDiagnostic(types.DiagUnterminatedHexBinStr, span, "unterminated hex/binary string")
 		return l.token(TokError, start)
 	}
 	l.advance() // consume closing quote
@@ -541,7 +545,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 	suffix, ok := l.peek()
 	if !ok {
 		span := l.spanFrom(start)
-		l.emitDiagnostic(types.DiagMissingHexBinSuffix, types.SeverityError, span, "expected 'H' or 'B' suffix for hex/binary string")
+		l.emitDiagnostic(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
 		return l.token(TokError, start)
 	}
 
@@ -557,7 +561,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 
 	default:
 		span := l.spanFrom(start)
-		l.emitDiagnostic(types.DiagMissingHexBinSuffix, types.SeverityError, span, "expected 'H' or 'B' suffix for hex/binary string")
+		l.emitDiagnostic(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
 		kind = TokError
 	}
 

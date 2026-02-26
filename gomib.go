@@ -117,14 +117,14 @@ func Load(ctx context.Context, opts ...LoadOption) (*mib.Mib, error) {
 	}
 
 	if cfg.hasModules {
-		return loadModulesByName(ctx, sources, cfg.modules, cfg)
+		return loadModulesByName(ctx, sources, cfg.modules, &cfg)
 	}
-	return loadAllModules(ctx, sources, cfg)
+	return loadAllModules(ctx, sources, &cfg)
 }
 
 // checkLoadResult checks the resolved Mib for diagnostic threshold violations
 // and missing requested modules. Returns nil if no issues found.
-func checkLoadResult(m *mib.Mib, cfg loadConfig, requestedModules []string) error {
+func checkLoadResult(m *mib.Mib, cfg *loadConfig, requestedModules []string) error {
 	var errs []error
 
 	// Check for missing requested modules
