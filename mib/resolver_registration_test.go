@@ -1,6 +1,7 @@
 package mib
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/module"
@@ -114,14 +115,7 @@ func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
 	for _, mod := range ctx.Modules {
 		entries, ok := ctx.ModuleIndex[mod.Name]
 		testutil.True(t, ok, "ModuleIndex missing entry for %q", mod.Name)
-		found := false
-		for _, entry := range entries {
-			if entry == mod {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "ModuleIndex[] does not contain the module pointer")
+		testutil.True(t, slices.Contains(entries, mod), "ModuleIndex[] does not contain the module pointer")
 	}
 }
 

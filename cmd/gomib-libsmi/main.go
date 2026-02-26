@@ -2,8 +2,6 @@
 
 // Command gomib-libsmi compares gomib against libsmi for lexer/parser cross-validation.
 // Build with: CGO_ENABLED=1 go build -tags cgo ./cmd/gomib-libsmi
-//
-//nolint:errcheck // CLI tool, fmt output errors are not critical
 package main
 
 import (

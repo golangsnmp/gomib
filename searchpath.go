@@ -186,11 +186,11 @@ func parseLibSMILine(line string) (pathOp, []string, bool) {
 // parseColonSemantic interprets leading/trailing colon semantics.
 // Leading colon = append, trailing colon = prepend, neither = replace.
 func parseColonSemantic(value string) (pathOp, []string) {
-	if strings.HasPrefix(value, ":") {
-		return pathAppend, splitPaths(strings.TrimPrefix(value, ":"))
+	if after, ok := strings.CutPrefix(value, ":"); ok {
+		return pathAppend, splitPaths(after)
 	}
-	if strings.HasSuffix(value, ":") {
-		return pathPrepend, splitPaths(strings.TrimSuffix(value, ":"))
+	if before, ok := strings.CutSuffix(value, ":"); ok {
+		return pathPrepend, splitPaths(before)
 	}
 	return pathReplace, splitPaths(value)
 }
@@ -226,7 +226,7 @@ func applyConfigFile(path string, current []string, parseLine func(string) (path
 	if err != nil {
 		return current
 	}
-	defer f.Close() //nolint:errcheck // best-effort config file read
+	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -247,7 +247,7 @@ func splitPaths(s string) []string {
 		return nil
 	}
 	var result []string
-	for _, p := range strings.Split(s, ":") {
+	for p := range strings.SplitSeq(s, ":") {
 		if p != "" {
 			result = append(result, p)
 		}

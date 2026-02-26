@@ -118,7 +118,7 @@ func TestSortedChildrenConcurrent(t *testing.T) {
 	// Access Children() concurrently from multiple goroutines.
 	// Run with -race to verify no data race on sortedCache.
 	var wg sync.WaitGroup
-	for i := 0; i < 32; i++ {
+	for range 32 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

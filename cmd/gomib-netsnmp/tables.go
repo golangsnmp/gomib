@@ -1,6 +1,5 @@
 //go:build cgo
 
-//nolint:errcheck // CLI output, errors not critical
 package main
 
 import (
@@ -207,8 +206,8 @@ func compareTables(netsnmp, gomib map[string]*NormalizedNode, detailed bool) *Ta
 }
 
 func getTableName(rowName string) string {
-	if strings.HasSuffix(rowName, "Entry") {
-		return strings.TrimSuffix(rowName, "Entry") + "Table"
+	if base, ok := strings.CutSuffix(rowName, "Entry"); ok {
+		return base + "Table"
 	}
 	return rowName + "Table"
 }
@@ -256,7 +255,8 @@ func printTableComparisonResult(w io.Writer, result *TableComparisonResult, deta
 
 	if detailed && len(result.Tables) > 0 {
 		fmt.Fprintf(w, "\nDetailed table comparison:\n")
-		for _, tc := range result.Tables {
+		for i := range result.Tables {
+			tc := &result.Tables[i]
 			status := "OK"
 			if !tc.IndexMatch {
 				status = "INDEX MISMATCH"

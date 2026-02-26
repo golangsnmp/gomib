@@ -93,7 +93,7 @@ func run() int {
 			c.paths = append(c.paths, arg[2:])
 		case strings.HasPrefix(arg, "--path="):
 			c.paths = append(c.paths, arg[7:])
-		case len(arg) > 0 && arg[0] == '-':
+		case arg != "" && arg[0] == '-':
 			cmdArgs = append(cmdArgs, arg)
 		default:
 			if cmd == "" {

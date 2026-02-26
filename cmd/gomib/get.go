@@ -224,10 +224,10 @@ func resolveQuery(m *mib.Mib, query string) *mib.Node {
 
 	// Numeric OID string
 	q := query
-	if len(q) > 0 && q[0] == '.' {
+	if q != "" && q[0] == '.' {
 		q = q[1:]
 	}
-	if len(q) > 0 && q[0] >= '0' && q[0] <= '9' {
+	if q != "" && q[0] >= '0' && q[0] <= '9' {
 		oid, err := mib.ParseOID(q)
 		if err != nil || len(oid) == 0 {
 			return nil
@@ -395,7 +395,7 @@ func printNodeTree(node *mib.Node, maxDepth int) {
 	printNodeTreeRecursive(node, 0, maxDepth)
 }
 
-func printNodeTreeRecursive(node *mib.Node, depth int, maxDepth int) {
+func printNodeTreeRecursive(node *mib.Node, depth, maxDepth int) {
 	if maxDepth > 0 && depth > maxDepth {
 		return
 	}

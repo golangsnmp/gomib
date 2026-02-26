@@ -2,6 +2,7 @@ package gomib
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -83,7 +84,7 @@ func TestDirSourceFindNotExist(t *testing.T) {
 	if err == nil {
 		t.Fatal("Find should fail for non-existent module")
 	}
-	testutil.True(t, err == fs.ErrNotExist, "error should be fs.ErrNotExist, got %v", err)
+	testutil.True(t, errors.Is(err, fs.ErrNotExist), "error should be fs.ErrNotExist, got %v", err)
 }
 
 func TestDirTreeSourceFindAcrossSubdirs(t *testing.T) {
@@ -103,7 +104,7 @@ func TestDirTreeSourceFindNotExist(t *testing.T) {
 	if err == nil {
 		t.Fatal("Find should fail for non-existent module")
 	}
-	testutil.True(t, err == fs.ErrNotExist, "error should be fs.ErrNotExist")
+	testutil.True(t, errors.Is(err, fs.ErrNotExist), "error should be fs.ErrNotExist")
 }
 
 func TestFSSource(t *testing.T) {
@@ -145,7 +146,7 @@ func TestFSSourceFindNotExist(t *testing.T) {
 	if err == nil {
 		t.Fatal("Find should fail in empty FS source")
 	}
-	testutil.True(t, err == fs.ErrNotExist, "error should be fs.ErrNotExist")
+	testutil.True(t, errors.Is(err, fs.ErrNotExist), "error should be fs.ErrNotExist")
 }
 
 func TestFSSourceListModulesEmpty(t *testing.T) {
@@ -227,7 +228,7 @@ func TestMultiSourceListModulesCombines(t *testing.T) {
 func TestMultiSourceListModulesDeduplicates(t *testing.T) {
 	tmpDir := t.TempDir()
 	content := []byte("X DEFINITIONS ::= BEGIN\nEND\n")
-	err := os.WriteFile(filepath.Join(tmpDir, "SHARED-MIB.mib"), content, 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "SHARED-MIB.mib"), content, 0o644)
 	testutil.NoError(t, err, "write file")
 
 	src1, err := Dir(tmpDir)
@@ -255,7 +256,7 @@ func TestMultiSourceFindNotExist(t *testing.T) {
 
 	multi := Multi(src1)
 	_, err = multi.Find("TOTALLY-NONEXISTENT-MODULE")
-	testutil.True(t, err == fs.ErrNotExist, "Multi.Find should return fs.ErrNotExist")
+	testutil.True(t, errors.Is(err, fs.ErrNotExist), "Multi.Find should return fs.ErrNotExist")
 }
 
 func TestWithExtensions(t *testing.T) {
@@ -270,7 +271,7 @@ extTestMIB MODULE-IDENTITY
     ::= { enterprises 99996 }
 END
 `
-	err := os.WriteFile(filepath.Join(tmpDir, "EXT-TEST-MIB.custom"), []byte(content), 0644)
+	err := os.WriteFile(filepath.Join(tmpDir, "EXT-TEST-MIB.custom"), []byte(content), 0o644)
 	testutil.NoError(t, err, "write test file")
 
 	srcDefault, err := Dir(tmpDir)

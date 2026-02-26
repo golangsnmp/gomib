@@ -1,6 +1,5 @@
 //go:build cgo
 
-//nolint:errcheck // CLI output, errors not critical
 package main
 
 import (
@@ -130,9 +129,9 @@ Options:
 
 	if fieldFilter != "" {
 		var filtered []Mismatch
-		for _, m := range result.Mismatches {
-			if m.Field == fieldFilter {
-				filtered = append(filtered, m)
+		for i := range result.Mismatches {
+			if result.Mismatches[i].Field == fieldFilter {
+				filtered = append(filtered, result.Mismatches[i])
 			}
 		}
 		result.Mismatches = filtered
@@ -171,12 +170,13 @@ func makeMismatch(oid, field, gomibVal, netsnmpVal string, gNode, nsNode *Normal
 
 // compareStringField compares a string field, tracking match/mismatch/missing.
 func (r *ComparisonResult) compareStringField(counts *CountPair, oid, field, gVal, nsVal string, eq func(string, string) bool, gNode, nsNode *NormalizedNode) {
-	if eq(gVal, nsVal) {
+	switch {
+	case eq(gVal, nsVal):
 		counts.Match++
-	} else if gVal != "" {
+	case gVal != "":
 		counts.Mismatch++
 		r.Mismatches = append(r.Mismatches, makeMismatch(oid, field, gVal, nsVal, gNode, nsNode))
-	} else {
+	default:
 		counts.Missing++
 		r.Mismatches = append(r.Mismatches, makeMismatch(oid, field, "", nsVal, gNode, nsNode))
 	}
@@ -413,7 +413,7 @@ func isHexAllOnes(s string) bool {
 		return false
 	}
 	hex := strings.ToUpper(s[2:])
-	if len(hex) == 0 {
+	if hex == "" {
 		return false
 	}
 	for _, c := range hex {
@@ -430,7 +430,7 @@ func isHexZeros(s string) bool {
 		return false
 	}
 	hex := s[2:]
-	if len(hex) == 0 {
+	if hex == "" {
 		return false
 	}
 	for _, c := range hex {
@@ -485,7 +485,7 @@ func formatEnums(enums map[int]string) string {
 	return "{ " + strings.Join(parts, ", ") + " }"
 }
 
-func printComparisonResult(w io.Writer, result *ComparisonResult, exampleLimit int, categorize bool, investigateOnly bool) {
+func printComparisonResult(w io.Writer, result *ComparisonResult, exampleLimit int, categorize, investigateOnly bool) {
 	fmt.Fprintln(w, strings.Repeat("=", 70))
 	fmt.Fprintln(w, "GOMIB vs NET-SNMP COMPARISON RESULTS")
 	fmt.Fprintln(w, strings.Repeat("=", 70))
@@ -519,8 +519,8 @@ func printComparisonResult(w io.Writer, result *ComparisonResult, exampleLimit i
 		fmt.Fprintf(w, "  investigate: %6d  (potential real issues)\n", investigate)
 
 		byField := make(map[string][]Mismatch)
-		for _, m := range result.Mismatches {
-			byField[m.Field] = append(byField[m.Field], m)
+		for i := range result.Mismatches {
+			byField[result.Mismatches[i].Field] = append(byField[result.Mismatches[i].Field], result.Mismatches[i])
 		}
 
 		fieldOrder := []string{"type", "access", "status", "enums", "index", "hint", "tc_name", "units", "ranges", "defval", "bits", "varbinds"}
@@ -554,12 +554,12 @@ func printComparisonResult(w io.Writer, result *ComparisonResult, exampleLimit i
 				if limit == 0 || len(mismatches) < limit {
 					limit = len(mismatches)
 				}
-				for _, m := range mismatches[:limit] {
-					fmt.Fprintf(w, "    %s (%s::%s)\n", m.OID, m.Module, m.Name)
-					if m.GomibModule != "" && m.NetSnmpModule != "" {
-						fmt.Fprintf(w, "      modules: gomib=%s net-snmp=%s\n", m.GomibModule, m.NetSnmpModule)
+				for i := range mismatches[:limit] {
+					fmt.Fprintf(w, "    %s (%s::%s)\n", mismatches[i].OID, mismatches[i].Module, mismatches[i].Name)
+					if mismatches[i].GomibModule != "" && mismatches[i].NetSnmpModule != "" {
+						fmt.Fprintf(w, "      modules: gomib=%s net-snmp=%s\n", mismatches[i].GomibModule, mismatches[i].NetSnmpModule)
 					}
-					fmt.Fprintf(w, "      gomib=%q net-snmp=%q\n", m.Gomib, m.NetSnmp)
+					fmt.Fprintf(w, "      gomib=%q net-snmp=%q\n", mismatches[i].Gomib, mismatches[i].NetSnmp)
 				}
 				if exampleLimit > 0 && len(mismatches) > limit {
 					fmt.Fprintf(w, "    ... and %d more\n", len(mismatches)-limit)
@@ -570,10 +570,7 @@ func printComparisonResult(w io.Writer, result *ComparisonResult, exampleLimit i
 
 	if len(result.MissingInGomib) > 0 {
 		fmt.Fprintf(w, "\nMissing in gomib (first 20):\n")
-		limit := 20
-		if len(result.MissingInGomib) < limit {
-			limit = len(result.MissingInGomib)
-		}
+		limit := min(20, len(result.MissingInGomib))
 		for _, oid := range result.MissingInGomib[:limit] {
 			fmt.Fprintf(w, "  %s\n", oid)
 		}
@@ -630,7 +627,8 @@ func printCategorizedMismatches(w io.Writer, field string, mismatches []Mismatch
 		if showLimit == 0 || len(cat.Mismatches) < showLimit {
 			showLimit = len(cat.Mismatches)
 		}
-		for _, m := range cat.Mismatches[:showLimit] {
+		for i := range cat.Mismatches[:showLimit] {
+			m := &cat.Mismatches[i]
 			fmt.Fprintf(w, "      %s (%s::%s)\n", m.OID, m.Module, m.Name)
 			if m.GomibModule != "" && m.NetSnmpModule != "" {
 				fmt.Fprintf(w, "        modules: gomib=%s net-snmp=%s\n", m.GomibModule, m.NetSnmpModule)
@@ -668,8 +666,8 @@ func categorizeMismatches(field string, mismatches []Mismatch) []MismatchCategor
 
 func countBenignAndInvestigate(mismatches []Mismatch) (benign, investigate int) {
 	byField := make(map[string][]Mismatch)
-	for _, m := range mismatches {
-		byField[m.Field] = append(byField[m.Field], m)
+	for i := range mismatches {
+		byField[mismatches[i].Field] = append(byField[mismatches[i].Field], mismatches[i])
 	}
 
 	for field, fieldMismatches := range byField {
@@ -682,27 +680,29 @@ func countBenignAndInvestigate(mismatches []Mismatch) (benign, investigate int) 
 			}
 		}
 	}
-	return
+
+	return benign, investigate
 }
 
 func categorizeRanges(mismatches []Mismatch) []MismatchCategory {
 	var overlap, signedUnsigned, countDiff, valueDiff, other []Mismatch
 
-	for _, m := range mismatches {
+	for i := range mismatches {
+		m := &mismatches[i]
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
-			overlap = append(overlap, m)
+			overlap = append(overlap, mismatches[i])
 			continue
 		}
 
 		switch {
 		case isSignedUnsignedDiff(m.Gomib, m.NetSnmp):
-			signedUnsigned = append(signedUnsigned, m)
+			signedUnsigned = append(signedUnsigned, mismatches[i])
 		case countRanges(m.Gomib) != countRanges(m.NetSnmp):
-			countDiff = append(countDiff, m)
+			countDiff = append(countDiff, mismatches[i])
 		case m.Gomib != m.NetSnmp:
-			valueDiff = append(valueDiff, m)
+			valueDiff = append(valueDiff, mismatches[i])
 		default:
-			other = append(other, m)
+			other = append(other, mismatches[i])
 		}
 	}
 
@@ -718,9 +718,10 @@ func categorizeRanges(mismatches []Mismatch) []MismatchCategory {
 func categorizeDefval(mismatches []Mismatch) []MismatchCategory {
 	var overlap, quoteDiff, hexZeros, hexDiff, oidSymbolic, enumDiff, emptyVsValue, spaceDiff, other []Mismatch
 
-	for _, m := range mismatches {
+	for i := range mismatches {
+		m := &mismatches[i]
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
-			overlap = append(overlap, m)
+			overlap = append(overlap, mismatches[i])
 			continue
 		}
 
@@ -729,24 +730,24 @@ func categorizeDefval(mismatches []Mismatch) []MismatchCategory {
 
 		switch {
 		case gNorm == nNorm:
-			quoteDiff = append(quoteDiff, m)
+			quoteDiff = append(quoteDiff, mismatches[i])
 		case strings.ReplaceAll(gNorm, " ", "") == strings.ReplaceAll(nNorm, " ", ""):
-			spaceDiff = append(spaceDiff, m)
+			spaceDiff = append(spaceDiff, mismatches[i])
 		case gNorm == "" && nNorm != "":
-			emptyVsValue = append(emptyVsValue, m)
+			emptyVsValue = append(emptyVsValue, mismatches[i])
 		case nNorm == "" && gNorm != "":
-			emptyVsValue = append(emptyVsValue, m)
+			emptyVsValue = append(emptyVsValue, mismatches[i])
 		case isHexZeroDiff(gNorm, nNorm):
-			hexZeros = append(hexZeros, m)
+			hexZeros = append(hexZeros, mismatches[i])
 		case strings.HasPrefix(gNorm, "0x") || strings.HasPrefix(nNorm, "0x") ||
 			strings.Contains(gNorm, "'H") || strings.Contains(nNorm, "'H"):
-			hexDiff = append(hexDiff, m)
+			hexDiff = append(hexDiff, mismatches[i])
 		case isOidSymbolicDiff(gNorm, nNorm):
-			oidSymbolic = append(oidSymbolic, m)
+			oidSymbolic = append(oidSymbolic, mismatches[i])
 		case strings.Contains(gNorm, "(") || strings.Contains(nNorm, "("):
-			enumDiff = append(enumDiff, m)
+			enumDiff = append(enumDiff, mismatches[i])
 		default:
-			other = append(other, m)
+			other = append(other, mismatches[i])
 		}
 	}
 
@@ -813,20 +814,21 @@ func normalizeDefval(s string) string {
 func categorizeStatus(mismatches []Mismatch) []MismatchCategory {
 	var overlap, deprecatedObsolete, currentMandatory, other []Mismatch
 
-	for _, m := range mismatches {
+	for i := range mismatches {
+		m := &mismatches[i]
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
-			overlap = append(overlap, m)
+			overlap = append(overlap, mismatches[i])
 			continue
 		}
 
 		g, n := strings.ToLower(m.Gomib), strings.ToLower(m.NetSnmp)
 		switch {
 		case (g == "deprecated" && n == "obsolete") || (g == "obsolete" && n == "deprecated"):
-			deprecatedObsolete = append(deprecatedObsolete, m)
+			deprecatedObsolete = append(deprecatedObsolete, mismatches[i])
 		case (g == "current" && n == "mandatory") || (g == "mandatory" && n == "current"):
-			currentMandatory = append(currentMandatory, m)
+			currentMandatory = append(currentMandatory, mismatches[i])
 		default:
-			other = append(other, m)
+			other = append(other, mismatches[i])
 		}
 	}
 
@@ -841,20 +843,21 @@ func categorizeStatus(mismatches []Mismatch) []MismatchCategory {
 func categorizeAccess(mismatches []Mismatch) []MismatchCategory {
 	var overlap, rwCreate, naReadOnly, other []Mismatch
 
-	for _, m := range mismatches {
+	for i := range mismatches {
+		m := &mismatches[i]
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
-			overlap = append(overlap, m)
+			overlap = append(overlap, mismatches[i])
 			continue
 		}
 
 		g, n := strings.ToLower(m.Gomib), strings.ToLower(m.NetSnmp)
 		switch {
 		case (g == "read-create" && n == "read-write") || (g == "read-write" && n == "read-create"):
-			rwCreate = append(rwCreate, m)
+			rwCreate = append(rwCreate, mismatches[i])
 		case (g == "not-accessible" && n == "read-only") || (g == "read-only" && n == "not-accessible"):
-			naReadOnly = append(naReadOnly, m)
+			naReadOnly = append(naReadOnly, mismatches[i])
 		default:
-			other = append(other, m)
+			other = append(other, mismatches[i])
 		}
 	}
 
@@ -869,20 +872,21 @@ func categorizeAccess(mismatches []Mismatch) []MismatchCategory {
 func categorizeType(mismatches []Mismatch) []MismatchCategory {
 	var overlap, networkAddr, intVariants, other []Mismatch
 
-	for _, m := range mismatches {
+	for i := range mismatches {
+		m := &mismatches[i]
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
-			overlap = append(overlap, m)
+			overlap = append(overlap, mismatches[i])
 			continue
 		}
 
 		switch {
 		case strings.Contains(m.Gomib, "Address") || strings.Contains(m.NetSnmp, "Address"):
-			networkAddr = append(networkAddr, m)
+			networkAddr = append(networkAddr, mismatches[i])
 		case strings.Contains(m.Gomib, "Integer") || strings.Contains(m.Gomib, "INTEGER") ||
 			strings.Contains(m.NetSnmp, "Integer") || strings.Contains(m.NetSnmp, "INTEGER"):
-			intVariants = append(intVariants, m)
+			intVariants = append(intVariants, mismatches[i])
 		default:
-			other = append(other, m)
+			other = append(other, mismatches[i])
 		}
 	}
 
@@ -897,9 +901,10 @@ func categorizeType(mismatches []Mismatch) []MismatchCategory {
 func categorizeEnums(mismatches []Mismatch) []MismatchCategory {
 	var overlap, gomibMoreValues, netsnmpMoreValues, valueDiff, other []Mismatch
 
-	for _, m := range mismatches {
+	for i := range mismatches {
+		m := &mismatches[i]
 		if m.GomibModule != "" && m.NetSnmpModule != "" {
-			overlap = append(overlap, m)
+			overlap = append(overlap, mismatches[i])
 			continue
 		}
 
@@ -907,13 +912,13 @@ func categorizeEnums(mismatches []Mismatch) []MismatchCategory {
 		nCount := strings.Count(m.NetSnmp, "(")
 		switch {
 		case gCount > nCount:
-			gomibMoreValues = append(gomibMoreValues, m)
+			gomibMoreValues = append(gomibMoreValues, mismatches[i])
 		case nCount > gCount:
-			netsnmpMoreValues = append(netsnmpMoreValues, m)
+			netsnmpMoreValues = append(netsnmpMoreValues, mismatches[i])
 		case gCount != nCount:
-			other = append(other, m)
+			other = append(other, mismatches[i])
 		default:
-			valueDiff = append(valueDiff, m)
+			valueDiff = append(valueDiff, mismatches[i])
 		}
 	}
 
@@ -929,7 +934,8 @@ func categorizeEnums(mismatches []Mismatch) []MismatchCategory {
 func categorizeVarbinds(mismatches []Mismatch) []MismatchCategory {
 	var netsnmpMore, gomibMore, different, other []Mismatch
 
-	for _, m := range mismatches {
+	for i := range mismatches {
+		m := &mismatches[i]
 		gCount := strings.Count(m.Gomib, ",") + 1
 		nCount := strings.Count(m.NetSnmp, ",") + 1
 		if m.Gomib == "" || m.Gomib == "{}" {
@@ -941,13 +947,13 @@ func categorizeVarbinds(mismatches []Mismatch) []MismatchCategory {
 
 		switch {
 		case nCount > gCount:
-			netsnmpMore = append(netsnmpMore, m)
+			netsnmpMore = append(netsnmpMore, mismatches[i])
 		case gCount > nCount:
-			gomibMore = append(gomibMore, m)
+			gomibMore = append(gomibMore, mismatches[i])
 		case gCount == nCount && gCount > 0:
-			different = append(different, m)
+			different = append(different, mismatches[i])
 		default:
-			other = append(other, m)
+			other = append(other, mismatches[i])
 		}
 	}
 
@@ -962,7 +968,8 @@ func categorizeVarbinds(mismatches []Mismatch) []MismatchCategory {
 func categorizeIndex(mismatches []Mismatch) []MismatchCategory {
 	var netsnmpMore, gomibMore, different, other []Mismatch
 
-	for _, m := range mismatches {
+	for i := range mismatches {
+		m := &mismatches[i]
 		gCount := strings.Count(m.Gomib, ",") + 1
 		nCount := strings.Count(m.NetSnmp, ",") + 1
 		if m.Gomib == "" || m.Gomib == "{}" {
@@ -974,13 +981,13 @@ func categorizeIndex(mismatches []Mismatch) []MismatchCategory {
 
 		switch {
 		case nCount > gCount:
-			netsnmpMore = append(netsnmpMore, m)
+			netsnmpMore = append(netsnmpMore, mismatches[i])
 		case gCount > nCount:
-			gomibMore = append(gomibMore, m)
+			gomibMore = append(gomibMore, mismatches[i])
 		case gCount == nCount && gCount > 0:
-			different = append(different, m)
+			different = append(different, mismatches[i])
 		default:
-			other = append(other, m)
+			other = append(other, mismatches[i])
 		}
 	}
 
@@ -1026,7 +1033,7 @@ func parseRangeValues(s string) []int64 {
 	s = strings.TrimSpace(s)
 	s = strings.Trim(s, "()")
 	var vals []int64
-	for _, part := range strings.Split(s, "|") {
+	for part := range strings.SplitSeq(s, "|") {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue

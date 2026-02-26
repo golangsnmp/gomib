@@ -65,11 +65,12 @@ func (c *cli) cmdLoad(args []string) int {
 	}
 
 	var opts []gomib.LoadOption
-	if *strict {
+	switch {
+	case *strict:
 		opts = append(opts, gomib.WithStrictness(mib.StrictnessStrict))
-	} else if *permissive {
+	case *permissive:
 		opts = append(opts, gomib.WithStrictness(mib.StrictnessPermissive))
-	} else if *level >= 0 {
+	case *level >= 0:
 		opts = append(opts, gomib.WithStrictness(mib.StrictnessLevel(*level)))
 	}
 

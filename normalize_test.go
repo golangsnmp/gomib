@@ -3,6 +3,7 @@ package gomib
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
@@ -139,7 +140,7 @@ func formatRanges(ranges []testutil.RangeInfo) string {
 	var parts []string
 	for _, r := range ranges {
 		if r.Low == r.High {
-			parts = append(parts, fmt.Sprintf("%d", r.Low))
+			parts = append(parts, strconv.FormatInt(r.Low, 10))
 		} else {
 			parts = append(parts, fmt.Sprintf("%d..%d", r.Low, r.High))
 		}

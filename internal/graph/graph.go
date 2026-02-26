@@ -132,15 +132,16 @@ func (g *Graph) ResolutionOrder() (order []Symbol, cycles [][]Symbol) {
 					break
 				}
 			}
-			if len(scc) > 1 {
+			switch {
+			case len(scc) > 1:
 				syms := make([]Symbol, len(scc))
 				for i, sid := range scc {
 					syms[i] = g.idToNode[sid]
 				}
 				cycles = append(cycles, syms)
-			} else if slices.Contains(g.edges[scc[0]], scc[0]) {
+			case slices.Contains(g.edges[scc[0]], scc[0]):
 				cycles = append(cycles, []Symbol{g.idToNode[scc[0]]})
-			} else {
+			default:
 				order = append(order, g.idToNode[scc[0]])
 			}
 		}

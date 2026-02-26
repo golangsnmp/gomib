@@ -39,7 +39,7 @@ func spanToLineCol(source []byte, offset types.ByteOffset) (line, col int) {
 	}
 	line = 1
 	lastNewline := -1
-	for i := 0; i < int(offset); i++ {
+	for i := range int(offset) {
 		if source[i] == '\n' {
 			line++
 			lastNewline = i

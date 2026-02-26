@@ -748,7 +748,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		// the name is actually an OID reference.
 		if isOIDType(syntax) {
 			if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
-				oid := OID(node.OID())
+				oid := node.OID()
 				dv := newDefValOID(oid, v.Name)
 				return &dv
 			}
@@ -764,7 +764,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		return &dv
 	case *module.DefValOidRef:
 		if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
-			oid := OID(node.OID())
+			oid := node.OID()
 			dv := newDefValOID(oid, v.Name)
 			return &dv
 		}
@@ -799,7 +799,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 				mod, types.Span{}, "DEFVAL OID root "+name+" could not be resolved")
 			return nil
 		}
-		oid := OID(node.OID())
+		oid := node.OID()
 		for _, comp := range v.Components[1:] {
 			switch c := comp.(type) {
 			case *module.OidComponentNumber:
@@ -819,7 +819,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 
 // hexToBytes converts a hex string (e.g., "00FF1A") to bytes.
 func hexToBytes(s string) ([]byte, error) {
-	if len(s) == 0 {
+	if s == "" {
 		return []byte{}, nil
 	}
 	// Handle odd-length hex strings by padding
@@ -831,7 +831,7 @@ func hexToBytes(s string) ([]byte, error) {
 
 // binaryToBytes converts a binary string (e.g., "10101010") to bytes.
 func binaryToBytes(s string) []byte {
-	if len(s) == 0 {
+	if s == "" {
 		return []byte{}
 	}
 	// Pad to multiple of 8
@@ -841,7 +841,7 @@ func binaryToBytes(s string) []byte {
 	result := make([]byte, len(s)/8)
 	for i := 0; i < len(s); i += 8 {
 		var b byte
-		for j := 0; j < 8; j++ {
+		for j := range 8 {
 			b <<= 1
 			if s[i+j] == '1' {
 				b |= 1

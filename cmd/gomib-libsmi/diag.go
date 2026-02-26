@@ -48,11 +48,11 @@ type DiagSummary struct {
 }
 
 func cmdDiag(args []string) int {
-	fs := flag.NewFlagSet("diag", flag.ContinueOnError)
-	level := fs.Int("level", 3, "Error level threshold (0-6, lower=stricter)")
+	flagSet := flag.NewFlagSet("diag", flag.ContinueOnError)
+	level := flagSet.Int("level", 3, "Error level threshold (0-6, lower=stricter)")
 
-	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), `Usage: gomib-libsmi diag [options] MODULE...
+	flagSet.Usage = func() {
+		fmt.Fprintf(flagSet.Output(), `Usage: gomib-libsmi diag [options] MODULE...
 
 Compare parser diagnostics between gomib and libsmi (smilint).
 
@@ -67,14 +67,14 @@ Severity levels (libsmi-compatible):
 
 Options:
 `)
-		fs.PrintDefaults()
+		flagSet.PrintDefaults()
 	}
 
-	if err := fs.Parse(args); err != nil {
+	if err := flagSet.Parse(args); err != nil {
 		return 1
 	}
 
-	modules := fs.Args()
+	modules := flagSet.Args()
 	if len(modules) == 0 {
 		printError("at least one MODULE is required")
 		return 1

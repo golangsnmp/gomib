@@ -4,11 +4,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
@@ -76,7 +78,7 @@ func rangesString(ranges []RangeInfo) string {
 	var parts []string
 	for _, r := range ranges {
 		if r.Low == r.High {
-			parts = append(parts, fmt.Sprintf("%d", r.Low))
+			parts = append(parts, strconv.FormatInt(r.Low, 10))
 		} else {
 			parts = append(parts, fmt.Sprintf("%d..%d", r.Low, r.High))
 		}
@@ -110,9 +112,9 @@ func varbindsString(varbinds []string) string {
 // loadNetSnmpNodes loads MIBs with net-snmp and returns normalized nodes.
 // net-snmp only reads flat directories, so all subdirectories are
 // discovered and joined into a colon-separated path.
-func loadNetSnmpNodes(mibPaths []string, modules []string) (map[string]*NormalizedNode, error) {
+func loadNetSnmpNodes(mibPaths, modules []string) (map[string]*NormalizedNode, error) {
 	if len(mibPaths) == 0 {
-		return nil, fmt.Errorf("no MIB paths specified (use -p flag)")
+		return nil, errors.New("no MIB paths specified (use -p flag)")
 	}
 
 	allDirs, err := findAllDirs(mibPaths)
@@ -160,9 +162,9 @@ func findAllDirs(roots []string) ([]string, error) {
 	return dirs, nil
 }
 
-func loadGomibNodes(mibPaths []string, modules []string) (map[string]*NormalizedNode, error) {
+func loadGomibNodes(mibPaths, modules []string) (map[string]*NormalizedNode, error) {
 	if len(mibPaths) == 0 {
-		return nil, fmt.Errorf("no MIB paths specified (use -p flag)")
+		return nil, errors.New("no MIB paths specified (use -p flag)")
 	}
 
 	var sources []gomib.Source
