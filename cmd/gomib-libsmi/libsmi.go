@@ -374,7 +374,7 @@ func GetDiagnostics() []LibsmiDiagnostic {
 	count := int(C.get_error_count())
 	diags := make([]LibsmiDiagnostic, 0, count)
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		e := C.get_error(C.int(i))
 		if e == nil {
 			continue
@@ -435,7 +435,7 @@ func GetNodes() []LibsmiNode {
 	count := int(C.get_node_count())
 	nodes := make([]LibsmiNode, 0, count)
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		n := C.get_node(C.int(i))
 		if n == nil {
 			continue

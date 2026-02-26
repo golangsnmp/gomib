@@ -1,6 +1,5 @@
 //go:build cgo
 
-//nolint:errcheck // CLI output, errors not critical
 package main
 
 import (
@@ -103,7 +102,7 @@ Options:
 	return 0
 }
 
-func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
+func compareSemantics(modules, mibPaths []string) *SemanticComparison {
 	result := &SemanticComparison{}
 
 	libsmiPath := BuildMIBPath(expandDirs(mibPaths))
@@ -116,9 +115,10 @@ func compareSemantics(modules []string, mibPaths []string) *SemanticComparison {
 	}
 
 	libsmiNodes := make(map[string]LibsmiNode)
-	for _, n := range GetNodes() {
-		if n.OID != "" {
-			libsmiNodes[n.OID] = n
+	nodes := GetNodes()
+	for i := range nodes {
+		if nodes[i].OID != "" {
+			libsmiNodes[nodes[i].OID] = nodes[i]
 		}
 	}
 	ClearNodes()
@@ -380,10 +380,7 @@ func printSemanticComparison(w io.Writer, result *SemanticComparison) {
 				continue
 			}
 			fmt.Fprintf(w, "\n  [%s] (%d total)\n", field, len(mismatches))
-			limit := 5
-			if len(mismatches) < limit {
-				limit = len(mismatches)
-			}
+			limit := min(5, len(mismatches))
 			for _, m := range mismatches[:limit] {
 				fmt.Fprintf(w, "    %s (%s::%s)\n", m.OID, m.Module, m.Name)
 				fmt.Fprintf(w, "      gomib=%q libsmi=%q\n", m.Gomib, m.Libsmi)
@@ -396,10 +393,7 @@ func printSemanticComparison(w io.Writer, result *SemanticComparison) {
 
 	if len(result.MissingInGomib) > 0 {
 		fmt.Fprintf(w, "\nMissing in gomib (first 10):\n")
-		limit := 10
-		if len(result.MissingInGomib) < limit {
-			limit = len(result.MissingInGomib)
-		}
+		limit := min(10, len(result.MissingInGomib))
 		for _, oid := range result.MissingInGomib[:limit] {
 			fmt.Fprintf(w, "  %s\n", oid)
 		}

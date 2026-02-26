@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
@@ -270,11 +271,12 @@ func TestDoubleHyphenAfterIdentifierPreservesComment(t *testing.T) {
 func TestManyJunkLinesNoStackOverflow(t *testing.T) {
 	// Verify iterative handling of many consecutive lines of unexpected chars.
 	// Previously this would recurse once per line and risk stack overflow.
-	var source string
-	for i := 0; i < 10000; i++ {
-		source += "@@@@\n"
+	var sb strings.Builder
+	for range 10000 {
+		sb.WriteString("@@@@\n")
 	}
-	source += "OBJECT"
+	sb.WriteString("OBJECT")
+	source := sb.String()
 	lexer := New([]byte(source), nil)
 	tokens, diags := lexer.Tokenize()
 
@@ -291,11 +293,12 @@ func TestManyJunkLinesNoStackOverflow(t *testing.T) {
 }
 
 func TestManyConsecutiveCommentsNoStackOverflow(t *testing.T) {
-	var source string
-	for i := 0; i < 10000; i++ {
-		source += "-- comment\n"
+	var sb strings.Builder
+	for range 10000 {
+		sb.WriteString("-- comment\n")
 	}
-	source += "OBJECT"
+	sb.WriteString("OBJECT")
+	source := sb.String()
 	lexer := New([]byte(source), nil)
 	tokens, _ := lexer.Tokenize()
 

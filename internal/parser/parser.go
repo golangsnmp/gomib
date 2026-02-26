@@ -95,7 +95,7 @@ func (p *Parser) validateIdentifier(name string, span types.Span) {
 // validateValueReference checks that a value reference starts with lowercase.
 // Per RFC 2578, value references (used in OID assignments) should start with lowercase.
 func (p *Parser) validateValueReference(name string, span types.Span) {
-	if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
+	if name != "" && name[0] >= 'A' && name[0] <= 'Z' {
 		p.emitDiagnostic(types.DiagBadIdentifierCase, types.SeverityError, span,
 			fmt.Sprintf("%q should start with a lowercase letter", name))
 	}
@@ -201,7 +201,7 @@ func (p *Parser) expect(kind lexer.TokenKind) (lexer.Token, *types.SpanDiagnosti
 	if p.check(kind) {
 		return p.advance(), nil
 	}
-	diag := p.makeError(fmt.Sprintf("expected %s", kind.LibsmiName()))
+	diag := p.makeError("expected " + kind.LibsmiName())
 	return lexer.Token{}, &diag
 }
 
@@ -372,8 +372,7 @@ func (p *Parser) parseImports() ([]ast.ImportClause, *types.SpanDiagnostic) {
 
 		for {
 			kind := p.peek().Kind
-			if kind.IsMacroKeyword() || kind.IsTypeKeyword() ||
-				kind.IsIdentifier() {
+			if kind.IsMacroKeyword() || kind.IsTypeKeyword() || kind.IsIdentifier() {
 				symToken := p.advance()
 				symbols = append(symbols, p.makeIdent(symToken))
 			} else if p.check(lexer.TokKwFrom) {
@@ -485,7 +484,7 @@ func (p *Parser) parseDefinition() (ast.Definition, *types.SpanDiagnostic) {
 		return p.parseDefinition()
 
 	default:
-		diag := p.makeError(fmt.Sprintf("unexpected token: %s", p.peek().Kind.LibsmiName()))
+		diag := p.makeError("unexpected token: " + p.peek().Kind.LibsmiName())
 		return nil, &diag
 	}
 }
@@ -889,7 +888,8 @@ func (p *Parser) parseTypeSyntax() (ast.TypeSyntax, *types.SpanDiagnostic) {
 		name := p.text(token.Span)
 		ident := ast.NewIdent(name, token.Span)
 
-		if p.check(lexer.TokLParen) {
+		switch {
+		case p.check(lexer.TokLParen):
 			constraint, err := p.parseConstraint()
 			if err != nil {
 				return nil, err
@@ -900,7 +900,7 @@ func (p *Parser) parseTypeSyntax() (ast.TypeSyntax, *types.SpanDiagnostic) {
 				Constraint: constraint,
 				Span:       span,
 			}
-		} else if p.check(lexer.TokLBrace) {
+		case p.check(lexer.TokLBrace):
 			// Enum value restriction: TypeRef { value1(1), value2(2) }
 			namedNumbers, err := p.parseNamedNumbers()
 			if err != nil {
@@ -912,7 +912,7 @@ func (p *Parser) parseTypeSyntax() (ast.TypeSyntax, *types.SpanDiagnostic) {
 				NamedNumbers: namedNumbers,
 				Span:         span,
 			}
-		} else {
+		default:
 			baseSyntax = &ast.TypeSyntaxTypeRef{Name: ident}
 		}
 
@@ -1084,7 +1084,8 @@ func (p *Parser) parseRangeList() ([]ast.Range, *types.SpanDiagnostic) {
 // parseRangeValue parses a single range endpoint (number, hex, or
 // identifier like MIN/MAX).
 func (p *Parser) parseRangeValue() (ast.RangeValue, *types.SpanDiagnostic) {
-	if p.check(lexer.TokNumber) {
+	switch {
+	case p.check(lexer.TokNumber):
 		token := p.advance()
 		text := p.text(token.Span)
 		// Try parsing as u64 first to handle large unsigned values
@@ -1094,11 +1095,11 @@ func (p *Parser) parseRangeValue() (ast.RangeValue, *types.SpanDiagnostic) {
 		// Fallback to signed
 		value := p.parseI64(token.Span, "range value")
 		return &ast.RangeValueSigned{Value: value}, nil
-	} else if p.check(lexer.TokNegativeNumber) {
+	case p.check(lexer.TokNegativeNumber):
 		token := p.advance()
 		value := p.parseI64(token.Span, "range value")
 		return &ast.RangeValueSigned{Value: value}, nil
-	} else if p.check(lexer.TokHexString) {
+	case p.check(lexer.TokHexString):
 		token := p.advance()
 		text := p.text(token.Span)
 		// Parse hex string to unsigned
@@ -1108,13 +1109,14 @@ func (p *Parser) parseRangeValue() (ast.RangeValue, *types.SpanDiagnostic) {
 			p.emitDiagnostic(types.DiagInvalidHexRange, types.SeverityError, token.Span, "invalid hex value in range")
 		}
 		return &ast.RangeValueUnsigned{Value: value}, nil
-	} else if p.check(lexer.TokUppercaseIdent) || p.check(lexer.TokForbiddenKeyword) {
+	case p.check(lexer.TokUppercaseIdent) || p.check(lexer.TokForbiddenKeyword):
 		token := p.advance()
 		name := p.text(token.Span)
 		return &ast.RangeValueIdent{Name: ast.NewIdent(name, token.Span)}, nil
+	default:
+		diag := p.makeError("expected range value")
+		return nil, &diag
 	}
-	diag := p.makeError("expected range value")
-	return nil, &diag
 }
 
 // parseSequenceFields parses comma-separated name/type pairs within

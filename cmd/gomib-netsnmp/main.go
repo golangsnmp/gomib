@@ -2,8 +2,6 @@
 
 // Command gomib-netsnmp compares gomib against net-snmp for cross-validation.
 // Build with: CGO_ENABLED=1 go build -tags cgo ./cmd/gomib-netsnmp
-//
-//nolint:errcheck // CLI tool, fmt output errors are not critical
 package main
 
 import (

@@ -483,7 +483,7 @@ type sarifDriver struct {
 type sarifRule struct {
 	ID               string             `json:"id"`
 	ShortDescription sarifMessage       `json:"shortDescription"`
-	DefaultConfig    sarifDefaultConfig `json:"defaultConfiguration,omitempty"`
+	DefaultConfig    sarifDefaultConfig `json:"defaultConfiguration,omitzero"`
 }
 
 type sarifDefaultConfig struct {

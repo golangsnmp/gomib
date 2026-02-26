@@ -399,7 +399,7 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 	nodeCount := int(C.get_collected_node_count())
 	nodes := make(map[string]*NormalizedNode)
 
-	for i := 0; i < nodeCount; i++ {
+	for i := range nodeCount {
 		cNode := C.get_collected_node(C.int(i))
 		if cNode == nil {
 			continue
@@ -433,7 +433,7 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 		// net-snmp uses the same enum list for INTEGER enums and BITS;
 		// distinguish based on type code
 		isBitsType := cNode._type == 12 // TYPE_BITSTRING
-		for j := 0; j < int(cNode.enum_count); j++ {
+		for j := range int(cNode.enum_count) {
 			val := int(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.enum_values)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
 			namePtr := *(**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.enum_names)) + uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
 			name := C.GoString(namePtr)
@@ -444,7 +444,7 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 			}
 		}
 
-		for j := 0; j < int(cNode.index_count); j++ {
+		for j := range int(cNode.index_count) {
 			idxPtr := *(**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.indexes)) + uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
 			implied := *(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.implied_flags)) + uintptr(j)*unsafe.Sizeof(C.int(0))))
 			node.Indexes = append(node.Indexes, IndexInfo{
@@ -453,13 +453,13 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 			})
 		}
 
-		for j := 0; j < int(cNode.range_count); j++ {
+		for j := range int(cNode.range_count) {
 			low := int64(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.range_lows)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
 			high := int64(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.range_highs)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
 			node.Ranges = append(node.Ranges, RangeInfo{Low: low, High: high})
 		}
 
-		for j := 0; j < int(cNode.varbind_count); j++ {
+		for j := range int(cNode.varbind_count) {
 			vbPtr := *(**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.varbinds)) + uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
 			node.Varbinds = append(node.Varbinds, C.GoString(vbPtr))
 		}

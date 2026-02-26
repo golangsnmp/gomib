@@ -492,7 +492,7 @@ func TestResolveBaseFromChain(t *testing.T) {
 		root.setBase(BaseOctetString)
 
 		prev := root
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			typ := newType("type")
 			typ.setBase(BaseOctetString)
 			typ.setParent(prev)

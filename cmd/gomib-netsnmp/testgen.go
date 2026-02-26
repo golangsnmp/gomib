@@ -1,6 +1,5 @@
 //go:build cgo
 
-//nolint:errcheck // CLI output, errors not critical
 package main
 
 import (

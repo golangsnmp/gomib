@@ -12,7 +12,7 @@ import (
 const LevelTrace = slog.Level(-8)
 
 // noCtx is a background context used for slog calls that don't need cancellation.
-var noCtx = context.Background() //nolint:gochecknoglobals
+var noCtx = context.Background() //nolint:gochecknoglobals // package-level context for internal use
 
 // Logger wraps slog.Logger with nil-safe convenience methods.
 type Logger struct {

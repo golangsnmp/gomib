@@ -1,6 +1,7 @@
 package mib
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -17,20 +18,20 @@ type OID []uint32
 // Returns an error for empty input or arc values exceeding uint32.
 func ParseOID(s string) (OID, error) {
 	if s == "" {
-		return nil, fmt.Errorf("empty OID string")
+		return nil, errors.New("empty OID string")
 	}
 	// Handle leading dot (e.g., ".1.3.6.1")
 	if s[0] == '.' {
 		s = s[1:]
 	}
 	if s == "" {
-		return nil, fmt.Errorf("empty OID string")
+		return nil, errors.New("empty OID string")
 	}
 
 	arcs := make([]uint32, 0, strings.Count(s, ".")+1)
 	var current uint32
 	var hasDigit bool
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if c >= '0' && c <= '9' {
 			digit := uint32(c - '0')

@@ -30,7 +30,7 @@ func ParseCGOArgs(args []string) (flags CGOFlags, cmd string, cmdArgs []string, 
 		case arg == "-p" || arg == "--path":
 			if i+1 >= len(args) {
 				errMsg = arg + " requires a value"
-				return
+				return flags, cmd, cmdArgs, errMsg
 			}
 			i++
 			flags.Paths = append(flags.Paths, args[i])
@@ -41,7 +41,7 @@ func ParseCGOArgs(args []string) (flags CGOFlags, cmd string, cmdArgs []string, 
 		case arg == "-o" || arg == "--output":
 			if i+1 >= len(args) {
 				errMsg = arg + " requires a value"
-				return
+				return flags, cmd, cmdArgs, errMsg
 			}
 			i++
 			flags.OutputFile = args[i]
@@ -49,7 +49,7 @@ func ParseCGOArgs(args []string) (flags CGOFlags, cmd string, cmdArgs []string, 
 			flags.OutputFile = arg[2:]
 		case strings.HasPrefix(arg, "--output="):
 			flags.OutputFile = arg[9:]
-		case len(arg) > 0 && arg[0] == '-':
+		case arg != "" && arg[0] == '-':
 			cmdArgs = append(cmdArgs, arg)
 		default:
 			if cmd == "" {
@@ -59,7 +59,7 @@ func ParseCGOArgs(args []string) (flags CGOFlags, cmd string, cmdArgs []string, 
 			}
 		}
 	}
-	return
+	return flags, cmd, cmdArgs, errMsg
 }
 
 // GetOutput opens the output file or returns stdout.

@@ -42,28 +42,28 @@ type ModuleAccept struct {
 }
 
 func cmdAccept(args []string) int {
-	fs := flag.NewFlagSet("accept", flag.ContinueOnError)
-	level := fs.Int("level", 2, "Error level threshold (0-6)")
-	showAll := fs.Bool("all", false, "Show all modules, not just discrepancies")
-	details := fs.Bool("details", false, "Show diagnostic messages for discrepancies")
-	diagLimit := fs.Int("diag-limit", 3, "Max diagnostics to show per module (with -details)")
+	flagSet := flag.NewFlagSet("accept", flag.ContinueOnError)
+	level := flagSet.Int("level", 2, "Error level threshold (0-6)")
+	showAll := flagSet.Bool("all", false, "Show all modules, not just discrepancies")
+	details := flagSet.Bool("details", false, "Show diagnostic messages for discrepancies")
+	diagLimit := flagSet.Int("diag-limit", 3, "Max diagnostics to show per module (with -details)")
 
-	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), `Usage: gomib-libsmi accept [options] [MODULE...]
+	flagSet.Usage = func() {
+		fmt.Fprintf(flagSet.Output(), `Usage: gomib-libsmi accept [options] [MODULE...]
 
 Test which MIBs pass/fail in gomib vs libsmi.
 If no modules specified, tests all MIBs found in search paths.
 
 Options:
 `)
-		fs.PrintDefaults()
+		flagSet.PrintDefaults()
 	}
 
-	if err := fs.Parse(args); err != nil {
+	if err := flagSet.Parse(args); err != nil {
 		return 1
 	}
 
-	modules := fs.Args()
+	modules := flagSet.Args()
 	mibPaths := getMIBPaths()
 	if len(mibPaths) == 0 {
 		printError("at least one -p PATH is required")
@@ -100,7 +100,7 @@ Options:
 	return 0
 }
 
-func testAcceptance(modules []string, mibPaths []string, level int, showAll bool, collectDiags bool, diagLimit int) *AcceptResult {
+func testAcceptance(modules, mibPaths []string, level int, showAll, collectDiags bool, diagLimit int) *AcceptResult {
 	result := &AcceptResult{
 		TotalModules: len(modules),
 	}
@@ -150,14 +150,15 @@ func testAcceptance(modules []string, mibPaths []string, level int, showAll bool
 		ma.LibsmiPass = loaded && ma.LibsmiErrors == 0
 
 		isDiscrepancy := false
-		if ma.GomibPass && ma.LibsmiPass {
+		switch {
+		case ma.GomibPass && ma.LibsmiPass:
 			result.BothPass++
-		} else if !ma.GomibPass && !ma.LibsmiPass {
+		case !ma.GomibPass && !ma.LibsmiPass:
 			result.BothFail++
-		} else if ma.GomibPass && !ma.LibsmiPass {
+		case ma.GomibPass && !ma.LibsmiPass:
 			result.OnlyGomibPass++
 			isDiscrepancy = true
-		} else {
+		default:
 			result.OnlyLibsmiPass++
 			isDiscrepancy = true
 		}
@@ -215,7 +216,7 @@ func findAllModules(mibPaths []string) []string {
 	return modules
 }
 
-func printAcceptResult(w io.Writer, result *AcceptResult, showAll bool, showDetails bool) {
+func printAcceptResult(w io.Writer, result *AcceptResult, showAll, showDetails bool) {
 	fmt.Fprintln(w, strings.Repeat("=", 70))
 	fmt.Fprintln(w, "PARSER ACCEPTANCE TEST RESULTS")
 	fmt.Fprintln(w, strings.Repeat("=", 70))

@@ -1,6 +1,5 @@
 //go:build cgo
 
-//nolint:errcheck // CLI output, errors not critical
 package main
 
 import (
@@ -39,11 +38,11 @@ type ValidationIssue struct {
 }
 
 func cmdValidate(args []string) int {
-	fs := flag.NewFlagSet("validate", flag.ContinueOnError)
-	testDir := fs.String("tests", "", "Directory containing test files (default: ./integration)")
+	flagSet := flag.NewFlagSet("validate", flag.ContinueOnError)
+	testDir := flagSet.String("tests", "", "Directory containing test files (default: ./integration)")
 
-	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), `Usage: gomib-netsnmp validate [options]
+	flagSet.Usage = func() {
+		fmt.Fprintf(flagSet.Output(), `Usage: gomib-netsnmp validate [options]
 
 Reads existing test cases and validates against net-snmp:
 - Reports mismatches
@@ -52,10 +51,10 @@ Reads existing test cases and validates against net-snmp:
 
 Options:
 `)
-		fs.PrintDefaults()
+		flagSet.PrintDefaults()
 	}
 
-	if err := fs.Parse(args); err != nil {
+	if err := flagSet.Parse(args); err != nil {
 		return 1
 	}
 
@@ -122,7 +121,6 @@ func validateTestFiles(dir string, netsnmp map[string]*NormalizedNode) *Validati
 		}
 		return nil
 	})
-
 	if err != nil {
 		result.Warnings = append(result.Warnings, ValidationIssue{
 			Message: fmt.Sprintf("error walking directory: %v", err),
@@ -273,8 +271,8 @@ func validateTableTestCase(file string, tc *extractedTestCase, netsnmp map[strin
 			File:     file,
 			TestName: tc.RowName,
 			Field:    "HasImplied",
-			Expected: fmt.Sprintf("%v", nsHasImplied),
-			Actual:   fmt.Sprintf("%v", tc.HasImplied),
+			Expected: strconv.FormatBool(nsHasImplied),
+			Actual:   strconv.FormatBool(tc.HasImplied),
 			Message:  "IMPLIED flag mismatch",
 		})
 		return

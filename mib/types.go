@@ -85,7 +85,7 @@ func newDefValUint(v uint64, raw string) DefVal {
 }
 
 // newDefValString creates a DefVal for a quoted string.
-func newDefValString(v string, raw string) DefVal {
+func newDefValString(v, raw string) DefVal {
 	return DefVal{kind: DefValKindString, value: v, raw: raw}
 }
 
@@ -95,7 +95,7 @@ func newDefValBytes(v []byte, raw string) DefVal {
 }
 
 // newDefValEnum creates a DefVal for an enum label.
-func newDefValEnum(label string, raw string) DefVal {
+func newDefValEnum(label, raw string) DefVal {
 	return DefVal{kind: DefValKindEnum, value: label, raw: raw}
 }
 
