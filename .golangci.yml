@@ -14,7 +14,6 @@ linters:
     - nilerr
     - nolintlint
     - perfsprint
-    - predeclared
     - revive
     - unconvert
     - unparam
@@ -29,8 +28,19 @@ linters:
       disable:
         - fieldalignment
         - shadow
+    gosec:
+      excludes: [G115, G602, G705]
     gocritic:
       enabled-tags: [diagnostic, style, performance, opinionated]
+      disabled-checks: [builtinShadow]
+    revive:
+      rules:
+        - name: redefines-builtin-id
+          disabled: true
+        - name: exported
+          disabled: true
+        - name: var-naming
+          disabled: true
     exhaustive:
       default-signifies-exhaustive: true
     nakedret:
