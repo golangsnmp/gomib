@@ -47,7 +47,12 @@ func main() {
 		idxs := row.EffectiveIndexes()
 		idxNames := make([]string, len(idxs))
 		for i, idx := range idxs {
-			name := idx.Object.Name()
+			var name string
+			if idx.Object != nil {
+				name = idx.Object.Name()
+			} else {
+				name = idx.TypeName
+			}
 			if idx.Implied {
 				name += " (IMPLIED)"
 			}

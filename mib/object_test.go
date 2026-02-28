@@ -123,6 +123,15 @@ func TestEffectiveIndexes(t *testing.T) {
 		testutil.Equal(t, sentinel, got[0].Object, "inherited index object")
 	})
 
+	t.Run("bare type index entry", func(t *testing.T) {
+		bareIdx := []IndexEntry{{TypeName: "INTEGER", Implied: false}}
+		row := makeRow("bareTypeRow", bareIdx)
+		got := row.EffectiveIndexes()
+		testutil.Len(t, got, 1, "effective indexes")
+		testutil.Nil(t, got[0].Object, "bare type Object should be nil")
+		testutil.Equal(t, "INTEGER", got[0].TypeName, "bare type TypeName")
+	})
+
 	t.Run("augments cycle terminates", func(t *testing.T) {
 		a := makeRow("rowA", nil)
 		b := makeRow("rowB", nil)

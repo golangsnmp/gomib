@@ -254,6 +254,11 @@ func loadGomibNodes(mibPaths, modules []string) (map[string]*NormalizedNode, err
 						Name:    idx.Object.Name(),
 						Implied: idx.Implied,
 					})
+				} else if idx.TypeName != "" {
+					n.Indexes = append(n.Indexes, IndexInfo{
+						Name:    idx.TypeName,
+						Implied: idx.Implied,
+					})
 				}
 			}
 

@@ -230,6 +230,11 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 							ref.mod, obj.Span,
 							"INDEX "+item.Object+" of "+obj.Name+" resolves to a node without an object definition")
 					}
+				} else if isBareTypeIndex(item.Object) {
+					indexEntries = append(indexEntries, IndexEntry{
+						TypeName: item.Object,
+						Implied:  item.Implied,
+					})
 				}
 			}
 			resolvedObj.setIndex(indexEntries)
