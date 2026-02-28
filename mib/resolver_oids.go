@@ -433,16 +433,21 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 			slog.String("current", currentMod.Name()),
 			slog.String("new", def.mod.Name))
 	}
+	// Register non-semantic definitions in the defining module's node list
+	// regardless of preference. Both modules that define the same OID should
+	// list it in their Nodes(). Semantic definitions (object types, notifications,
+	// etc.) are registered in the semantics phase instead.
+	switch def.kind {
+	case defValueAssignment, defObjectIdentity, defModuleIdentity:
+		newMod.addNode(node)
+	default:
+		// Semantic definitions (object types, notifications, groups, etc.)
+		// are registered in the semantics phase.
+	}
+
+	// The node's back-reference (node.Module()) points to the preferred module.
 	if shouldPreferModule(ctx, currentMod, def.mod) {
 		node.setModule(newMod)
-		// Only register non-semantic definitions here; object types,
-		// notifications, etc. are registered in the semantics phase.
-		switch def.kind {
-		case defValueAssignment, defObjectIdentity, defModuleIdentity:
-			newMod.addNode(node)
-		case defObjectType, defNotification, defObjectGroup, defNotificationGroup, defModuleCompliance, defAgentCapabilities:
-			// Handled in the semantics phase.
-		}
 		if def.kind == defModuleIdentity {
 			newMod.setOID(node.OID())
 		}

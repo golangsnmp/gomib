@@ -1073,3 +1073,75 @@ func TestModuleIdentityPermissive(t *testing.T) {
 		testutil.NotNil(t, m.Object("ipv6IfIndex"), "ipv6IfIndex should exist")
 	})
 }
+
+// TestProblemSharedOIDs tests that when two SMIv2 modules with identical
+// LAST-UPDATED dates define the same OBJECT IDENTIFIER value assignments,
+// both modules' Nodes() lists contain those nodes.
+//
+// Reproduces: HOST-RESOURCES-MIB and HOST-RESOURCES-TYPES both define
+// hrStorageTypes, hrDeviceTypes, hrFSTypes. With identical LAST-UPDATED
+// dates, shouldPreferModule returns false for the second module, so its
+// nodes never get added via addNode().
+func TestProblemSharedOIDs(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-SHARED-OIDS-MIB")
+
+	sharedMod := m.Module("PROBLEM-SHARED-OIDS-MIB")
+	if sharedMod == nil {
+		t.Fatal("PROBLEM-SHARED-OIDS-MIB not found")
+	}
+
+	baseMod := m.Module("PROBLEM-SHARED-OIDS-BASE-MIB")
+	if baseMod == nil {
+		t.Fatal("PROBLEM-SHARED-OIDS-BASE-MIB not found")
+	}
+
+	sharedOIDs := []string{"sharedBranch1", "sharedBranch2", "sharedBranch3"}
+
+	// The shared nodes should be globally findable
+	for _, name := range sharedOIDs {
+		node := m.Node(name)
+		if node == nil {
+			t.Errorf("global Node(%s) returned nil", name)
+		}
+	}
+
+	// Both modules define these OIDs. Each module's Nodes() list
+	// should contain them.
+	t.Run("base module nodes", func(t *testing.T) {
+		baseNodes := make(map[string]bool)
+		for _, n := range baseMod.Nodes() {
+			baseNodes[n.Name()] = true
+		}
+		for _, name := range sharedOIDs {
+			if !baseNodes[name] {
+				t.Errorf("PROBLEM-SHARED-OIDS-BASE-MIB.Nodes() missing %s", name)
+			}
+		}
+	})
+
+	t.Run("shared module nodes", func(t *testing.T) {
+		sharedNodes := make(map[string]bool)
+		for _, n := range sharedMod.Nodes() {
+			sharedNodes[n.Name()] = true
+		}
+		for _, name := range sharedOIDs {
+			if !sharedNodes[name] {
+				t.Errorf("PROBLEM-SHARED-OIDS-MIB.Nodes() missing %s", name)
+			}
+		}
+	})
+
+	// OBJECT-IDENTITY nodes unique to the shared module should always be present
+	uniqueNodes := []string{"sharedItem1", "sharedItem2", "sharedItem3"}
+	t.Run("unique nodes in shared module", func(t *testing.T) {
+		sharedNodes := make(map[string]bool)
+		for _, n := range sharedMod.Nodes() {
+			sharedNodes[n.Name()] = true
+		}
+		for _, name := range uniqueNodes {
+			if !sharedNodes[name] {
+				t.Errorf("PROBLEM-SHARED-OIDS-MIB.Nodes() missing unique node %s", name)
+			}
+		}
+	})
+}
