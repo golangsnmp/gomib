@@ -754,7 +754,7 @@ func (p *Parser) parseTypeSyntax() (ast.TypeSyntax, *types.SpanDiagnostic) {
 	var baseSyntax ast.TypeSyntax
 
 	switch p.peek().Kind {
-	case lexer.TokKwInteger, lexer.TokKwInteger32:
+	case lexer.TokKwInteger:
 		p.advance()
 		// Check for enum: INTEGER { ... }
 		if p.check(lexer.TokLBrace) {

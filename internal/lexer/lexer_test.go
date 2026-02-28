@@ -82,7 +82,7 @@ func TestKeywords(t *testing.T) {
 func TestTypeKeywords(t *testing.T) {
 	kinds := tokenKinds("INTEGER Integer32 Counter32 Counter64 Gauge32")
 	expected := []TokenKind{
-		TokKwInteger, TokKwInteger32, TokKwCounter32,
+		TokKwInteger, TokUppercaseIdent, TokKwCounter32,
 		TokKwCounter64, TokKwGauge32, TokEOF,
 	}
 	testutil.SliceEqual(t, expected, kinds, "token kinds")
@@ -538,7 +538,7 @@ func TestKeywordLookup(t *testing.T) {
 		{"OBJECT-TYPE", TokKwObjectType, true},
 		{"DEFINITIONS", TokKwDefinitions, true},
 		{"BEGIN", TokKwBegin, true},
-		{"Integer32", TokKwInteger32, true},
+		{"Integer32", TokError, false},
 		{"current", TokKwCurrent, true},
 		{"ifIndex", TokError, false},
 		{"", TokError, false},

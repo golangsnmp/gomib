@@ -124,7 +124,6 @@ const (
 	// Type keywords
 
 	TokKwInteger
-	TokKwInteger32
 	TokKwUnsigned32
 	TokKwCounter32
 	TokKwCounter64
@@ -181,7 +180,7 @@ func (k TokenKind) IsIdentifier() bool {
 // (INTEGER, Counter32, OCTET STRING components, etc.).
 func (k TokenKind) IsTypeKeyword() bool {
 	switch k {
-	case TokKwInteger, TokKwInteger32, TokKwUnsigned32, TokKwCounter32,
+	case TokKwInteger, TokKwUnsigned32, TokKwCounter32,
 		TokKwCounter64, TokKwGauge32, TokKwIpAddress, TokKwOpaque,
 		TokKwTimeTicks, TokKwBits, TokKwOctet, TokKwString,
 		TokKwCounter, TokKwGauge, TokKwNetworkAddress:
@@ -364,8 +363,6 @@ func (k TokenKind) LibsmiName() string {
 		return "TRAP_TYPE"
 	case TokKwInteger:
 		return "INTEGER"
-	case TokKwInteger32:
-		return "INTEGER32"
 	case TokKwUnsigned32:
 		return "UNSIGNED32"
 	case TokKwCounter32:
