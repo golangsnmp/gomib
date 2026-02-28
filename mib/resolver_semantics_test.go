@@ -1554,6 +1554,39 @@ func TestLinkObjectIndexes(t *testing.T) {
 		testutil.True(t, found, "expected DiagAugmentsNotObject diagnostic")
 	})
 
+	t.Run("bare type index creates TypeName entry", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		ctx.Modules = append(ctx.Modules, mod)
+		resolvedMod := newModule(mod.Name)
+		ctx.ModuleToResolved[mod] = resolvedMod
+
+		root := ctx.Mib.Root()
+
+		rowNode := buildOIDPath(root, 1, 1, 1)
+		rowNode.setName("myEntry")
+		ctx.registerModuleNodeSymbol(mod, "myEntry", rowNode)
+		rowObj := newObject("myEntry")
+		rowObj.setNode(rowNode)
+		resolvedMod.addObject(rowObj)
+		rowNode.setObject(rowObj)
+
+		objRefs := []objectTypeRef{
+			{mod: mod, obj: &module.ObjectType{
+				Name:   "myEntry",
+				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:  []module.IndexItem{{Object: "INTEGER"}},
+			}},
+		}
+
+		linkObjectIndexes(ctx, objRefs)
+
+		idx := rowObj.Index()
+		testutil.Len(t, idx, 1, "index entries")
+		testutil.Nil(t, idx[0].Object, "bare type index Object should be nil")
+		testutil.Equal(t, "INTEGER", idx[0].TypeName, "bare type index TypeName")
+	})
+
 	t.Run("nil resolved module skipped", func(_ *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}

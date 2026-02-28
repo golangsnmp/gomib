@@ -95,6 +95,11 @@ func normalizeIndexes(entries []mib.IndexEntry) []testutil.IndexInfo {
 				Name:    e.Object.Name(),
 				Implied: e.Implied,
 			})
+		} else if e.TypeName != "" {
+			result = append(result, testutil.IndexInfo{
+				Name:    e.TypeName,
+				Implied: e.Implied,
+			})
 		}
 	}
 	if len(result) == 0 {

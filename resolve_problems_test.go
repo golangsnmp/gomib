@@ -597,6 +597,11 @@ func TestProblemIndexBareType(t *testing.T) {
 	kind := normalizeKind(entry.Kind())
 	testutil.Equal(t, "row", kind, "entry should be a row")
 
+	idx := entry.Index()
+	testutil.Len(t, idx, 1, "bare type entry should have one index")
+	testutil.Nil(t, idx[0].Object, "bare type index Object should be nil")
+	testutil.Equal(t, "INTEGER", idx[0].TypeName, "bare type index TypeName")
+
 	val := m.Object("problemBareTypeValue")
 	testutil.NotNil(t, val, "problemBareTypeValue should resolve even with bare type index")
 }
