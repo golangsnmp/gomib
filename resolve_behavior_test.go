@@ -347,6 +347,15 @@ func TestModulePreferenceSMIv2OverSMIv1(t *testing.T) {
 
 	testutil.Equal(t, "IF-MIB", mod.Name(),
 		"ifIndex should be attributed to IF-MIB (SMIv2), not RFC1213-MIB (SMIv1)")
+
+	// Verify the module's own collections contain the object, not just
+	// the back-reference from object to module.
+	ifMIB := m.Module("IF-MIB")
+	if ifMIB == nil {
+		t.Fatal("IF-MIB module not found")
+	}
+	testutil.NotNil(t, ifMIB.Object("ifIndex"),
+		"IF-MIB.Object(ifIndex) should be found in the module's object list")
 }
 
 func TestDiagnosticEmissionUnresolvedType(t *testing.T) {
