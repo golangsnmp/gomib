@@ -264,7 +264,7 @@ END
 		testutil.Equal(t, "col1", seq.Fields[0].Name, "first field name")
 		ref0, ok0 := seq.Fields[0].Syntax.(*TypeSyntaxTypeRef)
 		testutil.True(t, ok0, "expected field 0 syntax *TypeSyntaxTypeRef, got %T", seq.Fields[0].Syntax)
-		testutil.Equal(t, "INTEGER", ref0.Name, "first field type name")
+		testutil.Equal(t, "Integer32", ref0.Name, "first field type name")
 
 		// Second field
 		testutil.Equal(t, "col2", seq.Fields[1].Name, "second field name")
