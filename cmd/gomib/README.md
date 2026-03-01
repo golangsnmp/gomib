@@ -81,6 +81,20 @@ gomib dump --compact IF-MIB
 
 Flags: `-o OID` (subtree filter), `--compact` (minified), `--no-tree`, `--no-descriptions`.
 
+### normalize
+
+Emit modules as canonical SMIv2 text. Normalizes SMIv1/v2 differences, OID syntax, status values, and access levels into a consistent output format.
+
+```
+gomib normalize IF-MIB
+gomib normalize --no-conformance IF-MIB
+gomib normalize --no-descriptions IF-MIB
+gomib normalize --no-sequences IF-MIB
+gomib normalize -o /tmp/normalized IF-MIB SNMPv2-MIB
+```
+
+Flags: `-o DIR` (write each module to a file in DIR), `--no-conformance` (omit conformance constructs), `--no-descriptions` (omit DESCRIPTION clauses), `--no-sequences` (omit reconstructed SEQUENCE types).
+
 ### lint
 
 Check modules for issues.
