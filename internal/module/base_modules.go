@@ -1,6 +1,7 @@
 package module
 
 import (
+	"math"
 	"slices"
 	"sync"
 
@@ -359,10 +360,10 @@ func createOidDefinitions() []Definition {
 }
 
 func createBaseTypeDefinitions() []Definition {
-	int32Min := int64(-2147483648)
-	int32Max := int64(2147483647)
-	uint32Max := uint64(4294967295)
-	uint64Max := uint64(18446744073709551615)
+	int32Min := int64(math.MinInt32)
+	int32Max := int64(math.MaxInt32)
+	uint32Max := uint64(math.MaxUint32)
+	uint64Max := uint64(math.MaxUint64)
 
 	return []Definition{
 		// Integer32 ::= INTEGER (-2147483648..2147483647)
@@ -407,7 +408,7 @@ func createBaseTypeDefinitions() []Definition {
 }
 
 func createSMIv1TypeDefinitions() []Definition {
-	uint32Max := uint64(4294967295)
+	uint32Max := uint64(math.MaxUint32)
 
 	return []Definition{
 		// Counter ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
@@ -432,7 +433,7 @@ func createSMIv1OidDefinitions() []Definition {
 }
 
 func createTCDefinitions() []Definition {
-	int32Max := int64(2147483647)
+	int32Max := int64(math.MaxInt32)
 
 	return []Definition{
 		// DisplayString ::= TEXTUAL-CONVENTION DISPLAY-HINT "255a" SYNTAX OCTET STRING (SIZE (0..255))
@@ -468,7 +469,7 @@ func createTCDefinitions() []Definition {
 		// TimeInterval ::= TEXTUAL-CONVENTION SYNTAX INTEGER (0..2147483647)
 		makeTC("TimeInterval", "",
 			constrainedIntRange(
-				&RangeValueUnsigned{Value: 0},
+				&RangeValueSigned{Value: 0},
 				&RangeValueSigned{Value: int32Max},
 			), types.StatusCurrent,
 		),
@@ -482,7 +483,7 @@ func createTCDefinitions() []Definition {
 		// TestAndIncr ::= TEXTUAL-CONVENTION SYNTAX INTEGER (0..2147483647)
 		makeTC("TestAndIncr", "",
 			constrainedIntRange(
-				&RangeValueUnsigned{Value: 0},
+				&RangeValueSigned{Value: 0},
 				&RangeValueSigned{Value: int32Max},
 			), types.StatusCurrent,
 		),

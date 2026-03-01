@@ -31,8 +31,8 @@ func TestDiagnosticConfigShouldReport(t *testing.T) {
 		{"permissive/warning", PermissiveConfig(), "test", SeverityWarning, true},
 		{"permissive/info", PermissiveConfig(), "test", SeverityInfo, false},
 
-		// Silent mode suppresses everything
-		{"silent/fatal", DiagnosticConfig{Level: StrictnessSilent}, "test", SeverityFatal, false},
+		// Silent mode suppresses non-fatal, but fatal always reports
+		{"silent/fatal", DiagnosticConfig{Level: StrictnessSilent}, "test", SeverityFatal, true},
 		{"silent/info", DiagnosticConfig{Level: StrictnessSilent}, "test", SeverityInfo, false},
 	}
 

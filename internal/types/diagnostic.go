@@ -107,8 +107,9 @@ func SilentConfig() DiagnosticConfig {
 // ShouldReport returns true if a diagnostic with the given code and severity
 // should be reported under this configuration.
 //
-// Evaluation order: Ignore is checked first, then Overrides, then Level.
-// A code in both Ignore and Overrides is always suppressed (Ignore wins).
+// Evaluation order: Overrides are applied first, then fatal check, then
+// Ignore, then Level. Fatal diagnostics are always reported regardless of
+// Ignore list or Level (unless overridden to a non-fatal severity).
 //
 // The Level controls reporting threshold:
 //   - Level 0 (Strict): Report all diagnostics (Info and above)
@@ -118,14 +119,19 @@ func SilentConfig() DiagnosticConfig {
 //
 // Lower severity numbers are more severe (Fatal=0, Info=6).
 func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
+	if override, ok := c.Overrides[code]; ok {
+		sev = override
+	}
+
+	// Fatal diagnostics are always reported regardless of Ignore or Level.
+	if sev <= SeverityFatal {
+		return true
+	}
+
 	if slices.ContainsFunc(c.Ignore, func(pattern string) bool {
 		return MatchGlob(pattern, code)
 	}) {
 		return false
-	}
-
-	if override, ok := c.Overrides[code]; ok {
-		sev = override
 	}
 
 	if c.Level >= StrictnessSilent {

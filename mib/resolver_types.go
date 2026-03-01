@@ -209,28 +209,8 @@ func findTypeDefiningModule(ctx *resolverContext, fromMod *module.Module, typeNa
 		}
 	}
 
-	// RFC-compliant: ASN.1 primitives are always available
-	if ctx.Snmpv2SMIModule != nil && isASN1Primitive(typeName) {
-		return ctx.Snmpv2SMIModule.Name
-	}
-
-	if !ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
-		return ""
-	}
-
-	// Permissive only: SMI global types from SNMPv2-SMI
-	if ctx.Snmpv2SMIModule != nil && isSmiGlobalType(typeName) {
-		return ctx.Snmpv2SMIModule.Name
-	}
-
-	// Permissive only: SMIv1 types from RFC1155-SMI
-	if ctx.Rfc1155SMIModule != nil && isSmiV1GlobalType(typeName) {
-		return ctx.Rfc1155SMIModule.Name
-	}
-
-	// Permissive only: SNMPv2-TC textual conventions
-	if ctx.Snmpv2TCModule != nil && isSNMPv2TCType(typeName) {
-		return ctx.Snmpv2TCModule.Name
+	if m := ctx.findWellKnownModuleForType(typeName); m != nil {
+		return m.Name
 	}
 
 	return ""

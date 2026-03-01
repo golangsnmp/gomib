@@ -433,7 +433,7 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 			slog.String("current", currentMod.Name()),
 			slog.String("new", def.mod.Name))
 	}
-	if shouldPreferModule(ctx, newMod, currentMod, def.mod) {
+	if shouldPreferModule(ctx, currentMod, def.mod) {
 		node.setModule(newMod)
 		// Only register non-semantic definitions here; object types,
 		// notifications, etc. are registered in the semantics phase.
@@ -501,7 +501,7 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 		trapNode.setName(defName)
 		trapNode.setKind(KindNotification)
 		newMod := ctx.ModuleToResolved[def.mod]
-		if shouldPreferModule(ctx, newMod, trapNode.Module(), def.mod) {
+		if shouldPreferModule(ctx, trapNode.Module(), def.mod) {
 			trapNode.setModule(newMod)
 		}
 		ctx.registerModuleNodeSymbol(def.mod, defName, trapNode)
@@ -561,7 +561,7 @@ func wellKnownRootArc(name string) int {
 
 // shouldPreferModule determines if newMod should replace currentMod as the node's module.
 // Preference order: SMIv2 > SMIv1 > Unknown, with newer LAST-UPDATED as tiebreaker.
-func shouldPreferModule(ctx *resolverContext, _, currentMod *Module, srcMod *module.Module) bool {
+func shouldPreferModule(ctx *resolverContext, currentMod *Module, srcMod *module.Module) bool {
 	if currentMod == nil {
 		return true
 	}

@@ -173,27 +173,35 @@ func TestHexToBytes(t *testing.T) {
 
 func TestBinaryToBytes(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  []byte
+		name     string
+		input    string
+		rightPad bool
+		want     []byte
 	}{
-		{"empty", "", []byte{}},
-		{"one byte all ones", "11111111", []byte{0xFF}},
-		{"one byte all zeros", "00000000", []byte{0x00}},
-		{"one byte pattern", "10101010", []byte{0xAA}},
-		{"two bytes", "1111111100000000", []byte{0xFF, 0x00}},
-		{"short padded to 8", "1", []byte{0x01}},
-		{"short padded 4 bits", "1010", []byte{0x0A}},
-		{"non-multiple of 8 nine bits", "101010101", []byte{0x01, 0x55}},
-		{"three bits", "111", []byte{0x07}},
-		{"nine bits", "100000001", []byte{0x01, 0x01}},
+		{"empty", "", false, []byte{}},
+		{"one byte all ones", "11111111", false, []byte{0xFF}},
+		{"one byte all zeros", "00000000", false, []byte{0x00}},
+		{"one byte pattern", "10101010", false, []byte{0xAA}},
+		{"two bytes", "1111111100000000", false, []byte{0xFF, 0x00}},
+		{"short left-padded to 8", "1", false, []byte{0x01}},
+		{"short left-padded 4 bits", "1010", false, []byte{0x0A}},
+		{"non-multiple of 8 nine bits left-pad", "101010101", false, []byte{0x01, 0x55}},
+		{"three bits left-pad", "111", false, []byte{0x07}},
+		{"nine bits left-pad", "100000001", false, []byte{0x01, 0x01}},
+		// BITS right-padding: bits are MSB-first per RFC 2578
+		{"short right-padded to 8", "1", true, []byte{0x80}},
+		{"short right-padded 4 bits", "1010", true, []byte{0xA0}},
+		{"three bits right-pad", "101", true, []byte{0xA0}},
+		{"nine bits right-pad", "101010101", true, []byte{0xAA, 0x80}},
+		{"full byte no padding needed", "11111111", true, []byte{0xFF}},
+		{"empty right-pad", "", true, []byte{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := binaryToBytes(tt.input)
+			got := binaryToBytes(tt.input, tt.rightPad)
 			testutil.Len(t, got, len(tt.want), "binaryToBytes() len")
 			for i := range got {
-				testutil.Equal(t, tt.want[i], got[i], "binaryToBytes(")
+				testutil.Equal(t, tt.want[i], got[i], "binaryToBytes()")
 			}
 		})
 	}

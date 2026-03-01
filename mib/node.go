@@ -25,6 +25,8 @@ type Node struct {
 	capability  *Capability
 	parent      *Node
 	children    map[uint32]*Node
+	oidCache    OID       // lazily computed full OID; nil = not yet computed
+	oidOnce     sync.Once // ensures thread-safe lazy init of oidCache
 	sortedCache []*Node   // lazily computed sorted children; nil = invalidated
 	sortedOnce  sync.Once // ensures thread-safe lazy init of sortedCache
 }
@@ -63,16 +65,20 @@ func (n *Node) Module() *Module {
 }
 
 // OID returns the full numeric OID from the root to this node, or nil for the root.
+// The result is a cloned copy; callers may freely modify it.
 func (n *Node) OID() OID {
 	if n == nil || n.parent == nil {
 		return nil
 	}
-	var arcs OID
-	for nd := n; nd.parent != nil; nd = nd.parent {
-		arcs = append(arcs, nd.arc)
-	}
-	slices.Reverse(arcs)
-	return arcs
+	n.oidOnce.Do(func() {
+		var arcs OID
+		for nd := n; nd.parent != nil; nd = nd.parent {
+			arcs = append(arcs, nd.arc)
+		}
+		slices.Reverse(arcs)
+		n.oidCache = arcs
+	})
+	return slices.Clone(n.oidCache)
 }
 
 // Object returns the OBJECT-TYPE attached to this node, or nil.

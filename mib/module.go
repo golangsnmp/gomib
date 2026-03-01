@@ -166,6 +166,9 @@ func (m *Module) addObject(obj *Object) {
 	m.objectsByName[obj.name] = obj
 }
 
+// addType uses first-write-wins for the name index. Multiple modules can
+// define the same type name (e.g. DisplayString in both RFC1213-MIB and
+// SNMPv2-TC). The slice holds all definitions; the map keeps the first.
 func (m *Module) addType(t *Type) {
 	m.types = append(m.types, t)
 	if m.typesByName[t.name] == nil {

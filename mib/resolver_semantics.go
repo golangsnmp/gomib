@@ -146,7 +146,9 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 
 		resolved := newObject(obj.Name)
 		resolved.setNode(node)
-		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+			resolved.setModule(resolvedMod)
+		}
 		resolved.setAccess(obj.Access)
 		resolved.setStatus(obj.Status)
 		resolved.setDescription(obj.Description)
@@ -181,8 +183,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 		if currentObj != nil {
 			currentMod = currentObj.Module()
 		}
-		newMod := ctx.ModuleToResolved[ref.mod]
-		if shouldPreferModule(ctx, newMod, currentMod, ref.mod) {
+		if shouldPreferModule(ctx, currentMod, ref.mod) {
 			node.setObject(resolved)
 		}
 		created++
@@ -246,28 +247,28 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 // only missing values are inherited from ancestor types. The first non-empty
 // value found in the chain wins.
 func computeEffectiveValues(obj *Object) {
-	t := obj.Type()
+	t := obj.typ
 	if t == nil {
 		return
 	}
 
 	for t != nil {
-		if obj.EffectiveDisplayHint() == "" && t.DisplayHint() != "" {
-			obj.setEffectiveHint(t.DisplayHint())
+		if obj.hint == "" && t.hint != "" {
+			obj.hint = t.hint
 		}
-		if len(obj.EffectiveSizes()) == 0 && len(t.Sizes()) > 0 {
-			obj.setEffectiveSizes(t.Sizes())
+		if len(obj.sizes) == 0 && len(t.sizes) > 0 {
+			obj.sizes = t.sizes
 		}
-		if len(obj.EffectiveRanges()) == 0 && len(t.Ranges()) > 0 {
-			obj.setEffectiveRanges(t.Ranges())
+		if len(obj.ranges) == 0 && len(t.ranges) > 0 {
+			obj.ranges = t.ranges
 		}
-		if len(obj.EffectiveEnums()) == 0 && len(t.Enums()) > 0 {
-			obj.setEffectiveEnums(t.Enums())
+		if len(obj.enums) == 0 && len(t.enums) > 0 {
+			obj.enums = t.enums
 		}
-		if len(obj.EffectiveBits()) == 0 && len(t.Bits()) > 0 {
-			obj.setEffectiveBits(t.Bits())
+		if len(obj.bits) == 0 && len(t.bits) > 0 {
+			obj.bits = t.bits
 		}
-		t = t.Parent()
+		t = t.parent
 	}
 }
 
@@ -283,7 +284,9 @@ func createResolvedNotifications(ctx *resolverContext) {
 
 		resolved := newNotification(notif.Name)
 		resolved.setNode(node)
-		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+			resolved.setModule(resolvedMod)
+		}
 		resolved.setStatus(notif.Status)
 		resolved.setDescription(notif.Description)
 		resolved.setReference(notif.Reference)
@@ -367,7 +370,9 @@ func createResolvedObjectGroups(ctx *resolverContext) int {
 
 		resolved := newGroup(grp.Name)
 		resolved.setNode(node)
-		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+			resolved.setModule(resolvedMod)
+		}
 		resolved.setStatus(grp.Status)
 		resolved.setDescription(grp.Description)
 		resolved.setReference(grp.Reference)
@@ -405,7 +410,9 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 
 		resolved := newGroup(grp.Name)
 		resolved.setNode(node)
-		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+			resolved.setModule(resolvedMod)
+		}
 		resolved.setStatus(grp.Status)
 		resolved.setDescription(grp.Description)
 		resolved.setReference(grp.Reference)
@@ -425,7 +432,13 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 
 func registerNotification(ctx *resolverContext, mod *module.Module, node *Node, resolved *Notification) {
 	ctx.Mib.addNotification(resolved)
-	node.setNotification(resolved)
+	var currentMod *Module
+	if current := node.Notification(); current != nil {
+		currentMod = current.Module()
+	}
+	if shouldPreferModule(ctx, currentMod, mod) {
+		node.setNotification(resolved)
+	}
 	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
 		resolvedMod.addNotification(resolved)
 	}
@@ -433,7 +446,13 @@ func registerNotification(ctx *resolverContext, mod *module.Module, node *Node, 
 
 func registerGroup(ctx *resolverContext, mod *module.Module, node *Node, resolved *Group) {
 	ctx.Mib.addGroup(resolved)
-	node.setGroup(resolved)
+	var currentMod *Module
+	if current := node.Group(); current != nil {
+		currentMod = current.Module()
+	}
+	if shouldPreferModule(ctx, currentMod, mod) {
+		node.setGroup(resolved)
+	}
 	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
 		resolvedMod.addGroup(resolved)
 	}
@@ -441,7 +460,13 @@ func registerGroup(ctx *resolverContext, mod *module.Module, node *Node, resolve
 
 func registerCompliance(ctx *resolverContext, mod *module.Module, node *Node, resolved *Compliance) {
 	ctx.Mib.addCompliance(resolved)
-	node.setCompliance(resolved)
+	var currentMod *Module
+	if current := node.Compliance(); current != nil {
+		currentMod = current.Module()
+	}
+	if shouldPreferModule(ctx, currentMod, mod) {
+		node.setCompliance(resolved)
+	}
 	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
 		resolvedMod.addCompliance(resolved)
 	}
@@ -449,7 +474,13 @@ func registerCompliance(ctx *resolverContext, mod *module.Module, node *Node, re
 
 func registerCapability(ctx *resolverContext, mod *module.Module, node *Node, resolved *Capability) {
 	ctx.Mib.addCapability(resolved)
-	node.setCapability(resolved)
+	var currentMod *Module
+	if current := node.Capability(); current != nil {
+		currentMod = current.Module()
+	}
+	if shouldPreferModule(ctx, currentMod, mod) {
+		node.setCapability(resolved)
+	}
 	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
 		resolvedMod.addCapability(resolved)
 	}
@@ -481,7 +512,9 @@ func createResolvedCompliances(ctx *resolverContext) {
 
 		resolved := newCompliance(comp.Name)
 		resolved.setNode(node)
-		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+			resolved.setModule(resolvedMod)
+		}
 		resolved.setStatus(comp.Status)
 		resolved.setDescription(comp.Description)
 		resolved.setReference(comp.Reference)
@@ -548,7 +581,9 @@ func createResolvedCapabilities(ctx *resolverContext) {
 
 		resolved := newCapability(ac.Name)
 		resolved.setNode(node)
-		resolved.setModule(ctx.ModuleToResolved[ref.mod])
+		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+			resolved.setModule(resolvedMod)
+		}
 		resolved.setStatus(ac.Status)
 		resolved.setDescription(ac.Description)
 		resolved.setReference(ac.Reference)
@@ -741,7 +776,8 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		return &dv
 	case *module.DefValBinaryString:
 		raw := "'" + v.Value + "'B"
-		bytes := binaryToBytes(v.Value)
+		_, isBits := syntax.(*module.TypeSyntaxBits)
+		bytes := binaryToBytes(v.Value, isBits)
 		dv := newDefValBytes(bytes, raw)
 		return &dv
 	case *module.DefValEnum:
@@ -809,6 +845,12 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 				oid = append(oid, c.NumberValue)
 			case *module.OidComponentQualifiedNamedNumber:
 				oid = append(oid, c.NumberValue)
+			case *module.OidComponentName:
+				ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
+					mod, types.Span{}, "DEFVAL OID component "+c.NameValue+" has no numeric value")
+			case *module.OidComponentQualifiedName:
+				ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
+					mod, types.Span{}, "DEFVAL OID component "+c.ModuleValue+"."+c.NameValue+" has no numeric value")
 			}
 		}
 		dv := newDefValOID(oid, name)
@@ -831,13 +873,21 @@ func hexToBytes(s string) ([]byte, error) {
 }
 
 // binaryToBytes converts a binary string (e.g., "10101010") to bytes.
-func binaryToBytes(s string) []byte {
+// For BITS-typed values (RFC 2578), bits are MSB-first so the string is
+// right-padded to a byte boundary. For other types (OCTET STRING), the
+// string is left-padded (treated as a numeric value).
+func binaryToBytes(s string, rightPad bool) []byte {
 	if s == "" {
 		return []byte{}
 	}
 	// Pad to multiple of 8
 	if padding := (8 - len(s)%8) % 8; padding > 0 {
-		s = strings.Repeat("0", padding) + s
+		pad := strings.Repeat("0", padding)
+		if rightPad {
+			s += pad
+		} else {
+			s = pad + s
+		}
 	}
 	result := make([]byte, len(s)/8)
 	for i := 0; i < len(s); i += 8 {

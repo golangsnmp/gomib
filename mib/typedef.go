@@ -2,6 +2,11 @@ package mib
 
 import "slices"
 
+// maxTypeChainDepth is a safety limit for parent chain walks. Real MIB type
+// chains are rarely deeper than 5-10. This prevents infinite loops if a
+// cycle slips past the resolver.
+const maxTypeChainDepth = 1000
+
 // Type is a named type definition, either a TEXTUAL-CONVENTION or an inline
 // type refinement. Types form chains via [Type.Parent]; the chain terminates
 // at a base SMI type. Walking the chain with the Effective* methods resolves
@@ -94,7 +99,7 @@ func (t *Type) IsBits() bool { return len(t.EffectiveBits()) > 0 }
 // EffectiveBase walks the parent type chain and returns the first non-zero
 // base type, or 0 if none is set.
 func (t *Type) EffectiveBase() BaseType {
-	for current := t; current != nil; current = current.parent {
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
 		if current.base != 0 {
 			return current.base
 		}
@@ -105,7 +110,7 @@ func (t *Type) EffectiveBase() BaseType {
 // EffectiveDisplayHint walks the parent type chain and returns the first
 // non-empty display hint.
 func (t *Type) EffectiveDisplayHint() string {
-	for current := t; current != nil; current = current.parent {
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
 		if current.hint != "" {
 			return current.hint
 		}
@@ -116,7 +121,7 @@ func (t *Type) EffectiveDisplayHint() string {
 // EffectiveSizes walks the parent type chain and returns the first non-empty
 // size constraint list.
 func (t *Type) EffectiveSizes() []Range {
-	for current := t; current != nil; current = current.parent {
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
 		if len(current.sizes) > 0 {
 			return slices.Clone(current.sizes)
 		}
@@ -127,7 +132,7 @@ func (t *Type) EffectiveSizes() []Range {
 // EffectiveRanges walks the parent type chain and returns the first non-empty
 // range constraint list.
 func (t *Type) EffectiveRanges() []Range {
-	for current := t; current != nil; current = current.parent {
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
 		if len(current.ranges) > 0 {
 			return slices.Clone(current.ranges)
 		}
@@ -138,7 +143,7 @@ func (t *Type) EffectiveRanges() []Range {
 // EffectiveEnums walks the parent type chain and returns the first non-empty
 // enumeration value list.
 func (t *Type) EffectiveEnums() []NamedValue {
-	for current := t; current != nil; current = current.parent {
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
 		if len(current.enums) > 0 {
 			return slices.Clone(current.enums)
 		}
@@ -149,7 +154,7 @@ func (t *Type) EffectiveEnums() []NamedValue {
 // EffectiveBits walks the parent type chain and returns the first non-empty
 // BITS definition list.
 func (t *Type) EffectiveBits() []NamedValue {
-	for current := t; current != nil; current = current.parent {
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
 		if len(current.bits) > 0 {
 			return slices.Clone(current.bits)
 		}

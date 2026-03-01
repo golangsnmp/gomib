@@ -179,41 +179,44 @@ func (c *resolverContext) lookupTypeInModule(mod *module.Module, name string) (*
 	return nil, false
 }
 
-// tryWellKnownTypeFallbacks searches ASN.1 primitives (always) and well-known
-// base modules (permissive only) for a type by name.
-func (c *resolverContext) tryWellKnownTypeFallbacks(name string) (*Type, bool) {
+// findWellKnownModuleForType returns the well-known base module expected to
+// define the given type name. ASN.1 primitives are always checked; other
+// well-known modules (SMI globals, SMIv1 types, SNMPv2-TC) require permissive
+// mode. Returns nil if no well-known module matches.
+func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module {
 	// RFC-compliant: ASN.1 primitives are always available
-	if isASN1Primitive(name) {
-		if t, ok := c.lookupTypeInModule(c.Snmpv2SMIModule, name); ok {
-			return t, true
-		}
+	if c.Snmpv2SMIModule != nil && isASN1Primitive(name) {
+		return c.Snmpv2SMIModule
 	}
 
 	if !c.diagConfig.AllowBestGuessFallbacks() {
-		return nil, false
+		return nil
 	}
 
 	// Permissive only: SMI global types from SNMPv2-SMI
-	if isSmiGlobalType(name) {
-		if t, ok := c.lookupTypeInModule(c.Snmpv2SMIModule, name); ok {
-			return t, true
-		}
+	if c.Snmpv2SMIModule != nil && isSmiGlobalType(name) {
+		return c.Snmpv2SMIModule
 	}
 
 	// Permissive only: SMIv1 types (Counter, Gauge, NetworkAddress) from RFC1155-SMI
-	if isSmiV1GlobalType(name) {
-		if t, ok := c.lookupTypeInModule(c.Rfc1155SMIModule, name); ok {
-			return t, true
-		}
+	if c.Rfc1155SMIModule != nil && isSmiV1GlobalType(name) {
+		return c.Rfc1155SMIModule
 	}
 
 	// Permissive only: SNMPv2-TC textual conventions (DisplayString, TruthValue, etc.)
-	if isSNMPv2TCType(name) {
-		if t, ok := c.lookupTypeInModule(c.Snmpv2TCModule, name); ok {
-			return t, true
-		}
+	if c.Snmpv2TCModule != nil && isSNMPv2TCType(name) {
+		return c.Snmpv2TCModule
 	}
 
+	return nil
+}
+
+// tryWellKnownTypeFallbacks searches ASN.1 primitives (always) and well-known
+// base modules (permissive only) for a type by name.
+func (c *resolverContext) tryWellKnownTypeFallbacks(name string) (*Type, bool) {
+	if m := c.findWellKnownModuleForType(name); m != nil {
+		return c.lookupTypeInModule(m, name)
+	}
 	return nil, false
 }
 

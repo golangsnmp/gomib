@@ -607,9 +607,9 @@ func TestSNMPv2TC_TimeInterval_Range(t *testing.T) {
 	testutil.Len(t, rangeConstraint.Ranges, 1, "TimeInterval range count")
 
 	r := rangeConstraint.Ranges[0]
-	minVal, ok := r.Min.(*RangeValueUnsigned)
+	minVal, ok := r.Min.(*RangeValueSigned)
 	testutil.True(t, ok, "TimeInterval min type")
-	testutil.Equal(t, uint64(0), minVal.Value, "TimeInterval min")
+	testutil.Equal(t, int64(0), minVal.Value, "TimeInterval min")
 
 	maxVal, ok := r.Max.(*RangeValueSigned)
 	testutil.True(t, ok, "TimeInterval max type")

@@ -9,8 +9,9 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-func TestSpanToLineCol(t *testing.T) {
+func TestLineColFromTable(t *testing.T) {
 	source := []byte("line1\nline2\nline3\n")
+	table := types.BuildLineTable(source)
 
 	tests := []struct {
 		name     string
@@ -28,21 +29,16 @@ func TestSpanToLineCol(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			line, col := spanToLineCol(source, tt.offset)
-			testutil.Equal(t, tt.wantLine, line, "spanToLineCol(source, %d) line", tt.offset)
-			testutil.Equal(t, tt.wantCol, col, "spanToLineCol(source, %d) col", tt.offset)
+			line, col := types.LineColFromTable(table, tt.offset)
+			testutil.Equal(t, tt.wantLine, line, "LineColFromTable(table, %d) line", tt.offset)
+			testutil.Equal(t, tt.wantCol, col, "LineColFromTable(table, %d) col", tt.offset)
 		})
 	}
 
-	// Nil source returns (0, 0)
-	line, col := spanToLineCol(nil, 5)
-	testutil.Equal(t, 0, line, "spanToLineCol(nil, 5) line")
-	testutil.Equal(t, 0, col, "spanToLineCol(nil, 5) col")
-
-	// Out of range offset returns (0, 0)
-	line, col = spanToLineCol(source, 100)
-	testutil.Equal(t, 0, line, "spanToLineCol(source, 100) line")
-	testutil.Equal(t, 0, col, "spanToLineCol(source, 100) col")
+	// Nil table returns (0, 0)
+	line, col := types.LineColFromTable(nil, 5)
+	testutil.Equal(t, 0, line, "LineColFromTable(nil, 5) line")
+	testutil.Equal(t, 0, col, "LineColFromTable(nil, 5) col")
 }
 
 func TestLower_DiagnosticSourceLocation(t *testing.T) {

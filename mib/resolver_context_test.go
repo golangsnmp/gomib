@@ -604,12 +604,20 @@ func TestEmitDiagnostic(t *testing.T) {
 			want:     0,
 		},
 		{
-			name: "silent suppresses everything",
+			name: "silent suppresses non-fatal",
+			config: DiagnosticConfig{
+				Level: StrictnessSilent,
+			},
+			severity: SeverityInfo,
+			want:     0,
+		},
+		{
+			name: "silent still reports fatal",
 			config: DiagnosticConfig{
 				Level: StrictnessSilent,
 			},
 			severity: SeverityFatal,
-			want:     0,
+			want:     1,
 		},
 	}
 

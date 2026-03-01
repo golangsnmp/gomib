@@ -219,7 +219,7 @@ func (m *Mib) ObjectsByType(typeName string) []*Object {
 func (m *Mib) ObjectsByBaseType(base BaseType) []*Object {
 	var result []*Object
 	for _, obj := range m.objects {
-		if obj.typ != nil && obj.typ.Base() == base {
+		if obj.typ != nil && obj.typ.EffectiveBase() == base {
 			result = append(result, obj)
 		}
 	}
@@ -255,6 +255,9 @@ func (m *Mib) addObject(obj *Object) {
 	m.objects = append(m.objects, obj)
 }
 
+// addType uses first-write-wins for the name index. Types are seeded in
+// priority order (primitives, then base module types, then user types),
+// so the first definition wins cross-module name collisions.
 func (m *Mib) addType(t *Type) {
 	m.types = append(m.types, t)
 	if t.name != "" && m.typeByName[t.name] == nil {

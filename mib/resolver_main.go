@@ -44,7 +44,7 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "register"))
 	registerModules(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "register"),
-		slog.Int("modules", len(ctx.Mib.Modules())))
+		slog.Int("modules", len(ctx.Mib.modules)))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "imports"))
 	resolveImports(ctx)
@@ -54,7 +54,7 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "types"))
 	resolveTypes(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "types"),
-		slog.Int("types", len(ctx.Mib.Types())))
+		slog.Int("types", len(ctx.Mib.types)))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "oids"))
 	resolveOids(ctx)
@@ -94,8 +94,8 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	m := ctx.Mib
 
 	r.Log(slog.LevelInfo, "resolution complete",
-		slog.Int("modules", len(m.Modules())),
-		slog.Int("types", len(m.Types())),
+		slog.Int("modules", len(m.modules)),
+		slog.Int("types", len(m.types)),
 		slog.Int("nodes", m.NodeCount()))
 
 	return m
