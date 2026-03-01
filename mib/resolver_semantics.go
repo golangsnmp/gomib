@@ -221,9 +221,11 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 			for _, item := range obj.Index {
 				if indexNode, ok := ctx.LookupNodeForModule(ref.mod, item.Object); ok {
 					if indexNode.Object() != nil {
+						idxObj := indexNode.Object()
 						indexEntries = append(indexEntries, IndexEntry{
-							Object:  indexNode.Object(),
-							Implied: item.Implied,
+							Object:   idxObj,
+							Implied:  item.Implied,
+							Encoding: classifyIndexEncoding(idxObj, item.Implied),
 						})
 					} else if !isBareTypeIndex(item.Object) {
 						ctx.EmitDiagnostic(types.DiagIndexNotObject, SeverityMinor,
@@ -242,8 +244,9 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 
 		if obj.Augments != "" {
 			if augNode, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); ok {
-				if augNode.Object() != nil {
-					resolvedObj.setAugments(augNode.Object())
+				if target := augNode.Object(); target != nil {
+					resolvedObj.setAugments(target)
+					target.addAugmentedBy(resolvedObj)
 				} else {
 					ctx.EmitDiagnostic(types.DiagAugmentsNotObject, SeverityMinor,
 						ref.mod, obj.Span,

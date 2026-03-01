@@ -6,18 +6,19 @@ import "slices"
 // Each object is classified by its [Kind]: scalar, table, row, or column.
 // Objects are attached to the OID tree via their [Node].
 type Object struct {
-	name     string
-	node     *Node
-	module   *Module
-	typ      *Type
-	access   Access
-	status   Status
-	desc     string
-	ref      string
-	units    string
-	defVal   *DefVal
-	augments *Object
-	index    []IndexEntry
+	name        string
+	node        *Node
+	module      *Module
+	typ         *Type
+	access      Access
+	status      Status
+	desc        string
+	ref         string
+	units       string
+	defVal      *DefVal
+	augments    *Object
+	augmentedBy []*Object
+	index       []IndexEntry
 
 	hint   string
 	sizes  []Range
@@ -59,6 +60,10 @@ func (o *Object) Units() string { return o.units }
 
 // Augments returns the row object this one augments, or nil.
 func (o *Object) Augments() *Object { return o.augments }
+
+// AugmentedBy returns the row objects that augment this one, or nil.
+// Only meaningful for KindRow objects with their own INDEX clause.
+func (o *Object) AugmentedBy() []*Object { return slices.Clone(o.augmentedBy) }
 
 // OID returns the object's position in the OID tree, or nil if unresolved.
 func (o *Object) OID() OID {
@@ -223,6 +228,25 @@ func (o *Object) IsColumn() bool { return o != nil && o.node != nil && o.node.ki
 // IsScalar reports whether this object is a scalar node.
 func (o *Object) IsScalar() bool { return o != nil && o.node != nil && o.node.kind == KindScalar }
 
+// IsIndex reports whether this column object appears in its parent row's
+// effective INDEX clause. RFC 2578 s7.7 calls these "auxiliary objects"
+// and requires them to be not-accessible, with limited exceptions.
+func (o *Object) IsIndex() bool {
+	if o == nil || o.node == nil || o.node.kind != KindColumn {
+		return false
+	}
+	row := o.Row()
+	if row == nil {
+		return false
+	}
+	for _, idx := range row.EffectiveIndexes() {
+		if idx.Object == o {
+			return true
+		}
+	}
+	return false
+}
+
 // String returns a brief summary: "name (oid)".
 func (o *Object) String() string {
 	if o == nil {
@@ -241,6 +265,7 @@ func (o *Object) setReference(r string)            { o.ref = r }
 func (o *Object) setUnits(u string)                { o.units = u }
 func (o *Object) setDefaultValue(d *DefVal)        { o.defVal = d }
 func (o *Object) setAugments(a *Object)            { o.augments = a }
+func (o *Object) addAugmentedBy(a *Object)         { o.augmentedBy = append(o.augmentedBy, a) }
 func (o *Object) setIndex(idx []IndexEntry)        { o.index = idx }
 func (o *Object) setEffectiveHint(h string)        { o.hint = h }
 func (o *Object) setEffectiveSizes(s []Range)      { o.sizes = s }

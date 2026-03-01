@@ -1463,6 +1463,11 @@ func TestLinkObjectIndexes(t *testing.T) {
 
 		testutil.NotNil(t, augObj.Augments(), "augments should be set")
 		testutil.Equal(t, targetObj, augObj.Augments(), "augments target")
+
+		// Verify reverse mapping
+		augBy := targetObj.AugmentedBy()
+		testutil.Len(t, augBy, 1, "augmented by")
+		testutil.Equal(t, augObj, augBy[0], "augmented by entry")
 	})
 
 	t.Run("index node without object emits diagnostic", func(t *testing.T) {
