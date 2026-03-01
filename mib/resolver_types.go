@@ -259,6 +259,10 @@ func getPrimitiveParentName(syntax module.TypeSyntax) string {
 			return "OCTET STRING"
 		case *module.TypeSyntaxObjectIdentifier:
 			return "OBJECT IDENTIFIER"
+		case *module.TypeSyntaxIntegerEnum:
+			return "INTEGER"
+		case *module.TypeSyntaxBits:
+			return "BITS"
 		}
 	}
 	return ""

@@ -748,21 +748,29 @@ func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *modu
 		if t, ok := ctx.LookupType("INTEGER"); ok {
 			return t, true
 		}
+		ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing, SeverityError,
+			mod, span, "primitive type INTEGER not found for "+objectName)
 		return nil, false
 	case *module.TypeSyntaxBits:
 		if t, ok := ctx.LookupType("BITS"); ok {
 			return t, true
 		}
+		ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing, SeverityError,
+			mod, span, "primitive type BITS not found for "+objectName)
 		return nil, false
 	case *module.TypeSyntaxOctetString:
 		if t, ok := ctx.LookupType("OCTET STRING"); ok {
 			return t, true
 		}
+		ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing, SeverityError,
+			mod, span, "primitive type OCTET STRING not found for "+objectName)
 		return nil, false
 	case *module.TypeSyntaxObjectIdentifier:
 		if t, ok := ctx.LookupType("OBJECT IDENTIFIER"); ok {
 			return t, true
 		}
+		ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing, SeverityError,
+			mod, span, "primitive type OBJECT IDENTIFIER not found for "+objectName)
 		return nil, false
 	case *module.TypeSyntaxSequenceOf, *module.TypeSyntaxSequence:
 		return nil, false

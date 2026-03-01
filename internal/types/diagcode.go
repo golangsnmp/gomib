@@ -55,6 +55,8 @@ const (
 	DiagGroupMemberUnresolved    = "group-member-unresolved"
 	DiagIndexNotObject           = "index-not-object"
 	DiagAugmentsNotObject        = "augments-not-object"
+	DiagNotificationNoOid        = "notification-no-oid"
+	DiagPrimitiveTypeMissing     = "primitive-type-missing"
 )
 
 // AllDiagnosticCodes returns all known diagnostic codes grouped by phase.
@@ -102,6 +104,8 @@ func AllDiagnosticCodes() []DiagCodeInfo {
 		{Code: DiagGroupMemberUnresolved, Phase: "resolver"},
 		{Code: DiagIndexNotObject, Phase: "resolver"},
 		{Code: DiagAugmentsNotObject, Phase: "resolver"},
+		{Code: DiagNotificationNoOid, Phase: "resolver"},
+		{Code: DiagPrimitiveTypeMissing, Phase: "resolver"},
 	}
 }
 
