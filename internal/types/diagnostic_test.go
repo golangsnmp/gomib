@@ -87,12 +87,21 @@ func TestShouldReport(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "silent suppresses everything",
+			name: "silent still reports fatal",
 			cfg: DiagnosticConfig{
 				Level: StrictnessSilent,
 			},
 			code: "fatal-thing",
 			sev:  SeverityFatal,
+			want: true,
+		},
+		{
+			name: "silent suppresses non-fatal",
+			cfg: DiagnosticConfig{
+				Level: StrictnessSilent,
+			},
+			code: "some-warning",
+			sev:  SeverityWarning,
 			want: false,
 		},
 		{
@@ -126,11 +135,22 @@ func TestShouldReport(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "ignore takes precedence over override",
+			name: "override to fatal always reports even with ignore",
 			cfg: DiagnosticConfig{
 				Level:     StrictnessStrict,
 				Ignore:    []string{"some-code"},
 				Overrides: map[string]Severity{"some-code": SeverityFatal},
+			},
+			code: "some-code",
+			sev:  SeverityInfo,
+			want: true,
+		},
+		{
+			name: "ignore suppresses non-fatal with override",
+			cfg: DiagnosticConfig{
+				Level:     StrictnessStrict,
+				Ignore:    []string{"some-code"},
+				Overrides: map[string]Severity{"some-code": SeverityWarning},
 			},
 			code: "some-code",
 			sev:  SeverityInfo,
@@ -145,5 +165,23 @@ func TestShouldReport(t *testing.T) {
 				t.Errorf("ShouldReport(%q, %v) = %v, want %v", tt.code, tt.sev, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestStrictnessSeverityAlignment verifies that the numeric values of
+// StrictnessLevel and Severity enums remain aligned. ShouldReport relies
+// on comparing int(sev) <= int(level) for threshold filtering.
+func TestStrictnessSeverityAlignment(t *testing.T) {
+	if int(StrictnessNormal) != int(SeverityMinor) {
+		t.Errorf("StrictnessNormal(%d) != SeverityMinor(%d)", StrictnessNormal, SeverityMinor)
+	}
+	if int(StrictnessPermissive) != int(SeverityWarning) {
+		t.Errorf("StrictnessPermissive(%d) != SeverityWarning(%d)", StrictnessPermissive, SeverityWarning)
+	}
+	if int(StrictnessSilent) != int(SeverityInfo) {
+		t.Errorf("StrictnessSilent(%d) != SeverityInfo(%d)", StrictnessSilent, SeverityInfo)
+	}
+	if int(StrictnessStrict) != int(SeverityFatal) {
+		t.Errorf("StrictnessStrict(%d) != SeverityFatal(%d)", StrictnessStrict, SeverityFatal)
 	}
 }

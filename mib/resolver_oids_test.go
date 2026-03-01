@@ -409,7 +409,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx := newTestContext()
 		ctx.ModuleToResolved = map[*module.Module]*Module{srcMod: newMod}
 
-		testutil.True(t, shouldPreferModule(ctx, newMod, nil, srcMod), "expected true when currentMod is nil")
+		testutil.True(t, shouldPreferModule(ctx, nil, srcMod), "expected true when currentMod is nil")
 	})
 
 	t.Run("nil currentSrcMod prefers new", func(t *testing.T) {
@@ -420,7 +420,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*Module{srcMod: newMod}
 		ctx.ResolvedToModule = map[*Module]*module.Module{} // currentMod not mapped
 
-		testutil.True(t, shouldPreferModule(ctx, newMod, currentMod, srcMod), "expected true when currentSrcMod lookup returns nil")
+		testutil.True(t, shouldPreferModule(ctx, currentMod, srcMod), "expected true when currentSrcMod lookup returns nil")
 	})
 
 	t.Run("SMIv2 preferred over SMIv1", func(t *testing.T) {
@@ -433,7 +433,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		testutil.True(t, shouldPreferModule(ctx, newMod, oldMod, newSrc), "expected SMIv2 to be preferred over SMIv1")
+		testutil.True(t, shouldPreferModule(ctx, oldMod, newSrc), "expected SMIv2 to be preferred over SMIv1")
 	})
 
 	t.Run("SMIv1 not preferred over SMIv2", func(t *testing.T) {
@@ -446,7 +446,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		testutil.False(t, shouldPreferModule(ctx, newMod, oldMod, newSrc), "expected SMIv1 NOT to be preferred over SMIv2")
+		testutil.False(t, shouldPreferModule(ctx, oldMod, newSrc), "expected SMIv1 NOT to be preferred over SMIv2")
 	})
 
 	t.Run("same language uses LAST-UPDATED tiebreaker", func(t *testing.T) {
@@ -471,7 +471,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		testutil.True(t, shouldPreferModule(ctx, newMod, oldMod, newSrc), "expected newer LAST-UPDATED to win")
+		testutil.True(t, shouldPreferModule(ctx, oldMod, newSrc), "expected newer LAST-UPDATED to win")
 	})
 
 	t.Run("same language older LAST-UPDATED loses", func(t *testing.T) {
@@ -496,7 +496,7 @@ func TestShouldPreferModule(t *testing.T) {
 		ctx.ModuleToResolved = map[*module.Module]*Module{newSrc: newMod, oldSrc: oldMod}
 		ctx.ResolvedToModule = map[*Module]*module.Module{oldMod: oldSrc, newMod: newSrc}
 
-		testutil.False(t, shouldPreferModule(ctx, newMod, oldMod, newSrc), "expected older LAST-UPDATED to lose")
+		testutil.False(t, shouldPreferModule(ctx, oldMod, newSrc), "expected older LAST-UPDATED to lose")
 	})
 }
 

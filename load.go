@@ -58,12 +58,11 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 			slog.Int("modules", len(allModules)))
 	}
 
-	type parseResult struct {
-		mod *module.Module
-	}
-	results := make(chan parseResult, len(allModules))
+	results := make(chan *module.Module, len(allModules))
 
 	var wg sync.WaitGroup
+	var firstErr error
+	var errOnce sync.Once
 	sem := make(chan struct{}, runtime.NumCPU())
 
 	for _, sm := range allModules {
@@ -90,17 +89,20 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 							slog.String("module", sm.name),
 							slog.Any("error", err))
 					}
-				} else if logEnabled(ctx, logger, slog.LevelWarn) {
-					logger.LogAttrs(ctx, slog.LevelWarn, "module read error",
-						slog.String("module", sm.name),
-						slog.Any("error", err))
+				} else {
+					if logEnabled(ctx, logger, slog.LevelWarn) {
+						logger.LogAttrs(ctx, slog.LevelWarn, "module read error",
+							slog.String("module", sm.name),
+							slog.Any("error", err))
+					}
+					errOnce.Do(func() { firstErr = err })
 				}
 				return
 			}
 
 			mod := decodeModule(ctx, result.Content, result.Path, sm.name, logger, cfg)
 			if mod != nil {
-				results <- parseResult{mod: mod}
+				results <- mod
 			}
 		}(sm)
 	}
@@ -111,14 +113,17 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 	}()
 
 	modules := make(map[string]*module.Module)
-	for r := range results {
-		if _, exists := modules[r.mod.Name]; !exists {
-			modules[r.mod.Name] = r.mod
+	for mod := range results {
+		if _, exists := modules[mod.Name]; !exists {
+			modules[mod.Name] = mod
 		}
 	}
 
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
+	}
+	if firstErr != nil {
+		return nil, firstErr
 	}
 
 	mods := collectModules(modules)

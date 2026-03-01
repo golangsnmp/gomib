@@ -69,18 +69,25 @@ func registerModules(ctx *resolverContext) {
 
 		ctx.ModuleIndex[mod.Name] = append(ctx.ModuleIndex[mod.Name], mod)
 
-		// Cache definition names for faster import/OID resolution
+		// Cache definition names for faster import/OID resolution.
+		// ModuleOidDefNames is pre-populated for user modules in
+		// newResolverContext, so only build it for base modules.
 		defNames := make(map[string]struct{}, len(mod.Definitions))
-		oidDefNames := make(map[string]struct{})
+		var oidDefNames map[string]struct{}
+		if _, exists := ctx.ModuleOidDefNames[mod]; !exists {
+			oidDefNames = make(map[string]struct{})
+		}
 		for _, def := range mod.Definitions {
 			name := def.DefinitionName()
 			defNames[name] = struct{}{}
-			if def.DefinitionOid() != nil {
+			if oidDefNames != nil && def.DefinitionOid() != nil {
 				oidDefNames[name] = struct{}{}
 			}
 		}
 		ctx.ModuleDefNames[mod] = defNames
-		ctx.ModuleOidDefNames[mod] = oidDefNames
+		if oidDefNames != nil {
+			ctx.ModuleOidDefNames[mod] = oidDefNames
+		}
 
 		if ctx.TraceEnabled() {
 			ctx.Trace("registered module",

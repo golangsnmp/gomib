@@ -4,6 +4,7 @@ package types
 import (
 	"context"
 	"log/slog"
+	"math"
 )
 
 // LevelTrace is a custom log level more verbose than Debug.
@@ -50,8 +51,16 @@ type Span struct {
 	End   ByteOffset // exclusive
 }
 
-// Synthetic is a span for compiler-generated constructs.
-var Synthetic = Span{Start: 0, End: 0}
+// Synthetic is a span for compiler-generated constructs (base modules,
+// built-in types). Uses MaxUint32 to distinguish from uninitialized zero-value spans.
+//
+//nolint:gochecknoglobals // package-level sentinel
+var Synthetic = Span{Start: ByteOffset(math.MaxUint32), End: ByteOffset(math.MaxUint32)}
+
+// IsSynthetic reports whether s is the Synthetic sentinel span.
+func (s Span) IsSynthetic() bool {
+	return s == Synthetic
+}
 
 // NewSpan creates a Span from start and end byte offsets.
 func NewSpan(start, end ByteOffset) Span {
