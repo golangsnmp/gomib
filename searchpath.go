@@ -183,13 +183,15 @@ func parseLibSMILine(line string) (pathOp, []string, bool) {
 	return op, dirs, true
 }
 
-// parseColonSemantic interprets leading/trailing colon semantics.
-// Leading colon = append, trailing colon = prepend, neither = replace.
+// parseColonSemantic interprets leading/trailing path-separator semantics
+// used by libsmi's smi.conf path directive and SMIPATH env var.
+// Leading separator = append, trailing separator = prepend, neither = replace.
 func parseColonSemantic(value string) (op pathOp, paths []string) {
-	if after, ok := strings.CutPrefix(value, ":"); ok {
+	sep := string(os.PathListSeparator)
+	if after, ok := strings.CutPrefix(value, sep); ok {
 		return pathAppend, splitPaths(after)
 	}
-	if before, ok := strings.CutSuffix(value, ":"); ok {
+	if before, ok := strings.CutSuffix(value, sep); ok {
 		return pathPrepend, splitPaths(before)
 	}
 	return pathReplace, splitPaths(value)

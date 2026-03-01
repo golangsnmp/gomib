@@ -4,10 +4,19 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/types"
 )
+
+// sep is the OS path list separator as a string (":" on Unix, ";" on Windows).
+var sep = string(os.PathListSeparator)
+
+// pl joins paths with the OS path list separator.
+func pl(paths ...string) string {
+	return strings.Join(paths, sep)
+}
 
 func TestParseNetSNMPLine(t *testing.T) {
 	tests := []struct {
@@ -18,10 +27,10 @@ func TestParseNetSNMPLine(t *testing.T) {
 	}{
 		// Replace
 		{"mibdirs /usr/share/snmp/mibs", pathReplace, []string{"/usr/share/snmp/mibs"}, true},
-		{"mibdirs /a:/b:/c", pathReplace, []string{"/a", "/b", "/c"}, true},
+		{"mibdirs " + pl("/a", "/b", "/c"), pathReplace, []string{"/a", "/b", "/c"}, true},
 		// Append (+ prefix on value)
 		{"mibdirs +/extra/mibs", pathAppend, []string{"/extra/mibs"}, true},
-		{"mibdirs +/a:/b", pathAppend, []string{"/a", "/b"}, true},
+		{"mibdirs +" + pl("/a", "/b"), pathAppend, []string{"/a", "/b"}, true},
 		// Prepend (- prefix on value)
 		{"mibdirs -/first/mibs", pathPrepend, []string{"/first/mibs"}, true},
 		// Append (+mibdirs directive)
@@ -70,13 +79,13 @@ func TestParseLibSMILine(t *testing.T) {
 	}{
 		// Replace
 		{"path /usr/share/mibs/ietf", pathReplace, []string{"/usr/share/mibs/ietf"}, true},
-		{"path /a:/b", pathReplace, []string{"/a", "/b"}, true},
-		// Append (leading colon)
-		{"path :/extra/mibs", pathAppend, []string{"/extra/mibs"}, true},
-		{"path :/a:/b", pathAppend, []string{"/a", "/b"}, true},
-		// Prepend (trailing colon)
-		{"path /first/mibs:", pathPrepend, []string{"/first/mibs"}, true},
-		{"path /a:/b:", pathPrepend, []string{"/a", "/b"}, true},
+		{"path " + pl("/a", "/b"), pathReplace, []string{"/a", "/b"}, true},
+		// Append (leading separator)
+		{"path " + sep + "/extra/mibs", pathAppend, []string{"/extra/mibs"}, true},
+		{"path " + sep + pl("/a", "/b"), pathAppend, []string{"/a", "/b"}, true},
+		// Prepend (trailing separator)
+		{"path /first/mibs" + sep, pathPrepend, []string{"/first/mibs"}, true},
+		{"path " + pl("/a", "/b") + sep, pathPrepend, []string{"/a", "/b"}, true},
 		// Tagged lines - skipped
 		{"smilint: path /foo", 0, nil, false},
 		{"smiquery: path /foo", 0, nil, false},
@@ -145,11 +154,11 @@ func TestApplyNetSNMPEnv(t *testing.T) {
 		want  []string
 	}{
 		{"replace", "/new/mibs", []string{"/new/mibs"}},
-		{"replace multiple", "/a:/b", []string{"/a", "/b"}},
+		{"replace multiple", pl("/a", "/b"), []string{"/a", "/b"}},
 		{"append", "+/extra/mibs", []string{"/default/mibs", "/extra/mibs"}},
-		{"append multiple", "+/a:/b", []string{"/default/mibs", "/a", "/b"}},
+		{"append multiple", "+" + pl("/a", "/b"), []string{"/default/mibs", "/a", "/b"}},
 		{"prepend", "-/first/mibs", []string{"/first/mibs", "/default/mibs"}},
-		{"prepend multiple", "-/a:/b", []string{"/a", "/b", "/default/mibs"}},
+		{"prepend multiple", "-" + pl("/a", "/b"), []string{"/a", "/b", "/default/mibs"}},
 	}
 
 	for _, tt := range tests {
@@ -171,11 +180,11 @@ func TestApplyLibSMIEnv(t *testing.T) {
 		want  []string
 	}{
 		{"replace", "/new/mibs", []string{"/new/mibs"}},
-		{"replace multiple", "/a:/b", []string{"/a", "/b"}},
-		{"append", ":/extra/mibs", []string{"/default/mibs", "/extra/mibs"}},
-		{"append multiple", ":/a:/b", []string{"/default/mibs", "/a", "/b"}},
-		{"prepend", "/first/mibs:", []string{"/first/mibs", "/default/mibs"}},
-		{"prepend multiple", "/a:/b:", []string{"/a", "/b", "/default/mibs"}},
+		{"replace multiple", pl("/a", "/b"), []string{"/a", "/b"}},
+		{"append", sep + "/extra/mibs", []string{"/default/mibs", "/extra/mibs"}},
+		{"append multiple", sep + pl("/a", "/b"), []string{"/default/mibs", "/a", "/b"}},
+		{"prepend", "/first/mibs" + sep, []string{"/first/mibs", "/default/mibs"}},
+		{"prepend multiple", pl("/a", "/b") + sep, []string{"/a", "/b", "/default/mibs"}},
 	}
 
 	for _, tt := range tests {
@@ -261,7 +270,7 @@ func TestApplyConfigFileNetSNMPPrepend(t *testing.T) {
 func TestApplyConfigFileLibSMI(t *testing.T) {
 	dir := t.TempDir()
 	confPath := filepath.Join(dir, "smi.conf")
-	if err := os.WriteFile(confPath, []byte("# Comment\npath /base/mibs\npath :/extra/mibs\nsmilint: path /ignored\n"), 0o644); err != nil {
+	if err := os.WriteFile(confPath, []byte("# Comment\npath /base/mibs\npath "+sep+"/extra/mibs\nsmilint: path /ignored\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -285,12 +294,12 @@ func TestSplitPaths(t *testing.T) {
 		input string
 		want  []string
 	}{
-		{"/a:/b:/c", []string{"/a", "/b", "/c"}},
+		{pl("/a", "/b", "/c"), []string{"/a", "/b", "/c"}},
 		{"/single", []string{"/single"}},
 		{"", nil},
-		{":/a", []string{"/a"}},          // leading empty segment skipped
-		{"/a:", []string{"/a"}},          // trailing empty segment skipped
-		{"/a::/b", []string{"/a", "/b"}}, // double colon, empty segment skipped
+		{sep + "/a", []string{"/a"}},                    // leading empty segment skipped
+		{"/a" + sep, []string{"/a"}},                    // trailing empty segment skipped
+		{"/a" + sep + sep + "/b", []string{"/a", "/b"}}, // double separator, empty segment skipped
 	}
 
 	for _, tt := range tests {
@@ -332,7 +341,7 @@ func TestEnvVarOverride(t *testing.T) {
 	}
 
 	// SMIPATH appends
-	t.Setenv("SMIPATH", ":/extra/smi")
+	t.Setenv("SMIPATH", sep+"/extra/smi")
 	got = applyLibSMIEnv(os.Getenv("SMIPATH"), defaults)
 	want = []string{"/usr/share/snmp/mibs", "/extra/smi"}
 	if !slices.Equal(got, want) {
