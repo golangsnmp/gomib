@@ -3,6 +3,7 @@ package gomib
 import (
 	"errors"
 	"io/fs"
+	"log/slog"
 	"maps"
 	"os"
 	"path/filepath"
@@ -51,12 +52,17 @@ func defaultSourceConfig() sourceConfig {
 }
 
 // WithExtensions overrides the default file extensions used to match MIB files.
-// Extensions are normalized to lowercase for consistent matching.
+// Extensions are normalized to lowercase with a leading dot (e.g. "mib"
+// becomes ".mib"). An empty string matches files with no extension.
 func WithExtensions(exts ...string) SourceOption {
 	return func(c *sourceConfig) {
 		c.extensions = make([]string, len(exts))
 		for i, ext := range exts {
-			c.extensions[i] = strings.ToLower(ext)
+			ext = strings.ToLower(ext)
+			if ext != "" && !strings.HasPrefix(ext, ".") {
+				ext = "." + ext
+			}
+			c.extensions[i] = ext
 		}
 	}
 }
@@ -312,7 +318,6 @@ func moduleNameFromPath(path string) string {
 // Among files with the same extension priority, the first encountered during
 // the walk wins.
 func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error) (map[string]string, error) {
-	extSet := makeExtensionSet(extensions)
 	extPriority := make(map[string]int, len(extensions))
 	for i, ext := range extensions {
 		extPriority[ext] = i
@@ -323,6 +328,7 @@ func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error) (map
 
 	err := walkFn(func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
+			slog.Debug("buildTreeIndex: skipping entry", "path", path, "error", err)
 			if d != nil && d.IsDir() {
 				return fs.SkipDir
 			}
@@ -332,7 +338,7 @@ func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error) (map
 			return nil
 		}
 		ext := strings.ToLower(filepath.Ext(path))
-		if _, ok := extSet[ext]; !ok {
+		if _, ok := extPriority[ext]; !ok {
 			return nil
 		}
 

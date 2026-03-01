@@ -90,11 +90,13 @@ func (t *Type) IsString() bool { return t.EffectiveBase() == BaseOctetString }
 
 // IsEnumeration reports whether this is an INTEGER type with named values.
 func (t *Type) IsEnumeration() bool {
-	return t.EffectiveBase() == BaseInteger32 && len(t.EffectiveEnums()) > 0
+	return t.EffectiveBase() == BaseInteger32 && walkTypeChainHasSlice(t, func(t *Type) []NamedValue { return t.enums })
 }
 
 // IsBits reports whether this type has BITS definitions.
-func (t *Type) IsBits() bool { return len(t.EffectiveBits()) > 0 }
+func (t *Type) IsBits() bool {
+	return walkTypeChainHasSlice(t, func(t *Type) []NamedValue { return t.bits })
+}
 
 // walkTypeChain walks the parent chain and returns the first value for which
 // get returns a non-zero result.
@@ -117,6 +119,17 @@ func walkTypeChainSlice[T any](t *Type, get func(*Type) []T) []T {
 		}
 	}
 	return nil
+}
+
+// walkTypeChainHasSlice walks the parent chain and reports whether any type
+// has a non-empty slice, without cloning.
+func walkTypeChainHasSlice[T any](t *Type, get func(*Type) []T) bool {
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
+		if len(get(current)) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // EffectiveBase walks the parent type chain and returns the first non-zero
@@ -159,9 +172,9 @@ func (t *Type) EffectiveBits() []NamedValue {
 // for anonymous types.
 func (t *Type) String() string {
 	if t.name == "" {
-		return t.base.String()
+		return t.EffectiveBase().String()
 	}
-	return t.name + " (" + t.base.String() + ")"
+	return t.name + " (" + t.EffectiveBase().String() + ")"
 }
 
 func (t *Type) setModule(m *Module)     { t.module = m }

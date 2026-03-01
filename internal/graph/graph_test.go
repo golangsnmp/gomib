@@ -6,6 +6,26 @@ import (
 	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
+// dependencies returns the symbols that sym depends on (forward edges).
+func (g *Graph) dependencies(sym Symbol) []Symbol {
+	id, ok := g.nodeToID[sym]
+	if !ok {
+		return nil
+	}
+	deps := g.edges[id]
+	result := make([]Symbol, len(deps))
+	for i, depID := range deps {
+		result[i] = g.idToNode[depID]
+	}
+	return result
+}
+
+// hasNode reports whether the symbol exists in the graph.
+func (g *Graph) hasNode(sym Symbol) bool {
+	_, ok := g.nodeToID[sym]
+	return ok
+}
+
 func TestGraphBasic(t *testing.T) {
 	g := New(0)
 

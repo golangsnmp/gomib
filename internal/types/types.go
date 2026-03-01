@@ -58,11 +58,6 @@ type Span struct {
 //nolint:gochecknoglobals // package-level sentinel
 var Synthetic = Span{Start: ByteOffset(math.MaxUint32), End: ByteOffset(math.MaxUint32)}
 
-// IsSynthetic reports whether s is the Synthetic sentinel span.
-func (s Span) IsSynthetic() bool {
-	return s == Synthetic
-}
-
 // NewSpan creates a Span from start and end byte offsets.
 func NewSpan(start, end ByteOffset) Span {
 	return Span{Start: start, End: end}
@@ -100,9 +95,10 @@ func BuildLineTable(source []byte) []int {
 }
 
 // LineColFromTable converts a byte offset to 1-based line and column numbers
-// using a precomputed line table. Returns (0, 0) if the table is empty.
+// using a precomputed line table. Returns (0, 0) if the table is empty or
+// the offset is from a synthetic span.
 func LineColFromTable(table []int, offset ByteOffset) (line, col int) {
-	if len(table) == 0 {
+	if len(table) == 0 || offset == ByteOffset(math.MaxUint32) {
 		return 0, 0
 	}
 	off := int(offset)

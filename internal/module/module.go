@@ -47,12 +47,9 @@ type Module struct {
 // NewModule returns a Module with the given name and no definitions.
 func NewModule(name string, span types.Span) *Module {
 	return &Module{
-		Name:        name,
-		Language:    types.LanguageUnknown,
-		Imports:     nil,
-		Definitions: nil,
-		Span:        span,
-		Diagnostics: nil,
+		Name:     name,
+		Language: types.LanguageUnknown,
+		Span:     span,
 	}
 }
 

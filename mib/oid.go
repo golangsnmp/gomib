@@ -84,7 +84,7 @@ func (o OID) Parent() OID {
 
 // Child returns a new OID with the given arc appended.
 func (o OID) Child(arc uint32) OID {
-	return append(slices.Clip(o), arc)
+	return append(slices.Clone(o), arc)
 }
 
 // HasPrefix returns true if this OID starts with the given prefix.

@@ -141,7 +141,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 	log := types.Logger{L: cfg.logger}
 
 	modules := make(map[string]*module.Module)
-	loading := make(map[string]struct{})
+	combined := Multi(sources...)
 
 	var loadOne func(name string) error
 	loadOne = func(name string) error {
@@ -158,13 +158,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			return nil
 		}
 
-		if _, inProgress := loading[name]; inProgress {
-			return nil
-		}
-		loading[name] = struct{}{}
-		defer delete(loading, name)
-
-		result, err := findModule(sources, name)
+		result, err := combined.Find(name)
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
 				return err

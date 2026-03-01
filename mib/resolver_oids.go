@@ -148,13 +148,13 @@ func lookupNamedParentSymbol(ctx *resolverContext, def oidDefinition, name strin
 // findOidDefiningModule finds the module that defines an OID symbol,
 // checking local definitions first, then imports.
 func findOidDefiningModule(ctx *resolverContext, fromMod *module.Module, name string) string {
-	if oidDefs := ctx.ModuleOidDefNames[fromMod]; oidDefs != nil {
+	if oidDefs := ctx.moduleOidDefNames[fromMod]; oidDefs != nil {
 		if _, ok := oidDefs[name]; ok {
 			return fromMod.Name
 		}
 	}
 
-	if imports := ctx.ModuleImports[fromMod]; imports != nil {
+	if imports := ctx.moduleImports[fromMod]; imports != nil {
 		if srcMod := imports[name]; srcMod != nil {
 			return srcMod.Name
 		}
@@ -249,14 +249,14 @@ type collectedOidDefinitions struct {
 func collectOidDefinitions(ctx *resolverContext) collectedOidDefinitions {
 	// Estimate capacity: most definitions are OID-bearing (TypeDefs are the exception).
 	totalDefs := 0
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		totalDefs += len(mod.Definitions)
 	}
 	defs := collectedOidDefinitions{
 		oidDefs: make([]oidDefinition, 0, totalDefs),
 	}
 
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		for _, def := range mod.Definitions {
 			var kind definitionKind
 			switch d := def.(type) {
@@ -370,7 +370,6 @@ func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) 
 
 func resolveNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *Node, name string, number uint32, isLast bool) (*Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
-		ctx.registerModuleNodeSymbol(def.mod, name, node)
 		return node, true
 	}
 	return createNamedChild(ctx, def, currentNode, name, number, isLast)
@@ -402,8 +401,8 @@ func createNamedChild(ctx *resolverContext, def oidDefinition, currentNode *Node
 	ctx.registerModuleNodeSymbol(def.mod, name, child)
 	if !isLast {
 		child.setName(name)
-		child.setModule(ctx.ModuleToResolved[def.mod])
-		ctx.Mib.registerNode(name, child)
+		child.setModule(ctx.moduleToResolved[def.mod])
+		ctx.mib.registerNode(name, child)
 		if child.Kind() == KindInternal {
 			child.setKind(KindNode)
 		}
@@ -429,7 +428,7 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 	node.setName(label)
 
 	// Prefer SMIv2 over SMIv1 when multiple modules define the same OID
-	newMod := ctx.ModuleToResolved[def.mod]
+	newMod := ctx.moduleToResolved[def.mod]
 	currentMod := node.Module()
 	if currentMod != nil && ctx.TraceEnabled() {
 		ctx.Trace("node already has module",
@@ -458,7 +457,7 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 	}
 
 	ctx.registerModuleNodeSymbol(def.mod, label, node)
-	ctx.Mib.registerNode(label, node)
+	ctx.mib.registerNode(label, node)
 
 	if ctx.TraceEnabled() {
 		ctx.Trace("resolved OID definition",
@@ -472,7 +471,7 @@ func resolveNumericComponent(ctx *resolverContext, parent *Node, arc uint32) *No
 	if parent != nil {
 		return parent.getOrCreateChild(arc)
 	}
-	return ctx.Mib.Root().getOrCreateChild(arc)
+	return ctx.mib.Root().getOrCreateChild(arc)
 }
 
 func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
@@ -509,12 +508,12 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 
 		trapNode.setName(defName)
 		trapNode.setKind(KindNotification)
-		newMod := ctx.ModuleToResolved[def.mod]
+		newMod := ctx.moduleToResolved[def.mod]
 		if shouldPreferModule(ctx, trapNode.Module(), def.mod) {
 			trapNode.setModule(newMod)
 		}
 		ctx.registerModuleNodeSymbol(def.mod, defName, trapNode)
-		ctx.Mib.registerNode(defName, trapNode)
+		ctx.mib.registerNode(defName, trapNode)
 
 		if ctx.TraceEnabled() {
 			ctx.Trace("resolved TRAP-TYPE",
@@ -530,7 +529,7 @@ func lookupOrCreateWellKnownRoot(ctx *resolverContext, name string) (*Node, bool
 	if arc < 0 {
 		return nil, false
 	}
-	return ctx.Mib.Root().getOrCreateChild(uint32(arc)), true
+	return ctx.mib.Root().getOrCreateChild(uint32(arc)), true
 }
 
 func lookupSmiGlobalOidRoot(ctx *resolverContext, name string) (*Node, bool) {
@@ -575,7 +574,7 @@ func shouldPreferModule(ctx *resolverContext, currentMod *Module, srcMod *module
 		return true
 	}
 
-	currentSrcMod := ctx.ResolvedToModule[currentMod]
+	currentSrcMod := ctx.resolvedToModule[currentMod]
 	if currentSrcMod == nil {
 		return true
 	}

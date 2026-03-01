@@ -163,12 +163,15 @@ func (m *Module) setImports(imports []Import)  { m.imports = imports }
 
 func (m *Module) addObject(obj *Object) {
 	m.objects = append(m.objects, obj)
-	m.objectsByName[obj.name] = obj
+	if m.objectsByName[obj.name] == nil {
+		m.objectsByName[obj.name] = obj
+	}
 }
 
-// addType uses first-write-wins for the name index. Multiple modules can
-// define the same type name (e.g. DisplayString in both RFC1213-MIB and
-// SNMPv2-TC). The slice holds all definitions; the map keeps the first.
+// addType uses first-write-wins for the name index, like all add methods.
+// Multiple modules can define the same name (e.g. DisplayString in both
+// RFC1213-MIB and SNMPv2-TC). The slice holds all definitions; the map
+// keeps the first.
 func (m *Module) addType(t *Type) {
 	m.types = append(m.types, t)
 	if m.typesByName[t.name] == nil {
@@ -178,25 +181,35 @@ func (m *Module) addType(t *Type) {
 
 func (m *Module) addNotification(n *Notification) {
 	m.notifications = append(m.notifications, n)
-	m.notificationsByName[n.name] = n
+	if m.notificationsByName[n.name] == nil {
+		m.notificationsByName[n.name] = n
+	}
 }
 
 func (m *Module) addGroup(g *Group) {
 	m.groups = append(m.groups, g)
-	m.groupsByName[g.name] = g
+	if m.groupsByName[g.name] == nil {
+		m.groupsByName[g.name] = g
+	}
 }
 
 func (m *Module) addCompliance(c *Compliance) {
 	m.compliances = append(m.compliances, c)
-	m.compliancesByName[c.name] = c
+	if m.compliancesByName[c.name] == nil {
+		m.compliancesByName[c.name] = c
+	}
 }
 
 func (m *Module) addCapability(c *Capability) {
 	m.capabilities = append(m.capabilities, c)
-	m.capabilitiesByName[c.name] = c
+	if m.capabilitiesByName[c.name] == nil {
+		m.capabilitiesByName[c.name] = c
+	}
 }
 
 func (m *Module) addNode(n *Node) {
 	m.nodes = append(m.nodes, n)
-	m.nodesByName[n.name] = n
+	if m.nodesByName[n.name] == nil {
+		m.nodesByName[n.name] = n
+	}
 }

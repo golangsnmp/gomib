@@ -61,26 +61,6 @@ func (g *Graph) AddEdge(from, to Symbol) {
 	g.edges[fromID] = append(g.edges[fromID], toID)
 }
 
-// dependencies returns the symbols that sym depends on (forward edges).
-func (g *Graph) dependencies(sym Symbol) []Symbol {
-	id, ok := g.nodeToID[sym]
-	if !ok {
-		return nil
-	}
-	deps := g.edges[id]
-	result := make([]Symbol, len(deps))
-	for i, depID := range deps {
-		result[i] = g.idToNode[depID]
-	}
-	return result
-}
-
-// hasNode reports whether the symbol exists in the graph.
-func (g *Graph) hasNode(sym Symbol) bool {
-	_, ok := g.nodeToID[sym]
-	return ok
-}
-
 // ResolutionOrder returns symbols ordered so that dependencies come before
 // dependents, using Tarjan's algorithm. Strongly connected components with
 // more than one node (or a single node with a self-loop) are reported as

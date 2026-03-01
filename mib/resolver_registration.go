@@ -16,16 +16,16 @@ func registerModules(ctx *resolverContext) {
 	ctx.Log(slog.LevelDebug, "loaded base modules", slog.Int("count", len(baseModules)))
 
 	var userModules []*module.Module
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
 		userModules = append(userModules, mod)
 	}
 
-	ctx.Modules = slices.Concat(baseModules, userModules)
+	ctx.modules = slices.Concat(baseModules, userModules)
 
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		resolved := newModule(mod.Name)
 		resolved.setSourcePath(mod.SourcePath)
 		resolved.setLanguage(mod.Language)
@@ -44,37 +44,36 @@ func registerModules(ctx *resolverContext) {
 			break
 		}
 
-		ctx.Mib.addModule(resolved)
-		ctx.ModuleToResolved[mod] = resolved
-		ctx.ResolvedToModule[resolved] = mod
+		ctx.mib.addModule(resolved)
+		ctx.moduleToResolved[mod] = resolved
+		ctx.resolvedToModule[resolved] = mod
 
 		// Collect diagnostics from parsing and lowering
 		for _, d := range mod.Diagnostics {
-			ctx.Mib.addDiagnostic(d)
+			ctx.mib.addDiagnostic(d)
 		}
 
 		// Cache pointers to base modules used by the type resolution
 		// fallback chain (LookupTypeForModule, LookupType). Many vendor
 		// MIBs use types from these modules without importing them, so
 		// the resolver needs direct access for permissive-mode lookups.
-		if mod.Name == moduleSNMPv2SMI {
-			ctx.Snmpv2SMIModule = mod
-		}
-		if mod.Name == moduleRFC1155SMI {
-			ctx.Rfc1155SMIModule = mod
-		}
-		if mod.Name == moduleSNMPv2TC {
-			ctx.Snmpv2TCModule = mod
+		switch mod.Name {
+		case moduleSNMPv2SMI:
+			ctx.snmpv2SMIModule = mod
+		case moduleRFC1155SMI:
+			ctx.rfc1155SMIModule = mod
+		case moduleSNMPv2TC:
+			ctx.snmpv2TCModule = mod
 		}
 
-		ctx.ModuleIndex[mod.Name] = append(ctx.ModuleIndex[mod.Name], mod)
+		ctx.moduleIndex[mod.Name] = append(ctx.moduleIndex[mod.Name], mod)
 
 		// Cache definition names for faster import/OID resolution.
 		// ModuleOidDefNames is pre-populated for user modules in
 		// newResolverContext, so only build it for base modules.
 		defNames := make(map[string]struct{}, len(mod.Definitions))
 		var oidDefNames map[string]struct{}
-		if _, exists := ctx.ModuleOidDefNames[mod]; !exists {
+		if _, exists := ctx.moduleOidDefNames[mod]; !exists {
 			oidDefNames = make(map[string]struct{})
 		}
 		for _, def := range mod.Definitions {
@@ -84,9 +83,9 @@ func registerModules(ctx *resolverContext) {
 				oidDefNames[name] = struct{}{}
 			}
 		}
-		ctx.ModuleDefNames[mod] = defNames
+		ctx.moduleDefNames[mod] = defNames
 		if oidDefNames != nil {
-			ctx.ModuleOidDefNames[mod] = oidDefNames
+			ctx.moduleOidDefNames[mod] = oidDefNames
 		}
 
 		if ctx.TraceEnabled() {
@@ -102,7 +101,7 @@ func groupImports(raw []module.Import) []Import {
 	if len(raw) == 0 {
 		return nil
 	}
-	order := make([]string, 0)
+	var order []string
 	grouped := make(map[string][]string)
 	for _, imp := range raw {
 		if _, ok := grouped[imp.Module]; !ok {

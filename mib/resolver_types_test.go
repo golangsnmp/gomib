@@ -534,7 +534,7 @@ func TestCreateUserTypes_Reference(t *testing.T) {
 	mod.Language = types.LanguageSMIv2
 	mod.Definitions = []module.Definition{
 		&module.TypeDef{
-			Name:                "MyTC",
+			DefBase:             module.DefBase{Name: "MyTC"},
 			Syntax:              &module.TypeSyntaxTypeRef{Name: "DisplayString"},
 			Status:              types.StatusCurrent,
 			Description:         "A test textual convention",

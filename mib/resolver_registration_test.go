@@ -50,7 +50,7 @@ func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 		Name:     "MY-MIB",
 		Language: types.LanguageSMIv2,
 		Definitions: []module.Definition{
-			&module.ObjectType{Name: "myObject", Span: types.Synthetic},
+			&module.ObjectType{DefBase: module.DefBase{Name: "myObject", Span: types.Synthetic}},
 		},
 	}
 	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
@@ -59,11 +59,11 @@ func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 
 	// Base modules should come first, user module last
 	baseNames := module.BaseModuleNames()
-	testutil.Equal(t, len(baseNames)+1, len(ctx.Modules), "module count (base=%d + user=1)", len(baseNames))
+	testutil.Equal(t, len(baseNames)+1, len(ctx.modules), "module count (base=%d + user=1)", len(baseNames))
 	for i, name := range baseNames {
-		testutil.Equal(t, name, ctx.Modules[i].Name, "Modules[].Name")
+		testutil.Equal(t, name, ctx.modules[i].Name, "Modules[].Name")
 	}
-	last := ctx.Modules[len(ctx.Modules)-1]
+	last := ctx.modules[len(ctx.modules)-1]
 	testutil.Equal(t, "MY-MIB", last.Name, "last module")
 }
 
@@ -84,7 +84,7 @@ func TestRegisterModules_UserModulesWithBaseNamesFiltered(t *testing.T) {
 	// The user's SNMPv2-SMI should be replaced by the base version.
 	// Count how many SNMPv2-SMI modules exist.
 	count := 0
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		if mod.Name == "SNMPv2-SMI" {
 			count++
 		}
@@ -93,13 +93,13 @@ func TestRegisterModules_UserModulesWithBaseNamesFiltered(t *testing.T) {
 
 	// MY-MIB should still be present
 	found := false
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		if mod.Name == "MY-MIB" {
 			found = true
 			break
 		}
 	}
-	testutil.True(t, found, "MY-MIB not found in ctx.Modules")
+	testutil.True(t, found, "MY-MIB not found in ctx.modules")
 }
 
 func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
@@ -112,8 +112,8 @@ func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
 	registerModules(ctx)
 
 	// Every module should be indexed by name
-	for _, mod := range ctx.Modules {
-		entries, ok := ctx.ModuleIndex[mod.Name]
+	for _, mod := range ctx.modules {
+		entries, ok := ctx.moduleIndex[mod.Name]
 		testutil.True(t, ok, "ModuleIndex missing entry for %q", mod.Name)
 		testutil.True(t, slices.Contains(entries, mod), "ModuleIndex[] does not contain the module pointer")
 	}
@@ -124,14 +124,14 @@ func TestRegisterModules_BaseModulePointersCached(t *testing.T) {
 
 	registerModules(ctx)
 
-	testutil.NotNil(t, ctx.Snmpv2SMIModule, "Snmpv2SMIModule")
-	testutil.Equal(t, "SNMPv2-SMI", ctx.Snmpv2SMIModule.Name, "Snmpv2SMIModule.Name")
+	testutil.NotNil(t, ctx.snmpv2SMIModule, "Snmpv2SMIModule")
+	testutil.Equal(t, "SNMPv2-SMI", ctx.snmpv2SMIModule.Name, "Snmpv2SMIModule.Name")
 
-	testutil.NotNil(t, ctx.Rfc1155SMIModule, "Rfc1155SMIModule")
-	testutil.Equal(t, "RFC1155-SMI", ctx.Rfc1155SMIModule.Name, "Rfc1155SMIModule.Name")
+	testutil.NotNil(t, ctx.rfc1155SMIModule, "Rfc1155SMIModule")
+	testutil.Equal(t, "RFC1155-SMI", ctx.rfc1155SMIModule.Name, "Rfc1155SMIModule.Name")
 
-	testutil.NotNil(t, ctx.Snmpv2TCModule, "Snmpv2TCModule")
-	testutil.Equal(t, "SNMPv2-TC", ctx.Snmpv2TCModule.Name, "Snmpv2TCModule.Name")
+	testutil.NotNil(t, ctx.snmpv2TCModule, "Snmpv2TCModule")
+	testutil.Equal(t, "SNMPv2-TC", ctx.snmpv2TCModule.Name, "Snmpv2TCModule.Name")
 }
 
 func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
@@ -139,8 +139,8 @@ func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 		Name:     "MY-MIB",
 		Language: types.LanguageSMIv2,
 		Definitions: []module.Definition{
-			&module.ObjectType{Name: "fooObject", Span: types.Synthetic},
-			&module.TypeDef{Name: "BarType", Span: types.Synthetic},
+			&module.ObjectType{DefBase: module.DefBase{Name: "fooObject", Span: types.Synthetic}},
+			&module.TypeDef{DefBase: module.DefBase{Name: "BarType", Span: types.Synthetic}},
 		},
 	}
 	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
@@ -149,15 +149,15 @@ func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 
 	// Find the user module pointer (the original may have been replaced)
 	var found *module.Module
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		if mod.Name == "MY-MIB" {
 			found = mod
 			break
 		}
 	}
-	testutil.NotNil(t, found, "MY-MIB not found in ctx.Modules")
+	testutil.NotNil(t, found, "MY-MIB not found in ctx.modules")
 
-	defNames := ctx.ModuleDefNames[found]
+	defNames := ctx.moduleDefNames[found]
 	testutil.NotNil(t, defNames, "ModuleDefNames[MY-MIB] is nil")
 	_, hasFoo := defNames["fooObject"]
 	testutil.True(t, hasFoo, "fooObject not in ModuleDefNames")
@@ -176,12 +176,12 @@ func TestRegisterModules_ModuleToResolvedMapping(t *testing.T) {
 
 	registerModules(ctx)
 
-	for _, mod := range ctx.Modules {
-		resolved, ok := ctx.ModuleToResolved[mod]
+	for _, mod := range ctx.modules {
+		resolved, ok := ctx.moduleToResolved[mod]
 		testutil.True(t, ok, "ModuleToResolved missing entry for %q", mod.Name)
 		testutil.Equal(t, mod.Name, resolved.Name(), "resolved name")
 		// Check reverse mapping
-		reverse, ok := ctx.ResolvedToModule[resolved]
+		reverse, ok := ctx.resolvedToModule[resolved]
 		testutil.True(t, ok, "ResolvedToModule missing entry for %q", mod.Name)
 		testutil.Equal(t, mod, reverse, "reverse mapping for")
 	}
@@ -197,7 +197,7 @@ func TestRegisterModules_LanguageSetOnResolved(t *testing.T) {
 	registerModules(ctx)
 
 	var found *module.Module
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		if mod.Name == "MY-MIB" {
 			found = mod
 			break
@@ -205,14 +205,14 @@ func TestRegisterModules_LanguageSetOnResolved(t *testing.T) {
 	}
 	testutil.NotNil(t, found, "MY-MIB not found")
 
-	resolved := ctx.ModuleToResolved[found]
+	resolved := ctx.moduleToResolved[found]
 	testutil.NotNil(t, resolved, "no resolved module for MY-MIB")
 	testutil.Equal(t, LanguageSMIv1, resolved.Language(), "resolved language")
 }
 
 func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
 	mi := &module.ModuleIdentity{
-		Name:         "myMIB",
+		DefBase:      module.DefBase{Name: "myMIB", Span: types.Synthetic},
 		Organization: "ACME Corp",
 		ContactInfo:  "support@acme.example",
 		Description:  "Test MIB module",
@@ -220,15 +220,14 @@ func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
 			{Date: "2024-06-01", Description: "Rev 2"},
 			{Date: "2024-01-15", Description: "Rev 1"},
 		},
-		Oid:  module.NewOidAssignment(nil, types.Synthetic),
-		Span: types.Synthetic,
+		Oid: module.NewOidAssignment(nil, types.Synthetic),
 	}
 	userMod := &module.Module{
 		Name:     "MY-MIB",
 		Language: types.LanguageSMIv2,
 		Definitions: []module.Definition{
 			// Some other definition before MODULE-IDENTITY
-			&module.ObjectType{Name: "someObj", Span: types.Synthetic},
+			&module.ObjectType{DefBase: module.DefBase{Name: "someObj", Span: types.Synthetic}},
 			mi,
 		},
 	}
@@ -237,7 +236,7 @@ func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
 	registerModules(ctx)
 
 	var found *module.Module
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		if mod.Name == "MY-MIB" {
 			found = mod
 			break
@@ -245,7 +244,7 @@ func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
 	}
 	testutil.NotNil(t, found, "MY-MIB not found")
 
-	resolved := ctx.ModuleToResolved[found]
+	resolved := ctx.moduleToResolved[found]
 	testutil.NotNil(t, resolved, "no resolved module for MY-MIB")
 
 	testutil.Equal(t, "ACME Corp", resolved.Organization(), "Organization")
@@ -265,7 +264,7 @@ func TestRegisterModules_NoModuleIdentity(t *testing.T) {
 		Name:     "MY-MIB",
 		Language: types.LanguageSMIv1,
 		Definitions: []module.Definition{
-			&module.ObjectType{Name: "someObj", Span: types.Synthetic},
+			&module.ObjectType{DefBase: module.DefBase{Name: "someObj", Span: types.Synthetic}},
 		},
 	}
 	ctx := newResolverContext([]*module.Module{userMod}, nil, DefaultConfig())
@@ -273,7 +272,7 @@ func TestRegisterModules_NoModuleIdentity(t *testing.T) {
 	registerModules(ctx)
 
 	var found *module.Module
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		if mod.Name == "MY-MIB" {
 			found = mod
 			break
@@ -281,7 +280,7 @@ func TestRegisterModules_NoModuleIdentity(t *testing.T) {
 	}
 	testutil.NotNil(t, found, "MY-MIB not found")
 
-	resolved := ctx.ModuleToResolved[found]
+	resolved := ctx.moduleToResolved[found]
 	testutil.Equal(t, "", resolved.Organization(), "Organization")
 	testutil.Equal(t, "", resolved.ContactInfo(), "ContactInfo")
 	testutil.Equal(t, "", resolved.Description(), "Description")
@@ -299,13 +298,13 @@ func TestRegisterModules_BuilderReceivesModules(t *testing.T) {
 
 	baseNames := module.BaseModuleNames()
 	wantCount := len(baseNames) + 1
-	testutil.Len(t, ctx.Mib.Modules(), wantCount, "len(Builder.Modules())")
+	testutil.Len(t, ctx.mib.Modules(), wantCount, "len(Builder.Modules())")
 
 	// Verify the builder can look up each module by name
 	for _, name := range baseNames {
-		testutil.NotNil(t, ctx.Mib.Module(name), "Builder.Module() returned nil")
+		testutil.NotNil(t, ctx.mib.Module(name), "Builder.Module() returned nil")
 	}
-	testutil.NotNil(t, ctx.Mib.Module("MY-MIB"), "Builder.Module(MY-MIB) returned nil")
+	testutil.NotNil(t, ctx.mib.Module("MY-MIB"), "Builder.Module(MY-MIB) returned nil")
 }
 
 func TestRegisterModules_DiagnosticsForwarded(t *testing.T) {
@@ -322,7 +321,7 @@ func TestRegisterModules_DiagnosticsForwarded(t *testing.T) {
 	registerModules(ctx)
 
 	// Build and check diagnostics are present
-	built := ctx.Mib
+	built := ctx.mib
 	diags := built.Diagnostics()
 	found := false
 	for _, d := range diags {
@@ -354,7 +353,7 @@ func TestRegisterModules_AllBaseModulesFiltered(t *testing.T) {
 
 	// Each base name should appear exactly once (from base, not user)
 	nameCounts := make(map[string]int)
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		nameCounts[mod.Name]++
 	}
 	for _, name := range baseNames {
@@ -370,9 +369,9 @@ func TestRegisterModules_EmptyModuleList(t *testing.T) {
 	registerModules(ctx)
 
 	baseNames := module.BaseModuleNames()
-	testutil.Len(t, ctx.Modules, len(baseNames), "modules")
+	testutil.Len(t, ctx.modules, len(baseNames), "modules")
 	for i, name := range baseNames {
-		testutil.Equal(t, name, ctx.Modules[i].Name, "Modules[].Name")
+		testutil.Equal(t, name, ctx.modules[i].Name, "Modules[].Name")
 	}
 }
 
@@ -384,7 +383,7 @@ func TestRegisterModules_BaseModuleDefinitionNamesCached(t *testing.T) {
 
 	// SNMPv2-SMI should have well-known definitions like "internet", "Integer32"
 	var snmpv2smi *module.Module
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		if mod.Name == "SNMPv2-SMI" {
 			snmpv2smi = mod
 			break
@@ -392,7 +391,7 @@ func TestRegisterModules_BaseModuleDefinitionNamesCached(t *testing.T) {
 	}
 	testutil.NotNil(t, snmpv2smi, "SNMPv2-SMI not found")
 
-	defNames := ctx.ModuleDefNames[snmpv2smi]
+	defNames := ctx.moduleDefNames[snmpv2smi]
 	testutil.NotNil(t, defNames, "ModuleDefNames[SNMPv2-SMI] is nil")
 	// Spot-check a few well-known names
 	for _, name := range []string{"internet", "Integer32", "Counter32", "enterprises"} {

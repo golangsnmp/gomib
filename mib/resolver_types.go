@@ -16,11 +16,11 @@ func resolveTypes(ctx *resolverContext) {
 }
 
 func seedPrimitiveTypes(ctx *resolverContext) {
-	if ctx.Snmpv2SMIModule == nil {
+	if ctx.snmpv2SMIModule == nil {
 		return
 	}
-	mod := ctx.Snmpv2SMIModule
-	resolved := ctx.ModuleToResolved[mod]
+	mod := ctx.snmpv2SMIModule
+	resolved := ctx.moduleToResolved[mod]
 
 	seeded := 0
 	seedType := func(name string, base BaseType) {
@@ -28,7 +28,7 @@ func seedPrimitiveTypes(ctx *resolverContext) {
 		typ.setModule(resolved)
 		typ.setBase(base)
 
-		ctx.Mib.addType(typ)
+		ctx.mib.addType(typ)
 		ctx.registerModuleTypeSymbol(mod, name, typ)
 		if resolved != nil {
 			resolved.addType(typ)
@@ -46,8 +46,8 @@ func seedPrimitiveTypes(ctx *resolverContext) {
 }
 
 func createUserTypes(ctx *resolverContext) {
-	for _, mod := range ctx.Modules {
-		resolved := ctx.ModuleToResolved[mod]
+	for _, mod := range ctx.modules {
+		resolved := ctx.moduleToResolved[mod]
 
 		for _, def := range mod.Definitions {
 			td, ok := def.(*module.TypeDef)
@@ -96,7 +96,7 @@ func createUserTypes(ctx *resolverContext) {
 			typ.setSizes(sizes)
 			typ.setRanges(ranges)
 
-			ctx.Mib.addType(typ)
+			ctx.mib.addType(typ)
 			ctx.registerModuleTypeSymbol(mod, td.Name, typ)
 
 			if ctx.TraceEnabled() {
@@ -133,7 +133,7 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 	entries := make(map[graph.Symbol]typeResolutionEntry, nTypes)
 	g := graph.New(nTypes)
 
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		for _, def := range mod.Definitions {
 			td, ok := def.(*module.TypeDef)
 			if !ok {
@@ -205,13 +205,13 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 
 // findTypeDefiningModule finds the module that defines a type, following imports.
 func findTypeDefiningModule(ctx *resolverContext, fromMod *module.Module, typeName string) string {
-	if defNames := ctx.ModuleDefNames[fromMod]; defNames != nil {
+	if defNames := ctx.moduleDefNames[fromMod]; defNames != nil {
 		if _, ok := defNames[typeName]; ok {
 			return fromMod.Name
 		}
 	}
 
-	if imports := ctx.ModuleImports[fromMod]; imports != nil {
+	if imports := ctx.moduleImports[fromMod]; imports != nil {
 		if srcMod := imports[typeName]; srcMod != nil {
 			return srcMod.Name
 		}
@@ -262,22 +262,13 @@ func getPrimitiveParentName(syntax module.TypeSyntax) string {
 	case *module.TypeSyntaxBits:
 		return "BITS"
 	case *module.TypeSyntaxConstrained:
-		switch s.Base.(type) {
-		case *module.TypeSyntaxOctetString:
-			return "OCTET STRING"
-		case *module.TypeSyntaxObjectIdentifier:
-			return "OBJECT IDENTIFIER"
-		case *module.TypeSyntaxIntegerEnum:
-			return "INTEGER"
-		case *module.TypeSyntaxBits:
-			return "BITS"
-		}
+		return getPrimitiveParentName(s.Base)
 	}
 	return ""
 }
 
 func linkPrimitiveSyntaxParents(ctx *resolverContext) {
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		for _, def := range mod.Definitions {
 			td, ok := def.(*module.TypeDef)
 			if !ok {
@@ -314,8 +305,8 @@ func linkRFC1213TypesToTCs(ctx *resolverContext) {
 	}
 
 	for _, pair := range pairs {
-		sourceMods := ctx.ModuleIndex[pair.sourceModule]
-		targetMods := ctx.ModuleIndex[pair.targetModule]
+		sourceMods := ctx.moduleIndex[pair.sourceModule]
+		targetMods := ctx.moduleIndex[pair.targetModule]
 		if len(sourceMods) == 0 || len(targetMods) == 0 {
 			continue
 		}
@@ -335,7 +326,7 @@ func linkRFC1213TypesToTCs(ctx *resolverContext) {
 }
 
 func inheritBaseTypes(ctx *resolverContext) {
-	for _, t := range ctx.Mib.Types() {
+	for _, t := range ctx.mib.Types() {
 		if t.Parent() != nil && !isApplicationBaseType(t.Base()) {
 			if base, ok := resolveBaseFromChain(t); ok {
 				t.setBase(base)

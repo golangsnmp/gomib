@@ -17,43 +17,43 @@ const (
 
 // resolverContext holds indices and working state for all resolution phases.
 type resolverContext struct {
-	Mib *Mib
+	mib *Mib
 
-	Modules []*module.Module
+	modules []*module.Module
 
-	// ModuleIndex maps module name to parsed modules (multiple versions possible).
-	ModuleIndex map[string][]*module.Module
+	// moduleIndex maps module name to parsed modules (multiple versions possible).
+	moduleIndex map[string][]*module.Module
 
-	// ModuleToResolved maps parsed module to resolved module.
-	ModuleToResolved map[*module.Module]*Module
+	// moduleToResolved maps parsed module to resolved module.
+	moduleToResolved map[*module.Module]*Module
 
-	// ResolvedToModule is the reverse of ModuleToResolved.
-	ResolvedToModule map[*Module]*module.Module
+	// resolvedToModule is the reverse of moduleToResolved.
+	resolvedToModule map[*Module]*module.Module
 
-	// ModuleSymbolToNode maps module -> symbol -> Node for OID lookups.
-	ModuleSymbolToNode map[*module.Module]map[string]*Node
+	// moduleSymbolToNode maps module -> symbol -> Node for OID lookups.
+	moduleSymbolToNode map[*module.Module]map[string]*Node
 
-	// ModuleImports maps module -> symbol -> source module for import chain traversal.
-	ModuleImports map[*module.Module]map[string]*module.Module
+	// moduleImports maps module -> symbol -> source module for import chain traversal.
+	moduleImports map[*module.Module]map[string]*module.Module
 
-	// ModuleSymbolToType maps module -> symbol -> Type for type lookups.
-	ModuleSymbolToType map[*module.Module]map[string]*Type
+	// moduleSymbolToType maps module -> symbol -> Type for type lookups.
+	moduleSymbolToType map[*module.Module]map[string]*Type
 
-	// ModuleDefNames caches definition names per module for import resolution.
-	ModuleDefNames map[*module.Module]map[string]struct{}
+	// moduleDefNames caches definition names per module for import resolution.
+	moduleDefNames map[*module.Module]map[string]struct{}
 
-	// ModuleOidDefNames caches names of definitions that have OIDs, per module.
+	// moduleOidDefNames caches names of definitions that have OIDs, per module.
 	// Used by findOidDefiningModule to avoid O(n) linear scans.
-	ModuleOidDefNames map[*module.Module]map[string]struct{}
+	moduleOidDefNames map[*module.Module]map[string]struct{}
 
-	// Snmpv2SMIModule is the SNMPv2-SMI base module (for primitive types).
-	Snmpv2SMIModule *module.Module
+	// snmpv2SMIModule is the SNMPv2-SMI base module (for primitive types).
+	snmpv2SMIModule *module.Module
 
-	// Rfc1155SMIModule is the RFC1155-SMI base module (for SMIv1 types).
-	Rfc1155SMIModule *module.Module
+	// rfc1155SMIModule is the RFC1155-SMI base module (for SMIv1 types).
+	rfc1155SMIModule *module.Module
 
-	// Snmpv2TCModule is the SNMPv2-TC module (for standard textual conventions).
-	Snmpv2TCModule *module.Module
+	// snmpv2TCModule is the SNMPv2-TC module (for standard textual conventions).
+	snmpv2TCModule *module.Module
 
 	// Unresolved references collected during resolution
 	unresolvedImports      []unresolvedImport
@@ -108,16 +108,16 @@ type unresolvedNotifObject struct {
 func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig DiagnosticConfig) *resolverContext {
 	n := len(mods)
 	ctx := &resolverContext{
-		Mib:                newMib(),
-		Modules:            mods,
-		ModuleIndex:        make(map[string][]*module.Module, n),
-		ModuleToResolved:   make(map[*module.Module]*Module, n),
-		ResolvedToModule:   make(map[*Module]*module.Module, n),
-		ModuleSymbolToNode: make(map[*module.Module]map[string]*Node, n),
-		ModuleImports:      make(map[*module.Module]map[string]*module.Module, n),
-		ModuleSymbolToType: make(map[*module.Module]map[string]*Type, n),
-		ModuleDefNames:     make(map[*module.Module]map[string]struct{}, n),
-		ModuleOidDefNames:  make(map[*module.Module]map[string]struct{}, n),
+		mib:                newMib(),
+		modules:            mods,
+		moduleIndex:        make(map[string][]*module.Module, n),
+		moduleToResolved:   make(map[*module.Module]*Module, n),
+		resolvedToModule:   make(map[*Module]*module.Module, n),
+		moduleSymbolToNode: make(map[*module.Module]map[string]*Node, n),
+		moduleImports:      make(map[*module.Module]map[string]*module.Module, n),
+		moduleSymbolToType: make(map[*module.Module]map[string]*Type, n),
+		moduleDefNames:     make(map[*module.Module]map[string]struct{}, n),
+		moduleOidDefNames:  make(map[*module.Module]map[string]struct{}, n),
 		diagConfig:         diagConfig,
 		Logger:             types.Logger{L: logger},
 	}
@@ -132,7 +132,7 @@ func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig D
 				oidDefs[def.DefinitionName()] = struct{}{}
 			}
 		}
-		ctx.ModuleOidDefNames[mod] = oidDefs
+		ctx.moduleOidDefNames[mod] = oidDefs
 	}
 	return ctx
 }
@@ -144,7 +144,7 @@ func (c *resolverContext) LookupNodeForModule(mod *module.Module, name string) (
 
 // LookupNodeInModule resolves a node across all versions of a named module.
 func (c *resolverContext) LookupNodeInModule(moduleName, name string) (*Node, bool) {
-	candidates := c.ModuleIndex[moduleName]
+	candidates := c.moduleIndex[moduleName]
 	for _, mod := range candidates {
 		if node, ok := c.LookupNodeForModule(mod, name); ok {
 			return node, true
@@ -156,8 +156,8 @@ func (c *resolverContext) LookupNodeInModule(moduleName, name string) (*Node, bo
 // LookupNodeGlobal searches all modules for a node with the given name.
 // Iterates in module-list order for deterministic results.
 func (c *resolverContext) LookupNodeGlobal(name string) (*Node, bool) {
-	for _, mod := range c.Modules {
-		if symbols := c.ModuleSymbolToNode[mod]; symbols != nil {
+	for _, mod := range c.modules {
+		if symbols := c.moduleSymbolToNode[mod]; symbols != nil {
 			if node, ok := symbols[name]; ok {
 				return node, true
 			}
@@ -171,7 +171,7 @@ func (c *resolverContext) lookupTypeInModule(mod *module.Module, name string) (*
 	if mod == nil {
 		return nil, false
 	}
-	if symbols := c.ModuleSymbolToType[mod]; symbols != nil {
+	if symbols := c.moduleSymbolToType[mod]; symbols != nil {
 		if t, ok := symbols[name]; ok {
 			return t, true
 		}
@@ -188,7 +188,7 @@ func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module
 
 	// RFC-compliant: ASN.1 primitives are always available
 	if cls == typeClassASN1Primitive {
-		return c.Snmpv2SMIModule
+		return c.snmpv2SMIModule
 	}
 
 	if !c.diagConfig.AllowBestGuessFallbacks() {
@@ -198,11 +198,11 @@ func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module
 	// Permissive only: well-known modules for SMI globals, SMIv1 types, SNMPv2-TC
 	switch cls {
 	case typeClassSmiGlobal:
-		return c.Snmpv2SMIModule
+		return c.snmpv2SMIModule
 	case typeClassSmiV1Global:
-		return c.Rfc1155SMIModule
+		return c.rfc1155SMIModule
 	case typeClassSNMPv2TC:
-		return c.Snmpv2TCModule
+		return c.snmpv2TCModule
 	default:
 		return nil
 	}
@@ -229,8 +229,8 @@ func (c *resolverContext) LookupType(name string) (*Type, bool) {
 	}
 
 	// Permissive only: scan all modules for unknown types.
-	for _, mod := range c.Modules {
-		if symbols := c.ModuleSymbolToType[mod]; symbols != nil {
+	for _, mod := range c.modules {
+		if symbols := c.moduleSymbolToType[mod]; symbols != nil {
 			if t, ok := symbols[name]; ok {
 				return t, true
 			}
@@ -280,34 +280,57 @@ func lookupInModuleScope[T any](
 
 func (c *resolverContext) lookupNodeInModuleScope(mod *module.Module, name string) (*Node, bool) {
 	return lookupInModuleScope(mod, name,
-		func(m *module.Module) map[string]*Node { return c.ModuleSymbolToNode[m] },
-		func(m *module.Module) map[string]*module.Module { return c.ModuleImports[m] },
+		func(m *module.Module) map[string]*Node { return c.moduleSymbolToNode[m] },
+		func(m *module.Module) map[string]*module.Module { return c.moduleImports[m] },
 	)
 }
 
 func (c *resolverContext) lookupTypeInModuleScope(mod *module.Module, name string) (*Type, bool) {
 	return lookupInModuleScope(mod, name,
-		func(m *module.Module) map[string]*Type { return c.ModuleSymbolToType[m] },
-		func(m *module.Module) map[string]*module.Module { return c.ModuleImports[m] },
+		func(m *module.Module) map[string]*Type { return c.moduleSymbolToType[m] },
+		func(m *module.Module) map[string]*module.Module { return c.moduleImports[m] },
 	)
+}
+
+// lookupObjectInModuleScope finds the resolved Object for a name using the
+// correct module's object. This avoids using node.Object() which may return
+// an object from a different module when multiple modules define the same OID.
+func (c *resolverContext) lookupObjectInModuleScope(mod *module.Module, name string) *Object {
+	// Check the current module first.
+	if resolved := c.moduleToResolved[mod]; resolved != nil {
+		if obj := resolved.Object(name); obj != nil {
+			return obj
+		}
+	}
+	// Check imported modules.
+	if imports := c.moduleImports[mod]; imports != nil {
+		if source, ok := imports[name]; ok {
+			if resolved := c.moduleToResolved[source]; resolved != nil {
+				if obj := resolved.Object(name); obj != nil {
+					return obj
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // registerImport maps a symbol in importingModule to its source module.
 func (c *resolverContext) registerImport(importingModule *module.Module, symbol string, sourceModule *module.Module) {
-	imports := c.ModuleImports[importingModule]
+	imports := c.moduleImports[importingModule]
 	if imports == nil {
 		imports = make(map[string]*module.Module)
-		c.ModuleImports[importingModule] = imports
+		c.moduleImports[importingModule] = imports
 	}
 	imports[symbol] = sourceModule
 }
 
 // registerModuleNodeSymbol binds a symbol name to a node within a module scope.
 func (c *resolverContext) registerModuleNodeSymbol(mod *module.Module, symbol string, node *Node) {
-	symbols := c.ModuleSymbolToNode[mod]
+	symbols := c.moduleSymbolToNode[mod]
 	if symbols == nil {
 		symbols = make(map[string]*Node)
-		c.ModuleSymbolToNode[mod] = symbols
+		c.moduleSymbolToNode[mod] = symbols
 	}
 	if _, exists := symbols[symbol]; exists && c.TraceEnabled() {
 		c.Trace("overwriting node symbol registration",
@@ -319,10 +342,10 @@ func (c *resolverContext) registerModuleNodeSymbol(mod *module.Module, symbol st
 
 // registerModuleTypeSymbol binds a symbol name to a type within a module scope.
 func (c *resolverContext) registerModuleTypeSymbol(mod *module.Module, name string, t *Type) {
-	symbols := c.ModuleSymbolToType[mod]
+	symbols := c.moduleSymbolToType[mod]
 	if symbols == nil {
 		symbols = make(map[string]*Type)
-		c.ModuleSymbolToType[mod] = symbols
+		c.moduleSymbolToType[mod] = symbols
 	}
 	symbols[name] = t
 }
@@ -362,7 +385,7 @@ func (c *resolverContext) DiagnosticConfig() DiagnosticConfig {
 // TypeCount returns the total number of registered types across all modules.
 func (c *resolverContext) TypeCount() int {
 	n := 0
-	for _, symbols := range c.ModuleSymbolToType {
+	for _, symbols := range c.moduleSymbolToType {
 		n += len(symbols)
 	}
 	return n
@@ -433,10 +456,10 @@ func (c *resolverContext) RecordUnresolvedNotificationObject(mod *module.Module,
 
 // DropModules releases parsed module data to free memory after resolution completes.
 func (c *resolverContext) DropModules() {
-	c.Modules = nil
-	c.ModuleIndex = nil
-	c.ModuleDefNames = nil
-	c.ModuleOidDefNames = nil
+	c.modules = nil
+	c.moduleIndex = nil
+	c.moduleDefNames = nil
+	c.moduleOidDefNames = nil
 }
 
 func addUnresolved(m *Mib, kind UnresolvedKind, symbol string, mod *module.Module) {
@@ -454,23 +477,23 @@ func addUnresolved(m *Mib, kind UnresolvedKind, symbol string, mod *module.Modul
 // FinalizeUnresolved copies collected unresolved references and diagnostics into the Mib builder.
 func (c *resolverContext) FinalizeUnresolved() {
 	for _, u := range c.unresolvedImports {
-		addUnresolved(c.Mib, UnresolvedImport, u.symbol, u.importingModule)
+		addUnresolved(c.mib, UnresolvedImport, u.symbol, u.importingModule)
 	}
 	for _, u := range c.unresolvedTypes {
-		addUnresolved(c.Mib, UnresolvedType, u.referenced, u.module)
+		addUnresolved(c.mib, UnresolvedType, u.referenced, u.module)
 	}
 	for _, u := range c.unresolvedOids {
-		addUnresolved(c.Mib, UnresolvedOID, u.component, u.module)
+		addUnresolved(c.mib, UnresolvedOID, u.component, u.module)
 	}
 	for _, u := range c.unresolvedIndexes {
-		addUnresolved(c.Mib, UnresolvedIndex, u.indexObject, u.module)
+		addUnresolved(c.mib, UnresolvedIndex, u.indexObject, u.module)
 	}
 	for _, u := range c.unresolvedNotifObjects {
-		addUnresolved(c.Mib, UnresolvedNotificationObject, u.object, u.module)
+		addUnresolved(c.mib, UnresolvedNotificationObject, u.object, u.module)
 	}
 
 	for _, d := range c.diagnostics {
-		c.Mib.addDiagnostic(d)
+		c.mib.addDiagnostic(d)
 	}
 }
 
@@ -508,8 +531,3 @@ var wellKnownTypes = map[string]typeClass{
 	"RowPointer": typeClassSNMPv2TC, "InstancePointer": typeClassSNMPv2TC,
 	"TDomain": typeClassSNMPv2TC, "TAddress": typeClassSNMPv2TC,
 }
-
-func isASN1Primitive(name string) bool   { return wellKnownTypes[name] == typeClassASN1Primitive }
-func isSmiGlobalType(name string) bool   { return wellKnownTypes[name] == typeClassSmiGlobal }
-func isSmiV1GlobalType(name string) bool { return wellKnownTypes[name] == typeClassSmiV1Global }
-func isSNMPv2TCType(name string) bool    { return wellKnownTypes[name] == typeClassSNMPv2TC }
