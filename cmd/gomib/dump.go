@@ -147,7 +147,7 @@ func buildDumpOutput(m *mib.Mib, opts JSONOptions) *DumpOutput {
 
 	if opts.IncludeTree {
 		if opts.OidFilter != "" {
-			node := resolveQuery(m, opts.OidFilter)
+			node := m.Resolve(opts.OidFilter)
 			if node != nil {
 				output.Tree = buildTreeJSON(node, opts)
 			}
@@ -280,6 +280,9 @@ func buildObjectJSON(obj *mib.Object, opts JSONOptions) ObjectJSON {
 		if idx.Object != nil {
 			idxJSON.Object = idx.Object.Name()
 		}
+		if idx.Encoding != mib.IndexEncodingUnknown {
+			idxJSON.Encoding = idx.Encoding.String()
+		}
 		o.Index = append(o.Index, idxJSON)
 	}
 
@@ -289,6 +292,43 @@ func buildObjectJSON(obj *mib.Object, opts JSONOptions) ObjectJSON {
 
 	if obj.Augments() != nil {
 		o.Augments = obj.Augments().Name()
+	}
+
+	switch obj.Kind() {
+	case mib.KindTable:
+		if entry := obj.Entry(); entry != nil {
+			o.Entry = entry.Name()
+		}
+		o.Columns = buildColumnSummaries(obj)
+	case mib.KindRow:
+		if tbl := obj.Table(); tbl != nil {
+			o.Table = tbl.Name()
+		}
+		o.Columns = buildColumnSummaries(obj)
+		for _, aug := range obj.AugmentedBy() {
+			o.AugmentedBy = append(o.AugmentedBy, aug.Name())
+		}
+		if obj.Augments() != nil {
+			for _, idx := range obj.EffectiveIndexes() {
+				ij := IndexJSON{Implied: idx.Implied}
+				if idx.Object != nil {
+					ij.Object = idx.Object.Name()
+				}
+				if idx.Encoding != mib.IndexEncodingUnknown {
+					ij.Encoding = idx.Encoding.String()
+				}
+				o.EffectiveIndexes = append(o.EffectiveIndexes, ij)
+			}
+		}
+	case mib.KindColumn:
+		if tbl := obj.Table(); tbl != nil {
+			o.Table = tbl.Name()
+		}
+		if row := obj.Row(); row != nil {
+			o.Row = row.Name()
+		}
+		isIdx := obj.IsIndex()
+		o.IsIndex = &isIdx
 	}
 
 	for _, nv := range obj.EffectiveEnums() {
@@ -406,6 +446,30 @@ func buildTreeJSON(node *mib.Node, opts JSONOptions) *TreeNodeJSON { //nolint:un
 	}
 
 	return t
+}
+
+func buildColumnSummaries(obj *mib.Object) []ColumnSummaryJSON {
+	cols := obj.Columns()
+	if len(cols) == 0 {
+		return nil
+	}
+	summaries := make([]ColumnSummaryJSON, 0, len(cols))
+	for _, col := range cols {
+		cs := ColumnSummaryJSON{
+			Name:   col.Name(),
+			Access: col.Access().String(),
+		}
+		if t := col.Type(); t != nil {
+			cs.Type = t.Name()
+			if cs.Type == "" {
+				cs.Type = t.Base().String()
+			}
+			cs.BaseType = t.EffectiveBase().String()
+		}
+		cs.IsIndex = col.IsIndex()
+		summaries = append(summaries, cs)
+	}
+	return summaries
 }
 
 func buildDiagnosticJSON(d mib.Diagnostic) DiagnosticJSON {

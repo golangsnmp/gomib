@@ -12,6 +12,8 @@
 package mib
 
 import (
+	"errors"
+	"fmt"
 	"iter"
 	"slices"
 	"strconv"
@@ -164,6 +166,116 @@ func (m *Mib) FormatOID(oid OID) string {
 		b.WriteString(strconv.FormatUint(uint64(arc), 10))
 	}
 	return b.String()
+}
+
+// Resolve looks up a node by name, qualified name, or numeric OID string.
+//
+// Accepted formats:
+//   - "ifDescr"                     plain name
+//   - "IF-MIB::ifDescr"            qualified (MODULE::name)
+//   - "1.3.6.1.2.1.2.2.1.2"       numeric OID
+//   - ".1.3.6.1.2.1.2.2.1.2"      numeric OID with leading dot
+//
+// Returns nil if no matching node is found.
+func (m *Mib) Resolve(query string) *Node {
+	// Qualified name: MODULE::name
+	if modName, itemName, ok := strings.Cut(query, "::"); ok {
+		mod := m.moduleByName[modName]
+		if mod == nil {
+			return nil
+		}
+		return mod.Node(itemName)
+	}
+
+	// Numeric OID
+	q := query
+	if q != "" && q[0] == '.' {
+		q = q[1:]
+	}
+	if q != "" && q[0] >= '0' && q[0] <= '9' {
+		oid, err := ParseOID(q)
+		if err != nil {
+			return nil
+		}
+		return m.NodeByOID(oid)
+	}
+
+	// Plain name
+	return m.Node(query)
+}
+
+// ResolveOID converts a symbolic or numeric OID string to a numeric OID.
+// Unlike Resolve, this handles instance-suffixed forms by resolving the
+// name portion and appending trailing numeric arcs.
+//
+// Accepted formats (all formats accepted by Resolve, plus):
+//   - "ifDescr.5"                   name with instance suffix
+//   - "IF-MIB::ifDescr.5"          qualified name with instance suffix
+//   - "IF-MIB::ifDescr.5.3"        qualified name with multi-arc suffix
+//
+// ResolveOID is the inverse of FormatOID:
+//
+//	m.FormatOID(OID{1,3,6,1,2,1,2,2,1,2,5}) => "IF-MIB::ifDescr.5"
+//	m.ResolveOID("IF-MIB::ifDescr.5")        => OID{1,3,6,1,2,1,2,2,1,2,5}
+//
+// Returns an error if the input cannot be parsed or resolved.
+func (m *Mib) ResolveOID(query string) (OID, error) {
+	if query == "" {
+		return nil, errors.New("empty query")
+	}
+
+	// Numeric OID: delegate to ParseOID directly (no tree lookup needed).
+	q := query
+	if q[0] == '.' {
+		q = q[1:]
+	}
+	if q != "" && q[0] >= '0' && q[0] <= '9' {
+		return ParseOID(query)
+	}
+
+	// Qualified name: MODULE::name[.suffix]
+	if modName, rest, ok := strings.Cut(query, "::"); ok {
+		name, suffix := splitNameSuffix(rest)
+		mod := m.moduleByName[modName]
+		if mod == nil {
+			return nil, fmt.Errorf("module not found: %s", modName)
+		}
+		nd := mod.Node(name)
+		if nd == nil {
+			return nil, fmt.Errorf("node not found: %s::%s", modName, name)
+		}
+		return appendSuffix(nd.OID(), suffix)
+	}
+
+	// Plain name[.suffix]
+	name, suffix := splitNameSuffix(query)
+	nd := m.Node(name)
+	if nd == nil {
+		return nil, fmt.Errorf("node not found: %s", name)
+	}
+	return appendSuffix(nd.OID(), suffix)
+}
+
+// splitNameSuffix splits "ifDescr.5.3" into ("ifDescr", ".5.3").
+// Returns (s, "") if no dot is present.
+func splitNameSuffix(s string) (name, suffix string) {
+	if i := strings.IndexByte(s, '.'); i >= 0 {
+		return s[:i], s[i:]
+	}
+	return s, ""
+}
+
+// appendSuffix parses dotted numeric arcs from suffix and appends them to base.
+// Returns base unchanged if suffix is empty.
+func appendSuffix(base OID, suffix string) (OID, error) {
+	if suffix == "" {
+		return base, nil
+	}
+	extra, err := ParseOID(suffix)
+	if err != nil {
+		return nil, fmt.Errorf("invalid instance suffix %q: %w", suffix, err)
+	}
+	return append(base, extra...), nil
 }
 
 // Module returns the module with the given name, or nil if not found.

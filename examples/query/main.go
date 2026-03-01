@@ -34,8 +34,37 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Resolve accepts any format: plain name, qualified name, or numeric OID
+	fmt.Println("=== Resolve ===")
+	for _, query := range []string{"ifIndex", "IF-MIB::ifDescr", "1.3.6.1.2.1.2.2.1.3"} {
+		node := m.Resolve(query)
+		if node != nil {
+			fmt.Printf("  %-30s -> %-20s %s\n", query, node.Name(), node.OID())
+		}
+	}
+
+	// ResolveOID handles instance-suffixed forms and is the inverse of FormatOID
+	fmt.Println("\n=== ResolveOID ===")
+	for _, query := range []string{"ifDescr.5", "IF-MIB::ifIndex.17", "1.3.6.1.2.1.2.2.1.2"} {
+		oid, err := m.ResolveOID(query)
+		if err != nil {
+			fmt.Printf("  %-30s -> error: %v\n", query, err)
+			continue
+		}
+		fmt.Printf("  %-30s -> %s\n", query, oid)
+	}
+
+	// FormatOID/ResolveOID round-trip
+	fmt.Println("\n=== FormatOID / ResolveOID round-trip ===")
+	oid, _ := m.ResolveOID("IF-MIB::ifDescr.5")
+	formatted := m.FormatOID(oid)
+	back, _ := m.ResolveOID(formatted)
+	fmt.Printf("  ResolveOID  -> %s\n", oid)
+	fmt.Printf("  FormatOID   -> %s\n", formatted)
+	fmt.Printf("  round-trip  -> %s\n", back)
+
 	// Query by name
-	fmt.Println("=== By name ===")
+	fmt.Println("\n=== By name ===")
 	obj := m.Object("ifIndex")
 	if obj != nil {
 		fmt.Printf("%-20s %s\n", obj.Name(), obj.OID())
@@ -53,7 +82,7 @@ func main() {
 
 	// OID-based lookup via NodeByOID().Object()
 	fmt.Println("\n=== By OID ===")
-	oid, _ := mib.ParseOID("1.3.6.1.2.1.2.2.1.3")
+	oid, _ = mib.ParseOID("1.3.6.1.2.1.2.2.1.3")
 	node := m.NodeByOID(oid)
 	if node != nil && node.Object() != nil {
 		obj = node.Object()
