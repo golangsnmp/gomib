@@ -277,3 +277,35 @@ func (b BaseType) String() string {
 		return fmt.Sprintf("BaseType(%d)", b)
 	}
 }
+
+// IndexEncoding classifies how an INDEX component maps to instance-identifier
+// sub-identifiers per RFC 2578 s7.7.
+type IndexEncoding int
+
+const (
+	IndexEncodingUnknown        IndexEncoding = iota // cannot determine (bare type, unresolved, etc.)
+	IndexEncodingInteger                             // 1 sub-identifier (integer-valued types)
+	IndexEncodingFixedString                         // n sub-identifiers, n = fixed SIZE
+	IndexEncodingLengthPrefixed                      // n+1 sub-identifiers, length prefix
+	IndexEncodingImplied                             // n sub-identifiers, no prefix (IMPLIED)
+	IndexEncodingIpAddress                           // 4 sub-identifiers
+)
+
+func (e IndexEncoding) String() string {
+	switch e {
+	case IndexEncodingUnknown:
+		return "unknown"
+	case IndexEncodingInteger:
+		return "integer"
+	case IndexEncodingFixedString:
+		return "fixed-string"
+	case IndexEncodingLengthPrefixed:
+		return "length-prefixed"
+	case IndexEncodingImplied:
+		return "implied"
+	case IndexEncodingIpAddress:
+		return "ip-address"
+	default:
+		return fmt.Sprintf("IndexEncoding(%d)", e)
+	}
+}

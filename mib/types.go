@@ -48,10 +48,55 @@ type Revision struct {
 }
 
 // IndexEntry describes an index component for a table row.
+// Exactly one of Object or TypeName is set: Object for object-reference
+// indexes, TypeName for bare-type indexes (e.g. INDEX { INTEGER }).
 type IndexEntry struct {
-	Object   *Object // nil for bare type indexes (e.g. INDEX { INTEGER })
-	TypeName string  // non-empty for bare type indexes
-	Implied  bool    // IMPLIED keyword present
+	Object   *Object       // nil for bare type indexes
+	TypeName string        // non-empty for bare type indexes
+	Implied  bool          // IMPLIED keyword present
+	Encoding IndexEncoding // RFC 2578 s7.7 encoding classification, set during resolution
+}
+
+// classifyIndexEncoding determines the index encoding from the object's
+// resolved type and effective constraints. Returns IndexEncodingUnknown
+// for bare type indexes or unresolved types.
+func classifyIndexEncoding(obj *Object, implied bool) IndexEncoding {
+	if obj == nil {
+		return IndexEncodingUnknown
+	}
+	t := obj.Type()
+	if t == nil {
+		return IndexEncodingUnknown
+	}
+	base := t.EffectiveBase()
+	switch base {
+	case BaseInteger32, BaseUnsigned32, BaseGauge32, BaseTimeTicks,
+		BaseCounter32, BaseCounter64:
+		return IndexEncodingInteger
+	case BaseIpAddress:
+		return IndexEncodingIpAddress
+	case BaseOctetString, BaseOpaque, BaseBits:
+		if implied {
+			return IndexEncodingImplied
+		}
+		if isFixedSize(obj.sizes) {
+			return IndexEncodingFixedString
+		}
+		return IndexEncodingLengthPrefixed
+	case BaseObjectIdentifier:
+		if implied {
+			return IndexEncodingImplied
+		}
+		return IndexEncodingLengthPrefixed
+	default:
+		return IndexEncodingUnknown
+	}
+}
+
+// isFixedSize reports whether sizes contains exactly one constraint with
+// min == max (and > 0), indicating a fixed-length string.
+func isFixedSize(sizes []Range) bool {
+	return len(sizes) == 1 && sizes[0].Min == sizes[0].Max && sizes[0].Min > 0
 }
 
 // DefValKind identifies the type of default value.

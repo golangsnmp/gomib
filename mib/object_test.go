@@ -95,6 +95,68 @@ func TestTableNavigation(t *testing.T) {
 	})
 }
 
+func TestIsIndex(t *testing.T) {
+	_, rowObj, col1Obj, col2Obj := buildTableTree()
+
+	// col1 is in the row's INDEX
+	rowObj.index = []IndexEntry{{Object: col1Obj}}
+
+	t.Run("index column is an index", func(t *testing.T) {
+		testutil.True(t, col1Obj.IsIndex(), "index column should be an index")
+	})
+
+	t.Run("data column is not an index", func(t *testing.T) {
+		testutil.False(t, col2Obj.IsIndex(), "data column should not be an index")
+	})
+
+	t.Run("row is not an index", func(t *testing.T) {
+		testutil.False(t, rowObj.IsIndex(), "row should not be an index")
+	})
+
+	t.Run("nil object is not an index", func(t *testing.T) {
+		var nilObj *Object
+		testutil.False(t, nilObj.IsIndex(), "nil should not be an index")
+	})
+}
+
+func TestAugmentedBy(t *testing.T) {
+	makeRow := func(name string) *Object {
+		node := &Node{kind: KindRow}
+		obj := &Object{name: name, node: node}
+		node.obj = obj
+		return obj
+	}
+
+	t.Run("base row with augmenters", func(t *testing.T) {
+		base := makeRow("baseEntry")
+		aug1 := makeRow("aug1Entry")
+		aug2 := makeRow("aug2Entry")
+		aug1.augments = base
+		aug2.augments = base
+		base.augmentedBy = []*Object{aug1, aug2}
+
+		got := base.AugmentedBy()
+		testutil.Len(t, got, 2, "augmented by")
+		testutil.Equal(t, aug1, got[0], "first augmenter")
+		testutil.Equal(t, aug2, got[1], "second augmenter")
+	})
+
+	t.Run("row without augmenters returns nil", func(t *testing.T) {
+		row := makeRow("plainEntry")
+		testutil.Nil(t, row.AugmentedBy(), "no augmenters")
+	})
+
+	t.Run("returned slice is a copy", func(t *testing.T) {
+		base := makeRow("baseEntry")
+		aug := makeRow("augEntry")
+		base.augmentedBy = []*Object{aug}
+
+		got := base.AugmentedBy()
+		got[0] = nil
+		testutil.NotNil(t, base.AugmentedBy()[0], "original should be unmodified")
+	})
+}
+
 func TestEffectiveIndexes(t *testing.T) {
 	makeRow := func(name string, idx []IndexEntry) *Object {
 		node := &Node{kind: KindRow}
@@ -141,4 +203,64 @@ func TestEffectiveIndexes(t *testing.T) {
 		got := a.EffectiveIndexes()
 		testutil.Nil(t, got, "got , want nil for cycle")
 	})
+}
+
+func TestClassifyIndexEncoding(t *testing.T) {
+	makeObj := func(base BaseType, sizes []Range) *Object {
+		typ := newType("t")
+		typ.setBase(base)
+		obj := &Object{name: "idx", typ: typ, sizes: sizes}
+		return obj
+	}
+
+	tests := []struct {
+		name    string
+		obj     *Object
+		implied bool
+		want    IndexEncoding
+	}{
+		{"Integer32", makeObj(BaseInteger32, nil), false, IndexEncodingInteger},
+		{"Unsigned32", makeObj(BaseUnsigned32, nil), false, IndexEncodingInteger},
+		{"Gauge32", makeObj(BaseGauge32, nil), false, IndexEncodingInteger},
+		{"TimeTicks", makeObj(BaseTimeTicks, nil), false, IndexEncodingInteger},
+		{"Counter32", makeObj(BaseCounter32, nil), false, IndexEncodingInteger},
+		{"IpAddress", makeObj(BaseIpAddress, nil), false, IndexEncodingIpAddress},
+		{"fixed size OCTET STRING", makeObj(BaseOctetString, []Range{{Min: 6, Max: 6}}), false, IndexEncodingFixedString},
+		{"variable OCTET STRING", makeObj(BaseOctetString, nil), false, IndexEncodingLengthPrefixed},
+		{"variable OCTET STRING with size range", makeObj(BaseOctetString, []Range{{Min: 0, Max: 255}}), false, IndexEncodingLengthPrefixed},
+		{"OCTET STRING with IMPLIED", makeObj(BaseOctetString, nil), true, IndexEncodingImplied},
+		{"OBJECT IDENTIFIER", makeObj(BaseObjectIdentifier, nil), false, IndexEncodingLengthPrefixed},
+		{"OBJECT IDENTIFIER with IMPLIED", makeObj(BaseObjectIdentifier, nil), true, IndexEncodingImplied},
+		{"BITS", makeObj(BaseBits, nil), false, IndexEncodingLengthPrefixed},
+		{"Opaque", makeObj(BaseOpaque, nil), false, IndexEncodingLengthPrefixed},
+		{"nil object", nil, false, IndexEncodingUnknown},
+		{"nil type", &Object{name: "x"}, false, IndexEncodingUnknown},
+		{"unknown base type", makeObj(BaseUnknown, nil), false, IndexEncodingUnknown},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testutil.Equal(t, tt.want, classifyIndexEncoding(tt.obj, tt.implied), "classifyIndexEncoding()")
+		})
+	}
+}
+
+func TestIsFixedSize(t *testing.T) {
+	tests := []struct {
+		name  string
+		sizes []Range
+		want  bool
+	}{
+		{"nil", nil, false},
+		{"empty", []Range{}, false},
+		{"fixed", []Range{{Min: 6, Max: 6}}, true},
+		{"range", []Range{{Min: 0, Max: 255}}, false},
+		{"zero fixed", []Range{{Min: 0, Max: 0}}, false},
+		{"multiple", []Range{{Min: 4, Max: 4}, {Min: 6, Max: 6}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testutil.Equal(t, tt.want, isFixedSize(tt.sizes), "isFixedSize()")
+		})
+	}
 }

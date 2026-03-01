@@ -96,3 +96,16 @@ const (
 	BaseOpaque           = types.BaseOpaque
 	BaseSequence         = types.BaseSequence
 )
+
+// IndexEncoding classifies how an INDEX component maps to instance-identifier
+// sub-identifiers per RFC 2578 s7.7.
+type IndexEncoding = types.IndexEncoding
+
+const (
+	IndexEncodingUnknown        = types.IndexEncodingUnknown
+	IndexEncodingInteger        = types.IndexEncodingInteger
+	IndexEncodingFixedString    = types.IndexEncodingFixedString
+	IndexEncodingLengthPrefixed = types.IndexEncodingLengthPrefixed
+	IndexEncodingImplied        = types.IndexEncodingImplied
+	IndexEncodingIpAddress      = types.IndexEncodingIpAddress
+)

@@ -624,6 +624,55 @@ func TestAugmentsEffectiveIndexes(t *testing.T) {
 		"augmenting table should inherit indexes from augmented table")
 }
 
+func TestAugmentedBy(t *testing.T) {
+	pm := loadSemanticsMIB(t)
+
+	base := pm.Object("problemSemEntry")
+	testutil.NotNil(t, base, "Object(problemSemEntry)")
+
+	augBy := base.AugmentedBy()
+	testutil.Len(t, augBy, 1, "problemSemEntry should be augmented by one row")
+	testutil.Equal(t, "problemAugEntry", augBy[0].Name(),
+		"problemSemEntry should be augmented by problemAugEntry")
+
+	// The augmenting entry itself should not be augmented by anything
+	augEntry := pm.Object("problemAugEntry")
+	testutil.Nil(t, augEntry.AugmentedBy(), "augmenting entry should not itself be augmented")
+}
+
+func TestIsIndex(t *testing.T) {
+	pm := loadSemanticsMIB(t)
+
+	t.Run("index column is an index", func(t *testing.T) {
+		idx := pm.Object("problemSemIndex")
+		testutil.NotNil(t, idx, "Object(problemSemIndex)")
+		testutil.True(t, idx.IsIndex(), "problemSemIndex should be an index")
+	})
+
+	t.Run("data column is not an index", func(t *testing.T) {
+		col := pm.Object("problemSemName")
+		testutil.NotNil(t, col, "Object(problemSemName)")
+		testutil.False(t, col.IsIndex(), "problemSemName should not be an index")
+	})
+
+	t.Run("scalar is not an index", func(t *testing.T) {
+		scalar := pm.Object("problemScalar1")
+		testutil.NotNil(t, scalar, "Object(problemScalar1)")
+		testutil.False(t, scalar.IsIndex(), "scalar should not be an index")
+	})
+
+	t.Run("real MIB index column", func(t *testing.T) {
+		m := loadTestMIB(t)
+		ifIndex := m.Object("ifIndex")
+		testutil.NotNil(t, ifIndex, "Object(ifIndex)")
+		testutil.True(t, ifIndex.IsIndex(), "ifIndex should be an index")
+
+		ifDescr := m.Object("ifDescr")
+		testutil.NotNil(t, ifDescr, "Object(ifDescr)")
+		testutil.False(t, ifDescr.IsIndex(), "ifDescr should not be an index")
+	})
+}
+
 func TestObjectsByType(t *testing.T) {
 	m := loadTestMIB(t)
 
