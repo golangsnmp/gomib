@@ -132,6 +132,14 @@ func TestGetPrimitiveParentName(t *testing.T) {
 			Base:       &module.TypeSyntaxObjectIdentifier{},
 			Constraint: &module.ConstraintSize{},
 		}, "OBJECT IDENTIFIER"},
+		{"Constrained IntegerEnum", &module.TypeSyntaxConstrained{
+			Base:       &module.TypeSyntaxIntegerEnum{},
+			Constraint: &module.ConstraintRange{},
+		}, "INTEGER"},
+		{"Constrained Bits", &module.TypeSyntaxConstrained{
+			Base:       &module.TypeSyntaxBits{},
+			Constraint: &module.ConstraintSize{},
+		}, "BITS"},
 		{"Constrained TypeRef", &module.TypeSyntaxConstrained{
 			Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			Constraint: &module.ConstraintRange{},

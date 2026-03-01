@@ -534,20 +534,32 @@ func TestProblemSMIv1v2MandatoryStatus(t *testing.T) {
 func TestProblemSMIv1v2TrapType(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-SMIv1v2-MIX-MIB")
 
-	// The MIB should load without error regardless of whether TRAP-TYPE
-	// is fully resolved. Verify that the surrounding objects are not
-	// affected by the TRAP-TYPE.
+	// Verify surrounding SMIv2 objects are not affected by TRAP-TYPE.
 	normalObj := m.Object("problemV2NormalObject")
-	if normalObj == nil {
-		t.Fatal("problemV2NormalObject should resolve - TRAP-TYPE should not prevent other objects from loading")
-	}
+	testutil.NotNil(t, normalObj, "Object(problemV2NormalObject)")
 	testutil.Equal(t, "1.3.6.1.4.1.99998.1.1.4", normalObj.OID().String(),
-		"normal SMIv2 object OID should resolve correctly alongside TRAP-TYPE")
+		"normal SMIv2 object OID")
 
 	notif := m.Notification("problemV2Notification")
 	testutil.NotNil(t, notif, "Notification(problemV2Notification)")
 	testutil.Equal(t, "1.3.6.1.4.1.99998.1.2.1", notif.OID().String(),
 		"SMIv2 notification OID")
+
+	// Verify the TRAP-TYPE itself resolves.
+	// OID = enterprise.0.trapNumber = 1.3.6.1.4.1.99998.1.0.1
+	trap := m.Notification("problemV1Trap")
+	testutil.NotNil(t, trap, "Notification(problemV1Trap)")
+	testutil.Equal(t, "1.3.6.1.4.1.99998.1.0.1", trap.OID().String(),
+		"TRAP-TYPE OID")
+
+	ti := trap.TrapInfo()
+	testutil.NotNil(t, ti, "TrapInfo for problemV1Trap")
+	testutil.Equal(t, "problemSmiv1v2MixMIB", ti.Enterprise, "trap enterprise")
+	testutil.Equal(t, uint32(1), ti.TrapNumber, "trap number")
+
+	objs := trap.Objects()
+	testutil.Len(t, objs, 1, "TRAP-TYPE VARIABLES count")
+	testutil.Equal(t, "problemV1AccessObject", objs[0].Name(), "TRAP-TYPE VARIABLES[0]")
 }
 
 // TestProblemSMIv1v2CounterGauge verifies resolution of SMIv1 Counter and
@@ -674,14 +686,19 @@ func TestProblemIndexTableKinds(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-INDEX-MIB")
 
 	tables := []struct {
-		table  string
-		entry  string
-		column string
+		table      string
+		entry      string
+		column     string
+		indexNames []string
 	}{
-		{"problemNetAddrTable", "problemNetAddrEntry", "problemNetAddrValue"},
-		{"problemMacIndexTable", "problemMacIndexEntry", "problemMacIndexPort"},
-		{"problemNoRangeTable", "problemNoRangeEntry", "problemNoRangeValue"},
-		{"problemStringIndexTable", "problemStringIndexEntry", "problemStringIndexValue"},
+		{"problemNetAddrTable", "problemNetAddrEntry", "problemNetAddrValue",
+			[]string{"problemNetAddrIfIndex", "problemNetAddrAddress"}},
+		{"problemMacIndexTable", "problemMacIndexEntry", "problemMacIndexPort",
+			[]string{"problemMacIndexAddress"}},
+		{"problemNoRangeTable", "problemNoRangeEntry", "problemNoRangeValue",
+			[]string{"problemNoRangeIndex1", "problemNoRangeIndex2"}},
+		{"problemStringIndexTable", "problemStringIndexEntry", "problemStringIndexValue",
+			[]string{"problemStringIndexName"}},
 	}
 
 	for _, tt := range tables {
@@ -693,6 +710,12 @@ func TestProblemIndexTableKinds(t *testing.T) {
 			ent := m.Object(tt.entry)
 			testutil.NotNil(t, ent, "Object(%s)", tt.entry)
 			testutil.Equal(t, "row", normalizeKind(ent.Kind()), "entry kind")
+
+			indexes := normalizeIndexes(ent.Index())
+			testutil.Len(t, indexes, len(tt.indexNames), "index count")
+			for i, name := range tt.indexNames {
+				testutil.Equal(t, name, indexes[i].Name, "index[%d]", i)
+			}
 
 			col := m.Object(tt.column)
 			testutil.NotNil(t, col, "Object(%s)", tt.column)
@@ -826,19 +849,12 @@ func TestProblemDefvalEmptyBits(t *testing.T) {
 	testutil.NotNil(t, obj, "Object(problemDefvalEmptyBits)")
 
 	dv := obj.DefaultValue()
-	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalEmptyBits")
+	testutil.True(t, !dv.IsZero(), "DefaultValue() should be set")
+	testutil.Equal(t, mib.DefValKindBits, dv.Kind(), "kind")
 
-	if dv.Kind() == mib.DefValKindBits {
-		labels, ok := mib.DefValAs[[]string](dv)
-		if !ok {
-			t.Error("DefValAs[[]string] failed for BITS defval")
-			return
-		}
-		testutil.Equal(t, 0, len(labels), "empty BITS should have 0 labels")
-	}
-	// "{ }" is the string representation of empty BITS
-	got := dv.String()
-	t.Logf("empty BITS defval: %q (kind=%v)", got, dv.Kind())
+	labels, ok := mib.DefValAs[[]string](dv)
+	testutil.True(t, ok, "DefValAs[[]string]")
+	testutil.Equal(t, 0, len(labels), "empty BITS should have 0 labels")
 }
 
 // TestProblemDefvalMultiBits verifies that DEFVAL { { read, write } } is parsed.
@@ -850,29 +866,24 @@ func TestProblemDefvalMultiBits(t *testing.T) {
 	testutil.NotNil(t, obj, "Object(problemDefvalMultiBits)")
 
 	dv := obj.DefaultValue()
-	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalMultiBits")
+	testutil.True(t, !dv.IsZero(), "DefaultValue() should be set")
+	testutil.Equal(t, mib.DefValKindBits, dv.Kind(), "kind")
 
-	if dv.Kind() == mib.DefValKindBits {
-		labels, ok := mib.DefValAs[[]string](dv)
-		if !ok {
-			t.Error("DefValAs[[]string] failed for BITS defval")
-			return
+	labels, ok := mib.DefValAs[[]string](dv)
+	testutil.True(t, ok, "DefValAs[[]string]")
+	testutil.Equal(t, 2, len(labels), "multi BITS should have 2 labels")
+
+	hasRead, hasWrite := false, false
+	for _, l := range labels {
+		if l == "read" {
+			hasRead = true
 		}
-		testutil.Equal(t, 2, len(labels), "multi BITS should have 2 labels")
-		hasRead, hasWrite := false, false
-		for _, l := range labels {
-			if l == "read" {
-				hasRead = true
-			}
-			if l == "write" {
-				hasWrite = true
-			}
+		if l == "write" {
+			hasWrite = true
 		}
-		testutil.True(t, hasRead, "should have 'read' bit")
-		testutil.True(t, hasWrite, "should have 'write' bit")
-	} else {
-		t.Logf("multi BITS defval kind=%v, string=%q", dv.Kind(), dv.String())
 	}
+	testutil.True(t, hasRead, "should have 'read' bit")
+	testutil.True(t, hasWrite, "should have 'write' bit")
 }
 
 // TestProblemDefvalNegative verifies that negative integer DEFVAL is parsed.

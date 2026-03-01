@@ -86,6 +86,11 @@ func TestCollectOidDefinitions(t *testing.T) {
 	testutil.Len(t, defs.trapDefs, 1, "trap defs")
 
 	testutil.Equal(t, "myTrap", defs.trapDefs[0].defName(), "trap def name")
+
+	// The empty notification should produce a diagnostic.
+	diags := ctx.Diagnostics()
+	testutil.Len(t, diags, 1, "diagnostics")
+	testutil.Equal(t, types.DiagNotificationNoOid, diags[0].Code, "diagnostic code")
 }
 
 func TestCollectOidDefinitionsEmpty(t *testing.T) {
