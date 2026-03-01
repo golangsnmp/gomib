@@ -399,11 +399,20 @@ func TestConvertDefValOidRefUnresolved(t *testing.T) {
 }
 
 func TestConvertDefValUnknown(t *testing.T) {
-	ctx := newTestContext()
+	ctx := newResolverContext(nil, nil, PermissiveConfig())
 	mod := &module.Module{Name: "TEST-MIB"}
 
 	dv := convertDefVal(ctx, &module.DefValUnparsed{}, mod, nil)
 	testutil.Nil(t, dv, "expected nil for unparsed DefVal, got")
+
+	var found bool
+	for _, d := range ctx.Diagnostics() {
+		if d.Code == types.DiagDefvalUnresolved {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected DiagDefvalUnresolved diagnostic for unparsed DefVal")
 }
 
 func TestResolveTypeSyntax(t *testing.T) {
@@ -1456,7 +1465,7 @@ func TestLinkObjectIndexes(t *testing.T) {
 		testutil.Equal(t, targetObj, augObj.Augments(), "augments target")
 	})
 
-	t.Run("index node without object skipped", func(t *testing.T) {
+	t.Run("index node without object emits diagnostic", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
 		ctx.Modules = append(ctx.Modules, mod)
@@ -1489,6 +1498,60 @@ func TestLinkObjectIndexes(t *testing.T) {
 		linkObjectIndexes(ctx, objRefs)
 
 		testutil.Len(t, rowObj.Index(), 0, "index entries should be empty when index node has no object")
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagIndexNotObject {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagIndexNotObject diagnostic")
+	})
+
+	t.Run("augments node without object emits diagnostic", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		ctx.Modules = append(ctx.Modules, mod)
+		resolvedMod := newModule(mod.Name)
+		ctx.ModuleToResolved[mod] = resolvedMod
+
+		root := ctx.Mib.Root()
+
+		// Create the augmenting row.
+		augNode := buildOIDPath(root, 1, 2, 1)
+		augNode.setName("myAugEntry")
+		ctx.registerModuleNodeSymbol(mod, "myAugEntry", augNode)
+		augObj := newObject("myAugEntry")
+		augObj.setNode(augNode)
+		resolvedMod.addObject(augObj)
+		augNode.setObject(augObj)
+
+		// Target node exists but has no Object attached.
+		targetNode := buildOIDPath(root, 1, 1, 1)
+		targetNode.setName("targetEntry")
+		ctx.registerModuleNodeSymbol(mod, "targetEntry", targetNode)
+
+		objRefs := []objectTypeRef{
+			{mod: mod, obj: &module.ObjectType{
+				Name:     "myAugEntry",
+				Syntax:   &module.TypeSyntaxTypeRef{Name: "MyAugEntry"},
+				Augments: "targetEntry",
+			}},
+		}
+
+		linkObjectIndexes(ctx, objRefs)
+
+		testutil.Nil(t, augObj.Augments(), "augments should be nil when target has no object")
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagAugmentsNotObject {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagAugmentsNotObject diagnostic")
 	})
 
 	t.Run("nil resolved module skipped", func(_ *testing.T) {
@@ -1690,6 +1753,51 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		count := createResolvedObjectGroups(ctx)
 		testutil.Equal(t, 0, count, "should create no groups when node is missing")
 	})
+
+	t.Run("unresolved member emits diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					Name:    "testGroup",
+					Objects: []string{"obj1", "missing"},
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.ModuleToResolved[mod] = resolvedMod
+		ctx.ResolvedToModule[resolvedMod] = mod
+
+		root := ctx.Mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("testGroup")
+		ctx.registerModuleNodeSymbol(mod, "testGroup", grpNode)
+
+		m1 := buildOIDPath(root, 1, 2)
+		m1.setName("obj1")
+		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
+		// "missing" is not registered.
+
+		createResolvedObjectGroups(ctx)
+
+		groups := ctx.Mib.Groups()
+		testutil.Len(t, groups, 1, "mib groups")
+		testutil.Len(t, groups[0].Members(), 1, "only resolved member should be present")
+		testutil.Equal(t, m1, groups[0].Members()[0], "resolved member")
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagGroupMemberUnresolved {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagGroupMemberUnresolved diagnostic")
+	})
 }
 
 func TestCreateResolvedNotificationGroups(t *testing.T) {
@@ -1733,6 +1841,51 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 		testutil.Len(t, groups, 1, "mib groups")
 		testutil.True(t, groups[0].IsNotificationGroup(), "should be notification group")
 		testutil.Len(t, groups[0].Members(), 2, "members")
+	})
+
+	t.Run("unresolved member emits diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.NotificationGroup{
+					Name:          "testNotifGroup",
+					Notifications: []string{"notif1", "missing"},
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.ModuleToResolved[mod] = resolvedMod
+		ctx.ResolvedToModule[resolvedMod] = mod
+
+		root := ctx.Mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("testNotifGroup")
+		ctx.registerModuleNodeSymbol(mod, "testNotifGroup", grpNode)
+
+		n1 := buildOIDPath(root, 1, 2)
+		n1.setName("notif1")
+		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
+		// "missing" is not registered.
+
+		createResolvedNotificationGroups(ctx)
+
+		groups := ctx.Mib.Groups()
+		testutil.Len(t, groups, 1, "mib groups")
+		testutil.Len(t, groups[0].Members(), 1, "only resolved member should be present")
+		testutil.Equal(t, n1, groups[0].Members()[0], "resolved member")
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagGroupMemberUnresolved {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagGroupMemberUnresolved diagnostic")
 	})
 }
 

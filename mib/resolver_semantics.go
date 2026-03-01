@@ -225,6 +225,10 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 							Object:  indexNode.Object(),
 							Implied: item.Implied,
 						})
+					} else if !isBareTypeIndex(item.Object) {
+						ctx.EmitDiagnostic(types.DiagIndexNotObject, SeverityMinor,
+							ref.mod, obj.Span,
+							"INDEX "+item.Object+" of "+obj.Name+" resolves to a node without an object definition")
 					}
 				}
 			}
@@ -235,6 +239,10 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 			if augNode, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); ok {
 				if augNode.Object() != nil {
 					resolvedObj.setAugments(augNode.Object())
+				} else {
+					ctx.EmitDiagnostic(types.DiagAugmentsNotObject, SeverityMinor,
+						ref.mod, obj.Span,
+						"AUGMENTS target "+obj.Augments+" of "+obj.Name+" resolves to a node without an object definition")
 				}
 			}
 		}
@@ -385,6 +393,10 @@ func createResolvedObjectGroups(ctx *resolverContext) int {
 						ref.mod, grp.DefinitionSpan(),
 						"object "+memberName+" of group "+grp.Name+" must not be not-accessible")
 				}
+			} else {
+				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved, SeverityError,
+					ref.mod, grp.DefinitionSpan(),
+					"group "+grp.Name+" references unresolved member "+memberName)
 			}
 		}
 
@@ -421,6 +433,10 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 		for _, memberName := range grp.Notifications {
 			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
 				resolved.addMember(memberNode)
+			} else {
+				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved, SeverityError,
+					ref.mod, grp.DefinitionSpan(),
+					"notification group "+grp.Name+" references unresolved member "+memberName)
 			}
 		}
 
@@ -856,6 +872,8 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		dv := newDefValOID(oid, name)
 		return &dv
 	default:
+		ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
+			mod, types.Span{}, "DEFVAL could not be parsed")
 		return nil
 	}
 }
