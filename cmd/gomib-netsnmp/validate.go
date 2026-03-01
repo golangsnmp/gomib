@@ -16,6 +16,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 )
 
 // ValidationResult tallies test cases checked against net-snmp ground truth.
@@ -38,7 +40,7 @@ type ValidationIssue struct {
 	Message  string `json:"message"`
 }
 
-func cmdValidate(args []string) int {
+func (c *cli) cmdValidate(args []string) int {
 	flagSet := flag.NewFlagSet("validate", flag.ContinueOnError)
 	testDir := flagSet.String("tests", "", "Directory containing test files (default: ./integration)")
 
@@ -59,11 +61,11 @@ Options:
 		return 1
 	}
 
-	mibPaths := getMIBPaths()
+	mibPaths := c.paths
 
-	out, cleanup, err := getOutput()
+	out, cleanup, err := c.getOutput()
 	if err != nil {
-		printError("cannot open output: %v", err)
+		cliutil.PrintError("cannot open output: %v", err)
 		return 1
 	}
 	defer cleanup()
@@ -71,7 +73,7 @@ Options:
 	fmt.Fprintln(os.Stderr, "Loading MIBs with net-snmp...")
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, nil)
 	if err != nil {
-		printError("net-snmp load failed: %v", err)
+		cliutil.PrintError("net-snmp load failed: %v", err)
 		return 1
 	}
 	fmt.Fprintf(os.Stderr, "Loaded %d nodes from net-snmp\n", len(netsnmpNodes))
@@ -83,11 +85,11 @@ Options:
 
 	result := validateTestFiles(dir, netsnmpNodes)
 
-	if jsonOutput {
+	if c.jsonOutput {
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(result); err != nil {
-			printError("json encode failed: %v", err)
+			cliutil.PrintError("json encode failed: %v", err)
 			return 1
 		}
 	} else {

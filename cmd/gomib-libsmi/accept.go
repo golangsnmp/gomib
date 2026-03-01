@@ -42,7 +42,7 @@ type ModuleAccept struct {
 	LibsmiDiags  []string `json:"libsmi_diags,omitempty"`
 }
 
-func cmdAccept(args []string) int {
+func (c *cli) cmdAccept(args []string) int {
 	flagSet := flag.NewFlagSet("accept", flag.ContinueOnError)
 	level := flagSet.Int("level", 2, "Error level threshold (0-6)")
 	showAll := flagSet.Bool("all", false, "Show all modules, not just discrepancies")
@@ -65,15 +65,15 @@ Options:
 	}
 
 	modules := flagSet.Args()
-	mibPaths := getMIBPaths()
+	mibPaths := c.paths
 	if len(mibPaths) == 0 {
-		printError("at least one -p PATH is required")
+		cliutil.PrintError("at least one -p PATH is required")
 		return 1
 	}
 
-	out, cleanup, err := getOutput()
+	out, cleanup, err := c.getOutput()
 	if err != nil {
-		printError("cannot open output: %v", err)
+		cliutil.PrintError("cannot open output: %v", err)
 		return 1
 	}
 	defer cleanup()
@@ -84,11 +84,11 @@ Options:
 
 	result := testAcceptance(modules, mibPaths, *level, *showAll, *details, *diagLimit)
 
-	if jsonOutput {
+	if c.jsonOutput {
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(result); err != nil {
-			printError("json encode failed: %v", err)
+			cliutil.PrintError("json encode failed: %v", err)
 			return 1
 		}
 	} else {

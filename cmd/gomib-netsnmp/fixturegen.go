@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 )
 
-func cmdFixturegen(args []string) int {
+func (c *cli) cmdFixturegen(args []string) int {
 	fs := flag.NewFlagSet("fixturegen", flag.ContinueOnError)
 
 	var outDir string
@@ -39,12 +41,12 @@ Options:
 		return 1
 	}
 
-	mibPaths := getMIBPaths()
+	mibPaths := c.paths
 
 	fmt.Fprintln(os.Stderr, "Loading MIBs with net-snmp...")
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, modules)
 	if err != nil {
-		printError("net-snmp load failed: %v", err)
+		cliutil.PrintError("net-snmp load failed: %v", err)
 		return 1
 	}
 
@@ -57,18 +59,18 @@ Options:
 
 		data, err := json.MarshalIndent(filtered, "", "  ")
 		if err != nil {
-			printError("json marshal failed for %s: %v", mod, err)
+			cliutil.PrintError("json marshal failed for %s: %v", mod, err)
 			return 1
 		}
 
 		if outDir != "" {
 			if err := os.MkdirAll(outDir, 0o750); err != nil {
-				printError("cannot create output directory: %v", err)
+				cliutil.PrintError("cannot create output directory: %v", err)
 				return 1
 			}
 			path := filepath.Join(outDir, mod+".json")
 			if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
-				printError("cannot write %s: %v", path, err)
+				cliutil.PrintError("cannot write %s: %v", path, err)
 				return 1
 			}
 			fmt.Fprintf(os.Stderr, "wrote %s (%d nodes)\n", path, len(filtered))

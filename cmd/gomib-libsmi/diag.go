@@ -45,7 +45,7 @@ type DiagSummary struct {
 	CommonIssues int            `json:"common_issues"`
 }
 
-func cmdDiag(args []string) int {
+func (c *cli) cmdDiag(args []string) int {
 	flagSet := flag.NewFlagSet("diag", flag.ContinueOnError)
 	level := flagSet.Int("level", 3, "Error level threshold (0-6, lower=stricter)")
 
@@ -74,19 +74,19 @@ Options:
 
 	modules := flagSet.Args()
 	if len(modules) == 0 {
-		printError("at least one MODULE is required")
+		cliutil.PrintError("at least one MODULE is required")
 		return 1
 	}
 
-	mibPaths := getMIBPaths()
+	mibPaths := c.paths
 	if len(mibPaths) == 0 {
-		printError("at least one -p PATH is required")
+		cliutil.PrintError("at least one -p PATH is required")
 		return 1
 	}
 
-	out, cleanup, err := getOutput()
+	out, cleanup, err := c.getOutput()
 	if err != nil {
-		printError("cannot open output: %v", err)
+		cliutil.PrintError("cannot open output: %v", err)
 		return 1
 	}
 	defer cleanup()
@@ -98,11 +98,11 @@ Options:
 		results = append(results, result)
 	}
 
-	if jsonOutput {
+	if c.jsonOutput {
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(results); err != nil {
-			printError("json encode failed: %v", err)
+			cliutil.PrintError("json encode failed: %v", err)
 			return 1
 		}
 	} else {

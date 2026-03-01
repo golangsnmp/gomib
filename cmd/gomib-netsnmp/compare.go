@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 )
 
 // ComparisonResult holds the results of comparing gomib against net-snmp.
@@ -61,7 +63,7 @@ type CountPair struct {
 	Missing  int `json:"missing,omitempty"` // one side has value, other doesn't
 }
 
-func cmdCompare(args []string) int {
+func (c *cli) cmdCompare(args []string) int {
 	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
 
 	var fieldFilter string
@@ -95,11 +97,11 @@ Options:
 	}
 
 	modules := fs.Args()
-	mibPaths := getMIBPaths()
+	mibPaths := c.paths
 
-	out, cleanup, err := getOutput()
+	out, cleanup, err := c.getOutput()
 	if err != nil {
-		printError("cannot open output: %v", err)
+		cliutil.PrintError("cannot open output: %v", err)
 		return 1
 	}
 	defer cleanup()
@@ -107,14 +109,14 @@ Options:
 	fmt.Fprintln(os.Stderr, "Loading MIBs with net-snmp...")
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, modules)
 	if err != nil {
-		printError("net-snmp load failed: %v", err)
+		cliutil.PrintError("net-snmp load failed: %v", err)
 		return 1
 	}
 
 	fmt.Fprintln(os.Stderr, "Loading MIBs with mib...")
 	gomibNodes, err := loadGomibNodes(mibPaths, modules)
 	if err != nil {
-		printError("gomib load failed: %v", err)
+		cliutil.PrintError("gomib load failed: %v", err)
 		return 1
 	}
 
@@ -137,11 +139,11 @@ Options:
 		result.Mismatches = filtered
 	}
 
-	if jsonOutput {
+	if c.jsonOutput {
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(result); err != nil {
-			printError("json encode failed: %v", err)
+			cliutil.PrintError("json encode failed: %v", err)
 			return 1
 		}
 	} else {
