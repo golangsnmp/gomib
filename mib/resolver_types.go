@@ -54,6 +54,11 @@ func createUserTypes(ctx *resolverContext) {
 			if !ok {
 				continue
 			}
+			// Skip SEQUENCE type assignments (e.g., IfEntry ::= SEQUENCE { ... }).
+			// These are structural declarations for table rows, not data types.
+			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
+				continue
+			}
 
 			base, hasBase := syntaxToBaseType(td.Syntax)
 			if td.BaseType != nil {
@@ -132,6 +137,9 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 		for _, def := range mod.Definitions {
 			td, ok := def.(*module.TypeDef)
 			if !ok {
+				continue
+			}
+			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
 				continue
 			}
 			typ, ok := ctx.LookupTypeForModule(mod, td.Name)
@@ -409,6 +417,8 @@ func syntaxToBaseType(syntax module.TypeSyntax) (BaseType, bool) {
 		return BaseObjectIdentifier, true
 	case *module.TypeSyntaxConstrained:
 		return syntaxToBaseType(s.Base)
+	case *module.TypeSyntaxSequenceOf, *module.TypeSyntaxSequence:
+		return BaseSequence, true
 	default:
 		return 0, false
 	}

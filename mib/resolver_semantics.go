@@ -731,6 +731,11 @@ func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *modu
 		if t, ok := ctx.LookupTypeForModule(mod, s.Name); ok {
 			return t, true
 		}
+		// Don't emit unresolved error for SEQUENCE type references (row SYNTAX).
+		// SEQUENCE types are structural and intentionally not registered.
+		if isSequenceTypeDef(ctx, mod, s.Name) {
+			return nil, false
+		}
 		ctx.RecordUnresolvedType(mod, objectName, s.Name, span)
 		return nil, false
 	case *module.TypeSyntaxConstrained:
@@ -777,6 +782,31 @@ func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *modu
 	default:
 		return nil, false
 	}
+}
+
+// isSequenceTypeDef checks whether name refers to a SEQUENCE type definition
+// in the module or its imports. Used to suppress spurious unresolved type
+// diagnostics for row OBJECT-TYPE SYNTAX references (e.g., SYNTAX IfEntry).
+func isSequenceTypeDef(ctx *resolverContext, mod *module.Module, name string) bool {
+	if hasSequenceTypeDef(mod, name) {
+		return true
+	}
+	if imports := ctx.ModuleImports[mod]; imports != nil {
+		if srcMod := imports[name]; srcMod != nil {
+			return hasSequenceTypeDef(srcMod, name)
+		}
+	}
+	return false
+}
+
+func hasSequenceTypeDef(mod *module.Module, name string) bool {
+	for _, def := range mod.Definitions {
+		if td, ok := def.(*module.TypeDef); ok && td.Name == name {
+			_, isSeq := td.Syntax.(*module.TypeSyntaxSequence)
+			return isSeq
+		}
+	}
+	return false
 }
 
 func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Module, syntax module.TypeSyntax) *DefVal {

@@ -7,6 +7,20 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
+func TestResolveNodeType(t *testing.T) {
+	forEachFixtureNode(t, nil, func(t *testing.T, m *mib.Mib, fn *testutil.FixtureNode) {
+		node := m.Node(fn.Name)
+		if node == nil {
+			t.Fatalf("divergence: gomib cannot find node %q (fixture OID %s)", fn.Name, fn.OID)
+		}
+		gomibNodeType := normalizeNodeType(node)
+		if !typesEquivalent(gomibNodeType, fn.NodeType) {
+			t.Errorf("divergence: node type for %s: gomib=%q fixture=%q",
+				fn.Name, gomibNodeType, fn.NodeType)
+		}
+	})
+}
+
 func TestResolveOIDs(t *testing.T) {
 	forEachFixtureNode(t, nil, func(t *testing.T, m *mib.Mib, fn *testutil.FixtureNode) {
 		node := m.Node(fn.Name)
@@ -30,19 +44,19 @@ func TestResolveTypes(t *testing.T) {
 				fn.Name, gomibType, fn.Type)
 		}
 
-		if fn.TCName != "" {
-			gomibTC := ""
-			if obj.Type() != nil {
-				gomibTC = obj.Type().Name()
-			}
+		gomibTC := ""
+		if t := obj.Type(); t != nil && t.IsTextualConvention() {
+			gomibTC = t.Name()
+		}
+		if fn.TCName != "" || gomibTC != "" {
 			if gomibTC != fn.TCName {
 				t.Errorf("divergence: TC name for %s: gomib=%q fixture=%q",
 					fn.Name, gomibTC, fn.TCName)
 			}
 		}
 
-		if fn.Hint != "" {
-			gomibHint := obj.EffectiveDisplayHint()
+		gomibHint := obj.EffectiveDisplayHint()
+		if fn.Hint != "" || gomibHint != "" {
 			if !hintsEquivalent(gomibHint, fn.Hint) {
 				t.Errorf("divergence: display hint for %s: gomib=%q fixture=%q",
 					fn.Name, gomibHint, fn.Hint)
@@ -220,19 +234,28 @@ func TestResolveUnits(t *testing.T) {
 }
 
 func TestResolveDefval(t *testing.T) {
-	forEachFixtureNode(t, func(fn *testutil.FixtureNode) bool {
-		return isObjectTypeNode(fn) && fn.DefaultValue != ""
-	}, func(t *testing.T, m *mib.Mib, fn *testutil.FixtureNode) {
+	forEachFixtureNode(t, isObjectTypeNode, func(t *testing.T, m *mib.Mib, fn *testutil.FixtureNode) {
 		obj := requireFixtureObject(t, m, fn)
 
 		dv := obj.DefaultValue()
-		if dv.IsZero() {
+		gomibDefval := ""
+		if !dv.IsZero() {
+			gomibDefval = dv.String()
+		}
+
+		if fn.DefaultValue == "" && gomibDefval == "" {
+			return
+		}
+		if fn.DefaultValue != "" && gomibDefval == "" {
 			t.Errorf("divergence: defval for %s: gomib has no defval, fixture=%q",
 				fn.Name, fn.DefaultValue)
 			return
 		}
-
-		gomibDefval := dv.String()
+		if fn.DefaultValue == "" && gomibDefval != "" {
+			t.Errorf("divergence: defval for %s: gomib=%q, fixture has no defval",
+				fn.Name, gomibDefval)
+			return
+		}
 		if !defvalEquivalent(gomibDefval, fn.DefaultValue) {
 			t.Errorf("divergence: defval for %s: gomib=%q fixture=%q",
 				fn.Name, gomibDefval, fn.DefaultValue)
