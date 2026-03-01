@@ -28,15 +28,16 @@ Usage:
   gomib <command> [options] [arguments]
 
 Commands:
-  load    Load and resolve MIB modules
-  lint    Check modules for issues (linter mode)
-  get     Query OID or name lookups
-  dump    Output modules or subtrees as JSON
-  trace   Trace symbol resolution for debugging
-  paths   Show MIB search paths
-  list    List available module names
-  find    Search for names across loaded MIBs
-  version Show version
+  load       Load and resolve MIB modules
+  lint       Check modules for issues (linter mode)
+  get        Query OID or name lookups
+  dump       Output modules or subtrees as JSON
+  normalize  Emit modules as canonical SMIv2 text
+  trace      Trace symbol resolution for debugging
+  paths      Show MIB search paths
+  list       List available module names
+  find       Search for names across loaded MIBs
+  version    Show version
 
 Common options:
   -p, --path PATH   Add MIB search path (repeatable)
@@ -123,6 +124,8 @@ func run() int {
 		return c.cmdGet(cmdArgs)
 	case "dump":
 		return c.cmdDump(cmdArgs)
+	case "normalize":
+		return c.cmdNormalize(cmdArgs)
 	case "trace":
 		return c.cmdTrace(cmdArgs)
 	case "paths":

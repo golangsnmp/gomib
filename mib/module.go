@@ -7,6 +7,7 @@ type Module struct {
 	name         string
 	language     Language
 	sourcePath   string
+	base         bool
 	oid          OID
 	organization string
 	contactInfo  string
@@ -55,6 +56,9 @@ func (m *Module) Language() Language { return m.language }
 
 // SourcePath returns the file path this module was loaded from, or "" for synthetic modules.
 func (m *Module) SourcePath() string { return m.sourcePath }
+
+// IsBase reports whether this is a synthetic base module (e.g. SNMPv2-SMI).
+func (m *Module) IsBase() bool { return m.base }
 
 // OID returns the MODULE-IDENTITY OID, or nil if not declared.
 func (m *Module) OID() OID { return slices.Clone(m.oid) }
@@ -152,6 +156,7 @@ func (m *Module) Capability(name string) *Capability {
 }
 
 func (m *Module) setSourcePath(path string)    { m.sourcePath = path }
+func (m *Module) setBase(b bool)               { m.base = b }
 func (m *Module) setLanguage(l Language)       { m.language = l }
 func (m *Module) setOID(oid OID)               { m.oid = oid }
 func (m *Module) setOrganization(org string)   { m.organization = org }
