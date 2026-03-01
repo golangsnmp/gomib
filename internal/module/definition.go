@@ -4,15 +4,6 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// AccessKeyword records which keyword was used (ACCESS, MAX-ACCESS, etc.).
-type AccessKeyword int
-
-const (
-	AccessKeywordAccess    AccessKeyword = iota // SMIv1: ACCESS
-	AccessKeywordMaxAccess                      // SMIv2: MAX-ACCESS
-	AccessKeywordMinAccess                      // SMIv2: MIN-ACCESS (compliance)
-)
-
 // Definition is a normalized MIB definition. SMIv1 and SMIv2 forms are
 // unified where appropriate. Use type switches to dispatch on concrete types.
 type Definition interface {
@@ -28,7 +19,7 @@ type ObjectType struct {
 	Syntax        TypeSyntax
 	Units         string
 	Access        types.Access
-	AccessKeyword AccessKeyword
+	AccessKeyword types.AccessKeyword
 	Status        types.Status
 	Description   string
 	Reference     string

@@ -67,7 +67,7 @@ func (n *Node) Module() *Module {
 // OID returns the full numeric OID from the root to this node, or nil for the root.
 // The result is a cloned copy; callers may freely modify it.
 func (n *Node) OID() OID {
-	if n == nil || n.parent == nil {
+	if n.parent == nil {
 		return nil
 	}
 	n.oidOnce.Do(func() {
@@ -169,9 +169,6 @@ func (n *Node) walkOID(oid OID) (matched *Node, exact bool) {
 // String returns a brief summary: "name (oid)" or just "(oid)" for
 // unnamed nodes.
 func (n *Node) String() string {
-	if n == nil {
-		return "<nil>"
-	}
 	if n.parent == nil {
 		return "(root)"
 	}

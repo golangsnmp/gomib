@@ -10,7 +10,6 @@ import (
 type Module struct {
 	Name        Ident
 	Imports     []ImportClause
-	Exports     *ExportsClause
 	Body        []Definition
 	Span        types.Span
 	Diagnostics []types.SpanDiagnostic
@@ -21,7 +20,6 @@ func NewModule(name Ident, span types.Span) *Module {
 	return &Module{
 		Name:        name,
 		Imports:     nil,
-		Exports:     nil,
 		Body:        nil,
 		Span:        span,
 		Diagnostics: nil,
@@ -40,19 +38,4 @@ type ImportClause struct {
 	Symbols    []Ident
 	FromModule Ident
 	Span       types.Span
-}
-
-// NewImportClause creates an ImportClause from its components.
-func NewImportClause(symbols []Ident, fromModule Ident, span types.Span) ImportClause {
-	return ImportClause{
-		Symbols:    symbols,
-		FromModule: fromModule,
-		Span:       span,
-	}
-}
-
-// ExportsClause records the presence of an EXPORTS clause (SMIv1 only).
-// The exported symbols are not tracked since EXPORTS is skipped.
-type ExportsClause struct {
-	Span types.Span
 }

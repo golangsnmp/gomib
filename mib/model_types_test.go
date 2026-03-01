@@ -14,8 +14,8 @@ func TestNotificationAccessors(t *testing.T) {
 	root.children = map[uint32]*Node{1: nd}
 
 	mod := newModule("TEST-MIB")
-	obj1 := &Object{name: "testObj1"}
-	obj2 := &Object{name: "testObj2"}
+	obj1 := &Object{entity: entity{name: "testObj1"}}
+	obj2 := &Object{entity: entity{name: "testObj2"}}
 
 	n := newNotification("linkDown")
 	n.setNode(nd)
@@ -68,11 +68,6 @@ func TestNotificationString(t *testing.T) {
 	testutil.Equal(t, "testNotif (5)", got, "String()")
 }
 
-func TestNotificationStringNil(t *testing.T) {
-	var n *Notification
-	testutil.Equal(t, "<nil>", n.String(), "nil String()")
-}
-
 func TestNotificationTrapInfo(t *testing.T) {
 	n := newNotification("coldStart")
 
@@ -85,7 +80,7 @@ func TestNotificationTrapInfo(t *testing.T) {
 }
 
 func TestNotificationObjectsClone(t *testing.T) {
-	obj := &Object{name: "testObj"}
+	obj := &Object{entity: entity{name: "testObj"}}
 	n := newNotification("testNotif")
 	n.addObject(obj)
 
@@ -139,11 +134,6 @@ func TestGroupOIDNilNode(t *testing.T) {
 	testutil.Nil(t, g.OID(), "OID()")
 }
 
-func TestGroupStringNil(t *testing.T) {
-	var g *Group
-	testutil.Equal(t, "<nil>", g.String(), "nil String()")
-}
-
 func TestGroupMembersClone(t *testing.T) {
 	nd := &Node{name: "obj1"}
 	g := newGroup("testGroup")
@@ -190,11 +180,6 @@ func TestComplianceOIDNilNode(t *testing.T) {
 	testutil.Nil(t, c.OID(), "OID()")
 }
 
-func TestComplianceStringNil(t *testing.T) {
-	var c *Compliance
-	testutil.Equal(t, "<nil>", c.String(), "nil String()")
-}
-
 // --- Capability ---
 
 func TestCapabilityAccessors(t *testing.T) {
@@ -232,11 +217,6 @@ func TestCapabilityOIDNilNode(t *testing.T) {
 	testutil.Nil(t, cap.OID(), "OID()")
 }
 
-func TestCapabilityStringNil(t *testing.T) {
-	var cap *Capability
-	testutil.Equal(t, "<nil>", cap.String(), "nil String()")
-}
-
 // --- Module ---
 
 func TestModuleAccessors(t *testing.T) {
@@ -270,22 +250,22 @@ func TestModuleAccessors(t *testing.T) {
 func TestModuleEntityLookups(t *testing.T) {
 	mod := newModule("TEST-MIB")
 
-	obj := &Object{name: "testObj"}
+	obj := &Object{entity: entity{name: "testObj"}}
 	mod.addObject(obj)
 
 	typ := &Type{name: "TestType"}
 	mod.addType(typ)
 
-	notif := &Notification{name: "testNotif"}
+	notif := &Notification{entity: entity{name: "testNotif"}}
 	mod.addNotification(notif)
 
-	grp := &Group{name: "testGroup"}
+	grp := &Group{entity: entity{name: "testGroup"}}
 	mod.addGroup(grp)
 
-	comp := &Compliance{name: "testComp"}
+	comp := &Compliance{entity: entity{name: "testComp"}}
 	mod.addCompliance(comp)
 
-	cap := &Capability{name: "testCap"}
+	cap := &Capability{entity: entity{name: "testCap"}}
 	mod.addCapability(cap)
 
 	nd := &Node{name: "testNode"}
@@ -318,10 +298,10 @@ func TestModuleCollections(t *testing.T) {
 	colNode := &Node{arc: 1, kind: KindColumn, parent: rowNode}
 	scalarNode := &Node{arc: 2, kind: KindScalar, parent: root}
 
-	tableObj := &Object{name: "fooTable", node: tableNode}
-	rowObj := &Object{name: "fooEntry", node: rowNode}
-	colObj := &Object{name: "fooCol", node: colNode}
-	scalarObj := &Object{name: "fooScalar", node: scalarNode}
+	tableObj := &Object{entity: entity{name: "fooTable", node: tableNode}}
+	rowObj := &Object{entity: entity{name: "fooEntry", node: rowNode}}
+	colObj := &Object{entity: entity{name: "fooCol", node: colNode}}
+	scalarObj := &Object{entity: entity{name: "fooScalar", node: scalarNode}}
 
 	mod.addObject(tableObj)
 	mod.addObject(rowObj)

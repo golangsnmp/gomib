@@ -45,23 +45,21 @@ func (c *cli) cmdLoad(args []string) int {
 	permissive := fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
 	level := fs.Int("level", -1, "set strictness level (0-6)")
 	stats := fs.Bool("stats", false, "show detailed statistics")
-	help := fs.Bool("h", false, "show help")
-	fs.BoolVar(help, "help", false, "show help")
+	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return 1
+		return exitError
 	}
 
-	if *help || c.helpFlag {
-		_, _ = fmt.Fprint(os.Stdout, loadUsage)
-		return 0
+	if c.checkHelp(help, loadUsage) {
+		return exitOK
 	}
 
 	modules := fs.Args()
 	if len(modules) == 0 {
 		printError("no modules specified")
 		fmt.Fprint(os.Stderr, loadUsage)
-		return 1
+		return exitError
 	}
 
 	var opts []gomib.LoadOption
@@ -77,7 +75,7 @@ func (c *cli) cmdLoad(args []string) int {
 	m, loadErr := c.loadMibWithOpts(modules, opts...)
 	if loadErr != nil && m == nil {
 		printError("failed to load: %v", loadErr)
-		return 1
+		return exitError
 	}
 
 	if *stats {

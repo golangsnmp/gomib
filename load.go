@@ -7,12 +7,14 @@ import (
 	"errors"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"runtime"
 	"slices"
 	"sync"
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/parser"
+	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -25,7 +27,7 @@ func componentLogger(logger *slog.Logger, component string) *slog.Logger {
 
 // loadAllModules loads all MIB files from sources in parallel.
 func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mib.Mib, error) {
-	logger := cfg.logger
+	log := types.Logger{L: cfg.logger}
 
 	type sourceModule struct {
 		source Source
@@ -53,10 +55,11 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 		return mib.Resolve(nil, nil, nil), nil
 	}
 
-	if logEnabled(ctx, logger, slog.LevelInfo) {
-		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading",
-			slog.Int("modules", len(allModules)))
-	}
+	log.Log(slog.LevelInfo, "parallel loading",
+		slog.Int("modules", len(allModules)))
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	results := make(chan *module.Module, len(allModules))
 
@@ -84,23 +87,22 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 			result, err := sm.source.Find(sm.name)
 			if err != nil {
 				if errors.Is(err, fs.ErrNotExist) {
-					if logEnabled(ctx, logger, slog.LevelDebug) {
-						logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
-							slog.String("module", sm.name),
-							slog.Any("error", err))
-					}
+					log.Log(slog.LevelDebug, "module not found",
+						slog.String("module", sm.name),
+						slog.Any("error", err))
 				} else {
-					if logEnabled(ctx, logger, slog.LevelWarn) {
-						logger.LogAttrs(ctx, slog.LevelWarn, "module read error",
-							slog.String("module", sm.name),
-							slog.Any("error", err))
-					}
-					errOnce.Do(func() { firstErr = err })
+					log.Log(slog.LevelWarn, "module read error",
+						slog.String("module", sm.name),
+						slog.Any("error", err))
+					errOnce.Do(func() {
+						firstErr = err
+						cancel()
+					})
 				}
 				return
 			}
 
-			mod := decodeModule(ctx, result.Content, result.Path, sm.name, logger, cfg)
+			mod := decodeModule(result.Content, result.Path, sm.name, cfg)
 			if mod != nil {
 				results <- mod
 			}
@@ -128,17 +130,15 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 
 	mods := collectModules(modules)
 
-	if logEnabled(ctx, logger, slog.LevelInfo) {
-		logger.LogAttrs(ctx, slog.LevelInfo, "parallel loading complete",
-			slog.Int("modules", len(mods)))
-	}
+	log.Log(slog.LevelInfo, "parallel loading complete",
+		slog.Int("modules", len(mods)))
 
-	m := mib.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig)
+	m := mib.Resolve(mods, componentLogger(cfg.logger, "resolver"), &cfg.diagConfig)
 	return m, checkLoadResult(m, cfg, nil)
 }
 
 func loadModulesByName(ctx context.Context, sources []Source, names []string, cfg *loadConfig) (*mib.Mib, error) {
-	logger := cfg.logger
+	log := types.Logger{L: cfg.logger}
 
 	modules := make(map[string]*module.Module)
 	loading := make(map[string]struct{})
@@ -169,14 +169,12 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			if !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
-			if logEnabled(ctx, logger, slog.LevelDebug) {
-				logger.LogAttrs(ctx, slog.LevelDebug, "module not found",
-					slog.String("module", name))
-			}
+			log.Log(slog.LevelDebug, "module not found",
+				slog.String("module", name))
 			return nil // skip missing modules
 		}
 
-		mod := decodeModule(ctx, result.Content, result.Path, name, logger, cfg)
+		mod := decodeModule(result.Content, result.Path, name, cfg)
 		if mod == nil {
 			return nil
 		}
@@ -203,22 +201,12 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 
 	mods := collectModules(modules)
 
-	m := mib.Resolve(mods, componentLogger(logger, "resolver"), &cfg.diagConfig)
+	m := mib.Resolve(mods, componentLogger(cfg.logger, "resolver"), &cfg.diagConfig)
 	return m, checkLoadResult(m, cfg, names)
 }
 
 func findModule(sources []Source, name string) (FindResult, error) {
-	for _, src := range sources {
-		result, err := src.Find(name)
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				continue
-			}
-			return FindResult{}, err
-		}
-		return result, nil
-	}
-	return FindResult{}, fs.ErrNotExist
+	return Multi(sources...).Find(name)
 }
 
 // collectModules adds missing base modules to the map, deduplicates,
@@ -231,14 +219,7 @@ func collectModules(modules map[string]*module.Module) []*module.Module {
 			}
 		}
 	}
-	seen := make(map[*module.Module]struct{}, len(modules))
-	mods := make([]*module.Module, 0, len(modules))
-	for _, mod := range modules {
-		if _, exists := seen[mod]; !exists {
-			seen[mod] = struct{}{}
-			mods = append(mods, mod)
-		}
-	}
+	mods := dedup(slices.Collect(maps.Values(modules)))
 	slices.SortFunc(mods, func(a, b *module.Module) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
@@ -247,19 +228,19 @@ func collectModules(modules map[string]*module.Module) []*module.Module {
 
 // decodeModule runs the heuristic/parse/lower pipeline on raw MIB content.
 // Returns nil if the content doesn't look like a MIB.
-func decodeModule(ctx context.Context, content []byte, sourcePath, name string, logger *slog.Logger, cfg *loadConfig) *module.Module {
+func decodeModule(content []byte, sourcePath, name string, cfg *loadConfig) *module.Module {
+	log := types.Logger{L: cfg.logger}
+
 	if !looksLikeMIBContent(content) {
-		if logEnabled(ctx, logger, slog.LevelDebug) {
-			logger.LogAttrs(ctx, slog.LevelDebug, "content rejected by heuristic",
-				slog.String("module", name))
-		}
+		log.Log(slog.LevelDebug, "content rejected by heuristic",
+			slog.String("module", name))
 		return nil
 	}
 
-	p := parser.New(content, componentLogger(logger, "parser"), cfg.diagConfig)
+	p := parser.New(content, componentLogger(cfg.logger, "parser"), cfg.diagConfig)
 	ast := p.ParseModule()
 
-	mod := module.Lower(ast, content, componentLogger(logger, "module"), cfg.diagConfig)
+	mod := module.Lower(ast, content, componentLogger(cfg.logger, "module"), cfg.diagConfig)
 	if mod != nil {
 		mod.SourcePath = sourcePath
 	}

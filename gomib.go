@@ -59,20 +59,7 @@ func WithDiagnosticConfig(cfg mib.DiagnosticConfig) LoadOption {
 // WithStrictness sets the strictness level using a preset configuration.
 // Convenience wrapper for WithDiagnosticConfig with preset configs.
 func WithStrictness(level mib.StrictnessLevel) LoadOption {
-	return func(c *loadConfig) {
-		switch level {
-		case mib.StrictnessStrict:
-			c.diagConfig = mib.StrictConfig()
-		case mib.StrictnessNormal:
-			c.diagConfig = mib.DefaultConfig()
-		case mib.StrictnessPermissive:
-			c.diagConfig = mib.PermissiveConfig()
-		case mib.StrictnessSilent:
-			c.diagConfig = mib.SilentConfig()
-		default:
-			c.diagConfig = mib.DefaultConfig()
-		}
-	}
+	return func(c *loadConfig) { c.diagConfig = mib.ConfigForLevel(level) }
 }
 
 // WithSource appends one or more MIB sources to the load configuration.
@@ -149,8 +136,4 @@ func checkLoadResult(m *mib.Mib, cfg *loadConfig, requestedModules []string) err
 	}
 
 	return errors.Join(errs...)
-}
-
-func logEnabled(ctx context.Context, logger *slog.Logger, level slog.Level) bool {
-	return logger != nil && logger.Enabled(ctx, level)
 }

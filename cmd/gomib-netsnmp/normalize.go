@@ -6,14 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -117,10 +116,17 @@ func loadNetSnmpNodes(mibPaths, modules []string) (map[string]*NormalizedNode, e
 		return nil, errors.New("no MIB paths specified (use -p flag)")
 	}
 
-	allDirs, err := findAllDirs(mibPaths)
-	if err != nil {
-		return nil, err
+	for _, root := range mibPaths {
+		info, err := os.Stat(root)
+		if err != nil {
+			return nil, fmt.Errorf("cannot access %s: %w", root, err)
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("%s is not a directory", root)
+		}
 	}
+
+	allDirs := cliutil.ExpandDirs(mibPaths)
 
 	if len(allDirs) > maxNetSnmpDirs {
 		return nil, fmt.Errorf("too many directories (%d > %d) - check your -p paths", len(allDirs), maxNetSnmpDirs)
@@ -129,37 +135,6 @@ func loadNetSnmpNodes(mibPaths, modules []string) (map[string]*NormalizedNode, e
 	mibDir := strings.Join(allDirs, ":")
 	initNetSnmp(mibDir, modules)
 	return collectNetSnmpNodes(), nil
-}
-
-func findAllDirs(roots []string) ([]string, error) {
-	var dirs []string
-	seen := make(map[string]bool)
-
-	for _, root := range roots {
-		info, err := os.Stat(root)
-		if err != nil {
-			return nil, fmt.Errorf("cannot access %s: %w", root, err)
-		}
-		if !info.IsDir() {
-			return nil, fmt.Errorf("%s is not a directory", root)
-		}
-
-		err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return nil //nolint:nilerr // intentionally skip inaccessible entries
-			}
-			if d.IsDir() && !seen[path] {
-				seen[path] = true
-				dirs = append(dirs, path)
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return dirs, nil
 }
 
 func loadGomibNodes(mibPaths, modules []string) (map[string]*NormalizedNode, error) {
@@ -217,8 +192,8 @@ func loadGomibNodes(mibPaths, modules []string) (map[string]*NormalizedNode, err
 
 		if obj := node.Object(); obj != nil {
 			n.Type = normalizeGomibType(obj.Type())
-			n.Access = normalizeGomibAccess(obj.Access())
-			n.Status = normalizeGomibStatus(obj.Status())
+			n.Access = obj.Access().String()
+			n.Status = obj.Status().String()
 			n.Units = obj.Units()
 			n.Hint = obj.EffectiveDisplayHint()
 			n.NodeType = "OBJECT-TYPE"
@@ -268,7 +243,7 @@ func loadGomibNodes(mibPaths, modules []string) (map[string]*NormalizedNode, err
 		}
 
 		if notif := node.Notification(); notif != nil {
-			n.Status = normalizeGomibStatus(notif.Status())
+			n.Status = notif.Status().String()
 			n.Reference = notif.Reference()
 			n.NodeType = "NOTIFICATION-TYPE"
 			for _, vb := range notif.Objects() {
@@ -287,14 +262,6 @@ func normalizeGomibType(t *mib.Type) string {
 		return ""
 	}
 	return t.EffectiveBase().String()
-}
-
-func normalizeGomibAccess(a mib.Access) string {
-	return a.String()
-}
-
-func normalizeGomibStatus(s mib.Status) string {
-	return s.String()
 }
 
 func normalizeGomibKind(k mib.Kind) string {

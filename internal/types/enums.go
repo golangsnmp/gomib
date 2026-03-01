@@ -2,6 +2,15 @@ package types
 
 import "fmt"
 
+// enumString returns names[v] if in range, or "TypeName(v)" otherwise.
+func enumString[T ~int](v T, names []string, typeName string) string {
+	i := int(v)
+	if i >= 0 && i < len(names) {
+		return names[i]
+	}
+	return fmt.Sprintf("%s(%d)", typeName, i)
+}
+
 // Severity indicates how serious a diagnostic issue is (libsmi-compatible).
 // Lower values are more severe.
 type Severity int
@@ -16,26 +25,9 @@ const (
 	SeverityInfo    Severity = 6 // Informational notice
 )
 
-func (s Severity) String() string {
-	switch s {
-	case SeverityFatal:
-		return "fatal"
-	case SeveritySevere:
-		return "severe"
-	case SeverityError:
-		return "error"
-	case SeverityMinor:
-		return "minor"
-	case SeverityStyle:
-		return "style"
-	case SeverityWarning:
-		return "warning"
-	case SeverityInfo:
-		return "info"
-	default:
-		return fmt.Sprintf("Severity(%d)", s)
-	}
-}
+var severityNames = [...]string{"fatal", "severe", "error", "minor", "style", "warning", "info"}
+
+func (s Severity) String() string { return enumString(s, severityNames[:], "Severity") }
 
 // AtLeast reports whether s is at least as severe as other.
 // Lower numeric values are more severe (Fatal=0, Info=6).
@@ -53,6 +45,7 @@ const (
 	StrictnessSilent     StrictnessLevel = 6 // Accept everything, minimal output
 )
 
+// StrictnessLevel has non-consecutive values, so it keeps a switch.
 func (l StrictnessLevel) String() string {
 	switch l {
 	case StrictnessStrict:
@@ -85,34 +78,12 @@ const (
 	KindCapability        // AGENT-CAPABILITIES
 )
 
-func (k Kind) String() string {
-	switch k {
-	case KindUnknown:
-		return "unknown"
-	case KindInternal:
-		return "internal"
-	case KindNode:
-		return "node"
-	case KindScalar:
-		return "scalar"
-	case KindTable:
-		return "table"
-	case KindRow:
-		return "row"
-	case KindColumn:
-		return "column"
-	case KindNotification:
-		return "notification"
-	case KindGroup:
-		return "group"
-	case KindCompliance:
-		return "compliance"
-	case KindCapability:
-		return "capabilities"
-	default:
-		return fmt.Sprintf("Kind(%d)", k)
-	}
+var kindNames = [...]string{
+	"unknown", "internal", "node", "scalar", "table", "row", "column",
+	"notification", "group", "compliance", "capabilities",
 }
+
+func (k Kind) String() string { return enumString(k, kindNames[:], "Kind") }
 
 // IsObjectType reports whether this is a scalar/table/row/column.
 func (k Kind) IsObjectType() bool {
@@ -149,26 +120,12 @@ const (
 	AccessNotImplemented // variation: not supported
 )
 
-func (a Access) String() string {
-	switch a {
-	case AccessNotAccessible:
-		return "not-accessible"
-	case AccessAccessibleForNotify:
-		return "accessible-for-notify"
-	case AccessReadOnly:
-		return "read-only"
-	case AccessReadWrite:
-		return "read-write"
-	case AccessReadCreate:
-		return "read-create"
-	case AccessWriteOnly:
-		return "write-only"
-	case AccessNotImplemented:
-		return "not-implemented"
-	default:
-		return fmt.Sprintf("Access(%d)", a)
-	}
+var accessNames = [...]string{
+	"not-accessible", "accessible-for-notify", "read-only", "read-write",
+	"read-create", "write-only", "not-implemented",
 }
+
+func (a Access) String() string { return enumString(a, accessNames[:], "Access") }
 
 // Status represents the lifecycle state of a MIB definition.
 // Preserves SMIv1-specific values (mandatory, optional) without normalizing.
@@ -182,22 +139,9 @@ const (
 	StatusOptional                 // SMIv1: agent MAY implement
 )
 
-func (s Status) String() string {
-	switch s {
-	case StatusCurrent:
-		return "current"
-	case StatusDeprecated:
-		return "deprecated"
-	case StatusObsolete:
-		return "obsolete"
-	case StatusMandatory:
-		return "mandatory"
-	case StatusOptional:
-		return "optional"
-	default:
-		return fmt.Sprintf("Status(%d)", s)
-	}
-}
+var statusNames = [...]string{"current", "deprecated", "obsolete", "mandatory", "optional"}
+
+func (s Status) String() string { return enumString(s, statusNames[:], "Status") }
 
 // IsSMIv1 reports whether this is an SMIv1-specific status value.
 func (s Status) IsSMIv1() bool {
@@ -213,18 +157,9 @@ const (
 	LanguageSMIv2
 )
 
-func (l Language) String() string {
-	switch l {
-	case LanguageUnknown:
-		return "unknown"
-	case LanguageSMIv1:
-		return "SMIv1"
-	case LanguageSMIv2:
-		return "SMIv2"
-	default:
-		return fmt.Sprintf("Language(%d)", l)
-	}
-}
+var languageNames = [...]string{"unknown", "SMIv1", "SMIv2"}
+
+func (l Language) String() string { return enumString(l, languageNames[:], "Language") }
 
 // BaseType identifies the fundamental SMI type.
 type BaseType int
@@ -245,38 +180,13 @@ const (
 	BaseSequence // For table row SEQUENCE types
 )
 
-func (b BaseType) String() string {
-	switch b {
-	case BaseUnknown:
-		return "unknown"
-	case BaseInteger32:
-		return "Integer32"
-	case BaseUnsigned32:
-		return "Unsigned32"
-	case BaseCounter32:
-		return "Counter32"
-	case BaseCounter64:
-		return "Counter64"
-	case BaseGauge32:
-		return "Gauge32"
-	case BaseTimeTicks:
-		return "TimeTicks"
-	case BaseIpAddress:
-		return "IpAddress"
-	case BaseOctetString:
-		return "OCTET STRING"
-	case BaseObjectIdentifier:
-		return "OBJECT IDENTIFIER"
-	case BaseBits:
-		return "BITS"
-	case BaseOpaque:
-		return "Opaque"
-	case BaseSequence:
-		return "SEQUENCE"
-	default:
-		return fmt.Sprintf("BaseType(%d)", b)
-	}
+var baseTypeNames = [...]string{
+	"unknown", "Integer32", "Unsigned32", "Counter32", "Counter64",
+	"Gauge32", "TimeTicks", "IpAddress", "OCTET STRING", "OBJECT IDENTIFIER",
+	"BITS", "Opaque", "SEQUENCE",
 }
+
+func (b BaseType) String() string { return enumString(b, baseTypeNames[:], "BaseType") }
 
 // IndexEncoding classifies how an INDEX component maps to instance-identifier
 // sub-identifiers per RFC 2578 s7.7.
@@ -291,21 +201,17 @@ const (
 	IndexEncodingIpAddress                           // 4 sub-identifiers
 )
 
-func (e IndexEncoding) String() string {
-	switch e {
-	case IndexEncodingUnknown:
-		return "unknown"
-	case IndexEncodingInteger:
-		return "integer"
-	case IndexEncodingFixedString:
-		return "fixed-string"
-	case IndexEncodingLengthPrefixed:
-		return "length-prefixed"
-	case IndexEncodingImplied:
-		return "implied"
-	case IndexEncodingIpAddress:
-		return "ip-address"
-	default:
-		return fmt.Sprintf("IndexEncoding(%d)", e)
-	}
+var indexEncodingNames = [...]string{
+	"unknown", "integer", "fixed-string", "length-prefixed", "implied", "ip-address",
 }
+
+func (e IndexEncoding) String() string { return enumString(e, indexEncodingNames[:], "IndexEncoding") }
+
+// AccessKeyword records which keyword was used (ACCESS, MAX-ACCESS, etc.).
+type AccessKeyword int
+
+const (
+	AccessKeywordAccess    AccessKeyword = iota // SMIv1: ACCESS
+	AccessKeywordMaxAccess                      // SMIv2: MAX-ACCESS
+	AccessKeywordMinAccess                      // SMIv2: MIN-ACCESS (compliance)
+)

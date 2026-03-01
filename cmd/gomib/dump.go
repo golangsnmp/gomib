@@ -37,23 +37,21 @@ func (c *cli) cmdDump(args []string) int {
 	compact := fs.Bool("compact", false, "minified JSON")
 	noTree := fs.Bool("no-tree", false, "omit tree structure")
 	noDescriptions := fs.Bool("no-descriptions", false, "omit descriptions")
-	help := fs.Bool("h", false, "show help")
-	fs.BoolVar(help, "help", false, "show help")
+	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return 1
+		return exitError
 	}
 
-	if *help || c.helpFlag {
-		_, _ = fmt.Fprint(os.Stdout, dumpUsage)
-		return 0
+	if c.checkHelp(help, dumpUsage) {
+		return exitOK
 	}
 
 	modules := fs.Args()
 	if len(modules) == 0 {
 		printError("no modules specified")
 		fmt.Fprint(os.Stderr, dumpUsage)
-		return 1
+		return exitError
 	}
 
 	m, err := c.loadMib(modules)
@@ -73,14 +71,11 @@ func (c *cli) cmdDump(args []string) int {
 
 	output := buildDumpOutput(m, opts)
 
-	json, err := marshalJSON(output, !*compact)
-	if err != nil {
+	if err := writeJSON(os.Stdout, output, !*compact); err != nil {
 		printError("failed to marshal JSON: %v", err)
-		return 1
+		return exitError
 	}
-
-	fmt.Println(string(json))
-	return 0
+	return exitOK
 }
 
 // JSONOptions controls which fields are included in dump output.

@@ -428,7 +428,7 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 			BitValues:    make(map[int]string),
 		}
 
-		node.Kind = inferNetSnmpKind(cNode._type, int(cNode.index_count), node.Augments)
+		node.Kind = inferNetSnmpKind(int(cNode.index_count), node.Augments)
 
 		// net-snmp uses the same enum list for INTEGER enums and BITS;
 		// distinguish based on type code
@@ -470,11 +470,11 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 	return nodes
 }
 
-// inferNetSnmpKind infers the node kind from net-snmp type and structure.
+// inferNetSnmpKind infers the node kind from net-snmp structure.
 // net-snmp does not directly expose table/row/column/scalar, so we
 // use heuristics: nodes with INDEX or AUGMENTS are rows; the rest
 // cannot be reliably classified without tree context.
-func inferNetSnmpKind(_ C.int, indexCount int, augments string) string {
+func inferNetSnmpKind(indexCount int, augments string) string {
 	if indexCount > 0 || augments != "" {
 		return "row"
 	}

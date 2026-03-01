@@ -932,40 +932,14 @@ func categorizeEnums(mismatches []Mismatch) []MismatchCategory {
 }
 
 func categorizeVarbinds(mismatches []Mismatch) []MismatchCategory {
-	var netsnmpMore, gomibMore, different, other []Mismatch
-
-	for i := range mismatches {
-		m := &mismatches[i]
-		gCount := strings.Count(m.Gomib, ",") + 1
-		nCount := strings.Count(m.NetSnmp, ",") + 1
-		if m.Gomib == "" || m.Gomib == "{}" {
-			gCount = 0
-		}
-		if m.NetSnmp == "" || m.NetSnmp == "{}" {
-			nCount = 0
-		}
-
-		switch {
-		case nCount > gCount:
-			netsnmpMore = append(netsnmpMore, mismatches[i])
-		case gCount > nCount:
-			gomibMore = append(gomibMore, mismatches[i])
-		case gCount == nCount && gCount > 0:
-			different = append(different, mismatches[i])
-		default:
-			other = append(other, mismatches[i])
-		}
-	}
-
-	return []MismatchCategory{
-		{Name: "netsnmp-more-objects", Description: "net-snmp has more OBJECTS (check for unresolved refs)", Benign: false, Mismatches: netsnmpMore},
-		{Name: "gomib-more-objects", Description: "gomib has more OBJECTS", Benign: false, Mismatches: gomibMore},
-		{Name: "different-objects", Description: "same count but different object names", Benign: false, Mismatches: different},
-		{Name: "other", Description: "uncategorized", Benign: false, Mismatches: other},
-	}
+	return categorizeByCommaCount(mismatches, "objects", "OBJECTS")
 }
 
 func categorizeIndex(mismatches []Mismatch) []MismatchCategory {
+	return categorizeByCommaCount(mismatches, "indexes", "INDEX items")
+}
+
+func categorizeByCommaCount(mismatches []Mismatch, field, label string) []MismatchCategory {
 	var netsnmpMore, gomibMore, different, other []Mismatch
 
 	for i := range mismatches {
@@ -992,9 +966,9 @@ func categorizeIndex(mismatches []Mismatch) []MismatchCategory {
 	}
 
 	return []MismatchCategory{
-		{Name: "netsnmp-more-indexes", Description: "net-snmp has more INDEX items (check for unresolved refs)", Benign: false, Mismatches: netsnmpMore},
-		{Name: "gomib-more-indexes", Description: "gomib has more INDEX items", Benign: false, Mismatches: gomibMore},
-		{Name: "different-indexes", Description: "same count but different index names", Benign: false, Mismatches: different},
+		{Name: "netsnmp-more-" + field, Description: "net-snmp has more " + label + " (check for unresolved refs)", Benign: false, Mismatches: netsnmpMore},
+		{Name: "gomib-more-" + field, Description: "gomib has more " + label, Benign: false, Mismatches: gomibMore},
+		{Name: "different-" + field, Description: "same count but different " + field + " names", Benign: false, Mismatches: different},
 		{Name: "other", Description: "uncategorized", Benign: false, Mismatches: other},
 	}
 }

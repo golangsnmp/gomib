@@ -10,8 +10,8 @@ func TestNodeLookupPriority(t *testing.T) {
 	m := newMib()
 
 	bare := &Node{name: "sysDescr"}
-	withNotif := &Node{name: "sysDescr", notif: &Notification{name: "sysDescr"}}
-	withObj := &Node{name: "sysDescr", obj: &Object{name: "sysDescr"}}
+	withNotif := &Node{name: "sysDescr", notif: &Notification{entity: entity{name: "sysDescr"}}}
+	withObj := &Node{name: "sysDescr", obj: &Object{entity: entity{name: "sysDescr"}}}
 
 	// Register in worst-to-best order so priority can't rely on position.
 	m.registerNode("sysDescr", bare)
@@ -59,7 +59,7 @@ func buildResolveTestMib() *Mib {
 			nd = nd.getOrCreateChild(arc)
 		}
 		nd.setName(name)
-		nd.setObject(&Object{name: name, module: mod})
+		nd.setObject(&Object{entity: entity{name: name, module: mod}})
 		m.registerNode(name, nd)
 		mod.addNode(nd)
 	}

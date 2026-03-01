@@ -79,7 +79,7 @@ func (*TypeSyntaxSequence) typeSyntax()              {}
 
 // TypeSyntaxChoice is a CHOICE type with named alternatives.
 type TypeSyntaxChoice struct {
-	Alternatives []ChoiceAlternative
+	Alternatives []SequenceField
 	Span         types.Span
 }
 
@@ -104,13 +104,6 @@ func (*TypeSyntaxObjectIdentifier) typeSyntax()              {}
 
 // SequenceField is a named field within a SEQUENCE definition.
 type SequenceField struct {
-	Name   Ident
-	Syntax TypeSyntax
-	Span   types.Span
-}
-
-// ChoiceAlternative is a named alternative within a CHOICE type.
-type ChoiceAlternative struct {
 	Name   Ident
 	Syntax TypeSyntax
 	Span   types.Span
@@ -175,19 +168,10 @@ func (*RangeValueIdent) rangeValue() {}
 
 // AccessClause holds a parsed ACCESS, MAX-ACCESS, or MIN-ACCESS clause.
 type AccessClause struct {
-	Keyword AccessKeyword
+	Keyword types.AccessKeyword
 	Value   types.Access
 	Span    types.Span
 }
-
-// AccessKeyword distinguishes ACCESS, MAX-ACCESS, and MIN-ACCESS.
-type AccessKeyword int
-
-const (
-	AccessKeywordAccess AccessKeyword = iota
-	AccessKeywordMaxAccess
-	AccessKeywordMinAccess
-)
 
 // StatusClause holds a parsed STATUS clause value and span.
 type StatusClause struct {

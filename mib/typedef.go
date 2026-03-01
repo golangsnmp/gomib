@@ -96,78 +96,68 @@ func (t *Type) IsEnumeration() bool {
 // IsBits reports whether this type has BITS definitions.
 func (t *Type) IsBits() bool { return len(t.EffectiveBits()) > 0 }
 
+// walkTypeChain walks the parent chain and returns the first value for which
+// get returns a non-zero result.
+func walkTypeChain[T comparable](t *Type, get func(*Type) T) T {
+	var zero T
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
+		if v := get(current); v != zero {
+			return v
+		}
+	}
+	return zero
+}
+
+// walkTypeChainSlice walks the parent chain and returns a clone of the first
+// non-empty slice.
+func walkTypeChainSlice[T any](t *Type, get func(*Type) []T) []T {
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
+		if s := get(current); len(s) > 0 {
+			return slices.Clone(s)
+		}
+	}
+	return nil
+}
+
 // EffectiveBase walks the parent type chain and returns the first non-zero
 // base type, or 0 if none is set.
 func (t *Type) EffectiveBase() BaseType {
-	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
-		if current.base != 0 {
-			return current.base
-		}
-	}
-	return 0
+	return walkTypeChain(t, func(t *Type) BaseType { return t.base })
 }
 
 // EffectiveDisplayHint walks the parent type chain and returns the first
 // non-empty display hint.
 func (t *Type) EffectiveDisplayHint() string {
-	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
-		if current.hint != "" {
-			return current.hint
-		}
-	}
-	return ""
+	return walkTypeChain(t, func(t *Type) string { return t.hint })
 }
 
 // EffectiveSizes walks the parent type chain and returns the first non-empty
 // size constraint list.
 func (t *Type) EffectiveSizes() []Range {
-	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
-		if len(current.sizes) > 0 {
-			return slices.Clone(current.sizes)
-		}
-	}
-	return nil
+	return walkTypeChainSlice(t, func(t *Type) []Range { return t.sizes })
 }
 
 // EffectiveRanges walks the parent type chain and returns the first non-empty
 // range constraint list.
 func (t *Type) EffectiveRanges() []Range {
-	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
-		if len(current.ranges) > 0 {
-			return slices.Clone(current.ranges)
-		}
-	}
-	return nil
+	return walkTypeChainSlice(t, func(t *Type) []Range { return t.ranges })
 }
 
 // EffectiveEnums walks the parent type chain and returns the first non-empty
 // enumeration value list.
 func (t *Type) EffectiveEnums() []NamedValue {
-	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
-		if len(current.enums) > 0 {
-			return slices.Clone(current.enums)
-		}
-	}
-	return nil
+	return walkTypeChainSlice(t, func(t *Type) []NamedValue { return t.enums })
 }
 
 // EffectiveBits walks the parent type chain and returns the first non-empty
 // BITS definition list.
 func (t *Type) EffectiveBits() []NamedValue {
-	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
-		if len(current.bits) > 0 {
-			return slices.Clone(current.bits)
-		}
-	}
-	return nil
+	return walkTypeChainSlice(t, func(t *Type) []NamedValue { return t.bits })
 }
 
 // String returns a brief summary: "Name (BaseType)" or just "BaseType"
 // for anonymous types.
 func (t *Type) String() string {
-	if t == nil {
-		return "<nil>"
-	}
 	if t.name == "" {
 		return t.base.String()
 	}

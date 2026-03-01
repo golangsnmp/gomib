@@ -37,44 +37,38 @@ func (c *cli) cmdFind(args []string) int {
 	fs := flag.NewFlagSet("find", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, findUsage) }
 
-	var modules moduleList
-	fs.Var(&modules, "m", "module to load")
-	fs.Var(&modules, "module", "module to load")
-	loadAll := fs.Bool("all", false, "load all MIBs from search path")
+	modules, loadAll := addModuleFlags(fs)
 	kindFilter := fs.String("kind", "", "filter by node kind")
 	typeFilter := fs.String("type", "", "filter by base type name")
 	count := fs.Bool("count", false, "print only match count")
-	help := fs.Bool("h", false, "show help")
-	fs.BoolVar(help, "help", false, "show help")
+	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return 1
+		return exitError
 	}
 
-	if *help || c.helpFlag {
-		_, _ = fmt.Fprint(os.Stdout, findUsage)
-		return 0
+	if c.checkHelp(help, findUsage) {
+		return exitOK
 	}
 
 	remaining := fs.Args()
 	if len(remaining) == 0 {
 		printError("no pattern specified")
 		fmt.Fprint(os.Stderr, findUsage)
-		return 1
+		return exitError
 	}
 	pattern := strings.ToLower(remaining[0])
 
-	if !*loadAll && len(modules) == 0 {
-		printError("specify -m MODULE or --all")
-		fmt.Fprint(os.Stderr, findUsage)
-		return 1
+	if _, err := filepath.Match(pattern, ""); err != nil {
+		printError("invalid pattern: %v", err)
+		return exitError
 	}
 
-	var loadModules []string
-	if !*loadAll {
-		loadModules = modules
+	if code, ok := requireModuleOrAll(*modules, *loadAll, findUsage); ok {
+		return code
 	}
-	m, err := c.loadMib(loadModules)
+
+	m, err := c.loadMib(modulesToLoad(*modules, *loadAll))
 	if err != nil {
 		printError("failed to load: %v", err)
 		return exitError
@@ -86,7 +80,7 @@ func (c *cli) cmdFind(args []string) int {
 		kind, ok = parseKindFilter(*kindFilter)
 		if !ok {
 			printError("unknown kind: %s", *kindFilter)
-			return 1
+			return exitError
 		}
 	}
 
@@ -116,7 +110,7 @@ func (c *cli) cmdFind(args []string) int {
 	if *count {
 		fmt.Println(matches)
 	}
-	return 0
+	return exitOK
 }
 
 func matchGlob(pattern, name string) bool {

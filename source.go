@@ -116,27 +116,21 @@ func (s *dirSource) Find(name string) (FindResult, error) {
 
 func (s *dirSource) ListModules() ([]string, error) {
 	extSet := makeExtensionSet(s.config.extensions)
-	seen := make(map[string]struct{})
-	var names []string
-
 	entries, err := os.ReadDir(s.path)
 	if err != nil {
 		return nil, err
 	}
 
+	var names []string
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 		if hasValidExtension(entry.Name(), extSet) {
-			name := moduleNameFromPath(entry.Name())
-			if _, ok := seen[name]; !ok {
-				seen[name] = struct{}{}
-				names = append(names, name)
-			}
+			names = append(names, moduleNameFromPath(entry.Name()))
 		}
 	}
-	return names, nil
+	return dedup(names), nil
 }
 
 type treeSource struct {
@@ -281,27 +275,21 @@ func (s *multiSource) Find(name string) (FindResult, error) {
 }
 
 func (s *multiSource) ListModules() ([]string, error) {
-	seen := make(map[string]struct{})
 	var names []string
 	for _, src := range s.sources {
 		n, err := src.ListModules()
 		if err != nil {
 			return nil, err
 		}
-		for _, name := range n {
-			if _, ok := seen[name]; !ok {
-				seen[name] = struct{}{}
-				names = append(names, name)
-			}
-		}
+		names = append(names, n...)
 	}
-	return names, nil
+	return dedup(names), nil
 }
 
 func makeExtensionSet(extensions []string) map[string]struct{} {
 	set := make(map[string]struct{}, len(extensions))
 	for _, ext := range extensions {
-		set[strings.ToLower(ext)] = struct{}{}
+		set[ext] = struct{}{}
 	}
 	return set
 }
@@ -319,10 +307,19 @@ func moduleNameFromPath(path string) string {
 }
 
 // buildTreeIndex walks a file tree and builds a module name -> path index.
-// First match wins for duplicate names.
+// When multiple files map to the same module name, the file whose extension
+// appears earliest in the extensions list wins, matching Dir's lookup order.
+// Among files with the same extension priority, the first encountered during
+// the walk wins.
 func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error) (map[string]string, error) {
 	extSet := makeExtensionSet(extensions)
+	extPriority := make(map[string]int, len(extensions))
+	for i, ext := range extensions {
+		extPriority[ext] = i
+	}
+
 	index := make(map[string]string)
+	indexPriority := make(map[string]int)
 
 	err := walkFn(func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -334,14 +331,18 @@ func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error) (map
 		if d.IsDir() {
 			return nil
 		}
-		if !hasValidExtension(path, extSet) {
+		ext := strings.ToLower(filepath.Ext(path))
+		if _, ok := extSet[ext]; !ok {
 			return nil
 		}
 
 		name := moduleNameFromPath(path)
-		if _, exists := index[name]; !exists {
-			index[name] = path
+		pri := extPriority[ext]
+		if existing, exists := indexPriority[name]; exists && existing <= pri {
+			return nil // existing entry has same or higher priority
 		}
+		index[name] = path
+		indexPriority[name] = pri
 		return nil
 	})
 	return index, err

@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"math"
+	"sort"
 )
 
 // LevelTrace is a custom log level more verbose than Debug.
@@ -105,15 +106,7 @@ func LineColFromTable(table []int, offset ByteOffset) (line, col int) {
 		return 0, 0
 	}
 	off := int(offset)
-	// Binary search for the last line start <= offset.
-	lo, hi := 0, len(table)-1
-	for lo < hi {
-		mid := (lo + hi + 1) / 2
-		if table[mid] <= off {
-			lo = mid
-		} else {
-			hi = mid - 1
-		}
-	}
+	// Find the last line start <= offset.
+	lo := sort.Search(len(table), func(i int) bool { return table[i] > off }) - 1
 	return lo + 1, off - table[lo] + 1
 }

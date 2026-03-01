@@ -454,60 +454,48 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 	return created
 }
 
-func registerNotification(ctx *resolverContext, mod *module.Module, node *Node, resolved *Notification) {
-	ctx.Mib.addNotification(resolved)
-	var currentMod *Module
-	if current := node.Notification(); current != nil {
-		currentMod = current.Module()
-	}
+// registerResolvedEntity handles the common pattern for registering a resolved entity:
+// add to global Mib, conditionally set on node (preferring newer modules), add to per-module collection.
+func registerResolvedEntity[T any](ctx *resolverContext, mod *module.Module, currentMod *Module, resolved T, addToMib, setOnNode func(T), addToModule func(*Module, T)) {
+	addToMib(resolved)
 	if shouldPreferModule(ctx, currentMod, mod) {
-		node.setNotification(resolved)
+		setOnNode(resolved)
 	}
 	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
-		resolvedMod.addNotification(resolved)
+		addToModule(resolvedMod, resolved)
 	}
+}
+
+func registerNotification(ctx *resolverContext, mod *module.Module, node *Node, resolved *Notification) {
+	var currentMod *Module
+	if n := node.Notification(); n != nil {
+		currentMod = n.Module()
+	}
+	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.Mib.addNotification, node.setNotification, (*Module).addNotification)
 }
 
 func registerGroup(ctx *resolverContext, mod *module.Module, node *Node, resolved *Group) {
-	ctx.Mib.addGroup(resolved)
 	var currentMod *Module
-	if current := node.Group(); current != nil {
-		currentMod = current.Module()
+	if g := node.Group(); g != nil {
+		currentMod = g.Module()
 	}
-	if shouldPreferModule(ctx, currentMod, mod) {
-		node.setGroup(resolved)
-	}
-	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
-		resolvedMod.addGroup(resolved)
-	}
+	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.Mib.addGroup, node.setGroup, (*Module).addGroup)
 }
 
 func registerCompliance(ctx *resolverContext, mod *module.Module, node *Node, resolved *Compliance) {
-	ctx.Mib.addCompliance(resolved)
 	var currentMod *Module
-	if current := node.Compliance(); current != nil {
-		currentMod = current.Module()
+	if c := node.Compliance(); c != nil {
+		currentMod = c.Module()
 	}
-	if shouldPreferModule(ctx, currentMod, mod) {
-		node.setCompliance(resolved)
-	}
-	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
-		resolvedMod.addCompliance(resolved)
-	}
+	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.Mib.addCompliance, node.setCompliance, (*Module).addCompliance)
 }
 
 func registerCapability(ctx *resolverContext, mod *module.Module, node *Node, resolved *Capability) {
-	ctx.Mib.addCapability(resolved)
 	var currentMod *Module
-	if current := node.Capability(); current != nil {
-		currentMod = current.Module()
+	if c := node.Capability(); c != nil {
+		currentMod = c.Module()
 	}
-	if shouldPreferModule(ctx, currentMod, mod) {
-		node.setCapability(resolved)
-	}
-	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
-		resolvedMod.addCapability(resolved)
-	}
+	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.Mib.addCapability, node.setCapability, (*Module).addCapability)
 }
 
 type complianceRef struct {
@@ -970,10 +958,8 @@ func binaryToBytes(s string, rightPad bool) []byte {
 // isBareTypeIndex returns true for primitive/global type names that can appear
 // directly in INDEX clauses without being object definitions.
 func isBareTypeIndex(name string) bool {
-	if name == "OBJECT IDENTIFIER" {
-		return false
-	}
-	return isASN1Primitive(name) || isSmiGlobalType(name) || isSmiV1GlobalType(name)
+	cls := wellKnownTypes[name]
+	return cls != 0 && cls != typeClassSNMPv2TC && name != "OBJECT IDENTIFIER"
 }
 
 // isOIDType checks if the syntax resolves to OBJECT IDENTIFIER.

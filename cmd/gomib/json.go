@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 )
 
 // DumpOutput is the top-level JSON output for the dump command.
@@ -183,9 +184,10 @@ type DiagnosticJSON struct {
 	Message  string `json:"message"`
 }
 
-func marshalJSON(v any, indent bool) ([]byte, error) {
+func writeJSON(w io.Writer, v any, indent bool) error {
+	enc := json.NewEncoder(w)
 	if indent {
-		return json.MarshalIndent(v, "", "  ")
+		enc.SetIndent("", "  ")
 	}
-	return json.Marshal(v)
+	return enc.Encode(v)
 }

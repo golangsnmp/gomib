@@ -57,13 +57,13 @@ func registerModules(ctx *resolverContext) {
 		// fallback chain (LookupTypeForModule, LookupType). Many vendor
 		// MIBs use types from these modules without importing them, so
 		// the resolver needs direct access for permissive-mode lookups.
-		if mod.Name == "SNMPv2-SMI" {
+		if mod.Name == moduleSNMPv2SMI {
 			ctx.Snmpv2SMIModule = mod
 		}
-		if mod.Name == "RFC1155-SMI" {
+		if mod.Name == moduleRFC1155SMI {
 			ctx.Rfc1155SMIModule = mod
 		}
-		if mod.Name == "SNMPv2-TC" {
+		if mod.Name == moduleSNMPv2TC {
 			ctx.Snmpv2TCModule = mod
 		}
 

@@ -6,14 +6,9 @@ import "slices"
 // Each object is classified by its [Kind]: scalar, table, row, or column.
 // Objects are attached to the OID tree via their [Node].
 type Object struct {
-	name        string
-	node        *Node
-	module      *Module
+	entity
 	typ         *Type
 	access      Access
-	status      Status
-	desc        string
-	ref         string
 	units       string
 	defVal      *DefVal
 	augments    *Object
@@ -28,32 +23,14 @@ type Object struct {
 }
 
 func newObject(name string) *Object {
-	return &Object{name: name}
+	return &Object{entity: entity{name: name}}
 }
-
-// Name returns the object's descriptor (e.g. "ifIndex").
-func (o *Object) Name() string { return o.name }
-
-// Node returns the OID tree node this object is attached to.
-func (o *Object) Node() *Node { return o.node }
-
-// Module returns the module that defines this object.
-func (o *Object) Module() *Module { return o.module }
 
 // Type returns the resolved type of this object, or nil if unresolved.
 func (o *Object) Type() *Type { return o.typ }
 
 // Access returns the MAX-ACCESS or ACCESS clause value.
 func (o *Object) Access() Access { return o.access }
-
-// Status returns the STATUS clause value.
-func (o *Object) Status() Status { return o.status }
-
-// Description returns the DESCRIPTION clause text.
-func (o *Object) Description() string { return o.desc }
-
-// Reference returns the REFERENCE clause text, or "".
-func (o *Object) Reference() string { return o.ref }
 
 // Units returns the UNITS clause text, or "".
 func (o *Object) Units() string { return o.units }
@@ -65,17 +42,9 @@ func (o *Object) Augments() *Object { return o.augments }
 // Only meaningful for KindRow objects with their own INDEX clause.
 func (o *Object) AugmentedBy() []*Object { return slices.Clone(o.augmentedBy) }
 
-// OID returns the object's position in the OID tree, or nil if unresolved.
-func (o *Object) OID() OID {
-	if o == nil || o.node == nil {
-		return nil
-	}
-	return o.node.OID()
-}
-
 // Kind reports the structural classification of this object's tree node.
 func (o *Object) Kind() Kind {
-	if o == nil || o.node == nil {
+	if o.node == nil {
 		return KindUnknown
 	}
 	return o.node.kind
@@ -83,7 +52,7 @@ func (o *Object) Kind() Kind {
 
 // DefaultValue returns the DEFVAL clause, or a zero DefVal if none was declared.
 func (o *Object) DefaultValue() DefVal {
-	if o == nil || o.defVal == nil {
+	if o.defVal == nil {
 		return DefVal{}
 	}
 	return *o.defVal
@@ -115,7 +84,7 @@ func (o *Object) Bit(label string) (NamedValue, bool) { return findNamedValue(o.
 
 // Table returns the table object that contains this row or column, or nil.
 func (o *Object) Table() *Object {
-	if o == nil || o.node == nil {
+	if o.node == nil {
 		return nil
 	}
 	switch o.node.kind {
@@ -135,7 +104,7 @@ func (o *Object) Table() *Object {
 
 // Row returns the parent row object for a column, or nil.
 func (o *Object) Row() *Object {
-	if o == nil || o.node == nil {
+	if o.node == nil {
 		return nil
 	}
 	if o.node.kind == KindColumn {
@@ -148,7 +117,7 @@ func (o *Object) Row() *Object {
 
 // Entry returns the row entry for a table, or nil.
 func (o *Object) Entry() *Object {
-	if o == nil || o.node == nil || o.node.kind != KindTable {
+	if o.node == nil || o.node.kind != KindTable {
 		return nil
 	}
 	for _, child := range o.node.sortedChildren() {
@@ -161,7 +130,7 @@ func (o *Object) Entry() *Object {
 
 // Columns returns the column objects for a table or row, or nil.
 func (o *Object) Columns() []*Object {
-	if o == nil || o.node == nil {
+	if o.node == nil {
 		return nil
 	}
 	var rowNode *Node
@@ -193,14 +162,11 @@ func (o *Object) Columns() []*Object {
 // EffectiveIndexes returns INDEX entries for a row, following the AUGMENTS
 // chain if the row has no indexes of its own.
 func (o *Object) EffectiveIndexes() []IndexEntry {
-	if o == nil {
-		return nil
-	}
 	return o.effectiveIndexes(make(map[*Object]struct{}))
 }
 
 func (o *Object) effectiveIndexes(visited map[*Object]struct{}) []IndexEntry {
-	if o == nil || o.node == nil || o.node.kind != KindRow {
+	if o.node == nil || o.node.kind != KindRow {
 		return nil
 	}
 	if len(o.index) > 0 {
@@ -217,22 +183,22 @@ func (o *Object) effectiveIndexes(visited map[*Object]struct{}) []IndexEntry {
 }
 
 // IsTable reports whether this object is a table node.
-func (o *Object) IsTable() bool { return o != nil && o.node != nil && o.node.kind == KindTable }
+func (o *Object) IsTable() bool { return o.node != nil && o.node.kind == KindTable }
 
 // IsRow reports whether this object is a table row (entry) node.
-func (o *Object) IsRow() bool { return o != nil && o.node != nil && o.node.kind == KindRow }
+func (o *Object) IsRow() bool { return o.node != nil && o.node.kind == KindRow }
 
 // IsColumn reports whether this object is a table column node.
-func (o *Object) IsColumn() bool { return o != nil && o.node != nil && o.node.kind == KindColumn }
+func (o *Object) IsColumn() bool { return o.node != nil && o.node.kind == KindColumn }
 
 // IsScalar reports whether this object is a scalar node.
-func (o *Object) IsScalar() bool { return o != nil && o.node != nil && o.node.kind == KindScalar }
+func (o *Object) IsScalar() bool { return o.node != nil && o.node.kind == KindScalar }
 
 // IsIndex reports whether this column object appears in its parent row's
 // effective INDEX clause. RFC 2578 s7.7 calls these "auxiliary objects"
 // and requires them to be not-accessible, with limited exceptions.
 func (o *Object) IsIndex() bool {
-	if o == nil || o.node == nil || o.node.kind != KindColumn {
+	if o.node == nil || o.node.kind != KindColumn {
 		return false
 	}
 	row := o.Row()
@@ -247,21 +213,8 @@ func (o *Object) IsIndex() bool {
 	return false
 }
 
-// String returns a brief summary: "name (oid)".
-func (o *Object) String() string {
-	if o == nil {
-		return "<nil>"
-	}
-	return o.name + " (" + o.OID().String() + ")"
-}
-
-func (o *Object) setNode(nd *Node)                 { o.node = nd }
-func (o *Object) setModule(m *Module)              { o.module = m }
 func (o *Object) setType(t *Type)                  { o.typ = t }
 func (o *Object) setAccess(a Access)               { o.access = a }
-func (o *Object) setStatus(s Status)               { o.status = s }
-func (o *Object) setDescription(d string)          { o.desc = d }
-func (o *Object) setReference(r string)            { o.ref = r }
 func (o *Object) setUnits(u string)                { o.units = u }
 func (o *Object) setDefaultValue(d *DefVal)        { o.defVal = d }
 func (o *Object) setAugments(a *Object)            { o.augments = a }

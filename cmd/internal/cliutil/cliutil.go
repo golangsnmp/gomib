@@ -3,8 +3,12 @@ package cliutil
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
+
+	gomib "github.com/golangsnmp/gomib"
 )
 
 // CGOFlags holds the common flags shared by CGO cross-validation tools.
@@ -77,4 +81,47 @@ func GetOutput(outputFile string) (*os.File, func(), error) {
 // PrintError writes a formatted error message to stderr.
 func PrintError(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "error: "+format+"\n", args...)
+}
+
+// BuildSources creates gomib.Source values from directory paths using DirTree.
+// Invalid paths are skipped with a warning to stderr. Returns only the
+// successfully created sources.
+func BuildSources(paths []string) []gomib.Source {
+	var sources []gomib.Source
+	for _, p := range paths {
+		src, err := gomib.DirTree(p)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: skipping path %s: %v\n", p, err)
+			continue
+		}
+		sources = append(sources, src)
+	}
+	return sources
+}
+
+// ExpandDirs recursively discovers all directories under the given roots.
+// Roots that don't exist or aren't directories are silently skipped.
+func ExpandDirs(roots []string) []string {
+	var dirs []string
+	seen := make(map[string]bool)
+
+	for _, root := range roots {
+		info, err := os.Stat(root)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+
+		_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil //nolint:nilerr // skip inaccessible entries
+			}
+			if d.IsDir() && !seen[path] {
+				seen[path] = true
+				dirs = append(dirs, path)
+			}
+			return nil
+		})
+	}
+
+	return dirs
 }

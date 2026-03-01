@@ -27,10 +27,10 @@ func buildTableTree() (tableObj, rowObj, col1Obj, col2Obj *Object) {
 	rowNode.children[1] = col1Node
 	rowNode.children[2] = col2Node
 
-	tableObj = &Object{name: "fooTable", node: tableNode}
-	rowObj = &Object{name: "fooEntry", node: rowNode}
-	col1Obj = &Object{name: "fooCol1", node: col1Node}
-	col2Obj = &Object{name: "fooCol2", node: col2Node}
+	tableObj = &Object{entity: entity{name: "fooTable", node: tableNode}}
+	rowObj = &Object{entity: entity{name: "fooEntry", node: rowNode}}
+	col1Obj = &Object{entity: entity{name: "fooCol1", node: col1Node}}
+	col2Obj = &Object{entity: entity{name: "fooCol2", node: col2Node}}
 
 	tableNode.obj = tableObj
 	rowNode.obj = rowObj
@@ -112,17 +112,12 @@ func TestIsIndex(t *testing.T) {
 	t.Run("row is not an index", func(t *testing.T) {
 		testutil.False(t, rowObj.IsIndex(), "row should not be an index")
 	})
-
-	t.Run("nil object is not an index", func(t *testing.T) {
-		var nilObj *Object
-		testutil.False(t, nilObj.IsIndex(), "nil should not be an index")
-	})
 }
 
 func TestAugmentedBy(t *testing.T) {
 	makeRow := func(name string) *Object {
 		node := &Node{kind: KindRow}
-		obj := &Object{name: name, node: node}
+		obj := &Object{entity: entity{name: name, node: node}}
 		node.obj = obj
 		return obj
 	}
@@ -160,12 +155,12 @@ func TestAugmentedBy(t *testing.T) {
 func TestEffectiveIndexes(t *testing.T) {
 	makeRow := func(name string, idx []IndexEntry) *Object {
 		node := &Node{kind: KindRow}
-		obj := &Object{name: name, node: node, index: idx}
+		obj := &Object{entity: entity{name: name, node: node}, index: idx}
 		node.obj = obj
 		return obj
 	}
 
-	sentinel := &Object{name: "idxObj"}
+	sentinel := &Object{entity: entity{name: "idxObj"}}
 	idx := []IndexEntry{{Object: sentinel, Implied: false}}
 
 	t.Run("row with own indexes", func(t *testing.T) {
@@ -209,7 +204,7 @@ func TestClassifyIndexEncoding(t *testing.T) {
 	makeObj := func(base BaseType, sizes []Range) *Object {
 		typ := newType("t")
 		typ.setBase(base)
-		obj := &Object{name: "idx", typ: typ, sizes: sizes}
+		obj := &Object{entity: entity{name: "idx"}, typ: typ, sizes: sizes}
 		return obj
 	}
 
@@ -234,7 +229,7 @@ func TestClassifyIndexEncoding(t *testing.T) {
 		{"BITS", makeObj(BaseBits, nil), false, IndexEncodingLengthPrefixed},
 		{"Opaque", makeObj(BaseOpaque, nil), false, IndexEncodingLengthPrefixed},
 		{"nil object", nil, false, IndexEncodingUnknown},
-		{"nil type", &Object{name: "x"}, false, IndexEncodingUnknown},
+		{"nil type", &Object{entity: entity{name: "x"}}, false, IndexEncodingUnknown},
 		{"unknown base type", makeObj(BaseUnknown, nil), false, IndexEncodingUnknown},
 	}
 

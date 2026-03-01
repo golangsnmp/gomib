@@ -55,11 +55,6 @@ func (ctx *LoweringContext) emitDiagnostic(code string, severity types.Severity,
 	})
 }
 
-// AddDiagnostic appends a diagnostic to the context.
-func (ctx *LoweringContext) AddDiagnostic(d types.Diagnostic) {
-	ctx.Diagnostics = append(ctx.Diagnostics, d)
-}
-
 // isSMIv2Import reports whether importing from this module indicates SMIv2.
 func isSMIv2Import(name string) bool {
 	bm, ok := BaseModuleFromName(name)
@@ -129,6 +124,9 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 
 // identNames extracts the Name field from each Ident.
 func identNames(idents []ast.Ident) []string {
+	if len(idents) == 0 {
+		return nil
+	}
 	names := make([]string, len(idents))
 	for i, id := range idents {
 		names[i] = id.Name
@@ -151,6 +149,14 @@ func optionalAccess(a *ast.AccessClause) *types.Access {
 		return &v
 	}
 	return nil
+}
+
+// optionalStatus returns s.Value if s is non-nil, or defaultStatus otherwise.
+func optionalStatus(s *ast.StatusClause, defaultStatus types.Status) types.Status {
+	if s != nil {
+		return s.Value
+	}
+	return defaultStatus
 }
 
 // lowerImports flattens import clauses and detects the SMI language.
@@ -215,21 +221,9 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 }
 
 func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
-	var status types.Status
-	if def.Status != nil {
-		status = def.Status.Value
-	} else {
-		status = types.StatusCurrent
-	}
-
 	var augments string
 	if def.Augments != nil {
 		augments = def.Augments.Target.Name
-	}
-
-	var defval DefVal
-	if def.DefVal != nil {
-		defval = lowerDefVal(def.DefVal, ctx)
 	}
 
 	return &ObjectType{
@@ -237,13 +231,13 @@ func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 		Syntax:        lowerTypeSyntax(def.Syntax.Syntax, ctx),
 		Units:         optionalString(def.Units),
 		Access:        def.Access.Value,
-		AccessKeyword: lowerAccessKeyword(def.Access.Keyword),
-		Status:        status,
+		AccessKeyword: def.Access.Keyword,
+		Status:        optionalStatus(def.Status, types.StatusCurrent),
 		Description:   optionalString(def.Description),
 		Reference:     optionalString(def.Reference),
 		Index:         lowerIndexClause(def.Index),
 		Augments:      augments,
-		DefVal:        defval,
+		DefVal:        lowerOptionalDefVal(def.DefVal, ctx),
 		Oid:           lowerOidAssignment(def.OidAssignment, ctx),
 		Span:          def.Span,
 	}
@@ -439,6 +433,13 @@ func lowerOptionalSyntax(clause *ast.SyntaxClause, ctx *LoweringContext) TypeSyn
 	return lowerTypeSyntax(clause.Syntax, ctx)
 }
 
+func lowerOptionalDefVal(clause *ast.DefValClause, ctx *LoweringContext) DefVal {
+	if clause == nil {
+		return nil
+	}
+	return lowerDefVal(clause, ctx)
+}
+
 func lowerComplianceObject(o *ast.ComplianceObject, ctx *LoweringContext) ComplianceObject {
 	return ComplianceObject{
 		Object:      o.Object.Name,
@@ -486,18 +487,13 @@ func lowerVariation(v *ast.Variation, ctx *LoweringContext) Variation {
 		creationRequires = identNames(v.CreationRequires)
 	}
 
-	var defval DefVal
-	if v.DefVal != nil {
-		defval = lowerDefVal(v.DefVal, ctx)
-	}
-
 	return Variation{
 		Name:             v.Name.Name,
 		Syntax:           lowerOptionalSyntax(v.Syntax, ctx),
 		WriteSyntax:      lowerOptionalSyntax(v.WriteSyntax, ctx),
 		Access:           optionalAccess(v.Access),
 		CreationRequires: creationRequires,
-		DefVal:           defval,
+		DefVal:           lowerOptionalDefVal(v.DefVal, ctx),
 		Description:      v.Description.Value,
 	}
 }
@@ -668,19 +664,6 @@ func lowerOidComponent(comp ast.OidComponent, ctx *LoweringContext) OidComponent
 		ctx.emitDiagnostic(types.DiagUnknownOidComponent, types.SeverityWarning, comp.ComponentSpan(),
 			fmt.Sprintf("unknown OID component type %T, defaulting to sub-id 0", comp))
 		return &OidComponentNumber{Value: 0}
-	}
-}
-
-func lowerAccessKeyword(keyword ast.AccessKeyword) AccessKeyword {
-	switch keyword {
-	case ast.AccessKeywordAccess:
-		return AccessKeywordAccess
-	case ast.AccessKeywordMaxAccess:
-		return AccessKeywordMaxAccess
-	case ast.AccessKeywordMinAccess:
-		return AccessKeywordMinAccess
-	default:
-		return AccessKeywordAccess
 	}
 }
 
