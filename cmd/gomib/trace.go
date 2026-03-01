@@ -187,7 +187,11 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 						if idx.Object != nil {
 							name = idx.Object.Name()
 						}
-						fmt.Printf("      [%d] %s\n", i, name)
+						enc := ""
+						if idx.Encoding != mib.IndexEncodingUnknown {
+							enc = fmt.Sprintf("  encoding=%s", idx.Encoding)
+						}
+						fmt.Printf("      [%d] %s%s\n", i, name, enc)
 					}
 				}
 			}
@@ -220,7 +224,11 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 				if idx.Implied {
 					implied = " (IMPLIED)"
 				}
-				fmt.Printf("    [%d] %s  OID=%s%s\n", i, name, oid, implied)
+				enc := ""
+				if idx.Encoding != mib.IndexEncodingUnknown {
+					enc = fmt.Sprintf("  encoding=%s", idx.Encoding)
+				}
+				fmt.Printf("    [%d] %s  OID=%s%s%s\n", i, name, oid, implied, enc)
 			}
 		}
 
@@ -237,7 +245,11 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 				if idx.Implied {
 					implied = " (IMPLIED)"
 				}
-				fmt.Printf("    [%d] %s  OID=%s%s\n", i, name, oid, implied)
+				enc := ""
+				if idx.Encoding != mib.IndexEncodingUnknown {
+					enc = fmt.Sprintf("  encoding=%s", idx.Encoding)
+				}
+				fmt.Printf("    [%d] %s  OID=%s%s%s\n", i, name, oid, implied, enc)
 			}
 		}
 		fmt.Println()
@@ -251,6 +263,59 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 			fmt.Printf("  Row INDEX count: %d\n", len(entry.Index()))
 			if len(entry.Index()) == 0 && entry.Augments() == nil {
 				fmt.Println("  WARNING: Row has no INDEX resolved!")
+			}
+
+			effIdx := entry.EffectiveIndexes()
+			if len(effIdx) > 0 {
+				fmt.Printf("  Effective indexes (%d):\n", len(effIdx))
+				for i, idx := range effIdx {
+					name := "(nil!)"
+					if idx.Object != nil {
+						name = idx.Object.Name()
+					}
+					enc := ""
+					if idx.Encoding != mib.IndexEncodingUnknown {
+						enc = fmt.Sprintf("  encoding=%s", idx.Encoding)
+					}
+					implied := ""
+					if idx.Implied {
+						implied = " (IMPLIED)"
+					}
+					fmt.Printf("    [%d] %s%s%s\n", i, name, implied, enc)
+				}
+			}
+
+			if augBy := entry.AugmentedBy(); len(augBy) > 0 {
+				names := make([]string, len(augBy))
+				for i, a := range augBy {
+					names[i] = a.Name()
+				}
+				fmt.Printf("  Augmented by: %s\n", strings.Join(names, ", "))
+			}
+
+			cols := entry.Columns()
+			if len(cols) > 0 {
+				fmt.Println("  Columns:")
+				fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+					"COLUMN", "TYPE", "BASE", "ACCESS", "ROLE")
+				fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+					"------", "----", "----", "------", "----")
+				for _, col := range cols {
+					typeName, base := "", ""
+					if t := col.Type(); t != nil {
+						typeName = t.Name()
+						if typeName == "" {
+							typeName = t.Base().String()
+						}
+						base = t.EffectiveBase().String()
+					}
+					role := "data"
+					if col.IsIndex() {
+						role = "index"
+					}
+					fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+						col.Name(), typeName, base, col.Access(), role)
+				}
 			}
 		} else {
 			fmt.Println("  WARNING: No row entry found!")

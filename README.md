@@ -107,7 +107,35 @@ For qualified lookup, scope through the module (see [Module-scoped queries](#mod
 
 Other lookup methods: `Node`, `Type`, `Notification`, `Group`, `Compliance`, `Capability`.
 
+### Resolve
+
+`Resolve` accepts any common format - plain name, qualified name, or numeric OID - and returns the matching node:
+
+```go
+node := m.Resolve("ifDescr")                     // plain name
+node  = m.Resolve("IF-MIB::ifDescr")             // qualified
+node  = m.Resolve("1.3.6.1.2.1.2.2.1.2")        // numeric OID
+node  = m.Resolve(".1.3.6.1.2.1.2.2.1.2")       // leading dot
+```
+
+`ResolveOID` converts any of those formats to a numeric OID, and also handles instance-suffixed forms:
+
+```go
+oid, err := m.ResolveOID("IF-MIB::ifDescr.5")    // OID{1,3,6,1,2,1,2,2,1,2,5}
+oid, err  = m.ResolveOID("ifDescr.5")             // same result
+oid, err  = m.ResolveOID("1.3.6.1.2.1.2.2.1.2")  // numeric pass-through
+```
+
+`ResolveOID` is the inverse of `FormatOID`:
+
+```go
+formatted := m.FormatOID(oid)       // "IF-MIB::ifDescr.5"
+back, _   := m.ResolveOID(formatted) // round-trips to the same OID
+```
+
 ### OID lookups
+
+For cases where you already know the format, lower-level methods avoid parsing:
 
 ```go
 oid, _ := mib.ParseOID("1.3.6.1.2.1.2.2.1.1")

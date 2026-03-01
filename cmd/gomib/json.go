@@ -71,27 +71,44 @@ type BitJSON struct {
 
 // ObjectJSON holds the JSON-serializable form of a resolved object.
 type ObjectJSON struct {
-	Name         string      `json:"name"`
-	Module       string      `json:"module,omitempty"`
-	OID          string      `json:"oid"`
-	Kind         string      `json:"kind"`
-	Type         string      `json:"type,omitempty"`
-	BaseType     string      `json:"baseType,omitempty"`
-	Access       string      `json:"access"`
-	Status       string      `json:"status"`
-	Description  string      `json:"description,omitempty"`
-	Units        string      `json:"units,omitempty"`
-	DefaultValue string      `json:"defaultValue,omitempty"`
-	Index        []IndexJSON `json:"index,omitempty"`
-	Augments     string      `json:"augments,omitempty"`
-	Enums        []EnumJSON  `json:"enums,omitempty"`
-	Bits         []BitJSON   `json:"bits,omitempty"`
+	Name             string              `json:"name"`
+	Module           string              `json:"module,omitempty"`
+	OID              string              `json:"oid"`
+	Kind             string              `json:"kind"`
+	Type             string              `json:"type,omitempty"`
+	BaseType         string              `json:"baseType,omitempty"`
+	Access           string              `json:"access"`
+	Status           string              `json:"status"`
+	Description      string              `json:"description,omitempty"`
+	Units            string              `json:"units,omitempty"`
+	DefaultValue     string              `json:"defaultValue,omitempty"`
+	Index            []IndexJSON         `json:"index,omitempty"`
+	Augments         string              `json:"augments,omitempty"`
+	Entry            string              `json:"entry,omitempty"`
+	Table            string              `json:"table,omitempty"`
+	Row              string              `json:"row,omitempty"`
+	AugmentedBy      []string            `json:"augmentedBy,omitempty"`
+	EffectiveIndexes []IndexJSON         `json:"effectiveIndexes,omitempty"`
+	IsIndex          *bool               `json:"isIndex,omitempty"`
+	Columns          []ColumnSummaryJSON `json:"columns,omitempty"`
+	Enums            []EnumJSON          `json:"enums,omitempty"`
+	Bits             []BitJSON           `json:"bits,omitempty"`
 }
 
 // IndexJSON holds an INDEX entry with its implied flag.
 type IndexJSON struct {
-	Object  string `json:"object"`
-	Implied bool   `json:"implied,omitempty"`
+	Object   string `json:"object"`
+	Implied  bool   `json:"implied,omitempty"`
+	Encoding string `json:"encoding,omitempty"`
+}
+
+// ColumnSummaryJSON holds a brief summary of a table column.
+type ColumnSummaryJSON struct {
+	Name     string `json:"name"`
+	Type     string `json:"type,omitempty"`
+	BaseType string `json:"baseType,omitempty"`
+	Access   string `json:"access"`
+	IsIndex  bool   `json:"isIndex,omitempty"`
 }
 
 // NotificationJSON holds the JSON-serializable form of a notification.

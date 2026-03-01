@@ -121,7 +121,7 @@ func (c *cli) cmdGet(args []string) int {
 		return exitError
 	}
 
-	node := resolveQuery(m, query)
+	node := m.Resolve(query)
 	if node == nil {
 		printError("not found: %s", query)
 		return 1
@@ -210,35 +210,6 @@ func trimTreeDepth(node *TreeNodeJSON, depth, maxDepth int) {
 	}
 }
 
-// resolveQuery parses a user query string and returns the matching node.
-// Supports: plain name, MODULE::name, numeric OID (with optional leading dot).
-func resolveQuery(m *mib.Mib, query string) *mib.Node {
-	// Qualified name: MODULE::name
-	if modName, itemName, ok := strings.Cut(query, "::"); ok {
-		mod := m.Module(modName)
-		if mod == nil {
-			return nil
-		}
-		return mod.Node(itemName)
-	}
-
-	// Numeric OID string
-	q := query
-	if q != "" && q[0] == '.' {
-		q = q[1:]
-	}
-	if q != "" && q[0] >= '0' && q[0] <= '9' {
-		oid, err := mib.ParseOID(q)
-		if err != nil || len(oid) == 0 {
-			return nil
-		}
-		return m.NodeByOID(oid)
-	}
-
-	// Plain name
-	return m.Node(query)
-}
-
 func printNode(node *mib.Node, descLimit int) {
 	label := node.Name()
 	if label == "" {
@@ -322,6 +293,9 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 			if idx.Implied {
 				name = "IMPLIED " + name
 			}
+			if idx.Encoding != mib.IndexEncodingUnknown {
+				name += " [" + idx.Encoding.String() + "]"
+			}
 			indexStrs = append(indexStrs, name)
 		}
 		fmt.Printf("  index:  [%s]\n", strings.Join(indexStrs, ", "))
@@ -329,6 +303,35 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 
 	if obj.Augments() != nil {
 		fmt.Printf("  augments: %s\n", obj.Augments().Name())
+	}
+
+	if augBy := obj.AugmentedBy(); len(augBy) > 0 {
+		names := make([]string, len(augBy))
+		for i, a := range augBy {
+			names[i] = a.Name()
+		}
+		fmt.Printf("  augmentedBy: %s\n", strings.Join(names, ", "))
+	}
+
+	if obj.Augments() != nil {
+		effIdx := obj.EffectiveIndexes()
+		if len(effIdx) > 0 {
+			indexStrs := make([]string, 0, len(effIdx))
+			for _, idx := range effIdx {
+				name := "(unknown)"
+				if idx.Object != nil {
+					name = idx.Object.Name()
+				}
+				if idx.Implied {
+					name = "IMPLIED " + name
+				}
+				if idx.Encoding != mib.IndexEncodingUnknown {
+					name += " [" + idx.Encoding.String() + "]"
+				}
+				indexStrs = append(indexStrs, name)
+			}
+			fmt.Printf("  effectiveIndex: [%s]\n", strings.Join(indexStrs, ", "))
+		}
 	}
 
 	if dv := obj.DefaultValue(); !dv.IsZero() {
@@ -360,6 +363,45 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 		fmt.Println("  bits:")
 		for _, b := range bits {
 			fmt.Printf("    %s(%d)\n", b.Label, b.Value)
+		}
+	}
+
+	// Column details: isIndex, row, table.
+	if obj.Kind() == mib.KindColumn {
+		fmt.Printf("  isIndex: %v\n", obj.IsIndex())
+		if row := obj.Row(); row != nil {
+			fmt.Printf("  row:    %s\n", row.Name())
+		}
+		if tbl := obj.Table(); tbl != nil {
+			fmt.Printf("  table:  %s\n", tbl.Name())
+		}
+	}
+
+	// Column table for tables and rows.
+	if obj.Kind() == mib.KindTable || obj.Kind() == mib.KindRow {
+		cols := obj.Columns()
+		if len(cols) > 0 {
+			fmt.Println("  columns:")
+			fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+				"COLUMN", "TYPE", "BASE", "ACCESS", "ROLE")
+			fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+				"------", "----", "----", "------", "----")
+			for _, col := range cols {
+				typeName, base := "", ""
+				if t := col.Type(); t != nil {
+					typeName = t.Name()
+					if typeName == "" {
+						typeName = t.Base().String()
+					}
+					base = t.EffectiveBase().String()
+				}
+				role := "data"
+				if col.IsIndex() {
+					role = "index"
+				}
+				fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+					col.Name(), typeName, base, col.Access(), role)
+			}
 		}
 	}
 }
