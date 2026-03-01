@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -35,16 +34,14 @@ func (c *cli) cmdList(args []string) int {
 
 	count := fs.Bool("count", false, "print only module count")
 	jsonOut := fs.Bool("json", false, "output as JSON array")
-	help := fs.Bool("h", false, "show help")
-	fs.BoolVar(help, "help", false, "show help")
+	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return 1
+		return exitError
 	}
 
-	if *help || c.helpFlag {
-		_, _ = fmt.Fprint(os.Stdout, listUsage)
-		return 0
+	if c.checkHelp(help, listUsage) {
+		return exitOK
 	}
 
 	sources, useSystem, err := c.buildSources()
@@ -72,21 +69,19 @@ func (c *cli) cmdList(args []string) int {
 
 	if *count {
 		fmt.Println(len(names))
-		return 0
+		return exitOK
 	}
 
 	if *jsonOut {
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(names); err != nil {
+		if err := writeJSON(os.Stdout, names, true); err != nil {
 			printError("encoding JSON: %v", err)
 			return exitError
 		}
-		return 0
+		return exitOK
 	}
 
 	for _, name := range names {
 		fmt.Println(name)
 	}
-	return 0
+	return exitOK
 }

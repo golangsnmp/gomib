@@ -55,25 +55,20 @@ func (c *cli) cmdGet(args []string) int {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, getUsage) }
 
-	var modules moduleList
-	fs.Var(&modules, "m", "module to load")
-	fs.Var(&modules, "module", "module to load")
-	loadAll := fs.Bool("all", false, "load all MIBs from search path")
+	modules, loadAll := addModuleFlags(fs)
 	tree := fs.Bool("t", false, "show subtree")
 	fs.BoolVar(tree, "tree", false, "show subtree")
 	maxDepth := fs.Int("max-depth", 0, "limit subtree depth")
 	full := fs.Bool("full", false, "show full descriptions")
 	format := fs.String("format", "text", "output format: text, json")
-	help := fs.Bool("h", false, "show help")
-	fs.BoolVar(help, "help", false, "show help")
+	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return 1
+		return exitError
 	}
 
-	if *help || c.helpFlag {
-		_, _ = fmt.Fprint(os.Stdout, getUsage)
-		return 0
+	if c.checkHelp(help, getUsage) {
+		return exitOK
 	}
 
 	remaining := fs.Args()
@@ -88,34 +83,28 @@ func (c *cli) cmdGet(args []string) int {
 	}
 
 	if dashIdx >= 0 {
-		modules = append(modules, remaining[:dashIdx]...)
+		*modules = append(*modules, remaining[:dashIdx]...)
 		if dashIdx+1 < len(remaining) {
 			query = remaining[dashIdx+1]
 		}
 	} else if len(remaining) > 0 {
 		query = remaining[len(remaining)-1]
-		if !*loadAll && len(modules) == 0 && len(remaining) > 1 {
-			modules = remaining[:len(remaining)-1]
+		if !*loadAll && len(*modules) == 0 && len(remaining) > 1 {
+			*modules = moduleList(remaining[:len(remaining)-1])
 		}
 	}
 
-	if !*loadAll && len(modules) == 0 {
-		printError("specify -m MODULE or --all")
-		fmt.Fprint(os.Stderr, getUsage)
-		return 1
+	if code, ok := requireModuleOrAll(*modules, *loadAll, getUsage); ok {
+		return code
 	}
 
 	if query == "" {
 		printError("no query specified")
 		fmt.Fprint(os.Stderr, getUsage)
-		return 1
+		return exitError
 	}
 
-	var loadModules []string
-	if !*loadAll {
-		loadModules = modules
-	}
-	m, err := c.loadMib(loadModules)
+	m, err := c.loadMib(modulesToLoad(*modules, *loadAll))
 	if err != nil {
 		printError("failed to load: %v", err)
 		return exitError
@@ -124,7 +113,7 @@ func (c *cli) cmdGet(args []string) int {
 	node := m.Resolve(query)
 	if node == nil {
 		printError("not found: %s", query)
-		return 1
+		return exitError
 	}
 
 	descLimit := 200
@@ -141,10 +130,10 @@ func (c *cli) cmdGet(args []string) int {
 		} else {
 			printNode(node, descLimit)
 		}
-		return 0
+		return exitOK
 	default:
 		printError("unknown format: %s", *format)
-		return 1
+		return exitError
 	}
 }
 
@@ -155,13 +144,11 @@ func printNodeJSON(node *mib.Node, tree bool, maxDepth int) int {
 		if maxDepth > 0 {
 			trimTreeDepth(output, 0, maxDepth)
 		}
-		data, err := marshalJSON(output, true)
-		if err != nil {
+		if err := writeJSON(os.Stdout, output, true); err != nil {
 			printError("encoding JSON: %v", err)
 			return exitError
 		}
-		fmt.Println(string(data))
-		return 0
+		return exitOK
 	}
 
 	// Single node: include object or notification detail
@@ -191,13 +178,11 @@ func printNodeJSON(node *mib.Node, tree bool, maxDepth int) int {
 		out.Notification = &notif
 	}
 
-	data, err := marshalJSON(out, true)
-	if err != nil {
+	if err := writeJSON(os.Stdout, out, true); err != nil {
 		printError("encoding JSON: %v", err)
 		return exitError
 	}
-	fmt.Println(string(data))
-	return 0
+	return exitOK
 }
 
 func trimTreeDepth(node *TreeNodeJSON, depth, maxDepth int) {
@@ -284,21 +269,7 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 	fmt.Printf("  status: %s\n", obj.Status().String())
 
 	if len(obj.Index()) > 0 {
-		indexStrs := make([]string, 0, len(obj.Index()))
-		for _, idx := range obj.Index() {
-			name := "(unknown)"
-			if idx.Object != nil {
-				name = idx.Object.Name()
-			}
-			if idx.Implied {
-				name = "IMPLIED " + name
-			}
-			if idx.Encoding != mib.IndexEncodingUnknown {
-				name += " [" + idx.Encoding.String() + "]"
-			}
-			indexStrs = append(indexStrs, name)
-		}
-		fmt.Printf("  index:  [%s]\n", strings.Join(indexStrs, ", "))
+		fmt.Printf("  index:  [%s]\n", formatIndexList(obj.Index()))
 	}
 
 	if obj.Augments() != nil {
@@ -316,21 +287,7 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 	if obj.Augments() != nil {
 		effIdx := obj.EffectiveIndexes()
 		if len(effIdx) > 0 {
-			indexStrs := make([]string, 0, len(effIdx))
-			for _, idx := range effIdx {
-				name := "(unknown)"
-				if idx.Object != nil {
-					name = idx.Object.Name()
-				}
-				if idx.Implied {
-					name = "IMPLIED " + name
-				}
-				if idx.Encoding != mib.IndexEncodingUnknown {
-					name += " [" + idx.Encoding.String() + "]"
-				}
-				indexStrs = append(indexStrs, name)
-			}
-			fmt.Printf("  effectiveIndex: [%s]\n", strings.Join(indexStrs, ", "))
+			fmt.Printf("  effectiveIndex: [%s]\n", formatIndexList(effIdx))
 		}
 	}
 
@@ -382,26 +339,7 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 		cols := obj.Columns()
 		if len(cols) > 0 {
 			fmt.Println("  columns:")
-			fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
-				"COLUMN", "TYPE", "BASE", "ACCESS", "ROLE")
-			fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
-				"------", "----", "----", "------", "----")
-			for _, col := range cols {
-				typeName, base := "", ""
-				if t := col.Type(); t != nil {
-					typeName = t.Name()
-					if typeName == "" {
-						typeName = t.Base().String()
-					}
-					base = t.EffectiveBase().String()
-				}
-				role := "data"
-				if col.IsIndex() {
-					role = "index"
-				}
-				fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
-					col.Name(), typeName, base, col.Access(), role)
-			}
+			printColumnTable(cols)
 		}
 	}
 }
@@ -429,7 +367,6 @@ func normalizeDescription(s string, maxLen int) string {
 	if maxLen > 0 && len(s) > maxLen {
 		s = s[:maxLen] + "..."
 	}
-	s = strings.ReplaceAll(s, "\n", " ")
 	return strings.Join(strings.Fields(s), " ")
 }
 
@@ -478,5 +415,48 @@ func printNodeTreeRecursive(node *mib.Node, depth, maxDepth int) {
 
 	for _, child := range node.Children() {
 		printNodeTreeRecursive(child, depth+1, maxDepth)
+	}
+}
+
+// formatIndexList formats a slice of index entries as a comma-separated
+// string with IMPLIED prefix and encoding suffix.
+func formatIndexList(indexes []mib.IndexEntry) string {
+	strs := make([]string, 0, len(indexes))
+	for _, idx := range indexes {
+		name := "(unknown)"
+		if idx.Object != nil {
+			name = idx.Object.Name()
+		}
+		if idx.Implied {
+			name = "IMPLIED " + name
+		}
+		if idx.Encoding != mib.IndexEncodingUnknown {
+			name += " [" + idx.Encoding.String() + "]"
+		}
+		strs = append(strs, name)
+	}
+	return strings.Join(strs, ", ")
+}
+
+func printColumnTable(cols []*mib.Object) {
+	fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+		"COLUMN", "TYPE", "BASE", "ACCESS", "ROLE")
+	fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+		"------", "----", "----", "------", "----")
+	for _, col := range cols {
+		typeName, base := "", ""
+		if t := col.Type(); t != nil {
+			typeName = t.Name()
+			if typeName == "" {
+				typeName = t.Base().String()
+			}
+			base = t.EffectiveBase().String()
+		}
+		role := "data"
+		if col.IsIndex() {
+			role = "index"
+		}
+		fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+			col.Name(), typeName, base, col.Access(), role)
 	}
 }

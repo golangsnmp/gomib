@@ -96,15 +96,7 @@ func printError(format string, args ...any) {
 // buildSource creates a gomib.Source from multiple directory paths.
 // Returns nil if no valid paths are found.
 func buildSource(mibPaths []string) gomib.Source {
-	var sources []gomib.Source
-	for _, p := range mibPaths {
-		src, err := gomib.DirTree(p)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: skipping path %s: %v\n", p, err)
-			continue
-		}
-		sources = append(sources, src)
-	}
+	sources := cliutil.BuildSources(mibPaths)
 	if len(sources) == 0 {
 		return nil
 	}

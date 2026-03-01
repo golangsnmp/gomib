@@ -205,8 +205,8 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 
 // findTypeDefiningModule finds the module that defines a type, following imports.
 func findTypeDefiningModule(ctx *resolverContext, fromMod *module.Module, typeName string) string {
-	for _, def := range fromMod.Definitions {
-		if td, ok := def.(*module.TypeDef); ok && td.Name == typeName {
+	if defNames := ctx.ModuleDefNames[fromMod]; defNames != nil {
+		if _, ok := defNames[typeName]; ok {
 			return fromMod.Name
 		}
 	}
@@ -309,8 +309,8 @@ func linkRFC1213TypesToTCs(ctx *resolverContext) {
 		sourceModule string
 		targetModule string
 	}{
-		{"DisplayString", "RFC1213-MIB", "SNMPv2-TC"},
-		{"PhysAddress", "RFC1213-MIB", "SNMPv2-TC"},
+		{"DisplayString", "RFC1213-MIB", moduleSNMPv2TC},
+		{"PhysAddress", "RFC1213-MIB", moduleSNMPv2TC},
 	}
 
 	for _, pair := range pairs {
@@ -358,13 +358,7 @@ func isApplicationBaseType(b BaseType) bool {
 }
 
 func resolveBaseFromChain(t *Type) (BaseType, bool) {
-	visited := make(map[*Type]struct{})
-	current := t
-	for current != nil {
-		if _, seen := visited[current]; seen {
-			return 0, false
-		}
-		visited[current] = struct{}{}
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.Parent(), depth+1 {
 		if current.Parent() == nil {
 			return current.Base(), true
 		}
@@ -373,7 +367,6 @@ func resolveBaseFromChain(t *Type) (BaseType, bool) {
 		if isApplicationBaseType(current.Base()) {
 			return current.Base(), true
 		}
-		current = current.Parent()
 	}
 	return 0, false
 }

@@ -242,12 +242,15 @@ func applyConfigFile(path string, current []string, parseLine func(string) (path
 	return current
 }
 
+// splitPaths splits a path list using the OS path list separator (colon on
+// Unix, semicolon on Windows), matching net-snmp's ENV_SEPARATOR and libsmi's
+// PATH_SEPARATOR. Empty segments are skipped (matching C strtok behavior).
 func splitPaths(s string) []string {
 	if s == "" {
 		return nil
 	}
 	var result []string
-	for p := range strings.SplitSeq(s, ":") {
+	for _, p := range filepath.SplitList(s) {
 		if p != "" {
 			result = append(result, p)
 		}
@@ -255,13 +258,14 @@ func splitPaths(s string) []string {
 	return result
 }
 
-func dedup(paths []string) []string {
-	seen := make(map[string]struct{}, len(paths))
-	var result []string
-	for _, p := range paths {
-		if _, ok := seen[p]; !ok {
-			seen[p] = struct{}{}
-			result = append(result, p)
+// dedup returns items with duplicates removed, preserving first-occurrence order.
+func dedup[T comparable](items []T) []T {
+	seen := make(map[T]struct{}, len(items))
+	var result []T
+	for _, item := range items {
+		if _, ok := seen[item]; !ok {
+			seen[item] = struct{}{}
+			result = append(result, item)
 		}
 	}
 	return result

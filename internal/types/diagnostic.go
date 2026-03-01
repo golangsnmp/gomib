@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 )
@@ -56,6 +57,23 @@ type DiagnosticConfig struct {
 	// Ignore lists diagnostic codes to suppress entirely.
 	// Supports glob patterns (e.g., "identifier-*").
 	Ignore []string
+}
+
+// ConfigForLevel returns the diagnostic configuration preset for the given
+// strictness level. Unknown levels fall back to DefaultConfig.
+func ConfigForLevel(level StrictnessLevel) DiagnosticConfig {
+	switch level {
+	case StrictnessStrict:
+		return StrictConfig()
+	case StrictnessNormal:
+		return DefaultConfig()
+	case StrictnessPermissive:
+		return PermissiveConfig()
+	case StrictnessSilent:
+		return SilentConfig()
+	default:
+		return DefaultConfig()
+	}
 }
 
 // DefaultConfig returns the default diagnostic configuration (Normal strictness).
@@ -171,34 +189,10 @@ func (c DiagnosticConfig) AllowBestGuessFallbacks() bool {
 	return c.Level >= StrictnessPermissive
 }
 
-// MatchGlob performs glob matching with * wildcards.
-// Each * matches zero or more characters. Multiple wildcards are supported.
+// MatchGlob performs glob matching on diagnostic codes using path.Match
+// semantics. Supports *, ?, and [] character classes. Diagnostic codes
+// contain no slashes, so * matches any sequence of characters.
 func MatchGlob(pattern, s string) bool {
-	parts := strings.Split(pattern, "*")
-	if len(parts) == 1 {
-		return pattern == s
-	}
-
-	// First segment must be a prefix.
-	if !strings.HasPrefix(s, parts[0]) {
-		return false
-	}
-	s = s[len(parts[0]):]
-
-	// Last segment must be a suffix.
-	last := parts[len(parts)-1]
-	if !strings.HasSuffix(s, last) {
-		return false
-	}
-	s = s[:len(s)-len(last)]
-
-	// Middle segments must appear in order.
-	for _, part := range parts[1 : len(parts)-1] {
-		i := strings.Index(s, part)
-		if i < 0 {
-			return false
-		}
-		s = s[i+len(part):]
-	}
-	return true
+	ok, _ := path.Match(pattern, s)
+	return ok
 }

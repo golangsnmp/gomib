@@ -11,6 +11,13 @@ const (
 	DiagMissingHexBinSuffix   = "missing-hex-bin-suffix"
 )
 
+var lexerDiagCodes = []string{
+	DiagUnexpectedCharacter,
+	DiagUnterminatedString,
+	DiagUnterminatedHexBinStr,
+	DiagMissingHexBinSuffix,
+}
+
 // Parser diagnostic codes.
 const (
 	DiagIdentifierUnderscore = "identifier-underscore"
@@ -25,6 +32,19 @@ const (
 	DiagInvalidHexRange      = "invalid-hex-range"
 )
 
+var parserDiagCodes = []string{
+	DiagIdentifierUnderscore,
+	DiagIdentifierHyphenEnd,
+	DiagIdentifierLength64,
+	DiagIdentifierLength32,
+	DiagBadIdentifierCase,
+	DiagParseError,
+	DiagInvalidU32,
+	DiagInvalidI64,
+	DiagKeywordReserved,
+	DiagInvalidHexRange,
+}
+
 // Lowering diagnostic codes.
 const (
 	DiagMissingModuleIdentity = "missing-module-identity"
@@ -37,6 +57,18 @@ const (
 	DiagUnknownDefvalType     = "unknown-defval-type"
 	DiagInvalidBitsPosition   = "invalid-bits-position"
 )
+
+var loweringDiagCodes = []string{
+	DiagMissingModuleIdentity,
+	DiagRevisionLastUpdated,
+	DiagUnknownDefinitionType,
+	DiagUnknownTypeSyntax,
+	DiagUnknownConstraintType,
+	DiagUnknownRangeValue,
+	DiagUnknownOidComponent,
+	DiagUnknownDefvalType,
+	DiagInvalidBitsPosition,
+}
 
 // Resolver diagnostic codes.
 const (
@@ -59,54 +91,46 @@ const (
 	DiagPrimitiveTypeMissing     = "primitive-type-missing"
 )
 
+var resolverDiagCodes = []string{
+	DiagImportNotFound,
+	DiagImportModuleNotFound,
+	DiagTypeUnknown,
+	DiagOidOrphan,
+	DiagIndexUnresolved,
+	DiagObjectsUnresolved,
+	DiagIdentifierHyphenSMI,
+	DiagGroupNotAccessible,
+	DiagNotifObjectNotObject,
+	DiagMalformedHexDefval,
+	DiagDefvalUnresolved,
+	DiagVariationAccessNotifOnly,
+	DiagGroupMemberUnresolved,
+	DiagIndexNotObject,
+	DiagAugmentsNotObject,
+	DiagNotificationNoOid,
+	DiagPrimitiveTypeMissing,
+}
+
+// diagPhases maps phase names to their diagnostic code slices.
+var diagPhases = []struct {
+	name  string
+	codes []string
+}{
+	{"lexer", lexerDiagCodes},
+	{"parser", parserDiagCodes},
+	{"lowering", loweringDiagCodes},
+	{"resolver", resolverDiagCodes},
+}
+
 // AllDiagnosticCodes returns all known diagnostic codes grouped by phase.
 func AllDiagnosticCodes() []DiagCodeInfo {
-	return []DiagCodeInfo{
-		// Lexer
-		{Code: DiagUnexpectedCharacter, Phase: "lexer"},
-		{Code: DiagUnterminatedString, Phase: "lexer"},
-		{Code: DiagUnterminatedHexBinStr, Phase: "lexer"},
-		{Code: DiagMissingHexBinSuffix, Phase: "lexer"},
-		// Parser
-		{Code: DiagIdentifierUnderscore, Phase: "parser"},
-		{Code: DiagIdentifierHyphenEnd, Phase: "parser"},
-		{Code: DiagIdentifierLength64, Phase: "parser"},
-		{Code: DiagIdentifierLength32, Phase: "parser"},
-		{Code: DiagBadIdentifierCase, Phase: "parser"},
-		{Code: DiagParseError, Phase: "parser"},
-		{Code: DiagInvalidU32, Phase: "parser"},
-		{Code: DiagInvalidI64, Phase: "parser"},
-		{Code: DiagKeywordReserved, Phase: "parser"},
-		{Code: DiagInvalidHexRange, Phase: "parser"},
-		// Lowering
-		{Code: DiagMissingModuleIdentity, Phase: "lowering"},
-		{Code: DiagRevisionLastUpdated, Phase: "lowering"},
-		{Code: DiagUnknownDefinitionType, Phase: "lowering"},
-		{Code: DiagUnknownTypeSyntax, Phase: "lowering"},
-		{Code: DiagUnknownConstraintType, Phase: "lowering"},
-		{Code: DiagUnknownRangeValue, Phase: "lowering"},
-		{Code: DiagUnknownOidComponent, Phase: "lowering"},
-		{Code: DiagUnknownDefvalType, Phase: "lowering"},
-		{Code: DiagInvalidBitsPosition, Phase: "lowering"},
-		// Resolver
-		{Code: DiagImportNotFound, Phase: "resolver"},
-		{Code: DiagImportModuleNotFound, Phase: "resolver"},
-		{Code: DiagTypeUnknown, Phase: "resolver"},
-		{Code: DiagOidOrphan, Phase: "resolver"},
-		{Code: DiagIndexUnresolved, Phase: "resolver"},
-		{Code: DiagObjectsUnresolved, Phase: "resolver"},
-		{Code: DiagIdentifierHyphenSMI, Phase: "resolver"},
-		{Code: DiagGroupNotAccessible, Phase: "resolver"},
-		{Code: DiagNotifObjectNotObject, Phase: "resolver"},
-		{Code: DiagMalformedHexDefval, Phase: "resolver"},
-		{Code: DiagDefvalUnresolved, Phase: "resolver"},
-		{Code: DiagVariationAccessNotifOnly, Phase: "resolver"},
-		{Code: DiagGroupMemberUnresolved, Phase: "resolver"},
-		{Code: DiagIndexNotObject, Phase: "resolver"},
-		{Code: DiagAugmentsNotObject, Phase: "resolver"},
-		{Code: DiagNotificationNoOid, Phase: "resolver"},
-		{Code: DiagPrimitiveTypeMissing, Phase: "resolver"},
+	var result []DiagCodeInfo
+	for _, phase := range diagPhases {
+		for _, code := range phase.codes {
+			result = append(result, DiagCodeInfo{Code: code, Phase: phase.name})
+		}
 	}
+	return result
 }
 
 // DiagCodeInfo describes a diagnostic code and the phase that emits it.

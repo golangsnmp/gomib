@@ -184,8 +184,10 @@ func (c *resolverContext) lookupTypeInModule(mod *module.Module, name string) (*
 // well-known modules (SMI globals, SMIv1 types, SNMPv2-TC) require permissive
 // mode. Returns nil if no well-known module matches.
 func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module {
+	cls := wellKnownTypes[name]
+
 	// RFC-compliant: ASN.1 primitives are always available
-	if c.Snmpv2SMIModule != nil && isASN1Primitive(name) {
+	if cls == typeClassASN1Primitive {
 		return c.Snmpv2SMIModule
 	}
 
@@ -193,22 +195,17 @@ func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module
 		return nil
 	}
 
-	// Permissive only: SMI global types from SNMPv2-SMI
-	if c.Snmpv2SMIModule != nil && isSmiGlobalType(name) {
+	// Permissive only: well-known modules for SMI globals, SMIv1 types, SNMPv2-TC
+	switch cls {
+	case typeClassSmiGlobal:
 		return c.Snmpv2SMIModule
-	}
-
-	// Permissive only: SMIv1 types (Counter, Gauge, NetworkAddress) from RFC1155-SMI
-	if c.Rfc1155SMIModule != nil && isSmiV1GlobalType(name) {
+	case typeClassSmiV1Global:
 		return c.Rfc1155SMIModule
-	}
-
-	// Permissive only: SNMPv2-TC textual conventions (DisplayString, TruthValue, etc.)
-	if c.Snmpv2TCModule != nil && isSNMPv2TCType(name) {
+	case typeClassSNMPv2TC:
 		return c.Snmpv2TCModule
+	default:
+		return nil
 	}
-
-	return nil
 }
 
 // tryWellKnownTypeFallbacks searches ASN.1 primitives (always) and well-known
@@ -477,47 +474,42 @@ func (c *resolverContext) FinalizeUnresolved() {
 	}
 }
 
-func isASN1Primitive(name string) bool {
-	switch name {
-	case "INTEGER", "OCTET STRING", "OBJECT IDENTIFIER", "BITS":
-		return true
-	default:
-		return false
-	}
+// typeClass classifies well-known SMI type names by their defining module.
+type typeClass int
+
+const (
+	typeClassASN1Primitive typeClass = iota + 1 // INTEGER, OCTET STRING, OBJECT IDENTIFIER, BITS
+	typeClassSmiGlobal                          // Integer32, Counter32, etc. (SNMPv2-SMI)
+	typeClassSmiV1Global                        // Counter, Gauge, NetworkAddress (RFC1155-SMI)
+	typeClassSNMPv2TC                           // DisplayString, TruthValue, etc. (SNMPv2-TC)
+)
+
+// wellKnownTypes maps type names to their class. Used by findWellKnownModuleForType
+// and isBareTypeIndex to avoid repeated switch statements.
+var wellKnownTypes = map[string]typeClass{
+	// ASN.1 primitives
+	"INTEGER": typeClassASN1Primitive, "OCTET STRING": typeClassASN1Primitive,
+	"OBJECT IDENTIFIER": typeClassASN1Primitive, "BITS": typeClassASN1Primitive,
+	// SMI global types (SNMPv2-SMI)
+	"Integer32": typeClassSmiGlobal, "Counter32": typeClassSmiGlobal,
+	"Counter64": typeClassSmiGlobal, "Gauge32": typeClassSmiGlobal,
+	"Unsigned32": typeClassSmiGlobal, "TimeTicks": typeClassSmiGlobal,
+	"IpAddress": typeClassSmiGlobal, "Opaque": typeClassSmiGlobal,
+	// SMIv1 types (RFC1155-SMI only)
+	"Counter": typeClassSmiV1Global, "Gauge": typeClassSmiV1Global,
+	"NetworkAddress": typeClassSmiV1Global,
+	// SNMPv2-TC textual conventions (RFC 2579)
+	"DisplayString": typeClassSNMPv2TC, "TruthValue": typeClassSNMPv2TC,
+	"PhysAddress": typeClassSNMPv2TC, "MacAddress": typeClassSNMPv2TC,
+	"RowStatus": typeClassSNMPv2TC, "TimeStamp": typeClassSNMPv2TC,
+	"TimeInterval": typeClassSNMPv2TC, "DateAndTime": typeClassSNMPv2TC,
+	"StorageType": typeClassSNMPv2TC, "TestAndIncr": typeClassSNMPv2TC,
+	"AutonomousType": typeClassSNMPv2TC, "VariablePointer": typeClassSNMPv2TC,
+	"RowPointer": typeClassSNMPv2TC, "InstancePointer": typeClassSNMPv2TC,
+	"TDomain": typeClassSNMPv2TC, "TAddress": typeClassSNMPv2TC,
 }
 
-func isSmiGlobalType(name string) bool {
-	switch name {
-	case "Integer32", "Counter32", "Counter64", "Gauge32", "Unsigned32", "TimeTicks", "IpAddress", "Opaque":
-		return true
-	default:
-		return false
-	}
-}
-
-// isSmiV1GlobalType returns true for SMIv1 type names that only exist in
-// RFC1155-SMI (Counter, Gauge, NetworkAddress). Types shared with SMIv2
-// (IpAddress, TimeTicks, Opaque) are handled by isSmiGlobalType.
-func isSmiV1GlobalType(name string) bool {
-	switch name {
-	case "Counter", "Gauge", "NetworkAddress":
-		return true
-	default:
-		return false
-	}
-}
-
-// isSNMPv2TCType returns true for well-known textual conventions defined
-// in SNMPv2-TC (RFC 2579) that vendor MIBs commonly use without imports.
-func isSNMPv2TCType(name string) bool {
-	switch name {
-	case "DisplayString", "TruthValue", "PhysAddress", "MacAddress",
-		"RowStatus", "TimeStamp", "TimeInterval", "DateAndTime",
-		"StorageType", "TestAndIncr", "AutonomousType",
-		"VariablePointer", "RowPointer", "InstancePointer",
-		"TDomain", "TAddress":
-		return true
-	default:
-		return false
-	}
-}
+func isASN1Primitive(name string) bool   { return wellKnownTypes[name] == typeClassASN1Primitive }
+func isSmiGlobalType(name string) bool   { return wellKnownTypes[name] == typeClassSmiGlobal }
+func isSmiV1GlobalType(name string) bool { return wellKnownTypes[name] == typeClassSmiV1Global }
+func isSNMPv2TCType(name string) bool    { return wellKnownTypes[name] == typeClassSNMPv2TC }

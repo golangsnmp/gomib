@@ -12,6 +12,7 @@ import (
 const (
 	moduleSNMPv2SMI  = "SNMPv2-SMI"
 	moduleRFC1155SMI = "RFC1155-SMI"
+	moduleSNMPv2TC   = "SNMPv2-TC"
 )
 
 var smiGlobalOidRoots = map[string]struct{}{

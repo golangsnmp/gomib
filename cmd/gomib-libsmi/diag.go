@@ -1,6 +1,5 @@
 //go:build cgo
 
-//nolint:errcheck // CLI output, errors not critical
 package main
 
 import (
@@ -9,13 +8,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -125,7 +123,7 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 		},
 	}
 
-	libsmiPath := BuildMIBPath(expandDirs(mibPaths))
+	libsmiPath := BuildMIBPath(cliutil.ExpandDirs(mibPaths))
 	InitLibsmi(libsmiPath, level)
 	defer CleanupLibsmi()
 
@@ -163,7 +161,7 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 				entry := DiagEntry{
 					Line:     d.Line,
 					Severity: int(d.Severity),
-					SevName:  severityToString(d.Severity),
+					SevName:  d.Severity.String(),
 					Code:     d.Code,
 					Message:  d.Message,
 				}
@@ -245,35 +243,6 @@ func printDiagComparison(w io.Writer, result *DiagComparison) {
 	}
 
 	fmt.Fprintln(w)
-}
-
-func severityToString(s mib.Severity) string {
-	return s.String()
-}
-
-func expandDirs(roots []string) []string {
-	var dirs []string
-	seen := make(map[string]bool)
-
-	for _, root := range roots {
-		info, err := os.Stat(root)
-		if err != nil || !info.IsDir() {
-			continue
-		}
-
-		filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error { //nolint:gosec // error intentionally ignored
-			if err != nil {
-				return nil //nolint:nilerr // intentionally skip inaccessible entries
-			}
-			if d.IsDir() && !seen[path] {
-				seen[path] = true
-				dirs = append(dirs, path)
-			}
-			return nil
-		})
-	}
-
-	return dirs
 }
 
 func truncate(s string, n int) string {

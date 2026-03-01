@@ -11,6 +11,7 @@ import (
 	"go/token"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -67,13 +68,13 @@ Options:
 	}
 	defer cleanup()
 
-	fmt.Fprintln(out, "Loading MIBs with net-snmp...")
+	fmt.Fprintln(os.Stderr, "Loading MIBs with net-snmp...")
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, nil)
 	if err != nil {
 		printError("net-snmp load failed: %v", err)
 		return 1
 	}
-	fmt.Fprintf(out, "Loaded %d nodes from net-snmp\n", len(netsnmpNodes))
+	fmt.Fprintf(os.Stderr, "Loaded %d nodes from net-snmp\n", len(netsnmpNodes))
 
 	dir := *testDir
 	if dir == "" {

@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -107,7 +108,7 @@ func testAcceptance(modules, mibPaths []string, level int, showAll, collectDiags
 
 	gomibSource := buildSource(mibPaths)
 
-	libsmiPath := BuildMIBPath(expandDirs(mibPaths))
+	libsmiPath := BuildMIBPath(cliutil.ExpandDirs(mibPaths))
 	InitLibsmi(libsmiPath, level)
 	defer CleanupLibsmi()
 

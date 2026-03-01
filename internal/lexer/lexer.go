@@ -9,8 +9,6 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-var endKeyword = []byte("END")
-
 type lexerState int
 
 const (
@@ -307,12 +305,7 @@ func (l *Lexer) tryConsumeTripleDashEOL() bool {
 		l.advance()
 		l.advance()
 		l.advance()
-		if b, ok := l.peek(); ok && b == '\r' {
-			l.advance()
-		}
-		if b, ok := l.peek(); ok && b == '\n' {
-			l.advance()
-		}
+		l.skipLineEnding()
 		return true
 	}
 	return false
@@ -339,7 +332,7 @@ func (l *Lexer) skipMacroBody() Token {
 			return l.token(TokEOF, start)
 		}
 
-		if l.matchesKeyword(endKeyword) {
+		if l.matchesKeyword([]byte("END")) {
 			// Check that the preceding character is not alphanumeric or hyphen,
 			// so we don't match "END" at the tail of identifiers like "PRETEND".
 			prevIsDelimiter := l.pos == 0 ||

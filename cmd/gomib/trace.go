@@ -42,35 +42,28 @@ func (c *cli) cmdTrace(args []string) int {
 	fs := flag.NewFlagSet("trace", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, traceUsage) }
 
-	var modules moduleList
-	fs.Var(&modules, "m", "module to load")
-	fs.Var(&modules, "module", "module to load")
-	loadAll := fs.Bool("all", false, "load all MIBs from search path")
-	help := fs.Bool("h", false, "show help")
-	fs.BoolVar(help, "help", false, "show help")
+	modules, loadAll := addModuleFlags(fs)
+	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return 1
+		return exitError
 	}
 
-	if *help || c.helpFlag {
-		_, _ = fmt.Fprint(os.Stdout, traceUsage)
-		return 0
+	if c.checkHelp(help, traceUsage) {
+		return exitOK
 	}
 
 	remaining := fs.Args()
 	if len(remaining) == 0 {
 		printError("no symbol specified")
 		fmt.Fprint(os.Stderr, traceUsage)
-		return 1
+		return exitError
 	}
 
 	symbol := remaining[0]
 
-	if !*loadAll && len(modules) == 0 {
-		printError("specify -m MODULE or --all")
-		fmt.Fprint(os.Stderr, traceUsage)
-		return 1
+	if code, ok := requireModuleOrAll(*modules, *loadAll, traceUsage); ok {
+		return code
 	}
 
 	var m *mib.Mib
@@ -81,8 +74,8 @@ func (c *cli) cmdTrace(args []string) int {
 		loadMode = "Load - all modules from search path"
 		m, err = c.loadMib(nil)
 	} else {
-		loadMode = fmt.Sprintf("Load WithModules(%v)", modules)
-		m, err = c.loadMib(modules)
+		loadMode = fmt.Sprintf("Load WithModules(%v)", *modules)
+		m, err = c.loadMib(*modules)
 	}
 
 	if err != nil {
@@ -96,7 +89,7 @@ func (c *cli) cmdTrace(args []string) int {
 
 	c.traceSymbol(m, symbol)
 
-	return 0
+	return exitOK
 }
 
 func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
@@ -213,44 +206,12 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 
 		if len(directIndex) > 0 {
 			fmt.Printf("  Direct INDEX (%d entries):\n", len(directIndex))
-			for i, idx := range directIndex {
-				name := "(nil object!)"
-				oid := ""
-				if idx.Object != nil {
-					name = idx.Object.Name()
-					oid = idx.Object.OID().String()
-				}
-				implied := ""
-				if idx.Implied {
-					implied = " (IMPLIED)"
-				}
-				enc := ""
-				if idx.Encoding != mib.IndexEncodingUnknown {
-					enc = fmt.Sprintf("  encoding=%s", idx.Encoding)
-				}
-				fmt.Printf("    [%d] %s  OID=%s%s%s\n", i, name, oid, implied, enc)
-			}
+			printIndexDetails(directIndex)
 		}
 
 		if len(effectiveIndex) > 0 && len(effectiveIndex) != len(directIndex) {
 			fmt.Printf("  Effective INDEX (%d entries, via AUGMENTS chain):\n", len(effectiveIndex))
-			for i, idx := range effectiveIndex {
-				name := "(nil object!)"
-				oid := ""
-				if idx.Object != nil {
-					name = idx.Object.Name()
-					oid = idx.Object.OID().String()
-				}
-				implied := ""
-				if idx.Implied {
-					implied = " (IMPLIED)"
-				}
-				enc := ""
-				if idx.Encoding != mib.IndexEncodingUnknown {
-					enc = fmt.Sprintf("  encoding=%s", idx.Encoding)
-				}
-				fmt.Printf("    [%d] %s  OID=%s%s%s\n", i, name, oid, implied, enc)
-			}
+			printIndexDetails(effectiveIndex)
 		}
 		fmt.Println()
 	}
@@ -296,26 +257,7 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 			cols := entry.Columns()
 			if len(cols) > 0 {
 				fmt.Println("  Columns:")
-				fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
-					"COLUMN", "TYPE", "BASE", "ACCESS", "ROLE")
-				fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
-					"------", "----", "----", "------", "----")
-				for _, col := range cols {
-					typeName, base := "", ""
-					if t := col.Type(); t != nil {
-						typeName = t.Name()
-						if typeName == "" {
-							typeName = t.Base().String()
-						}
-						base = t.EffectiveBase().String()
-					}
-					role := "data"
-					if col.IsIndex() {
-						role = "index"
-					}
-					fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
-						col.Name(), typeName, base, col.Access(), role)
-				}
+				printColumnTable(cols)
 			}
 		} else {
 			fmt.Println("  WARNING: No row entry found!")
@@ -369,5 +311,25 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 		for _, u := range unresolved {
 			fmt.Printf("  [%s] %s in module %s\n", u.Kind, u.Symbol, u.Module)
 		}
+	}
+}
+
+func printIndexDetails(indexes []mib.IndexEntry) {
+	for i, idx := range indexes {
+		name := "(nil object!)"
+		oid := ""
+		if idx.Object != nil {
+			name = idx.Object.Name()
+			oid = idx.Object.OID().String()
+		}
+		implied := ""
+		if idx.Implied {
+			implied = " (IMPLIED)"
+		}
+		enc := ""
+		if idx.Encoding != mib.IndexEncodingUnknown {
+			enc = fmt.Sprintf("  encoding=%s", idx.Encoding)
+		}
+		fmt.Printf("    [%d] %s  OID=%s%s%s\n", i, name, oid, implied, enc)
 	}
 }

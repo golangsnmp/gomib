@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -105,7 +106,7 @@ Options:
 func compareSemantics(modules, mibPaths []string) *SemanticComparison {
 	result := &SemanticComparison{}
 
-	libsmiPath := BuildMIBPath(expandDirs(mibPaths))
+	libsmiPath := BuildMIBPath(cliutil.ExpandDirs(mibPaths))
 	InitLibsmi(libsmiPath, 6) // Info level - collect everything
 	defer CleanupLibsmi()
 

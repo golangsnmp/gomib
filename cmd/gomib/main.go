@@ -106,12 +106,12 @@ func run() int {
 
 	if c.helpFlag && cmd == "" {
 		_, _ = fmt.Fprint(os.Stdout, usage)
-		return 0
+		return exitOK
 	}
 
 	if cmd == "" {
 		_, _ = fmt.Fprint(os.Stderr, usage)
-		return 1
+		return exitError
 	}
 
 	switch cmd {
@@ -133,14 +133,14 @@ func run() int {
 		return c.cmdFind(cmdArgs)
 	case "version":
 		printVersion()
-		return 0
+		return exitOK
 	case "help":
 		_, _ = fmt.Fprint(os.Stdout, usage)
-		return 0
+		return exitOK
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", cmd)
 		_, _ = fmt.Fprint(os.Stderr, usage)
-		return 1
+		return exitError
 	}
 }
 
@@ -168,14 +168,7 @@ func (c *cli) buildSources() ([]gomib.Source, bool, error) {
 	if len(c.paths) == 0 {
 		return nil, true, nil
 	}
-	var sources []gomib.Source
-	for _, p := range c.paths {
-		if src, err := gomib.DirTree(p); err == nil {
-			sources = append(sources, src)
-		} else {
-			fmt.Fprintf(os.Stderr, "warning: cannot access path %s: %v\n", p, err)
-		}
-	}
+	sources := cliutil.BuildSources(c.paths)
 	if len(sources) == 0 {
 		return nil, false, gomib.ErrNoSources
 	}
@@ -216,4 +209,47 @@ func printVersion() {
 
 func printError(format string, args ...any) {
 	cliutil.PrintError(format, args...)
+}
+
+// addHelpFlag registers -h and --help on the given FlagSet.
+func addHelpFlag(fs *flag.FlagSet) *bool {
+	help := fs.Bool("h", false, "show help")
+	fs.BoolVar(help, "help", false, "show help")
+	return help
+}
+
+// addModuleFlags registers -m/--module (repeatable) and --all flags.
+func addModuleFlags(fs *flag.FlagSet) (modules *moduleList, loadAll *bool) {
+	var m moduleList
+	fs.Var(&m, "m", "module to load")
+	fs.Var(&m, "module", "module to load")
+	return &m, fs.Bool("all", false, "load all MIBs from search path")
+}
+
+// checkHelp prints usage and returns true if help was requested.
+func (c *cli) checkHelp(help *bool, usageText string) bool {
+	if *help || c.helpFlag {
+		_, _ = fmt.Fprint(os.Stdout, usageText)
+		return true
+	}
+	return false
+}
+
+// requireModuleOrAll validates that either -m or --all was specified.
+// Returns an exit code and true if the validation failed.
+func requireModuleOrAll(modules moduleList, loadAll bool, usageText string) (int, bool) {
+	if !loadAll && len(modules) == 0 {
+		printError("specify -m MODULE or --all")
+		fmt.Fprint(os.Stderr, usageText)
+		return exitError, true
+	}
+	return exitOK, false
+}
+
+// modulesToLoad returns the module list for loading, or nil if --all is set.
+func modulesToLoad(modules moduleList, loadAll bool) []string {
+	if loadAll {
+		return nil
+	}
+	return modules
 }

@@ -28,16 +28,14 @@ func (c *cli) cmdPaths(args []string) int {
 	fs := flag.NewFlagSet("paths", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, pathsUsage) }
 
-	help := fs.Bool("h", false, "show help")
-	fs.BoolVar(help, "help", false, "show help")
+	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return 1
+		return exitError
 	}
 
-	if *help || c.helpFlag {
-		_, _ = fmt.Fprint(os.Stdout, pathsUsage)
-		return 0
+	if c.checkHelp(help, pathsUsage) {
+		return exitOK
 	}
 
 	var paths []string
@@ -49,11 +47,11 @@ func (c *cli) cmdPaths(args []string) int {
 
 	if len(paths) == 0 {
 		fmt.Fprintln(os.Stderr, "no search paths found")
-		return 0
+		return exitOK
 	}
 
 	for _, p := range paths {
 		fmt.Println(p)
 	}
-	return 0
+	return exitOK
 }

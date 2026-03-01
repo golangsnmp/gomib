@@ -2,7 +2,6 @@ package main
 
 import (
 	"cmp"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -111,28 +110,26 @@ func (c *cli) cmdLint(args []string) int {
 	fs.BoolVar(&cfg.summary, "summary", false, "summary only")
 	fs.BoolVar(&cfg.quiet, "quiet", false, "no output")
 	listCodes := fs.Bool("list-codes", false, "list all diagnostic codes")
-	help := fs.Bool("h", false, "show help")
-	fs.BoolVar(help, "help", false, "show help")
+	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return 1
+		return exitError
 	}
 
-	if *help || c.helpFlag {
-		_, _ = fmt.Fprint(os.Stdout, lintUsage)
-		return 0
+	if c.checkHelp(help, lintUsage) {
+		return exitOK
 	}
 
 	if *listCodes {
 		printDiagnosticCodes()
-		return 0
+		return exitOK
 	}
 
 	modules := fs.Args()
 	if len(modules) == 0 {
 		printError("no modules specified")
 		fmt.Fprint(os.Stderr, lintUsage)
-		return 1
+		return exitError
 	}
 
 	switch cfg.format {
@@ -140,7 +137,7 @@ func (c *cli) cmdLint(args []string) int {
 		// ok
 	default:
 		printError("unknown format: %s", cfg.format)
-		return 1
+		return exitError
 	}
 
 	switch cfg.groupBy {
@@ -148,7 +145,7 @@ func (c *cli) cmdLint(args []string) int {
 		// ok
 	default:
 		printError("unknown group-by: %s", cfg.groupBy)
-		return 1
+		return exitError
 	}
 
 	result := c.runLint(modules, &cfg)
@@ -167,7 +164,7 @@ func (c *cli) cmdLint(args []string) int {
 		}
 		if err != nil {
 			printError("output encoding failed: %v", err)
-			return 1
+			return exitError
 		}
 	}
 
@@ -431,9 +428,7 @@ func printLintCompact(result *lintResult, cfg *lintConfig) {
 }
 
 func printLintJSON(result *lintResult) error {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	return enc.Encode(result)
+	return writeJSON(os.Stdout, result, true)
 }
 
 // SARIF (Static Analysis Results Interchange Format) output
@@ -454,9 +449,7 @@ func printLintSARIF(result *lintResult) error {
 		}},
 	}
 
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	return enc.Encode(sarif)
+	return writeJSON(os.Stdout, sarif, true)
 }
 
 type sarifOutput struct {

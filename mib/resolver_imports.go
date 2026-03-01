@@ -365,9 +365,9 @@ func resolveUltimateDefiner(ctx *resolverContext, mod *module.Module, symbol str
 func baseModuleImportAlias(name string) string {
 	switch name {
 	case "SNMPv2-SMI-v1":
-		return "SNMPv2-SMI"
+		return moduleSNMPv2SMI
 	case "SNMPv2-TC-v1":
-		return "SNMPv2-TC"
+		return moduleSNMPv2TC
 	case "RFC1315-MIB":
 		return "FRAME-RELAY-DTE-MIB"
 	case "RFC-1213":
