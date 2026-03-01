@@ -225,7 +225,7 @@ func loadGomibNodes(mibPaths, modules []string) (map[string]*NormalizedNode, err
 			n.Kind = normalizeGomibKind(obj.Kind())
 			n.Reference = obj.Reference()
 
-			if t := obj.Type(); t != nil {
+			if t := obj.Type(); t != nil && t.IsTextualConvention() {
 				n.TCName = t.Name()
 			}
 

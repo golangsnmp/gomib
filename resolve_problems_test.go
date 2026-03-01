@@ -691,14 +691,22 @@ func TestProblemIndexTableKinds(t *testing.T) {
 		column     string
 		indexNames []string
 	}{
-		{"problemNetAddrTable", "problemNetAddrEntry", "problemNetAddrValue",
-			[]string{"problemNetAddrIfIndex", "problemNetAddrAddress"}},
-		{"problemMacIndexTable", "problemMacIndexEntry", "problemMacIndexPort",
-			[]string{"problemMacIndexAddress"}},
-		{"problemNoRangeTable", "problemNoRangeEntry", "problemNoRangeValue",
-			[]string{"problemNoRangeIndex1", "problemNoRangeIndex2"}},
-		{"problemStringIndexTable", "problemStringIndexEntry", "problemStringIndexValue",
-			[]string{"problemStringIndexName"}},
+		{
+			"problemNetAddrTable", "problemNetAddrEntry", "problemNetAddrValue",
+			[]string{"problemNetAddrIfIndex", "problemNetAddrAddress"},
+		},
+		{
+			"problemMacIndexTable", "problemMacIndexEntry", "problemMacIndexPort",
+			[]string{"problemMacIndexAddress"},
+		},
+		{
+			"problemNoRangeTable", "problemNoRangeEntry", "problemNoRangeValue",
+			[]string{"problemNoRangeIndex1", "problemNoRangeIndex2"},
+		},
+		{
+			"problemStringIndexTable", "problemStringIndexEntry", "problemStringIndexValue",
+			[]string{"problemStringIndexName"},
+		},
 	}
 
 	for _, tt := range tables {

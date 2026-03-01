@@ -39,6 +39,8 @@ func normalizeType(t *mib.Type) string {
 		return "BITS"
 	case mib.BaseOpaque:
 		return "Opaque"
+	case mib.BaseSequence:
+		return "OTHER"
 	default:
 		return base.String()
 	}
@@ -106,6 +108,47 @@ func normalizeIndexes(entries []mib.IndexEntry) []testutil.IndexInfo {
 		return nil
 	}
 	return result
+}
+
+// normalizeNodeType converts a gomib Node to the NodeType string used in fixtures.
+// net-snmp uses the data type string for OBJECT-TYPE nodes and the macro type
+// string for all others.
+func normalizeNodeType(node *mib.Node) string {
+	if node == nil {
+		return ""
+	}
+	if obj := node.Object(); obj != nil {
+		if obj.Type() == nil {
+			// Table/row objects have SEQUENCE syntax which doesn't resolve
+			// to a data type. Net-snmp reports OTHER for these.
+			return "OTHER"
+		}
+		return normalizeType(obj.Type())
+	}
+	if node.Notification() != nil {
+		return "NOTIFICATION-TYPE"
+	}
+	if g := node.Group(); g != nil {
+		if g.IsNotificationGroup() {
+			return "NOTIFICATION-GROUP"
+		}
+		return "OBJECT-GROUP"
+	}
+	if node.Compliance() != nil {
+		return "MODULE-COMPLIANCE"
+	}
+	if node.Capability() != nil {
+		return "AGENT-CAPABILITIES"
+	}
+	// MODULE-IDENTITY: the module's OID matches this node's OID.
+	if mod := node.Module(); mod != nil {
+		modOID := mod.OID()
+		nodeOID := node.OID()
+		if len(modOID) > 0 && slices.Equal(modOID, nodeOID) {
+			return "MODULE-IDENTITY"
+		}
+	}
+	return "OTHER"
 }
 
 // normalizeVarbinds converts gomib Object slice (notification OBJECTS) to name strings.

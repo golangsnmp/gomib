@@ -66,9 +66,9 @@ func TestSyntaxToBaseType(t *testing.T) {
 			Constraint: &module.ConstraintSize{},
 		}, 0, false},
 
-		// SequenceOf and Sequence have no base type
-		{"SequenceOf", &module.TypeSyntaxSequenceOf{EntryType: "FooEntry"}, 0, false},
-		{"Sequence", &module.TypeSyntaxSequence{Fields: []module.SequenceField{}}, 0, false},
+		// SequenceOf and Sequence resolve to BaseSequence
+		{"SequenceOf", &module.TypeSyntaxSequenceOf{EntryType: "FooEntry"}, BaseSequence, true},
+		{"Sequence", &module.TypeSyntaxSequence{Fields: []module.SequenceField{}}, BaseSequence, true},
 
 		// nil syntax
 		{"nil", nil, 0, false},
