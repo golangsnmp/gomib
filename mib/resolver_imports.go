@@ -17,7 +17,7 @@ type importSymbol struct {
 
 // resolveImports is the import resolution phase entry point.
 func resolveImports(ctx *resolverContext) {
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		importsBySource := make(map[string][]importSymbol)
 		for _, imp := range mod.Imports {
 			importsBySource[imp.Module] = append(importsBySource[imp.Module], importSymbol{
@@ -50,7 +50,7 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 		return
 	}
 
-	candidates := ctx.ModuleIndex[fromModuleName]
+	candidates := ctx.moduleIndex[fromModuleName]
 	if chosen, ok := findCandidateWithAllSymbols(ctx, candidates, userSymbols); ok {
 		if ctx.TraceEnabled() {
 			ctx.Trace("imports resolved directly",
@@ -66,7 +66,7 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 	// Module import aliases handle renamed modules (e.g., SNMPv2-SMI-v1 -> SNMPv2-SMI)
 	if ctx.DiagnosticConfig().AllowSafeFallbacks() {
 		if aliased := baseModuleImportAlias(fromModuleName); aliased != "" {
-			aliasCandidates := ctx.ModuleIndex[aliased]
+			aliasCandidates := ctx.moduleIndex[aliased]
 			if chosen, ok := findCandidateWithAllSymbols(ctx, aliasCandidates, userSymbols); ok {
 				if ctx.TraceEnabled() {
 					ctx.Trace("imports resolved via alias",
@@ -142,7 +142,7 @@ func tryPartialResolution(ctx *resolverContext, candidates []*module.Module, sym
 	for _, sym := range symbols {
 		found := false
 		for _, candidate := range candidates {
-			defNames := ctx.ModuleDefNames[candidate]
+			defNames := ctx.moduleDefNames[candidate]
 			if defNames != nil {
 				if _, isDirect := defNames[sym.name]; isDirect {
 					resolved = append(resolved, forwardedSymbol{
@@ -164,7 +164,7 @@ func tryPartialResolution(ctx *resolverContext, candidates []*module.Module, sym
 
 func tryImportForwarding(ctx *resolverContext, candidates []*module.Module, symbols []importSymbol) []forwardedSymbol {
 	for _, candidate := range candidates {
-		defNames := ctx.ModuleDefNames[candidate]
+		defNames := ctx.moduleDefNames[candidate]
 		importMap := make(map[string]string)
 		for _, imp := range candidate.Imports {
 			importMap[imp.Symbol] = imp.Module
@@ -188,7 +188,7 @@ func tryImportForwarding(ctx *resolverContext, candidates []*module.Module, symb
 				allFound = false
 				break
 			}
-			sourceCandidates := ctx.ModuleIndex[sourceModuleName]
+			sourceCandidates := ctx.moduleIndex[sourceModuleName]
 			if len(sourceCandidates) == 0 {
 				allFound = false
 				break
@@ -220,7 +220,7 @@ func findCandidateWithAllSymbols(ctx *resolverContext, candidates []*module.Modu
 	totalSymbols := len(symbols)
 
 	for _, candidate := range candidates {
-		defNames := ctx.ModuleDefNames[candidate]
+		defNames := ctx.moduleDefNames[candidate]
 		if defNames == nil {
 			continue
 		}
@@ -247,10 +247,8 @@ func findCandidateWithAllSymbols(ctx *resolverContext, candidates []*module.Modu
 		return cmp.Compare(b.lastUpdated, a.lastUpdated)
 	})
 
-	for _, cand := range scoredCandidates {
-		if cand.symbolCount == totalSymbols {
-			return cand.mod, true
-		}
+	if len(scoredCandidates) > 0 && scoredCandidates[0].symbolCount == totalSymbols {
+		return scoredCandidates[0].mod, true
 	}
 
 	return nil, false
@@ -286,6 +284,7 @@ func extractLastUpdated(mod *module.Module) string {
 // SMIv1 uses 10-digit format "YYMMDDHHmmZ" (2-digit year), SMIv2 uses
 // 12-digit "YYYYMMDDHHmmZ" (4-digit year). This expands 10-digit timestamps
 // to 12-digit by prepending "19" for years >= 70, "20" otherwise.
+// Both formats are normalized to include a trailing "Z".
 func normalizeTimestamp(ts string) string {
 	const smiv1TimestampLen = 10
 	trimmed := strings.TrimSuffix(ts, "Z")
@@ -295,9 +294,12 @@ func normalizeTimestamp(ts string) string {
 		if yy >= "70" {
 			century = "19"
 		}
-		return century + trimmed + "Z"
+		trimmed = century + trimmed
 	}
-	return ts
+	if trimmed == "" {
+		return ts
+	}
+	return trimmed + "Z"
 }
 
 func isMacroSymbol(name string) bool {
@@ -316,7 +318,7 @@ func isMacroSymbol(name string) bool {
 // actually defines the symbol, collapsing re-export chains. After this,
 // ModuleImports[mod][symbol] points directly to the defining module.
 func resolveTransitiveImports(ctx *resolverContext) {
-	for _, imports := range ctx.ModuleImports {
+	for _, imports := range ctx.moduleImports {
 		type update struct {
 			symbol  string
 			definer *module.Module
@@ -345,13 +347,13 @@ func resolveUltimateDefiner(ctx *resolverContext, mod *module.Module, symbol str
 		}
 		visited[current] = struct{}{}
 
-		if defNames := ctx.ModuleDefNames[current]; defNames != nil {
+		if defNames := ctx.moduleDefNames[current]; defNames != nil {
 			if _, ok := defNames[symbol]; ok {
 				return current
 			}
 		}
 
-		if nextImports := ctx.ModuleImports[current]; nextImports != nil {
+		if nextImports := ctx.moduleImports[current]; nextImports != nil {
 			if next, ok := nextImports[symbol]; ok {
 				current = next
 				continue

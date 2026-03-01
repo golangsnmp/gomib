@@ -137,7 +137,7 @@ func newDefValString(v, raw string) DefVal {
 
 // newDefValBytes creates a DefVal for bytes (from hex/binary string).
 func newDefValBytes(v []byte, raw string) DefVal {
-	return DefVal{kind: DefValKindBytes, value: v, raw: raw}
+	return DefVal{kind: DefValKindBytes, value: slices.Clone(v), raw: raw}
 }
 
 // newDefValEnum creates a DefVal for an enum label.
@@ -147,12 +147,12 @@ func newDefValEnum(label, raw string) DefVal {
 
 // newDefValBits creates a DefVal for BITS (list of bit labels).
 func newDefValBits(labels []string, raw string) DefVal {
-	return DefVal{kind: DefValKindBits, value: labels, raw: raw}
+	return DefVal{kind: DefValKindBits, value: slices.Clone(labels), raw: raw}
 }
 
 // newDefValOID creates a DefVal for an OID.
 func newDefValOID(oid OID, raw string) DefVal {
-	return DefVal{kind: DefValKindOID, value: oid, raw: raw}
+	return DefVal{kind: DefValKindOID, value: slices.Clone(oid), raw: raw}
 }
 
 // Kind returns the type of the default value.
@@ -207,6 +207,19 @@ func (d DefVal) String() string {
 // IsZero returns true if this is the zero value (no default set).
 func (d DefVal) IsZero() bool {
 	return d.value == nil
+}
+
+// clone returns a deep copy of the DefVal, cloning any slice-typed values.
+func (d DefVal) clone() DefVal {
+	switch v := d.value.(type) {
+	case []byte:
+		d.value = slices.Clone(v)
+	case []string:
+		d.value = slices.Clone(v)
+	case OID:
+		d.value = slices.Clone(v)
+	}
+	return d
 }
 
 // String returns a human-readable name for the default value kind
@@ -300,6 +313,7 @@ func (cm *CapabilitiesModule) clone() CapabilitiesModule {
 		result.ObjectVariations[i].Syntax = result.ObjectVariations[i].Syntax.clone()
 		result.ObjectVariations[i].WriteSyntax = result.ObjectVariations[i].WriteSyntax.clone()
 		result.ObjectVariations[i].CreationRequires = slices.Clone(result.ObjectVariations[i].CreationRequires)
+		result.ObjectVariations[i].DefVal = result.ObjectVariations[i].DefVal.clone()
 	}
 	result.NotificationVariations = slices.Clone(cm.NotificationVariations)
 	return result

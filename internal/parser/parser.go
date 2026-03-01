@@ -156,7 +156,7 @@ func (p *Parser) ParseModule() *ast.Module {
 
 	if p.check(lexer.TokKwEnd) {
 		p.advance()
-	} else if !p.isEOF() {
+	} else {
 		p.recordParseError(p.makeError("expected END"))
 	}
 
@@ -325,14 +325,11 @@ func (p *Parser) expectIndexObject() (lexer.Token, *types.SpanDiagnostic) {
 }
 
 // expectEnumLabel expects an identifier or keyword usable as an enum label.
-// Keywords like "current" and "deprecated" appear as enum labels in some MIBs.
+// Any keyword can appear as an enum label in real MIBs (current, deprecated,
+// mandatory, optional, object, module, etc.).
 func (p *Parser) expectEnumLabel() (lexer.Token, *types.SpanDiagnostic) {
 	kind := p.peek().Kind
-	if kind.IsIdentifier() ||
-		kind == lexer.TokKwCurrent || kind == lexer.TokKwDeprecated ||
-		kind == lexer.TokKwObsolete || kind == lexer.TokKwMandatory ||
-		kind == lexer.TokKwOptional || kind == lexer.TokKwObject ||
-		kind == lexer.TokKwModule || kind == lexer.TokKwGroup {
+	if kind.IsIdentifier() || kind.IsKeyword() {
 		return p.advance(), nil
 	}
 	diag := p.makeError("expected enum label")
@@ -1062,11 +1059,10 @@ func (p *Parser) parseRangeList() ([]ast.Range, *types.SpanDiagnostic) {
 			}
 		}
 
-		end := p.currentSpan().Start
 		ranges = append(ranges, ast.Range{
 			Min:  lo,
 			Max:  hi,
-			Span: types.NewSpan(start, end),
+			Span: types.NewSpan(start, p.lastEnd),
 		})
 
 		if p.check(lexer.TokPipe) {
@@ -1516,23 +1512,16 @@ func (p *Parser) parseDefValOidWithFirstIdent(ident ast.Ident, identToken lexer.
 		components = append(components, &ast.OidComponentName{Name: ident})
 	}
 
-	// Parse remaining components
-	var err *types.SpanDiagnostic
-	components, err = p.parseDefValOidComponents(components)
-	if err != nil {
-		return nil, err
-	}
-
-	endToken, err := p.expect(lexer.TokRBrace)
-	if err != nil {
-		return nil, err
-	}
-	span := types.NewSpan(innerStart, endToken.Span.End)
-	return &ast.DefValContentObjectIdentifier{Components: components, Span: span}, nil
+	// Parse remaining components and closing brace
+	return p.finishDefValOid(components, innerStart)
 }
 
 func (p *Parser) parseDefValOidNumeric(innerStart types.ByteOffset) (ast.DefVal, *types.SpanDiagnostic) {
-	components, err := p.parseDefValOidComponents(nil)
+	return p.finishDefValOid(nil, innerStart)
+}
+
+func (p *Parser) finishDefValOid(components []ast.OidComponent, innerStart types.ByteOffset) (ast.DefVal, *types.SpanDiagnostic) {
+	components, err := p.parseDefValOidComponents(components)
 	if err != nil {
 		return nil, err
 	}
@@ -2194,13 +2183,12 @@ func (p *Parser) parseComplianceModule() (ast.ComplianceModule, *types.SpanDiagn
 		}
 	}
 
-	end := p.currentSpan().Start
 	return ast.ComplianceModule{
 		ModuleName:      moduleName,
 		ModuleOid:       moduleOid,
 		MandatoryGroups: mandatoryGroups,
 		Compliances:     compliances,
-		Span:            types.NewSpan(start, end),
+		Span:            types.NewSpan(start, p.lastEnd),
 	}, nil
 }
 
@@ -2424,13 +2412,12 @@ func (p *Parser) parseSupportsModule() (ast.SupportsModule, *types.SpanDiagnosti
 		variations = append(variations, *v)
 	}
 
-	end := p.currentSpan().Start
 	return ast.SupportsModule{
 		ModuleName: moduleName,
 		ModuleOid:  moduleOid,
 		Includes:   includes,
 		Variations: variations,
-		Span:       types.NewSpan(start, end),
+		Span:       types.NewSpan(start, p.lastEnd),
 	}, nil
 }
 
@@ -2570,8 +2557,6 @@ func (p *Parser) parseBracedIdentifierList() ([]ast.Ident, *types.SpanDiagnostic
 	return idents, nil
 }
 
-// recoverToDefinition skips tokens until the start of a new definition
-// or END, allowing the parser to continue after an error.
 // skipBracedContent skips tokens until the matching closing brace. The opening
 // brace must already be consumed. If consumeClose is true, the closing brace
 // is also consumed; otherwise it is left for the caller.
@@ -2593,6 +2578,8 @@ func (p *Parser) skipBracedContent(consumeClose bool) {
 	}
 }
 
+// recoverToDefinition skips tokens until the start of a new definition
+// or END, allowing the parser to continue after an error.
 func (p *Parser) recoverToDefinition() {
 	for !p.isEOF() && !p.check(lexer.TokKwEnd) {
 		current := p.peek().Kind

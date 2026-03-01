@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 	"sync"
+	"sync/atomic"
 )
 
 // Node is a point in the OID tree. Each node has a numeric arc relative to
@@ -25,10 +26,9 @@ type Node struct {
 	capability  *Capability
 	parent      *Node
 	children    map[uint32]*Node
-	oidCache    OID       // lazily computed full OID; nil = not yet computed
-	oidOnce     sync.Once // ensures thread-safe lazy init of oidCache
-	sortedCache []*Node   // lazily computed sorted children; nil = invalidated
-	sortedOnce  sync.Once // ensures thread-safe lazy init of sortedCache
+	oidCache    OID                     // lazily computed full OID; nil = not yet computed
+	oidOnce     sync.Once               // ensures thread-safe lazy init of oidCache
+	sortedCache atomic.Pointer[[]*Node] // lazily computed sorted children; nil = invalidated
 }
 
 // Arc returns the numeric arc of this node relative to its parent.
@@ -119,12 +119,14 @@ func (n *Node) sortedChildren() []*Node {
 	if len(n.children) == 0 {
 		return nil
 	}
-	n.sortedOnce.Do(func() {
-		n.sortedCache = slices.SortedFunc(maps.Values(n.children), func(a, b *Node) int {
-			return cmp.Compare(a.arc, b.arc)
-		})
+	if cached := n.sortedCache.Load(); cached != nil {
+		return *cached
+	}
+	sorted := slices.SortedFunc(maps.Values(n.children), func(a, b *Node) int {
+		return cmp.Compare(a.arc, b.arc)
 	})
-	return n.sortedCache
+	n.sortedCache.Store(&sorted)
+	return sorted
 }
 
 // Subtree returns an iterator over this node and all its descendants, depth-first.
@@ -192,8 +194,7 @@ func (n *Node) getOrCreateChild(arc uint32) *Node {
 		kind:   KindInternal,
 	}
 	n.children[arc] = child
-	n.sortedCache = nil
-	n.sortedOnce = sync.Once{}
+	n.sortedCache.Store(nil)
 	return child
 }
 

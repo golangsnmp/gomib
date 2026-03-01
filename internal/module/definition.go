@@ -13,9 +13,18 @@ type Definition interface {
 	DefinitionOid() *OidAssignment
 }
 
+// DefBase provides the Name and Span fields common to all Definition types.
+type DefBase struct {
+	Name string
+	Span types.Span
+}
+
+func (d *DefBase) DefinitionName() string     { return d.Name }
+func (d *DefBase) DefinitionSpan() types.Span { return d.Span }
+
 // ObjectType is an OBJECT-TYPE definition.
 type ObjectType struct {
-	Name          string
+	DefBase
 	Syntax        TypeSyntax
 	Units         string
 	Access        types.Access
@@ -27,11 +36,8 @@ type ObjectType struct {
 	Augments      string
 	DefVal        DefVal
 	Oid           OidAssignment
-	Span          types.Span
 }
 
-func (d *ObjectType) DefinitionName() string        { return d.Name }
-func (d *ObjectType) DefinitionSpan() types.Span    { return d.Span }
 func (d *ObjectType) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // IndexItem is an entry in an OBJECT-TYPE INDEX clause.
@@ -42,18 +48,15 @@ type IndexItem struct {
 
 // ModuleIdentity is a MODULE-IDENTITY definition.
 type ModuleIdentity struct {
-	Name         string
+	DefBase
 	LastUpdated  string
 	Organization string
 	ContactInfo  string
 	Description  string
 	Revisions    []Revision
 	Oid          OidAssignment
-	Span         types.Span
 }
 
-func (d *ModuleIdentity) DefinitionName() string        { return d.Name }
-func (d *ModuleIdentity) DefinitionSpan() types.Span    { return d.Span }
 func (d *ModuleIdentity) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // Revision is a REVISION clause within a MODULE-IDENTITY.
@@ -64,21 +67,18 @@ type Revision struct {
 
 // ObjectIdentity is an OBJECT-IDENTITY definition.
 type ObjectIdentity struct {
-	Name        string
+	DefBase
 	Status      types.Status
 	Description string
 	Reference   string
 	Oid         OidAssignment
-	Span        types.Span
 }
 
-func (d *ObjectIdentity) DefinitionName() string        { return d.Name }
-func (d *ObjectIdentity) DefinitionSpan() types.Span    { return d.Span }
 func (d *ObjectIdentity) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // Notification represents both SMIv1 TRAP-TYPE and SMIv2 NOTIFICATION-TYPE.
 type Notification struct {
-	Name        string
+	DefBase
 	Objects     []string
 	Status      types.Status
 	Description string
@@ -86,12 +86,9 @@ type Notification struct {
 	// TrapInfo holds SMIv1 TRAP-TYPE fields. Nil for NOTIFICATION-TYPE.
 	TrapInfo *TrapInfo
 	// Oid is nil for TRAP-TYPE; its OID is derived from enterprise + trap number.
-	Oid  *OidAssignment
-	Span types.Span
+	Oid *OidAssignment
 }
 
-func (d *Notification) DefinitionName() string        { return d.Name }
-func (d *Notification) DefinitionSpan() types.Span    { return d.Span }
 func (d *Notification) DefinitionOid() *OidAssignment { return d.Oid }
 
 // IsTrap reports whether this is an SMIv1 TRAP-TYPE.
@@ -105,7 +102,7 @@ type TrapInfo struct {
 
 // TypeDef represents both TEXTUAL-CONVENTION and simple type assignments.
 type TypeDef struct {
-	Name   string
+	DefBase
 	Syntax TypeSyntax
 	// BaseType overrides the base type derived from Syntax. Some SMI base
 	// types like IpAddress are syntactically OCTET STRING (SIZE 4) but have
@@ -117,67 +114,52 @@ type TypeDef struct {
 	Description         string
 	Reference           string
 	IsTextualConvention bool
-	Span                types.Span
 }
 
-func (d *TypeDef) DefinitionName() string        { return d.Name }
-func (d *TypeDef) DefinitionSpan() types.Span    { return d.Span }
 func (d *TypeDef) DefinitionOid() *OidAssignment { return nil }
 
 // ValueAssignment is a plain OID value assignment.
 type ValueAssignment struct {
-	Name string
-	Oid  OidAssignment
-	Span types.Span
+	DefBase
+	Oid OidAssignment
 }
 
-func (d *ValueAssignment) DefinitionName() string        { return d.Name }
-func (d *ValueAssignment) DefinitionSpan() types.Span    { return d.Span }
 func (d *ValueAssignment) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // ObjectGroup is an OBJECT-GROUP definition.
 type ObjectGroup struct {
-	Name        string
+	DefBase
 	Objects     []string
 	Status      types.Status
 	Description string
 	Reference   string
 	Oid         OidAssignment
-	Span        types.Span
 }
 
-func (d *ObjectGroup) DefinitionName() string        { return d.Name }
-func (d *ObjectGroup) DefinitionSpan() types.Span    { return d.Span }
 func (d *ObjectGroup) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // NotificationGroup is a NOTIFICATION-GROUP definition.
 type NotificationGroup struct {
-	Name          string
+	DefBase
 	Notifications []string
 	Status        types.Status
 	Description   string
 	Reference     string
 	Oid           OidAssignment
-	Span          types.Span
 }
 
-func (d *NotificationGroup) DefinitionName() string        { return d.Name }
-func (d *NotificationGroup) DefinitionSpan() types.Span    { return d.Span }
 func (d *NotificationGroup) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // ModuleCompliance is a MODULE-COMPLIANCE definition.
 type ModuleCompliance struct {
-	Name        string
+	DefBase
 	Status      types.Status
 	Description string
 	Reference   string
 	Modules     []ComplianceModule
 	Oid         OidAssignment
-	Span        types.Span
 }
 
-func (d *ModuleCompliance) DefinitionName() string        { return d.Name }
-func (d *ModuleCompliance) DefinitionSpan() types.Span    { return d.Span }
 func (d *ModuleCompliance) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // ComplianceModule is a MODULE clause in MODULE-COMPLIANCE.
@@ -206,18 +188,15 @@ type ComplianceObject struct {
 
 // AgentCapabilities is an AGENT-CAPABILITIES definition.
 type AgentCapabilities struct {
-	Name           string
+	DefBase
 	ProductRelease string
 	Status         types.Status
 	Description    string
 	Reference      string
 	Supports       []SupportsModule
 	Oid            OidAssignment
-	Span           types.Span
 }
 
-func (d *AgentCapabilities) DefinitionName() string        { return d.Name }
-func (d *AgentCapabilities) DefinitionSpan() types.Span    { return d.Span }
 func (d *AgentCapabilities) DefinitionOid() *OidAssignment { return &d.Oid }
 
 // SupportsModule is a SUPPORTS clause in AGENT-CAPABILITIES.

@@ -217,9 +217,8 @@ func constrainedUintRange(max uint64) TypeSyntax {
 
 func makeOidValue(name string, components []OidComponent) Definition {
 	return &ValueAssignment{
-		Name: name,
-		Oid:  NewOidAssignment(components, types.Synthetic),
-		Span: types.Synthetic,
+		DefBase: DefBase{Name: name, Span: types.Synthetic},
+		Oid:     NewOidAssignment(components, types.Synthetic),
 	}
 }
 
@@ -227,29 +226,20 @@ func basePtr(b types.BaseType) *types.BaseType { return &b }
 
 func makeTypeDef(name string, syntax TypeSyntax, base *types.BaseType, status types.Status) Definition {
 	return &TypeDef{
-		Name:                name,
-		Syntax:              syntax,
-		BaseType:            base,
-		DisplayHint:         "",
-		Status:              status,
-		Description:         "",
-		Reference:           "",
-		IsTextualConvention: false,
-		Span:                types.Synthetic,
+		DefBase:  DefBase{Name: name, Span: types.Synthetic},
+		Syntax:   syntax,
+		BaseType: base,
+		Status:   status,
 	}
 }
 
 func makeTC(name, displayHint string, syntax TypeSyntax, status types.Status) Definition {
 	return &TypeDef{
-		Name:                name,
+		DefBase:             DefBase{Name: name, Span: types.Synthetic},
 		Syntax:              syntax,
-		BaseType:            nil,
 		DisplayHint:         displayHint,
 		Status:              status,
-		Description:         "",
-		Reference:           "",
 		IsTextualConvention: true,
-		Span:                types.Synthetic,
 	}
 }
 

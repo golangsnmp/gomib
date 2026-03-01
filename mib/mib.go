@@ -230,7 +230,7 @@ func (m *Mib) ResolveOID(query string) (OID, error) {
 		q = q[1:]
 	}
 	if q != "" && q[0] >= '0' && q[0] <= '9' {
-		return ParseOID(query)
+		return ParseOID(q)
 	}
 
 	// Qualified name: MODULE::name[.suffix]
@@ -318,20 +318,22 @@ func (m *Mib) Rows() []*Object { return objectsByKind(m.objects, KindRow) }
 
 // ObjectsByType returns all objects whose resolved type has the given name.
 func (m *Mib) ObjectsByType(typeName string) []*Object {
-	var result []*Object
-	for _, obj := range m.objects {
-		if obj.typ != nil && obj.typ.name == typeName {
-			result = append(result, obj)
-		}
-	}
-	return result
+	return filterObjects(m.objects, func(obj *Object) bool {
+		return obj.typ != nil && obj.typ.name == typeName
+	})
 }
 
 // ObjectsByBaseType returns all objects whose effective base type matches.
 func (m *Mib) ObjectsByBaseType(base BaseType) []*Object {
+	return filterObjects(m.objects, func(obj *Object) bool {
+		return obj.typ != nil && obj.typ.EffectiveBase() == base
+	})
+}
+
+func filterObjects(objects []*Object, pred func(*Object) bool) []*Object {
 	var result []*Object
-	for _, obj := range m.objects {
-		if obj.typ != nil && obj.typ.EffectiveBase() == base {
+	for _, obj := range objects {
+		if pred(obj) {
 			result = append(result, obj)
 		}
 	}

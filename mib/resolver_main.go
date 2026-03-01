@@ -44,7 +44,7 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "register"))
 	registerModules(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "register"),
-		slog.Int("modules", len(ctx.Mib.modules)))
+		slog.Int("modules", len(ctx.mib.modules)))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "imports"))
 	resolveImports(ctx)
@@ -54,12 +54,12 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "types"))
 	resolveTypes(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "types"),
-		slog.Int("types", len(ctx.Mib.types)))
+		slog.Int("types", len(ctx.mib.types)))
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "oids"))
 	resolveOids(ctx)
 	nodeCount := 0
-	for range ctx.Mib.Nodes() {
+	for range ctx.mib.Nodes() {
 		nodeCount++
 	}
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "oids"),
@@ -90,8 +90,8 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 			slog.Int("count", len(ctx.unresolvedIndexes)))
 	}
 
-	ctx.Mib.setNodeCount(nodeCount)
-	m := ctx.Mib
+	ctx.mib.setNodeCount(nodeCount)
+	m := ctx.mib
 
 	r.Log(slog.LevelInfo, "resolution complete",
 		slog.Int("modules", len(m.modules)),

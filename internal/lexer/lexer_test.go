@@ -650,3 +650,15 @@ func TestExportsEOFWithoutSemicolon(t *testing.T) {
 	expected := []TokenKind{TokKwExports, TokEOF}
 	testutil.SliceEqual(t, expected, kinds, "exports EOF without semicolon")
 }
+
+func TestLibsmiNamesCompleteness(t *testing.T) {
+	// Every valid TokenKind (excluding the sentinel) must have a
+	// non-empty entry in libsmiNames so that LibsmiName() never
+	// returns "UNKNOWN" for a real token kind.
+	for k := range tokKeywordEnd {
+		name := k.LibsmiName()
+		if name == "UNKNOWN" {
+			t.Errorf("TokenKind %d has no libsmiNames entry", k)
+		}
+	}
+}

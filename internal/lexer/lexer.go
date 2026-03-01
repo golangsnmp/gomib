@@ -18,6 +18,19 @@ const (
 	stateInComment
 )
 
+// punctuation maps single-character punctuation to their token kinds.
+var punctuation = map[byte]TokenKind{
+	'[': TokLBracket,
+	']': TokRBracket,
+	'{': TokLBrace,
+	'}': TokRBrace,
+	'(': TokLParen,
+	')': TokRParen,
+	';': TokSemicolon,
+	',': TokComma,
+	'|': TokPipe,
+}
+
 // Lexer tokenizes SMIv1/SMIv2 MIB source text.
 type Lexer struct {
 	source      []byte
@@ -31,8 +44,7 @@ type Lexer struct {
 func New(source []byte, logger *slog.Logger) *Lexer {
 	l := &Lexer{
 		source: source,
-		pos:    0,
-		state:  stateNormal,
+		state:  stateNormal, // stateNormal == 0, explicit for clarity
 		Logger: types.Logger{L: logger},
 	}
 	l.Log(slog.LevelDebug, "lexer initialized", slog.Int("bytes", len(source)))
@@ -199,44 +211,17 @@ func (l *Lexer) nextNormalToken() (Token, bool) {
 		return l.token(TokEOF, start), false
 	}
 
-	if b == '-' {
-		if next, ok := l.peekAt(1); ok && next == '-' {
-			l.advance()
-			l.advance()
-			l.state = stateInComment
-			l.Log(slog.LevelDebug, "entering comment", slog.Int("offset", start))
-			return Token{}, true
-		}
+	if l.isCommentStart() {
+		l.advance()
+		l.advance()
+		l.state = stateInComment
+		l.Log(slog.LevelDebug, "entering comment", slog.Int("offset", start))
+		return Token{}, true
 	}
 
-	switch b {
-	case '[':
+	if kind, ok := punctuation[b]; ok {
 		l.advance()
-		return l.token(TokLBracket, start), false
-	case ']':
-		l.advance()
-		return l.token(TokRBracket, start), false
-	case '{':
-		l.advance()
-		return l.token(TokLBrace, start), false
-	case '}':
-		l.advance()
-		return l.token(TokRBrace, start), false
-	case '(':
-		l.advance()
-		return l.token(TokLParen, start), false
-	case ')':
-		l.advance()
-		return l.token(TokRParen, start), false
-	case ';':
-		l.advance()
-		return l.token(TokSemicolon, start), false
-	case ',':
-		l.advance()
-		return l.token(TokComma, start), false
-	case '|':
-		l.advance()
-		return l.token(TokPipe, start), false
+		return l.token(kind, start), false
 	}
 
 	if b == '.' {
@@ -353,11 +338,9 @@ func (l *Lexer) skipMacroBody() Token {
 			}
 		}
 
-		if b, ok := l.peek(); ok && b == '-' {
-			if next, ok := l.peekAt(1); ok && next == '-' {
-				l.skipCommentInline()
-				continue
-			}
+		if l.isCommentStart() {
+			l.skipCommentInline()
+			continue
 		}
 
 		l.advance()
@@ -404,7 +387,7 @@ func (l *Lexer) skipCommentBody(handleTripleDash bool) {
 			if handleTripleDash && l.tryConsumeTripleDashEOL() {
 				return
 			}
-			if next, ok := l.peekAt(1); ok && next == '-' {
+			if l.isCommentStart() {
 				l.advance()
 				l.advance()
 				return
@@ -423,6 +406,16 @@ func (l *Lexer) peekAtEquals(offset int, expected byte) bool {
 	return ok && b == expected
 }
 
+// isCommentStart reports whether the current position starts a -- comment.
+func (l *Lexer) isCommentStart() bool {
+	b, ok := l.peek()
+	if !ok || b != '-' {
+		return false
+	}
+	next, ok := l.peekAt(1)
+	return ok && next == '-'
+}
+
 func (l *Lexer) scanIdentifierOrKeyword() Token {
 	start := l.pos
 	firstChar, _ := l.advance()
@@ -438,7 +431,7 @@ loop:
 		case isAlphanumeric(b) || b == '_':
 			l.advance()
 		case b == '-':
-			if next, ok := l.peekAt(1); ok && next == '-' {
+			if l.isCommentStart() {
 				break loop
 			}
 			l.advance()

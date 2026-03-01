@@ -106,6 +106,9 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 	}
 
 	for _, d := range astModule.Diagnostics {
+		if !ctx.DiagConfig.ShouldReport(d.Code, d.Severity) {
+			continue
+		}
 		line, col := types.LineColFromTable(ctx.lineTable, d.Span.Start)
 		module.Diagnostics = append(module.Diagnostics, types.Diagnostic{
 			Severity: d.Severity,
@@ -227,7 +230,7 @@ func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 	}
 
 	return &ObjectType{
-		Name:          def.Name.Name,
+		DefBase:       DefBase{Name: def.Name.Name, Span: def.Span},
 		Syntax:        lowerTypeSyntax(def.Syntax.Syntax, ctx),
 		Units:         optionalString(def.Units),
 		Access:        def.Access.Value,
@@ -239,7 +242,6 @@ func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 		Augments:      augments,
 		DefVal:        lowerOptionalDefVal(def.DefVal, ctx),
 		Oid:           lowerOidAssignment(def.OidAssignment, ctx),
-		Span:          def.Span,
 	}
 }
 
@@ -253,14 +255,13 @@ func lowerModuleIdentity(def *ast.ModuleIdentityDef, ctx *LoweringContext) *Modu
 	}
 
 	return &ModuleIdentity{
-		Name:         def.Name.Name,
+		DefBase:      DefBase{Name: def.Name.Name, Span: def.Span},
 		LastUpdated:  def.LastUpdated.Value,
 		Organization: def.Organization.Value,
 		ContactInfo:  def.ContactInfo.Value,
 		Description:  def.Description.Value,
 		Revisions:    revisions,
 		Oid:          lowerOidAssignment(def.OidAssignment, ctx),
-		Span:         def.Span,
 	}
 }
 
@@ -280,12 +281,11 @@ func checkRevisionLastUpdated(ctx *LoweringContext, mi *ModuleIdentity) {
 
 func lowerObjectIdentity(def *ast.ObjectIdentityDef, ctx *LoweringContext) *ObjectIdentity {
 	return &ObjectIdentity{
-		Name:        def.Name.Name,
+		DefBase:     DefBase{Name: def.Name.Name, Span: def.Span},
 		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   optionalString(def.Reference),
 		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
-		Span:        def.Span,
 	}
 }
 
@@ -293,20 +293,18 @@ func lowerNotificationType(def *ast.NotificationTypeDef, ctx *LoweringContext) *
 	oid := lowerOidAssignment(def.OidAssignment, ctx)
 
 	return &Notification{
-		Name:        def.Name.Name,
+		DefBase:     DefBase{Name: def.Name.Name, Span: def.Span},
 		Objects:     identNames(def.Objects),
 		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   optionalString(def.Reference),
-		TrapInfo:    nil,
 		Oid:         &oid,
-		Span:        def.Span,
 	}
 }
 
 func lowerTrapType(def *ast.TrapTypeDef, _ *LoweringContext) *Notification {
 	return &Notification{
-		Name:        def.Name.Name,
+		DefBase:     DefBase{Name: def.Name.Name, Span: def.Span},
 		Objects:     identNames(def.Variables),
 		Status:      types.StatusCurrent, // TRAP-TYPE has no STATUS clause
 		Description: optionalString(def.Description),
@@ -315,68 +313,55 @@ func lowerTrapType(def *ast.TrapTypeDef, _ *LoweringContext) *Notification {
 			Enterprise: def.Enterprise.Name,
 			TrapNumber: def.TrapNumber,
 		},
-		Oid:  nil, // derived from enterprise + trap number
-		Span: def.Span,
 	}
 }
 
 func lowerTextualConvention(def *ast.TextualConventionDef, ctx *LoweringContext) *TypeDef {
 	return &TypeDef{
-		Name:                def.Name.Name,
+		DefBase:             DefBase{Name: def.Name.Name, Span: def.Span},
 		Syntax:              lowerTypeSyntax(def.Syntax.Syntax, ctx),
-		BaseType:            nil,
 		DisplayHint:         optionalString(def.DisplayHint),
 		Status:              def.Status.Value,
 		Description:         def.Description.Value,
 		Reference:           optionalString(def.Reference),
 		IsTextualConvention: true,
-		Span:                def.Span,
 	}
 }
 
 func lowerTypeAssignment(def *ast.TypeAssignmentDef, ctx *LoweringContext) *TypeDef {
 	return &TypeDef{
-		Name:                def.Name.Name,
-		Syntax:              lowerTypeSyntax(def.Syntax, ctx),
-		BaseType:            nil,
-		DisplayHint:         "",
-		Status:              types.StatusCurrent,
-		Description:         "",
-		Reference:           "",
-		IsTextualConvention: false,
-		Span:                def.Span,
+		DefBase: DefBase{Name: def.Name.Name, Span: def.Span},
+		Syntax:  lowerTypeSyntax(def.Syntax, ctx),
+		Status:  types.StatusCurrent,
 	}
 }
 
 func lowerValueAssignment(def *ast.ValueAssignmentDef, ctx *LoweringContext) *ValueAssignment {
 	return &ValueAssignment{
-		Name: def.Name.Name,
-		Oid:  lowerOidAssignment(def.OidAssignment, ctx),
-		Span: def.Span,
+		DefBase: DefBase{Name: def.Name.Name, Span: def.Span},
+		Oid:     lowerOidAssignment(def.OidAssignment, ctx),
 	}
 }
 
 func lowerObjectGroup(def *ast.ObjectGroupDef, ctx *LoweringContext) *ObjectGroup {
 	return &ObjectGroup{
-		Name:        def.Name.Name,
+		DefBase:     DefBase{Name: def.Name.Name, Span: def.Span},
 		Objects:     identNames(def.Objects),
 		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   optionalString(def.Reference),
 		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
-		Span:        def.Span,
 	}
 }
 
 func lowerNotificationGroup(def *ast.NotificationGroupDef, ctx *LoweringContext) *NotificationGroup {
 	return &NotificationGroup{
-		Name:          def.Name.Name,
+		DefBase:       DefBase{Name: def.Name.Name, Span: def.Span},
 		Notifications: identNames(def.Notifications),
 		Status:        def.Status.Value,
 		Description:   def.Description.Value,
 		Reference:     optionalString(def.Reference),
 		Oid:           lowerOidAssignment(def.OidAssignment, ctx),
-		Span:          def.Span,
 	}
 }
 
@@ -387,13 +372,12 @@ func lowerModuleCompliance(def *ast.ModuleComplianceDef, ctx *LoweringContext) *
 	}
 
 	return &ModuleCompliance{
-		Name:        def.Name.Name,
+		DefBase:     DefBase{Name: def.Name.Name, Span: def.Span},
 		Status:      def.Status.Value,
 		Description: def.Description.Value,
 		Reference:   optionalString(def.Reference),
 		Modules:     modules,
 		Oid:         lowerOidAssignment(def.OidAssignment, ctx),
-		Span:        def.Span,
 	}
 }
 
@@ -437,7 +421,7 @@ func lowerOptionalDefVal(clause *ast.DefValClause, ctx *LoweringContext) DefVal 
 	if clause == nil {
 		return nil
 	}
-	return lowerDefVal(clause, ctx)
+	return lowerDefValValue(clause.Value, ctx)
 }
 
 func lowerComplianceObject(o *ast.ComplianceObject, ctx *LoweringContext) ComplianceObject {
@@ -457,14 +441,13 @@ func lowerAgentCapabilities(def *ast.AgentCapabilitiesDef, ctx *LoweringContext)
 	}
 
 	return &AgentCapabilities{
-		Name:           def.Name.Name,
+		DefBase:        DefBase{Name: def.Name.Name, Span: def.Span},
 		ProductRelease: def.ProductRelease.Value,
 		Status:         def.Status.Value,
 		Description:    def.Description.Value,
 		Reference:      optionalString(def.Reference),
 		Supports:       supports,
 		Oid:            lowerOidAssignment(def.OidAssignment, ctx),
-		Span:           def.Span,
 	}
 }
 
@@ -482,10 +465,7 @@ func lowerSupportsModule(s *ast.SupportsModule, ctx *LoweringContext) SupportsMo
 }
 
 func lowerVariation(v *ast.Variation, ctx *LoweringContext) Variation {
-	var creationRequires []string
-	if len(v.CreationRequires) > 0 {
-		creationRequires = identNames(v.CreationRequires)
-	}
+	creationRequires := identNames(v.CreationRequires)
 
 	return Variation{
 		Name:             v.Name.Name,
@@ -678,10 +658,6 @@ func lowerIndexClause(clause ast.IndexClause) []IndexItem {
 		items[i] = IndexItem{Object: idx.Object.Name, Implied: idx.Implied}
 	}
 	return items
-}
-
-func lowerDefVal(clause *ast.DefValClause, ctx *LoweringContext) DefVal {
-	return lowerDefValValue(clause.Value, ctx)
 }
 
 func lowerDefValValue(content ast.DefVal, ctx *LoweringContext) DefVal {

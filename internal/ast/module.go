@@ -15,14 +15,11 @@ type Module struct {
 	Diagnostics []types.SpanDiagnostic
 }
 
-// NewModule creates a Module with nil imports, body, and diagnostics.
+// NewModule creates a Module with the given name and span.
 func NewModule(name Ident, span types.Span) *Module {
 	return &Module{
-		Name:        name,
-		Imports:     nil,
-		Body:        nil,
-		Span:        span,
-		Diagnostics: nil,
+		Name: name,
+		Span: span,
 	}
 }
 

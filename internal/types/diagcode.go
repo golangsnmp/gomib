@@ -82,6 +82,7 @@ const (
 	DiagGroupNotAccessible       = "group-not-accessible"
 	DiagNotifObjectNotObject     = "notification-object-not-object"
 	DiagMalformedHexDefval       = "malformed-hex-defval"
+	DiagMalformedBinDefval       = "malformed-bin-defval"
 	DiagDefvalUnresolved         = "defval-unresolved"
 	DiagVariationAccessNotifOnly = "variation-access-notification-only"
 	DiagGroupMemberUnresolved    = "group-member-unresolved"
@@ -102,6 +103,7 @@ var resolverDiagCodes = []string{
 	DiagGroupNotAccessible,
 	DiagNotifObjectNotObject,
 	DiagMalformedHexDefval,
+	DiagMalformedBinDefval,
 	DiagDefvalUnresolved,
 	DiagVariationAccessNotifOnly,
 	DiagGroupMemberUnresolved,

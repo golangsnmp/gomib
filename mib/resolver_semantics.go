@@ -80,7 +80,7 @@ type notificationRef struct {
 // collectDefinitionRefs collects definitions matching matchFn across all modules.
 func collectDefinitionRefs[T any](ctx *resolverContext, matchFn func(*module.Module, module.Definition) (T, bool)) []T {
 	var refs []T
-	for _, mod := range ctx.Modules {
+	for _, mod := range ctx.modules {
 		for _, def := range mod.Definitions {
 			if ref, ok := matchFn(mod, def); ok {
 				refs = append(refs, ref)
@@ -146,7 +146,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 
 		resolved := newObject(obj.Name)
 		resolved.setNode(node)
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
 		}
 		resolved.setAccess(obj.Access)
@@ -174,7 +174,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 
 		computeEffectiveValues(resolved)
 
-		ctx.Mib.addObject(resolved)
+		ctx.mib.addObject(resolved)
 
 		// Prefer SMIv2 modules when multiple modules define the same OID
 		// (e.g., IF-MIB and RFC1213-MIB both define ifEntry).
@@ -188,7 +188,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 		created++
 
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolvedMod.addObject(resolved)
 		}
 	}
@@ -207,7 +207,7 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 	for _, ref := range objRefs {
 		obj := ref.obj
 
-		resolvedMod := ctx.ModuleToResolved[ref.mod]
+		resolvedMod := ctx.moduleToResolved[ref.mod]
 		if resolvedMod == nil {
 			continue
 		}
@@ -219,9 +219,11 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 		if len(obj.Index) > 0 {
 			var indexEntries []IndexEntry
 			for _, item := range obj.Index {
-				if indexNode, ok := ctx.LookupNodeForModule(ref.mod, item.Object); ok {
-					if indexNode.Object() != nil {
-						idxObj := indexNode.Object()
+				if _, ok := ctx.LookupNodeForModule(ref.mod, item.Object); ok {
+					// Use the module-scoped object lookup to get the correct
+					// module's object, not the shared node's object which may
+					// belong to a different module.
+					if idxObj := ctx.lookupObjectInModuleScope(ref.mod, item.Object); idxObj != nil {
 						indexEntries = append(indexEntries, IndexEntry{
 							Object:   idxObj,
 							Implied:  item.Implied,
@@ -243,8 +245,9 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 
 		if obj.Augments != "" {
-			if augNode, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); ok {
-				if target := augNode.Object(); target != nil {
+			if _, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); ok {
+				// Use module-scoped lookup to get the correct module's object.
+				if target := ctx.lookupObjectInModuleScope(ref.mod, obj.Augments); target != nil {
 					resolvedObj.setAugments(target)
 					target.addAugmentedBy(resolvedObj)
 				} else {
@@ -263,28 +266,25 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 // only missing values are inherited from ancestor types. The first non-empty
 // value found in the chain wins.
 func computeEffectiveValues(obj *Object) {
-	t := obj.typ
+	t := obj.Type()
 	if t == nil {
 		return
 	}
 
-	for t != nil {
-		if obj.hint == "" && t.hint != "" {
-			obj.hint = t.hint
-		}
-		if len(obj.sizes) == 0 && len(t.sizes) > 0 {
-			obj.sizes = t.sizes
-		}
-		if len(obj.ranges) == 0 && len(t.ranges) > 0 {
-			obj.ranges = t.ranges
-		}
-		if len(obj.enums) == 0 && len(t.enums) > 0 {
-			obj.enums = t.enums
-		}
-		if len(obj.bits) == 0 && len(t.bits) > 0 {
-			obj.bits = t.bits
-		}
-		t = t.parent
+	if obj.hint == "" {
+		obj.hint = t.EffectiveDisplayHint()
+	}
+	if len(obj.sizes) == 0 {
+		obj.sizes = t.EffectiveSizes()
+	}
+	if len(obj.ranges) == 0 {
+		obj.ranges = t.EffectiveRanges()
+	}
+	if len(obj.enums) == 0 {
+		obj.enums = t.EffectiveEnums()
+	}
+	if len(obj.bits) == 0 {
+		obj.bits = t.EffectiveBits()
 	}
 }
 
@@ -300,7 +300,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 
 		resolved := newNotification(notif.Name)
 		resolved.setNode(node)
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
 		}
 		resolved.setStatus(notif.Status)
@@ -386,7 +386,7 @@ func createResolvedObjectGroups(ctx *resolverContext) int {
 
 		resolved := newGroup(grp.Name)
 		resolved.setNode(node)
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
 		}
 		resolved.setStatus(grp.Status)
@@ -430,7 +430,7 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 
 		resolved := newGroup(grp.Name)
 		resolved.setNode(node)
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
 		}
 		resolved.setStatus(grp.Status)
@@ -461,7 +461,7 @@ func registerResolvedEntity[T any](ctx *resolverContext, mod *module.Module, cur
 	if shouldPreferModule(ctx, currentMod, mod) {
 		setOnNode(resolved)
 	}
-	if resolvedMod := ctx.ModuleToResolved[mod]; resolvedMod != nil {
+	if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
 		addToModule(resolvedMod, resolved)
 	}
 }
@@ -471,7 +471,7 @@ func registerNotification(ctx *resolverContext, mod *module.Module, node *Node, 
 	if n := node.Notification(); n != nil {
 		currentMod = n.Module()
 	}
-	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.Mib.addNotification, node.setNotification, (*Module).addNotification)
+	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.mib.addNotification, node.setNotification, (*Module).addNotification)
 }
 
 func registerGroup(ctx *resolverContext, mod *module.Module, node *Node, resolved *Group) {
@@ -479,7 +479,7 @@ func registerGroup(ctx *resolverContext, mod *module.Module, node *Node, resolve
 	if g := node.Group(); g != nil {
 		currentMod = g.Module()
 	}
-	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.Mib.addGroup, node.setGroup, (*Module).addGroup)
+	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.mib.addGroup, node.setGroup, (*Module).addGroup)
 }
 
 func registerCompliance(ctx *resolverContext, mod *module.Module, node *Node, resolved *Compliance) {
@@ -487,7 +487,7 @@ func registerCompliance(ctx *resolverContext, mod *module.Module, node *Node, re
 	if c := node.Compliance(); c != nil {
 		currentMod = c.Module()
 	}
-	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.Mib.addCompliance, node.setCompliance, (*Module).addCompliance)
+	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.mib.addCompliance, node.setCompliance, (*Module).addCompliance)
 }
 
 func registerCapability(ctx *resolverContext, mod *module.Module, node *Node, resolved *Capability) {
@@ -495,7 +495,7 @@ func registerCapability(ctx *resolverContext, mod *module.Module, node *Node, re
 	if c := node.Capability(); c != nil {
 		currentMod = c.Module()
 	}
-	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.Mib.addCapability, node.setCapability, (*Module).addCapability)
+	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.mib.addCapability, node.setCapability, (*Module).addCapability)
 }
 
 type complianceRef struct {
@@ -524,7 +524,7 @@ func createResolvedCompliances(ctx *resolverContext) {
 
 		resolved := newCompliance(comp.Name)
 		resolved.setNode(node)
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
 		}
 		resolved.setStatus(comp.Status)
@@ -593,7 +593,7 @@ func createResolvedCapabilities(ctx *resolverContext) {
 
 		resolved := newCapability(ac.Name)
 		resolved.setNode(node)
-		if resolvedMod := ctx.ModuleToResolved[ref.mod]; resolvedMod != nil {
+		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
 		}
 		resolved.setStatus(ac.Status)
@@ -748,31 +748,25 @@ func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *modu
 			mod, span, "primitive type INTEGER not found for "+objectName)
 		return nil, false
 	case *module.TypeSyntaxBits:
-		if t, ok := ctx.LookupType("BITS"); ok {
-			return t, true
-		}
-		ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing, SeverityError,
-			mod, span, "primitive type BITS not found for "+objectName)
-		return nil, false
+		return lookupPrimitiveType(ctx, mod, span, objectName, "BITS")
 	case *module.TypeSyntaxOctetString:
-		if t, ok := ctx.LookupType("OCTET STRING"); ok {
-			return t, true
-		}
-		ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing, SeverityError,
-			mod, span, "primitive type OCTET STRING not found for "+objectName)
-		return nil, false
+		return lookupPrimitiveType(ctx, mod, span, objectName, "OCTET STRING")
 	case *module.TypeSyntaxObjectIdentifier:
-		if t, ok := ctx.LookupType("OBJECT IDENTIFIER"); ok {
-			return t, true
-		}
-		ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing, SeverityError,
-			mod, span, "primitive type OBJECT IDENTIFIER not found for "+objectName)
-		return nil, false
+		return lookupPrimitiveType(ctx, mod, span, objectName, "OBJECT IDENTIFIER")
 	case *module.TypeSyntaxSequenceOf, *module.TypeSyntaxSequence:
 		return nil, false
 	default:
 		return nil, false
 	}
+}
+
+func lookupPrimitiveType(ctx *resolverContext, mod *module.Module, span types.Span, objectName, typeName string) (*Type, bool) {
+	if t, ok := ctx.LookupType(typeName); ok {
+		return t, true
+	}
+	ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing, SeverityError,
+		mod, span, "primitive type "+typeName+" not found for "+objectName)
+	return nil, false
 }
 
 // isSequenceTypeDef checks whether name refers to a SEQUENCE type definition
@@ -782,7 +776,7 @@ func isSequenceTypeDef(ctx *resolverContext, mod *module.Module, name string) bo
 	if hasSequenceTypeDef(mod, name) {
 		return true
 	}
-	if imports := ctx.ModuleImports[mod]; imports != nil {
+	if imports := ctx.moduleImports[mod]; imports != nil {
 		if srcMod := imports[name]; srcMod != nil {
 			return hasSequenceTypeDef(srcMod, name)
 		}
@@ -827,18 +821,24 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 	case *module.DefValBinaryString:
 		raw := "'" + v.Value + "'B"
 		_, isBits := syntax.(*module.TypeSyntaxBits)
-		bytes := binaryToBytes(v.Value, isBits)
+		bytes, valid := binaryToBytes(v.Value, isBits)
+		if !valid {
+			ctx.EmitDiagnostic(types.DiagMalformedBinDefval, SeverityWarning,
+				mod, types.Span{}, "binary DEFVAL contains non-binary digits: "+raw)
+		}
 		dv := newDefValBytes(bytes, raw)
 		return &dv
 	case *module.DefValEnum:
 		// Parser emits bare names as DefValEnum, but for OID-typed objects
 		// the name is actually an OID reference.
-		if isOIDType(syntax) {
+		if isOIDType(ctx, mod, syntax) {
 			if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
 				oid := node.OID()
 				dv := newDefValOID(oid, v.Name)
 				return &dv
 			}
+			ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
+				mod, types.Span{}, "DEFVAL OID reference "+v.Name+" could not be resolved")
 		}
 		dv := newDefValEnum(v.Name, v.Name)
 		return &dv
@@ -906,9 +906,11 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			case *module.OidComponentName:
 				ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
 					mod, types.Span{}, "DEFVAL OID component "+c.NameValue+" has no numeric value")
+				return nil
 			case *module.OidComponentQualifiedName:
 				ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
 					mod, types.Span{}, "DEFVAL OID component "+c.ModuleValue+"."+c.NameValue+" has no numeric value")
+				return nil
 			}
 		}
 		dv := newDefValOID(oid, name)
@@ -936,9 +938,18 @@ func hexToBytes(s string) ([]byte, error) {
 // For BITS-typed values (RFC 2578), bits are MSB-first so the string is
 // right-padded to a byte boundary. For other types (OCTET STRING), the
 // string is left-padded (treated as a numeric value).
-func binaryToBytes(s string, rightPad bool) []byte {
+// Returns the converted bytes and whether the input contained only valid
+// binary digits (0 and 1). Invalid characters are treated as 0.
+func binaryToBytes(s string, rightPad bool) ([]byte, bool) {
 	if s == "" {
-		return []byte{}
+		return []byte{}, true
+	}
+	valid := true
+	for i := range len(s) {
+		if s[i] != '0' && s[i] != '1' {
+			valid = false
+			break
+		}
 	}
 	// Pad to multiple of 8
 	if padding := (8 - len(s)%8) % 8; padding > 0 {
@@ -960,7 +971,7 @@ func binaryToBytes(s string, rightPad bool) []byte {
 		}
 		result[i/8] = b
 	}
-	return result
+	return result, valid
 }
 
 // isBareTypeIndex returns true for primitive/global type names that can appear
@@ -971,14 +982,23 @@ func isBareTypeIndex(name string) bool {
 }
 
 // isOIDType checks if the syntax resolves to OBJECT IDENTIFIER.
-func isOIDType(syntax module.TypeSyntax) bool {
+// For type references, it resolves the type and checks the effective base type,
+// which handles all OID-based textual conventions (AutonomousType, VariablePointer,
+// RowPointer, TDomain, etc.) without hardcoding names.
+func isOIDType(ctx *resolverContext, mod *module.Module, syntax module.TypeSyntax) bool {
 	switch s := syntax.(type) {
 	case *module.TypeSyntaxObjectIdentifier:
 		return true
 	case *module.TypeSyntaxTypeRef:
-		return s.Name == "OBJECT IDENTIFIER" || s.Name == "AutonomousType"
+		if s.Name == "OBJECT IDENTIFIER" {
+			return true
+		}
+		if t, ok := ctx.LookupTypeForModule(mod, s.Name); ok {
+			return t.EffectiveBase() == BaseObjectIdentifier
+		}
+		return false
 	case *module.TypeSyntaxConstrained:
-		return isOIDType(s.Base)
+		return isOIDType(ctx, mod, s.Base)
 	default:
 		return false
 	}

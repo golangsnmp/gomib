@@ -37,8 +37,11 @@ func (e *entity) OID() OID {
 	return e.node.OID()
 }
 
-// String returns a brief summary: "name (oid)".
+// String returns a brief summary: "name (oid)", or just "name" if unresolved.
 func (e *entity) String() string {
+	if e.node == nil {
+		return e.name
+	}
 	return e.name + " (" + e.OID().String() + ")"
 }
 

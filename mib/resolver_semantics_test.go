@@ -42,6 +42,19 @@ func TestIsBareTypeIndex(t *testing.T) {
 }
 
 func TestIsOIDType(t *testing.T) {
+	// Build a resolver context with base modules so type lookups work.
+	ctx := newResolverContext(nil, nil, DefaultConfig())
+	registerModules(ctx)
+	resolveTypes(ctx)
+	// Use SNMPv2-TC module for lookups (where AutonomousType etc. are defined).
+	var tcMod *module.Module
+	for _, m := range ctx.modules {
+		if m.Name == "SNMPv2-TC" {
+			tcMod = m
+			break
+		}
+	}
+
 	tests := []struct {
 		name   string
 		syntax module.TypeSyntax
@@ -60,6 +73,21 @@ func TestIsOIDType(t *testing.T) {
 		{
 			name:   "TypeRef AutonomousType",
 			syntax: &module.TypeSyntaxTypeRef{Name: "AutonomousType"},
+			want:   true,
+		},
+		{
+			name:   "TypeRef VariablePointer",
+			syntax: &module.TypeSyntaxTypeRef{Name: "VariablePointer"},
+			want:   true,
+		},
+		{
+			name:   "TypeRef RowPointer",
+			syntax: &module.TypeSyntaxTypeRef{Name: "RowPointer"},
+			want:   true,
+		},
+		{
+			name:   "TypeRef TDomain",
+			syntax: &module.TypeSyntaxTypeRef{Name: "TDomain"},
 			want:   true,
 		},
 		{
@@ -137,7 +165,7 @@ func TestIsOIDType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testutil.Equal(t, tt.want, isOIDType(tt.syntax), "isOIDType()")
+			testutil.Equal(t, tt.want, isOIDType(ctx, tcMod, tt.syntax), "isOIDType()")
 		})
 	}
 }
@@ -198,13 +226,21 @@ func TestBinaryToBytes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := binaryToBytes(tt.input, tt.rightPad)
+			got, valid := binaryToBytes(tt.input, tt.rightPad)
+			testutil.True(t, valid, "binaryToBytes() valid")
 			testutil.Len(t, got, len(tt.want), "binaryToBytes() len")
 			for i := range got {
 				testutil.Equal(t, tt.want[i], got[i], "binaryToBytes()")
 			}
 		})
 	}
+
+	// Invalid binary digits
+	t.Run("invalid digits", func(t *testing.T) {
+		got, valid := binaryToBytes("102", false)
+		testutil.False(t, valid, "binaryToBytes() should report invalid")
+		testutil.Len(t, got, 1, "binaryToBytes() still produces output")
+	})
 }
 
 func TestConvertDefValInteger(t *testing.T) {
@@ -322,7 +358,7 @@ func TestConvertDefValEnumOnOIDType(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 
 	// Set up a node so the OID lookup succeeds
-	root := ctx.Mib.Root()
+	root := ctx.mib.Root()
 	child := root.getOrCreateChild(1)
 	grandchild := child.getOrCreateChild(3)
 	grandchild.setName("myTarget")
@@ -380,7 +416,7 @@ func TestConvertDefValOidRef(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}
 
-	root := ctx.Mib.Root()
+	root := ctx.mib.Root()
 	child := root.getOrCreateChild(1)
 	child.setName("sysName")
 	ctx.registerModuleNodeSymbol(mod, "sysName", child)
@@ -418,7 +454,7 @@ func TestConvertDefValUnknown(t *testing.T) {
 func TestResolveTypeSyntax(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}
-	ctx.Modules = append(ctx.Modules, mod)
+	ctx.modules = append(ctx.modules, mod)
 
 	intType := newType("Integer32")
 	intType.setBase(BaseInteger32)
@@ -484,7 +520,7 @@ func TestResolveTypeSyntaxBaseTypes(t *testing.T) {
 	// that has the needed base types registered.
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
 	ctx := newResolverContext([]*module.Module{smiMod}, nil, DefaultConfig())
-	ctx.Snmpv2SMIModule = smiMod
+	ctx.snmpv2SMIModule = smiMod
 
 	integerType := newType("INTEGER")
 	integerType.setBase(BaseInteger32)
@@ -785,7 +821,7 @@ func TestConvertSupportsModules(t *testing.T) {
 	// SUPPORTS module so the resolver can classify variations correctly.
 	registerSupportsNode := func(moduleName, name string, kind Kind) {
 		supMod := &module.Module{Name: moduleName}
-		ctx.ModuleIndex[moduleName] = append(ctx.ModuleIndex[moduleName], supMod)
+		ctx.moduleIndex[moduleName] = append(ctx.moduleIndex[moduleName], supMod)
 		node := newTestNode(name)
 		node.setKind(kind)
 		ctx.registerModuleNodeSymbol(supMod, name, node)
@@ -963,9 +999,9 @@ func TestConvertDefValOidValue(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
+	ctx.moduleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
-	root := ctx.Mib.Root()
+	root := ctx.mib.Root()
 	child := root.getOrCreateChild(1)
 	child2 := child.getOrCreateChild(3)
 	child2.setName("enterprises")
@@ -1077,10 +1113,10 @@ func TestInferNodeKinds(t *testing.T) {
 	t.Run("classifies table row scalar", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
-		ctx.ModuleToResolved[mod] = newModule(mod.Name)
+		ctx.modules = append(ctx.modules, mod)
+		ctx.moduleToResolved[mod] = newModule(mod.Name)
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 		tableNode := buildOIDPath(root, 1, 1)
 		tableNode.setName("myTable")
 		ctx.registerModuleNodeSymbol(mod, "myTable", tableNode)
@@ -1095,17 +1131,17 @@ func TestInferNodeKinds(t *testing.T) {
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myTable",
-				Syntax: &module.TypeSyntaxSequenceOf{EntryType: "MyEntry"},
+				DefBase: module.DefBase{Name: "myTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "MyEntry"},
 			}},
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
-				Index:  []module.IndexItem{{Object: "myIndex"}},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "myIndex"}},
 			}},
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myScalar",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				DefBase: module.DefBase{Name: "myScalar"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			}},
 		}
 
@@ -1119,17 +1155,17 @@ func TestInferNodeKinds(t *testing.T) {
 	t.Run("augments classifies as row", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
-		ctx.ModuleToResolved[mod] = newModule(mod.Name)
+		ctx.modules = append(ctx.modules, mod)
+		ctx.moduleToResolved[mod] = newModule(mod.Name)
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 		augNode := buildOIDPath(root, 1, 1)
 		augNode.setName("myAugEntry")
 		ctx.registerModuleNodeSymbol(mod, "myAugEntry", augNode)
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:     "myAugEntry",
+				DefBase:  module.DefBase{Name: "myAugEntry"},
 				Syntax:   &module.TypeSyntaxTypeRef{Name: "MyAugEntry"},
 				Augments: "otherEntry",
 			}},
@@ -1143,10 +1179,10 @@ func TestInferNodeKinds(t *testing.T) {
 	t.Run("reclassifies scalar children of rows as columns", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
-		ctx.ModuleToResolved[mod] = newModule(mod.Name)
+		ctx.modules = append(ctx.modules, mod)
+		ctx.moduleToResolved[mod] = newModule(mod.Name)
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 		rowNode := buildOIDPath(root, 1, 1, 1)
 		rowNode.setName("myEntry")
 		ctx.registerModuleNodeSymbol(mod, "myEntry", rowNode)
@@ -1161,17 +1197,17 @@ func TestInferNodeKinds(t *testing.T) {
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
-				Index:  []module.IndexItem{{Object: "myCol1"}},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "myCol1"}},
 			}},
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myCol1",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				DefBase: module.DefBase{Name: "myCol1"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			}},
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myCol2",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "DisplayString"},
+				DefBase: module.DefBase{Name: "myCol2"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "DisplayString"},
 			}},
 		}
 
@@ -1185,14 +1221,14 @@ func TestInferNodeKinds(t *testing.T) {
 	t.Run("skips objects with unresolved nodes", func(_ *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
-		ctx.ModuleToResolved[mod] = newModule(mod.Name)
+		ctx.modules = append(ctx.modules, mod)
+		ctx.moduleToResolved[mod] = newModule(mod.Name)
 
 		// Don't register any node - the lookup should fail silently.
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "missing",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				DefBase: module.DefBase{Name: "missing"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			}},
 		}
 
@@ -1203,10 +1239,10 @@ func TestInferNodeKinds(t *testing.T) {
 	t.Run("non-scalar children of rows not reclassified", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
-		ctx.ModuleToResolved[mod] = newModule(mod.Name)
+		ctx.modules = append(ctx.modules, mod)
+		ctx.moduleToResolved[mod] = newModule(mod.Name)
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 		rowNode := buildOIDPath(root, 1, 1, 1)
 		rowNode.setName("myEntry")
 		ctx.registerModuleNodeSymbol(mod, "myEntry", rowNode)
@@ -1217,9 +1253,9 @@ func TestInferNodeKinds(t *testing.T) {
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
-				Index:  []module.IndexItem{{Object: "someIndex"}},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "someIndex"}},
 			}},
 		}
 
@@ -1236,18 +1272,18 @@ func TestResolveTableSemantics(t *testing.T) {
 	t.Run("resolved indexes produce no diagnostic", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 		idxNode := buildOIDPath(root, 1, 1)
 		idxNode.setName("myIndex")
 		ctx.registerModuleNodeSymbol(mod, "myIndex", idxNode)
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
-				Index:  []module.IndexItem{{Object: "myIndex"}},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "myIndex"}},
 			}},
 		}
 
@@ -1259,13 +1295,13 @@ func TestResolveTableSemantics(t *testing.T) {
 	t.Run("unresolved index emits diagnostic", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
-				Index:  []module.IndexItem{{Object: "missingIndex"}},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "missingIndex"}},
 			}},
 		}
 
@@ -1279,15 +1315,15 @@ func TestResolveTableSemantics(t *testing.T) {
 	t.Run("bare type index skipped", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 
 		// INTEGER is a bare type, so it should not produce a diagnostic
 		// even though no node exists for it.
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
-				Index:  []module.IndexItem{{Object: "INTEGER"}},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "INTEGER"}},
 			}},
 		}
 
@@ -1299,16 +1335,16 @@ func TestResolveTableSemantics(t *testing.T) {
 	t.Run("resolved augments produce no diagnostic", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 		augTarget := buildOIDPath(root, 1, 1)
 		augTarget.setName("otherEntry")
 		ctx.registerModuleNodeSymbol(mod, "otherEntry", augTarget)
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:     "myAugEntry",
+				DefBase:  module.DefBase{Name: "myAugEntry"},
 				Syntax:   &module.TypeSyntaxTypeRef{Name: "MyAugEntry"},
 				Augments: "otherEntry",
 			}},
@@ -1322,11 +1358,11 @@ func TestResolveTableSemantics(t *testing.T) {
 	t.Run("unresolved augments emits diagnostic", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:     "myAugEntry",
+				DefBase:  module.DefBase{Name: "myAugEntry"},
 				Syntax:   &module.TypeSyntaxTypeRef{Name: "MyAugEntry"},
 				Augments: "missingEntry",
 			}},
@@ -1342,12 +1378,12 @@ func TestResolveTableSemantics(t *testing.T) {
 	t.Run("skips objects without index or augments", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myScalar",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				DefBase: module.DefBase{Name: "myScalar"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			}},
 		}
 
@@ -1359,17 +1395,17 @@ func TestResolveTableSemantics(t *testing.T) {
 	t.Run("mixed resolved and unresolved indexes", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 		idx1 := buildOIDPath(root, 1, 1)
 		idx1.setName("goodIndex")
 		ctx.registerModuleNodeSymbol(mod, "goodIndex", idx1)
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
 				Index: []module.IndexItem{
 					{Object: "goodIndex"},
 					{Object: "badIndex"},
@@ -1389,11 +1425,11 @@ func TestLinkObjectIndexes(t *testing.T) {
 	t.Run("links indexes with implied flag", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
+		ctx.moduleToResolved[mod] = resolvedMod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		// Create row node and object.
 		rowNode := buildOIDPath(root, 1, 1, 1)
@@ -1411,12 +1447,13 @@ func TestLinkObjectIndexes(t *testing.T) {
 		idxObj := newObject("myIndex")
 		idxObj.setNode(idxNode)
 		idxNode.setObject(idxObj)
+		resolvedMod.addObject(idxObj)
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
-				Index:  []module.IndexItem{{Object: "myIndex", Implied: true}},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "myIndex", Implied: true}},
 			}},
 		}
 
@@ -1431,11 +1468,11 @@ func TestLinkObjectIndexes(t *testing.T) {
 	t.Run("links augments", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
+		ctx.moduleToResolved[mod] = resolvedMod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		// Create the augmenting row.
 		augNode := buildOIDPath(root, 1, 2, 1)
@@ -1453,10 +1490,11 @@ func TestLinkObjectIndexes(t *testing.T) {
 		targetObj := newObject("targetEntry")
 		targetObj.setNode(targetNode)
 		targetNode.setObject(targetObj)
+		resolvedMod.addObject(targetObj)
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:     "myAugEntry",
+				DefBase:  module.DefBase{Name: "myAugEntry"},
 				Syntax:   &module.TypeSyntaxTypeRef{Name: "MyAugEntry"},
 				Augments: "targetEntry",
 			}},
@@ -1476,11 +1514,11 @@ func TestLinkObjectIndexes(t *testing.T) {
 	t.Run("index node without object emits diagnostic", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
+		ctx.moduleToResolved[mod] = resolvedMod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		rowNode := buildOIDPath(root, 1, 1, 1)
 		rowNode.setName("myEntry")
@@ -1497,9 +1535,9 @@ func TestLinkObjectIndexes(t *testing.T) {
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
-				Index:  []module.IndexItem{{Object: "bareNode"}},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "bareNode"}},
 			}},
 		}
 
@@ -1520,11 +1558,11 @@ func TestLinkObjectIndexes(t *testing.T) {
 	t.Run("augments node without object emits diagnostic", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
+		ctx.moduleToResolved[mod] = resolvedMod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		// Create the augmenting row.
 		augNode := buildOIDPath(root, 1, 2, 1)
@@ -1542,7 +1580,7 @@ func TestLinkObjectIndexes(t *testing.T) {
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:     "myAugEntry",
+				DefBase:  module.DefBase{Name: "myAugEntry"},
 				Syntax:   &module.TypeSyntaxTypeRef{Name: "MyAugEntry"},
 				Augments: "targetEntry",
 			}},
@@ -1565,11 +1603,11 @@ func TestLinkObjectIndexes(t *testing.T) {
 	t.Run("bare type index creates TypeName entry", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
+		ctx.moduleToResolved[mod] = resolvedMod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		rowNode := buildOIDPath(root, 1, 1, 1)
 		rowNode.setName("myEntry")
@@ -1581,9 +1619,9 @@ func TestLinkObjectIndexes(t *testing.T) {
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
-				Index:  []module.IndexItem{{Object: "INTEGER"}},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "INTEGER"}},
 			}},
 		}
 
@@ -1598,14 +1636,14 @@ func TestLinkObjectIndexes(t *testing.T) {
 	t.Run("nil resolved module skipped", func(_ *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx.Modules = append(ctx.Modules, mod)
+		ctx.modules = append(ctx.modules, mod)
 		// Don't set ModuleToResolved - should skip without panic.
 
 		objRefs := []objectTypeRef{
 			{mod: mod, obj: &module.ObjectType{
-				Name:   "myEntry",
-				Syntax: &module.TypeSyntaxTypeRef{Name: "MyEntry"},
-				Index:  []module.IndexItem{{Object: "myIndex"}},
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "myIndex"}},
 			}},
 		}
 
@@ -1681,7 +1719,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
 				&module.ObjectGroup{
-					Name:        "testGroup",
+					DefBase:     module.DefBase{Name: "testGroup"},
 					Objects:     []string{"obj1", "obj2"},
 					Status:      types.StatusCurrent,
 					Description: "test group",
@@ -1690,12 +1728,12 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		}
 
 		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
-		ctx.ResolvedToModule[resolvedMod] = mod
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		// Group node.
 		grpNode := buildOIDPath(root, 1, 1)
@@ -1714,7 +1752,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		count := createResolvedObjectGroups(ctx)
 		testutil.Equal(t, 1, count, "created count")
 
-		groups := ctx.Mib.Groups()
+		groups := ctx.mib.Groups()
 		testutil.Len(t, groups, 1, "mib groups")
 		testutil.Equal(t, "testGroup", groups[0].Name(), "group name")
 		testutil.False(t, groups[0].IsNotificationGroup(), "should not be notification group")
@@ -1735,19 +1773,19 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
 				&module.ObjectGroup{
-					Name:    "testGroup",
+					DefBase: module.DefBase{Name: "testGroup"},
 					Objects: []string{"notAccessObj"},
 				},
 			},
 		}
 
 		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
-		ctx.ResolvedToModule[resolvedMod] = mod
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		grpNode := buildOIDPath(root, 1, 1)
 		grpNode.setName("testGroup")
@@ -1779,17 +1817,17 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
 				&module.ObjectGroup{
-					Name:    "missingGroup",
+					DefBase: module.DefBase{Name: "missingGroup"},
 					Objects: []string{"obj1"},
 				},
 			},
 		}
 
 		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
-		ctx.ResolvedToModule[resolvedMod] = mod
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
 
 		count := createResolvedObjectGroups(ctx)
 		testutil.Equal(t, 0, count, "should create no groups when node is missing")
@@ -1800,19 +1838,19 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
 				&module.ObjectGroup{
-					Name:    "testGroup",
+					DefBase: module.DefBase{Name: "testGroup"},
 					Objects: []string{"obj1", "missing"},
 				},
 			},
 		}
 
 		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
-		ctx.ResolvedToModule[resolvedMod] = mod
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		grpNode := buildOIDPath(root, 1, 1)
 		grpNode.setName("testGroup")
@@ -1825,7 +1863,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 
 		createResolvedObjectGroups(ctx)
 
-		groups := ctx.Mib.Groups()
+		groups := ctx.mib.Groups()
 		testutil.Len(t, groups, 1, "mib groups")
 		testutil.Len(t, groups[0].Members(), 1, "only resolved member should be present")
 		testutil.Equal(t, m1, groups[0].Members()[0], "resolved member")
@@ -1847,7 +1885,7 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
 				&module.NotificationGroup{
-					Name:          "testNotifGroup",
+					DefBase:       module.DefBase{Name: "testNotifGroup"},
 					Notifications: []string{"notif1", "notif2"},
 					Status:        types.StatusCurrent,
 					Description:   "notification group",
@@ -1856,12 +1894,12 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 		}
 
 		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
-		ctx.ResolvedToModule[resolvedMod] = mod
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		grpNode := buildOIDPath(root, 1, 1)
 		grpNode.setName("testNotifGroup")
@@ -1878,7 +1916,7 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 		count := createResolvedNotificationGroups(ctx)
 		testutil.Equal(t, 1, count, "created count")
 
-		groups := ctx.Mib.Groups()
+		groups := ctx.mib.Groups()
 		testutil.Len(t, groups, 1, "mib groups")
 		testutil.True(t, groups[0].IsNotificationGroup(), "should be notification group")
 		testutil.Len(t, groups[0].Members(), 2, "members")
@@ -1889,19 +1927,19 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
 				&module.NotificationGroup{
-					Name:          "testNotifGroup",
+					DefBase:       module.DefBase{Name: "testNotifGroup"},
 					Notifications: []string{"notif1", "missing"},
 				},
 			},
 		}
 
 		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
-		ctx.ResolvedToModule[resolvedMod] = mod
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		grpNode := buildOIDPath(root, 1, 1)
 		grpNode.setName("testNotifGroup")
@@ -1914,7 +1952,7 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 
 		createResolvedNotificationGroups(ctx)
 
-		groups := ctx.Mib.Groups()
+		groups := ctx.mib.Groups()
 		testutil.Len(t, groups, 1, "mib groups")
 		testutil.Len(t, groups[0].Members(), 1, "only resolved member should be present")
 		testutil.Equal(t, n1, groups[0].Members()[0], "resolved member")
@@ -1934,14 +1972,14 @@ func TestRegisterNotification(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
 	resolvedMod := newModule(mod.Name)
-	ctx.ModuleToResolved[mod] = resolvedMod
+	ctx.moduleToResolved[mod] = resolvedMod
 
-	node := buildOIDPath(ctx.Mib.Root(), 1, 1)
+	node := buildOIDPath(ctx.mib.Root(), 1, 1)
 	notif := newNotification("testNotif")
 
 	registerNotification(ctx, mod, node, notif)
 
-	testutil.Len(t, ctx.Mib.Notifications(), 1, "mib notifications")
+	testutil.Len(t, ctx.mib.Notifications(), 1, "mib notifications")
 	testutil.NotNil(t, node.Notification(), "node notification")
 	testutil.Equal(t, notif, node.Notification(), "node notification")
 	testutil.Len(t, resolvedMod.Notifications(), 1, "module notifications")
@@ -1951,14 +1989,14 @@ func TestRegisterGroup(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
 	resolvedMod := newModule(mod.Name)
-	ctx.ModuleToResolved[mod] = resolvedMod
+	ctx.moduleToResolved[mod] = resolvedMod
 
-	node := buildOIDPath(ctx.Mib.Root(), 1, 1)
+	node := buildOIDPath(ctx.mib.Root(), 1, 1)
 	grp := newGroup("testGroup")
 
 	registerGroup(ctx, mod, node, grp)
 
-	testutil.Len(t, ctx.Mib.Groups(), 1, "mib groups")
+	testutil.Len(t, ctx.mib.Groups(), 1, "mib groups")
 	testutil.NotNil(t, node.Group(), "node group")
 	testutil.Equal(t, grp, node.Group(), "node group")
 	testutil.Len(t, resolvedMod.Groups(), 1, "module groups")
@@ -1968,14 +2006,14 @@ func TestRegisterCompliance(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
 	resolvedMod := newModule(mod.Name)
-	ctx.ModuleToResolved[mod] = resolvedMod
+	ctx.moduleToResolved[mod] = resolvedMod
 
-	node := buildOIDPath(ctx.Mib.Root(), 1, 1)
+	node := buildOIDPath(ctx.mib.Root(), 1, 1)
 	comp := newCompliance("testCompliance")
 
 	registerCompliance(ctx, mod, node, comp)
 
-	testutil.Len(t, ctx.Mib.Compliances(), 1, "mib compliances")
+	testutil.Len(t, ctx.mib.Compliances(), 1, "mib compliances")
 	testutil.NotNil(t, node.Compliance(), "node compliance")
 	testutil.Equal(t, comp, node.Compliance(), "node compliance")
 	testutil.Len(t, resolvedMod.Compliances(), 1, "module compliances")
@@ -1985,14 +2023,14 @@ func TestRegisterCapability(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
 	resolvedMod := newModule(mod.Name)
-	ctx.ModuleToResolved[mod] = resolvedMod
+	ctx.moduleToResolved[mod] = resolvedMod
 
-	node := buildOIDPath(ctx.Mib.Root(), 1, 1)
+	node := buildOIDPath(ctx.mib.Root(), 1, 1)
 	capability := newCapability("testCapability")
 
 	registerCapability(ctx, mod, node, capability)
 
-	testutil.Len(t, ctx.Mib.Capabilities(), 1, "mib capabilities")
+	testutil.Len(t, ctx.mib.Capabilities(), 1, "mib capabilities")
 	testutil.NotNil(t, node.Capability(), "node capability")
 	testutil.Equal(t, capability, node.Capability(), "node capability")
 	testutil.Len(t, resolvedMod.Capabilities(), 1, "module capabilities")
@@ -2004,7 +2042,7 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
 				&module.Notification{
-					Name:    "myNotif",
+					DefBase: module.DefBase{Name: "myNotif"},
 					Objects: []string{"obj1", "obj2"},
 					Status:  types.StatusCurrent,
 				},
@@ -2012,12 +2050,12 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 		}
 
 		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
-		ctx.ResolvedToModule[resolvedMod] = mod
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		notifNode := buildOIDPath(root, 1, 1)
 		notifNode.setName("myNotif")
@@ -2037,7 +2075,7 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 
 		createResolvedNotifications(ctx)
 
-		notifs := ctx.Mib.Notifications()
+		notifs := ctx.mib.Notifications()
 		testutil.Len(t, notifs, 1, "mib notifications")
 		testutil.Equal(t, "myNotif", notifs[0].Name(), "notification name")
 		testutil.Len(t, notifs[0].Objects(), 2, "notification objects")
@@ -2048,19 +2086,19 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
 				&module.Notification{
-					Name:    "myNotif",
+					DefBase: module.DefBase{Name: "myNotif"},
 					Objects: []string{"missingObj"},
 				},
 			},
 		}
 
 		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
-		ctx.ResolvedToModule[resolvedMod] = mod
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 		notifNode := buildOIDPath(root, 1, 1)
 		notifNode.setName("myNotif")
 		ctx.registerModuleNodeSymbol(mod, "myNotif", notifNode)
@@ -2077,7 +2115,7 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 			Name: "A-MIB",
 			Definitions: []module.Definition{
 				&module.Notification{
-					Name:    "myNotif",
+					DefBase: module.DefBase{Name: "myNotif"},
 					Objects: []string{"foreignObj"},
 				},
 			},
@@ -2085,16 +2123,16 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 		modB := &module.Module{Name: "B-MIB"}
 
 		ctx := newResolverContext([]*module.Module{modA, modB}, nil, PermissiveConfig())
-		ctx.ModuleIndex[modA.Name] = []*module.Module{modA}
-		ctx.ModuleIndex[modB.Name] = []*module.Module{modB}
+		ctx.moduleIndex[modA.Name] = []*module.Module{modA}
+		ctx.moduleIndex[modB.Name] = []*module.Module{modB}
 		resolvedModA := newModule(modA.Name)
-		ctx.ModuleToResolved[modA] = resolvedModA
-		ctx.ResolvedToModule[resolvedModA] = modA
+		ctx.moduleToResolved[modA] = resolvedModA
+		ctx.resolvedToModule[resolvedModA] = modA
 		resolvedModB := newModule(modB.Name)
-		ctx.ModuleToResolved[modB] = resolvedModB
-		ctx.ResolvedToModule[resolvedModB] = modB
+		ctx.moduleToResolved[modB] = resolvedModB
+		ctx.resolvedToModule[resolvedModB] = modB
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 
 		notifNode := buildOIDPath(root, 1, 1)
 		notifNode.setName("myNotif")
@@ -2109,7 +2147,7 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 
 		createResolvedNotifications(ctx)
 
-		notifs := ctx.Mib.Notifications()
+		notifs := ctx.mib.Notifications()
 		testutil.Len(t, notifs, 1, "mib notifications")
 		testutil.Len(t, notifs[0].Objects(), 1, "notification objects via permissive fallback")
 	})
@@ -2119,7 +2157,7 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
 				&module.Notification{
-					Name: "myTrap",
+					DefBase: module.DefBase{Name: "myTrap"},
 					TrapInfo: &module.TrapInfo{
 						Enterprise: "enterprises",
 						TrapNumber: 42,
@@ -2129,19 +2167,19 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 		}
 
 		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
 		resolvedMod := newModule(mod.Name)
-		ctx.ModuleToResolved[mod] = resolvedMod
-		ctx.ResolvedToModule[resolvedMod] = mod
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
 
-		root := ctx.Mib.Root()
+		root := ctx.mib.Root()
 		trapNode := buildOIDPath(root, 1, 1)
 		trapNode.setName("myTrap")
 		ctx.registerModuleNodeSymbol(mod, "myTrap", trapNode)
 
 		createResolvedNotifications(ctx)
 
-		notifs := ctx.Mib.Notifications()
+		notifs := ctx.mib.Notifications()
 		testutil.Len(t, notifs, 1, "mib notifications")
 		ti := notifs[0].TrapInfo()
 		testutil.NotNil(t, ti, "trap info")
@@ -2158,20 +2196,20 @@ func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 		Name: "TEST-MIB",
 		Definitions: []module.Definition{
 			&module.Notification{
-				Name:    "testNotif",
+				DefBase: module.DefBase{Name: "testNotif"},
 				Objects: []string{"intermediateNode"},
 			},
 		},
 	}
 
 	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-	ctx.ModuleIndex[mod.Name] = []*module.Module{mod}
+	ctx.moduleIndex[mod.Name] = []*module.Module{mod}
 	resolvedMod := newModule(mod.Name)
-	ctx.ModuleToResolved[mod] = resolvedMod
-	ctx.ResolvedToModule[resolvedMod] = mod
+	ctx.moduleToResolved[mod] = resolvedMod
+	ctx.resolvedToModule[resolvedMod] = mod
 
 	// Create a node for the notification itself
-	root := ctx.Mib.Root()
+	root := ctx.mib.Root()
 	notifNode := root.getOrCreateChild(1)
 	notifNode.setName("testNotif")
 	ctx.registerModuleNodeSymbol(mod, "testNotif", notifNode)
