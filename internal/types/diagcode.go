@@ -52,6 +52,9 @@ const (
 	DiagMalformedHexDefval       = "malformed-hex-defval"
 	DiagDefvalUnresolved         = "defval-unresolved"
 	DiagVariationAccessNotifOnly = "variation-access-notification-only"
+	DiagGroupMemberUnresolved    = "group-member-unresolved"
+	DiagIndexNotObject           = "index-not-object"
+	DiagAugmentsNotObject        = "augments-not-object"
 )
 
 // AllDiagnosticCodes returns all known diagnostic codes grouped by phase.
@@ -96,6 +99,9 @@ func AllDiagnosticCodes() []DiagCodeInfo {
 		{Code: DiagMalformedHexDefval, Phase: "resolver"},
 		{Code: DiagDefvalUnresolved, Phase: "resolver"},
 		{Code: DiagVariationAccessNotifOnly, Phase: "resolver"},
+		{Code: DiagGroupMemberUnresolved, Phase: "resolver"},
+		{Code: DiagIndexNotObject, Phase: "resolver"},
+		{Code: DiagAugmentsNotObject, Phase: "resolver"},
 	}
 }
 
