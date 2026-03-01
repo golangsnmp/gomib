@@ -9,9 +9,11 @@ import (
 	"io"
 	"slices"
 	"strings"
+
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 )
 
-func cmdTestgen(args []string) int {
+func (c *cli) cmdTestgen(args []string) int {
 	fs := flag.NewFlagSet("testgen", flag.ContinueOnError)
 	testType := fs.String("type", "tables", "Test type: tables, oids, enums, access")
 	varName := fs.String("var", "", "Variable name for generated slice (default: auto)")
@@ -35,15 +37,15 @@ Options:
 
 	modules := fs.Args()
 	if len(modules) == 0 {
-		printError("at least one MODULE is required")
+		cliutil.PrintError("at least one MODULE is required")
 		return 1
 	}
 
-	mibPaths := getMIBPaths()
+	mibPaths := c.paths
 
-	out, cleanup, err := getOutput()
+	out, cleanup, err := c.getOutput()
 	if err != nil {
-		printError("cannot open output: %v", err)
+		cliutil.PrintError("cannot open output: %v", err)
 		return 1
 	}
 	defer cleanup()
@@ -54,7 +56,7 @@ Options:
 
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, modules)
 	if err != nil {
-		printError("net-snmp load failed: %v", err)
+		cliutil.PrintError("net-snmp load failed: %v", err)
 		return 1
 	}
 
@@ -86,7 +88,7 @@ Options:
 	case "tc":
 		return generateTCTests(out, netsnmpNodes, modules, *varName)
 	default:
-		printError("unknown test type: %s (expected: tables, oids, enums, access, augments, ranges, bits, hints, units, defval, notifications, tc)", *testType)
+		cliutil.PrintError("unknown test type: %s (expected: tables, oids, enums, access, augments, ranges, bits, hints, units, defval, notifications, tc)", *testType)
 		return 1
 	}
 }

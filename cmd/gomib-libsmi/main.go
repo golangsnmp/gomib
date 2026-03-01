@@ -34,11 +34,11 @@ Examples:
   gomib-libsmi compare -p ./testdata/corpus/primary IF-MIB SNMPv2-MIB
 `
 
-var (
+type cli struct {
 	paths      []string
 	outputFile string
 	jsonOutput bool
-)
+}
 
 func main() {
 	os.Exit(run())
@@ -50,9 +50,11 @@ func run() int {
 		cliutil.PrintError("%s", errMsg)
 		return 1
 	}
-	paths = flags.Paths
-	outputFile = flags.OutputFile
-	jsonOutput = flags.JSONOutput
+	c := cli{
+		paths:      flags.Paths,
+		outputFile: flags.OutputFile,
+		jsonOutput: flags.JSONOutput,
+	}
 
 	if flags.HelpFlag && cmd == "" {
 		fmt.Fprint(os.Stdout, usage)
@@ -66,11 +68,11 @@ func run() int {
 
 	switch cmd {
 	case "diag":
-		return cmdDiag(cmdArgs)
+		return c.cmdDiag(cmdArgs)
 	case "accept":
-		return cmdAccept(cmdArgs)
+		return c.cmdAccept(cmdArgs)
 	case "compare":
-		return cmdCompare(cmdArgs)
+		return c.cmdCompare(cmdArgs)
 	case "help":
 		fmt.Fprint(os.Stdout, usage)
 		return 0
@@ -81,16 +83,8 @@ func run() int {
 	}
 }
 
-func getOutput() (*os.File, func(), error) {
-	return cliutil.GetOutput(outputFile)
-}
-
-func getMIBPaths() []string {
-	return paths
-}
-
-func printError(format string, args ...any) {
-	cliutil.PrintError(format, args...)
+func (c *cli) getOutput() (*os.File, func(), error) {
+	return cliutil.GetOutput(c.outputFile)
 }
 
 // buildSource creates a gomib.Source from multiple directory paths.

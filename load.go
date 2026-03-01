@@ -121,11 +121,11 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 		}
 	}
 
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
 	if firstErr != nil {
 		return nil, firstErr
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 
 	mods := collectModules(modules)

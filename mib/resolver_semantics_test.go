@@ -962,12 +962,15 @@ func TestConvertSupportsModules(t *testing.T) {
 func TestConvertDefValOidValue(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}
+	smiMod := &module.Module{Name: "SNMPv2-SMI"}
+	ctx.ModuleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
 	root := ctx.Mib.Root()
 	child := root.getOrCreateChild(1)
 	child2 := child.getOrCreateChild(3)
 	child2.setName("enterprises")
 	ctx.registerModuleNodeSymbol(mod, "enterprises", child2)
+	ctx.registerModuleNodeSymbol(smiMod, "enterprises", child2)
 
 	t.Run("resolves name with trailing numeric arcs", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{

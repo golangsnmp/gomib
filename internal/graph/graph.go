@@ -61,8 +61,8 @@ func (g *Graph) AddEdge(from, to Symbol) {
 	g.edges[fromID] = append(g.edges[fromID], toID)
 }
 
-// Dependencies returns the symbols that sym depends on (forward edges).
-func (g *Graph) Dependencies(sym Symbol) []Symbol {
+// dependencies returns the symbols that sym depends on (forward edges).
+func (g *Graph) dependencies(sym Symbol) []Symbol {
 	id, ok := g.nodeToID[sym]
 	if !ok {
 		return nil
@@ -75,8 +75,8 @@ func (g *Graph) Dependencies(sym Symbol) []Symbol {
 	return result
 }
 
-// HasNode reports whether the symbol exists in the graph.
-func (g *Graph) HasNode(sym Symbol) bool {
+// hasNode reports whether the symbol exists in the graph.
+func (g *Graph) hasNode(sym Symbol) bool {
 	_, ok := g.nodeToID[sym]
 	return ok
 }

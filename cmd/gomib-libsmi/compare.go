@@ -51,7 +51,7 @@ type MatchCount struct {
 	Mismatch int `json:"mismatch"`
 }
 
-func cmdCompare(args []string) int {
+func (c *cli) cmdCompare(args []string) int {
 	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
 
 	fs.Usage = func() {
@@ -74,26 +74,26 @@ Options:
 	}
 
 	modules := fs.Args()
-	mibPaths := getMIBPaths()
+	mibPaths := c.paths
 	if len(mibPaths) == 0 {
-		printError("at least one -p PATH is required")
+		cliutil.PrintError("at least one -p PATH is required")
 		return 1
 	}
 
-	out, cleanup, err := getOutput()
+	out, cleanup, err := c.getOutput()
 	if err != nil {
-		printError("cannot open output: %v", err)
+		cliutil.PrintError("cannot open output: %v", err)
 		return 1
 	}
 	defer cleanup()
 
 	result := compareSemantics(modules, mibPaths)
 
-	if jsonOutput {
+	if c.jsonOutput {
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(result); err != nil {
-			printError("json encode failed: %v", err)
+			cliutil.PrintError("json encode failed: %v", err)
 			return 1
 		}
 	} else {

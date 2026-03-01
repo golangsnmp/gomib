@@ -16,10 +16,10 @@ func TestGraphBasic(t *testing.T) {
 	g.AddNode(b)
 	g.AddEdge(a, b)
 
-	testutil.True(t, g.HasNode(a), "graph should have node a")
-	testutil.True(t, g.HasNode(b), "graph should have node b")
-	testutil.Len(t, g.Dependencies(a), 1, "a dependencies")
-	testutil.Equal(t, b, g.Dependencies(a)[0], "a depends on")
+	testutil.True(t, g.hasNode(a), "graph should have node a")
+	testutil.True(t, g.hasNode(b), "graph should have node b")
+	testutil.Len(t, g.dependencies(a), 1, "a dependencies")
+	testutil.Equal(t, b, g.dependencies(a)[0], "a depends on")
 }
 
 func TestAddEdgeCreatesNodes(t *testing.T) {
@@ -31,17 +31,17 @@ func TestAddEdgeCreatesNodes(t *testing.T) {
 	// No AddNode calls, only AddEdge.
 	g.AddEdge(a, b)
 
-	testutil.True(t, g.HasNode(a), "AddEdge should create 'from' node")
-	testutil.True(t, g.HasNode(b), "AddEdge should create 'to' node")
-	testutil.Len(t, g.Dependencies(a), 1, "a dependencies")
+	testutil.True(t, g.hasNode(a), "AddEdge should create 'from' node")
+	testutil.True(t, g.hasNode(b), "AddEdge should create 'to' node")
+	testutil.Len(t, g.dependencies(a), 1, "a dependencies")
 }
 
 func TestHasNode(t *testing.T) {
 	g := New(0)
 	a := Symbol{Module: "M", Name: "a"}
-	testutil.False(t, g.HasNode(a), "empty graph should not have node")
+	testutil.False(t, g.hasNode(a), "empty graph should not have node")
 	g.AddNode(a)
-	testutil.True(t, g.HasNode(a), "should have node after AddNode")
+	testutil.True(t, g.hasNode(a), "should have node after AddNode")
 }
 
 func TestDuplicateEdges(t *testing.T) {
@@ -54,7 +54,7 @@ func TestDuplicateEdges(t *testing.T) {
 	g.AddEdge(a, b)
 	g.AddEdge(a, b)
 
-	testutil.Len(t, g.Dependencies(a), 1, "duplicate edges deduplicated")
+	testutil.Len(t, g.dependencies(a), 1, "duplicate edges deduplicated")
 
 	order, cycles := g.ResolutionOrder()
 	testutil.Len(t, cycles, 0, "cycles")

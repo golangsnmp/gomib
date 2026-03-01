@@ -11,6 +11,8 @@ import (
 	"os"
 	"slices"
 	"strings"
+
+	"github.com/golangsnmp/gomib/cmd/internal/cliutil"
 )
 
 // TableComparisonResult holds INDEX and AUGMENTS comparison results.
@@ -48,7 +50,7 @@ type TableComparison struct {
 	AugmentsMatch bool        `json:"augments_match"`
 }
 
-func cmdTables(args []string) int {
+func (c *cli) cmdTables(args []string) int {
 	fs := flag.NewFlagSet("tables", flag.ContinueOnError)
 	detailed := fs.Bool("detailed", false, "Show detailed per-table comparison")
 
@@ -70,11 +72,11 @@ Options:
 	}
 
 	modules := fs.Args()
-	mibPaths := getMIBPaths()
+	mibPaths := c.paths
 
-	out, cleanup, err := getOutput()
+	out, cleanup, err := c.getOutput()
 	if err != nil {
-		printError("cannot open output: %v", err)
+		cliutil.PrintError("cannot open output: %v", err)
 		return 1
 	}
 	defer cleanup()
@@ -82,14 +84,14 @@ Options:
 	fmt.Fprintln(os.Stderr, "Loading MIBs with net-snmp...")
 	netsnmpNodes, err := loadNetSnmpNodes(mibPaths, modules)
 	if err != nil {
-		printError("net-snmp load failed: %v", err)
+		cliutil.PrintError("net-snmp load failed: %v", err)
 		return 1
 	}
 
 	fmt.Fprintln(os.Stderr, "Loading MIBs with mib...")
 	gomibNodes, err := loadGomibNodes(mibPaths, modules)
 	if err != nil {
-		printError("gomib load failed: %v", err)
+		cliutil.PrintError("gomib load failed: %v", err)
 		return 1
 	}
 
@@ -100,11 +102,11 @@ Options:
 
 	result := compareTables(netsnmpNodes, gomibNodes, *detailed)
 
-	if jsonOutput {
+	if c.jsonOutput {
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(result); err != nil {
-			printError("json encode failed: %v", err)
+			cliutil.PrintError("json encode failed: %v", err)
 			return 1
 		}
 	} else {

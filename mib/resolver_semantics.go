@@ -864,15 +864,17 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 				mod, types.Span{}, "DEFVAL OID value has no components")
 			return nil
 		}
-		var name string
+		var name, qualModule string
 		switch c := v.Components[0].(type) {
 		case *module.OidComponentName:
 			name = c.NameValue
 		case *module.OidComponentNamedNumber:
 			name = c.NameValue
 		case *module.OidComponentQualifiedName:
+			qualModule = c.ModuleValue
 			name = c.NameValue
 		case *module.OidComponentQualifiedNamedNumber:
+			qualModule = c.ModuleValue
 			name = c.NameValue
 		}
 		if name == "" {
@@ -880,7 +882,13 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 				mod, types.Span{}, "DEFVAL OID value has no named root component")
 			return nil
 		}
-		node, ok := ctx.LookupNodeForModule(mod, name)
+		var node *Node
+		var ok bool
+		if qualModule != "" {
+			node, ok = ctx.LookupNodeInModule(qualModule, name)
+		} else {
+			node, ok = ctx.LookupNodeForModule(mod, name)
+		}
 		if !ok {
 			ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
 				mod, types.Span{}, "DEFVAL OID root "+name+" could not be resolved")
