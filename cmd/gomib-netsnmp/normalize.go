@@ -144,7 +144,7 @@ func loadGomibNodes(mibPaths, modules []string) (map[string]*NormalizedNode, err
 
 	var sources []gomib.Source
 	for _, p := range mibPaths {
-		src, err := gomib.DirTree(p)
+		src, err := gomib.Dir(p)
 		if err != nil {
 			return nil, fmt.Errorf("invalid path %s: %w", p, err)
 		}

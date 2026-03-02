@@ -97,66 +97,68 @@ func FuzzParseModule(f *testing.F) {
 		}
 
 		p := New(data, nil, types.PermissiveConfig())
-		mod := p.ParseModule()
+		mods := p.ParseModule()
 
-		if mod == nil {
-			t.Fatal("ParseModule returned nil")
+		if len(mods) == 0 {
+			t.Fatal("ParseModule returned empty slice")
 		}
-		for _, d := range mod.Diagnostics {
-			if d.Code == "" {
-				t.Fatal("diagnostic has empty Code")
-			}
-		}
-
-		// Validate module span.
 		inputLen := types.ByteOffset(len(data))
-		if mod.Span.Start > mod.Span.End {
-			t.Fatalf("module span start %d > end %d", mod.Span.Start, mod.Span.End)
-		}
-		if mod.Span.End > inputLen {
-			t.Fatalf("module span end %d > input length %d", mod.Span.End, inputLen)
-		}
-
-		// Validate definition spans are ordered and within input bounds.
-		for _, def := range mod.Body {
-			span := def.DefinitionSpan()
-			if span.Start > span.End {
-				t.Fatalf("definition span start %d > end %d", span.Start, span.End)
-			}
-			if span.End > inputLen {
-				t.Fatalf("definition span end %d > input length %d", span.End, inputLen)
-			}
-			// Definition name span (if present) must also be valid.
-			if name := def.DefinitionName(); name != nil && name.Name != "" {
-				ns := name.Span
-				if ns.Start > ns.End {
-					t.Fatalf("definition name %q span start %d > end %d",
-						name.Name, ns.Start, ns.End)
-				}
-				if ns.End > inputLen {
-					t.Fatalf("definition name %q span end %d > input length %d",
-						name.Name, ns.End, inputLen)
+		for _, mod := range mods {
+			for _, d := range mod.Diagnostics {
+				if d.Code == "" {
+					t.Fatal("diagnostic has empty Code")
 				}
 			}
-		}
 
-		// Validate import clause spans.
-		for _, imp := range mod.Imports {
-			if imp.Span.Start > imp.Span.End {
-				t.Fatalf("import span start %d > end %d", imp.Span.Start, imp.Span.End)
+			// Validate module span.
+			if mod.Span.Start > mod.Span.End {
+				t.Fatalf("module span start %d > end %d", mod.Span.Start, mod.Span.End)
 			}
-			if imp.Span.End > inputLen {
-				t.Fatalf("import span end %d > input length %d", imp.Span.End, inputLen)
+			if mod.Span.End > inputLen {
+				t.Fatalf("module span end %d > input length %d", mod.Span.End, inputLen)
 			}
-		}
 
-		// Validate diagnostic spans.
-		for _, d := range mod.Diagnostics {
-			if d.Span.Start > d.Span.End {
-				t.Fatalf("diagnostic span start %d > end %d", d.Span.Start, d.Span.End)
+			// Validate definition spans are ordered and within input bounds.
+			for _, def := range mod.Body {
+				span := def.DefinitionSpan()
+				if span.Start > span.End {
+					t.Fatalf("definition span start %d > end %d", span.Start, span.End)
+				}
+				if span.End > inputLen {
+					t.Fatalf("definition span end %d > input length %d", span.End, inputLen)
+				}
+				// Definition name span (if present) must also be valid.
+				if name := def.DefinitionName(); name != nil && name.Name != "" {
+					ns := name.Span
+					if ns.Start > ns.End {
+						t.Fatalf("definition name %q span start %d > end %d",
+							name.Name, ns.Start, ns.End)
+					}
+					if ns.End > inputLen {
+						t.Fatalf("definition name %q span end %d > input length %d",
+							name.Name, ns.End, inputLen)
+					}
+				}
 			}
-			if d.Span.End > inputLen {
-				t.Fatalf("diagnostic span end %d > input length %d", d.Span.End, inputLen)
+
+			// Validate import clause spans.
+			for _, imp := range mod.Imports {
+				if imp.Span.Start > imp.Span.End {
+					t.Fatalf("import span start %d > end %d", imp.Span.Start, imp.Span.End)
+				}
+				if imp.Span.End > inputLen {
+					t.Fatalf("import span end %d > input length %d", imp.Span.End, inputLen)
+				}
+			}
+
+			// Validate diagnostic spans.
+			for _, d := range mod.Diagnostics {
+				if d.Span.Start > d.Span.End {
+					t.Fatalf("diagnostic span start %d > end %d", d.Span.Start, d.Span.End)
+				}
+				if d.Span.End > inputLen {
+					t.Fatalf("diagnostic span end %d > input length %d", d.Span.End, inputLen)
+				}
 			}
 		}
 	})
@@ -214,10 +216,11 @@ func FuzzConstraintParsing(f *testing.F) {
 		}
 
 		p := New(src, nil, types.PermissiveConfig())
-		mod := p.ParseModule()
-		if mod == nil {
-			t.Fatal("ParseModule returned nil")
+		mods := p.ParseModule()
+		if len(mods) == 0 {
+			t.Fatal("ParseModule returned empty slice")
 		}
+		mod := mods[0]
 
 		// All diagnostics must have codes.
 		for _, d := range mod.Diagnostics {

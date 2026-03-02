@@ -1,6 +1,7 @@
 package gomib
 
 import (
+	"bytes"
 	"errors"
 	"io/fs"
 	"log/slog"
@@ -28,7 +29,7 @@ type FindResult struct {
 // Source provides access to MIB files for the loading pipeline.
 // Implementations are passed to [WithSource] and searched in order
 // during [Load] to locate module files by name. The standard
-// implementations are [Dir], [DirTree], [FS], and [Multi].
+// implementations are [Dir], [FS], and [Multi].
 type Source interface {
 	// Find returns the MIB content for the named module,
 	// or fs.ErrNotExist if the module is not available.
@@ -79,117 +80,29 @@ func validateDir(path string) error {
 	return nil
 }
 
-type dirSource struct {
-	path   string
-	config sourceConfig
-}
-
-// Dir creates a Source that searches a single directory (no recursion).
-// Files are looked up lazily on each Find() call.
-func Dir(path string, opts ...SourceOption) (Source, error) {
-	if err := validateDir(path); err != nil {
-		return nil, err
-	}
-	cfg := defaultSourceConfig()
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-	return &dirSource{path: path, config: cfg}, nil
-}
-
-// MustDir is like Dir but panics on error.
-func MustDir(path string, opts ...SourceOption) Source {
-	src, err := Dir(path, opts...)
-	if err != nil {
-		panic(err)
-	}
-	return src
-}
-
-func (s *dirSource) Find(name string) (FindResult, error) {
-	for _, ext := range s.config.extensions {
-		fullPath := filepath.Join(s.path, name+ext)
-		content, err := os.ReadFile(fullPath)
-		if err == nil {
-			return FindResult{Content: content, Path: fullPath}, nil
-		}
-		if !errors.Is(err, fs.ErrNotExist) {
-			return FindResult{Path: fullPath}, err
-		}
-	}
-	return FindResult{}, fs.ErrNotExist
-}
-
-func (s *dirSource) ListModules() ([]string, error) {
-	extSet := makeExtensionSet(s.config.extensions)
-	entries, err := os.ReadDir(s.path)
-	if err != nil {
-		return nil, err
-	}
-
-	var names []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		if hasValidExtension(entry.Name(), extSet) {
-			names = append(names, moduleNameFromPath(entry.Name()))
-		}
-	}
-	return dedup(names), nil
-}
-
-type treeSource struct {
-	index  map[string]string // module name -> file path
-	config sourceConfig
-}
-
-// DirTree creates a Source that recursively indexes a directory tree.
-// It walks the tree once at construction and builds a name->path index.
+// Dir creates a Source that recursively indexes a directory tree.
+// It walks the tree once at construction and builds a name->path index
+// using content-derived module names (not filenames).
 // First match wins for duplicate names.
-func DirTree(root string, opts ...SourceOption) (Source, error) {
+func Dir(root string, opts ...SourceOption) (Source, error) {
 	if err := validateDir(root); err != nil {
 		return nil, err
 	}
-
-	cfg := defaultSourceConfig()
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-
-	index, err := buildTreeIndex(cfg.extensions, func(fn fs.WalkDirFunc) error {
-		return filepath.WalkDir(root, fn)
-	})
-	if err != nil {
+	src := FS(root, os.DirFS(root), opts...)
+	// Trigger eager indexing so walk errors are returned at construction time.
+	if _, err := src.ListModules(); err != nil {
 		return nil, err
 	}
-
-	return &treeSource{index: index, config: cfg}, nil
+	return src, nil
 }
 
-// MustDirTree is like DirTree but panics on error.
-func MustDirTree(root string, opts ...SourceOption) Source {
-	src, err := DirTree(root, opts...)
+// MustDir is like Dir but panics on error.
+func MustDir(root string, opts ...SourceOption) Source {
+	src, err := Dir(root, opts...)
 	if err != nil {
 		panic(err)
 	}
 	return src
-}
-
-func (s *treeSource) Find(name string) (FindResult, error) {
-	path, ok := s.index[name]
-	if !ok {
-		return FindResult{}, fs.ErrNotExist
-	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return FindResult{Path: path}, err
-	}
-	return FindResult{Content: content, Path: path}, nil
-}
-
-func (s *treeSource) ListModules() ([]string, error) {
-	return slices.Sorted(maps.Keys(s.index)), nil
 }
 
 type fsSource struct {
@@ -203,12 +116,9 @@ type fsSource struct {
 }
 
 // FS creates a Source backed by an fs.FS (e.g., embed.FS).
-// The name is used in diagnostic paths. The filesystem is lazily
-// indexed on first use.
-//
-// Unlike Dir and DirTree, FS does not return an error at construction time.
-// This is intentional: embed.FS cannot be walked until the program runs,
-// so validation is deferred to the first Find or ListModules call.
+// The name is used as a prefix in diagnostic paths. The filesystem
+// is lazily indexed on first use. Errors are deferred to the first
+// Find or ListModules call.
 func FS(name string, fsys fs.FS, opts ...SourceOption) Source {
 	cfg := defaultSourceConfig()
 	for _, opt := range opts {
@@ -233,7 +143,7 @@ func (s *fsSource) Find(name string) (FindResult, error) {
 	if !ok {
 		return FindResult{}, fs.ErrNotExist
 	}
-	fullPath := s.name + ":" + path
+	fullPath := filepath.Join(s.name, path)
 	content, err := fs.ReadFile(s.fsys, path)
 	if err != nil {
 		return FindResult{Path: fullPath}, err
@@ -254,6 +164,8 @@ func (s *fsSource) ListModules() ([]string, error) {
 func (s *fsSource) buildIndex() (map[string]string, error) {
 	return buildTreeIndex(s.config.extensions, func(fn fs.WalkDirFunc) error {
 		return fs.WalkDir(s.fsys, ".", fn)
+	}, func(path string) ([]byte, error) {
+		return fs.ReadFile(s.fsys, path)
 	})
 }
 
@@ -306,25 +218,103 @@ func hasValidExtension(path string, extSet map[string]struct{}) bool {
 	return ok
 }
 
-func moduleNameFromPath(path string) string {
-	base := filepath.Base(path)
-	ext := filepath.Ext(base)
-	return strings.TrimSuffix(base, ext)
+// scanModuleNames extracts module names from raw MIB file bytes by finding
+// identifiers that precede "DEFINITIONS ::=". This is a lightweight scan,
+// not a full parse. ASN.1 comments (-- to end of line or next --) are
+// skipped so that commented-out module headers are not indexed.
+// Returns nil if no module headers are found.
+func scanModuleNames(content []byte) []string {
+	var names []string
+	rest := content
+	for {
+		idx := bytes.Index(rest, sigDefinitions)
+		if idx < 0 {
+			break
+		}
+		// Absolute offset of this DEFINITIONS in content.
+		absOff := len(content) - len(rest) + idx
+
+		// Check that DEFINITIONS is not inside an ASN.1 comment by
+		// scanning from the start of the line, toggling on each --.
+		if inLineComment(content, absOff) {
+			rest = rest[idx+len(sigDefinitions):]
+			continue
+		}
+
+		// Require ::= somewhere after DEFINITIONS (possibly with
+		// intervening tag defaults like IMPLICIT TAGS).
+		after := rest[idx+len(sigDefinitions):]
+		window := after
+		if len(window) > 100 {
+			window = window[:100]
+		}
+		if !bytes.Contains(window, sigAssign) {
+			rest = rest[idx+len(sigDefinitions):]
+			continue
+		}
+
+		// Walk backwards from DEFINITIONS to find the identifier.
+		// Skip whitespace between identifier and DEFINITIONS.
+		pos := idx - 1
+		for pos >= 0 && (rest[pos] == ' ' || rest[pos] == '\t' || rest[pos] == '\r' || rest[pos] == '\n') {
+			pos--
+		}
+		if pos < 0 {
+			rest = rest[idx+len(sigDefinitions):]
+			continue
+		}
+		// Collect the identifier characters backwards.
+		end := pos + 1
+		for pos >= 0 && isIdentChar(rest[pos]) {
+			pos--
+		}
+		start := pos + 1
+		if start < end {
+			name := string(rest[start:end])
+			// Module names must start with an uppercase letter.
+			if name[0] >= 'A' && name[0] <= 'Z' {
+				names = append(names, name)
+			}
+		}
+		rest = rest[idx+len(sigDefinitions):]
+	}
+	return names
+}
+
+// inLineComment reports whether the byte at pos in content is inside an
+// ASN.1 comment. It scans from the start of the line containing pos,
+// toggling on each "--" sequence.
+func inLineComment(content []byte, pos int) bool {
+	lineStart := pos
+	for lineStart > 0 && content[lineStart-1] != '\n' {
+		lineStart--
+	}
+	inComment := false
+	i := lineStart
+	for i < pos {
+		if i+1 < len(content) && content[i] == '-' && content[i+1] == '-' {
+			inComment = !inComment
+			i += 2
+			continue
+		}
+		i++
+	}
+	return inComment
+}
+
+// isIdentChar returns true for characters valid in SMI identifiers.
+func isIdentChar(b byte) bool {
+	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '-' || b == '_'
 }
 
 // buildTreeIndex walks a file tree and builds a module name -> path index.
-// When multiple files map to the same module name, the file whose extension
-// appears earliest in the extensions list wins, matching Dir's lookup order.
-// Among files with the same extension priority, the first encountered during
-// the walk wins.
-func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error) (map[string]string, error) {
-	extPriority := make(map[string]int, len(extensions))
-	for i, ext := range extensions {
-		extPriority[ext] = i
-	}
-
+// Module names are derived from file content (scanning for DEFINITIONS headers),
+// not from filenames. Multiple module names from one file each get their own
+// index entry pointing to the same path. First match wins for duplicate names.
+// The readFn parameter provides file content for scanning.
+func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error, readFn func(path string) ([]byte, error)) (map[string]string, error) {
+	extSet := makeExtensionSet(extensions)
 	index := make(map[string]string)
-	indexPriority := make(map[string]int)
 
 	err := walkFn(func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -337,18 +327,22 @@ func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error) (map
 		if d.IsDir() {
 			return nil
 		}
-		ext := strings.ToLower(filepath.Ext(path))
-		if _, ok := extPriority[ext]; !ok {
+		if !hasValidExtension(path, extSet) {
 			return nil
 		}
 
-		name := moduleNameFromPath(path)
-		pri := extPriority[ext]
-		if existing, exists := indexPriority[name]; exists && existing <= pri {
-			return nil // existing entry has same or higher priority
+		content, readErr := readFn(path)
+		if readErr != nil {
+			slog.Debug("buildTreeIndex: cannot read file", "path", path, "error", readErr)
+			return nil
 		}
-		index[name] = path
-		indexPriority[name] = pri
+
+		names := scanModuleNames(content)
+		for _, name := range names {
+			if _, exists := index[name]; !exists {
+				index[name] = path
+			}
+		}
 		return nil
 	})
 	return index, err

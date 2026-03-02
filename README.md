@@ -55,14 +55,11 @@ m, err := gomib.Load(ctx, gomib.WithSource(src), gomib.WithModules("IF-MIB", "IP
 
 ### Sources
 
-`Dir` searches a single flat directory. `DirTree` recursively indexes a directory tree. `FS` wraps an `fs.FS` (useful with `embed.FS`). `Multi` tries multiple sources in order.
+`Dir` recursively indexes a directory tree using content-derived module names. `FS` wraps an `fs.FS` (useful with `embed.FS`). `Multi` tries multiple sources in order.
 
 ```go
-// Single directory
+// Directory tree (indexed once at construction)
 src, err := gomib.Dir("/usr/share/snmp/mibs")
-
-// Recursive tree (indexed once at construction)
-src, err := gomib.DirTree("/usr/share/snmp/mibs")
 
 // Embedded filesystem
 //go:embed mibs
@@ -73,7 +70,7 @@ src := gomib.FS("embedded", mibFS)
 src := gomib.Multi(systemSrc, vendorSrc)
 ```
 
-`Must` variants (`MustDir`, `MustDirTree`) panic on error for use in `var` blocks.
+`MustDir` panics on error for use in `var` blocks.
 
 Files are matched by extension: no extension, `.mib`, `.smi`, `.txt`, `.my`. Override with `WithExtensions`. Non-MIB files are filtered during loading by checking for `DEFINITIONS` and `::=` in the content.
 

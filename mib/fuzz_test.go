@@ -107,8 +107,8 @@ func FuzzFormatOID(f *testing.F) {
 		END`)
 	cfg := types.PermissiveConfig()
 	p := parser.New(src, nil, cfg)
-	astMod := p.ParseModule()
-	mod := module.Lower(astMod, src, nil, cfg)
+	astMods := p.ParseModule()
+	mod := module.Lower(astMods[0], src, nil, cfg)
 	resolverCfg := PermissiveConfig()
 	mibTree := Resolve([]*module.Module{mod}, nil, &resolverCfg)
 

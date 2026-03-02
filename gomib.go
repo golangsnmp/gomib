@@ -82,7 +82,7 @@ func WithModules(names ...string) LoadOption {
 // Example:
 //
 //	m, err := gomib.Load(ctx,
-//	    gomib.WithSource(gomib.MustDirTree("/usr/share/snmp/mibs")),
+//	    gomib.WithSource(gomib.MustDir("/usr/share/snmp/mibs")),
 //	    gomib.WithModules("IF-MIB", "IP-MIB"),
 //	)
 //

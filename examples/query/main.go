@@ -18,7 +18,7 @@ func main() {
 	var src gomib.Source
 	if *path != "" {
 		var err error
-		src, err = gomib.DirTree(*path)
+		src, err = gomib.Dir(*path)
 		if err != nil {
 			log.Fatal(err)
 		}

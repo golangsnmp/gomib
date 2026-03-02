@@ -13,7 +13,7 @@ import (
 
 func loadTestMib(t *testing.T, modules ...string) *mib.Mib {
 	t.Helper()
-	src, err := gomib.DirTree("../testdata/corpus/primary")
+	src, err := gomib.Dir("../testdata/corpus/primary")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,11 +390,11 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	// Reload from the normalized file
-	src1, err := gomib.DirTree("../testdata/corpus/primary")
+	src1, err := gomib.Dir("../testdata/corpus/primary")
 	if err != nil {
 		t.Fatal(err)
 	}
-	src2, err := gomib.DirTree(dir)
+	src2, err := gomib.Dir(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

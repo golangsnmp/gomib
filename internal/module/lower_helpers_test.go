@@ -13,9 +13,9 @@ func lowerModule(t *testing.T, source string) *Module {
 	t.Helper()
 	b := []byte(source)
 	p := parser.New(b, nil, types.PermissiveConfig())
-	ast := p.ParseModule()
-	testutil.NotNil(t, ast, "parse returned nil")
-	mod := Lower(ast, b, nil, types.PermissiveConfig())
+	mods := p.ParseModule()
+	testutil.Greater(t, len(mods), 0, "parse returned no modules")
+	mod := Lower(mods[0], b, nil, types.PermissiveConfig())
 	testutil.NotNil(t, mod, "lower returned nil")
 	return mod
 }
@@ -44,10 +44,10 @@ func lowerAndFindDiagnostic(t *testing.T, source []byte, config types.Diagnostic
 	t.Helper()
 
 	p := parser.New(source, nil, config)
-	ast := p.ParseModule()
-	testutil.NotNil(t, ast, "parse returned nil")
+	mods := p.ParseModule()
+	testutil.Greater(t, len(mods), 0, "parse returned no modules")
 
-	mod := Lower(ast, source, nil, config)
+	mod := Lower(mods[0], source, nil, config)
 	testutil.NotNil(t, mod, "lower returned nil")
 
 	for _, d := range mod.Diagnostics {

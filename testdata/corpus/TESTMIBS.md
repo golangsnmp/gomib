@@ -25,7 +25,7 @@ corpus/
 
 ```go
 // Load with recursive directory traversal
-src, _ := loader.DirTree("testdata/corpus/primary")
+src, _ := loader.Dir("testdata/corpus/primary")
 l := loader.New(src)
 l.Load("IF-MIB")  // finds ietf/IF-MIB.mib
 ```
