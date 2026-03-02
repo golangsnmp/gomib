@@ -300,6 +300,31 @@ func TestWriteIFMIB(t *testing.T) {
 	}
 }
 
+func TestWriteIFMIBInlineConstraints(t *testing.T) {
+	m := loadTestMib(t, "IF-MIB")
+	var buf bytes.Buffer
+	if err := Write(&buf, m, "IF-MIB"); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	// ifIndex has an inline range constraint: Integer32 (1..2147483647)
+	if !strings.Contains(output, "SYNTAX Integer32 (1..2147483647)") {
+		t.Error("missing inline range constraint on ifIndex")
+	}
+
+	// ifAlias has an inline SIZE constraint on a named TC: DisplayString (SIZE (0..64))
+	if !strings.Contains(output, "SYNTAX DisplayString (SIZE (0..64))") {
+		t.Error("missing inline SIZE constraint on ifAlias")
+	}
+
+	// Objects without inline constraints should not have spurious ranges.
+	// ifLastChange is plain TimeTicks with no constraint.
+	if strings.Contains(output, "SYNTAX TimeTicks (") {
+		t.Error("TimeTicks should not have inline constraints")
+	}
+}
+
 func TestWithConformanceFalse(t *testing.T) {
 	m := loadTestMib(t, "IF-MIB")
 	var buf bytes.Buffer
