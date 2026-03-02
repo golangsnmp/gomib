@@ -63,6 +63,15 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 
 	results := make(chan *module.Module, len(allModules))
 
+	// Cache decoded files by path so multi-module files are only
+	// parsed once even when multiple goroutines request different
+	// module names from the same file.
+	type cachedDecode struct {
+		once sync.Once
+		mods []*module.Module
+	}
+	var pathCache sync.Map // result.Path -> *cachedDecode
+
 	var wg sync.WaitGroup
 	var firstErr error
 	var errOnce sync.Once
@@ -102,9 +111,18 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 				return
 			}
 
-			mod := decodeModule(result.Content, result.Path, sm.name, cfg)
-			if mod != nil {
-				results <- mod
+			entry, _ := pathCache.LoadOrStore(result.Path, &cachedDecode{})
+			cd := entry.(*cachedDecode)
+			cd.once.Do(func() {
+				cd.mods = decodeModules(result.Content, result.Path, cfg)
+			})
+			// Send only this goroutine's module to avoid N^2 sends
+			// for multi-module files. The consumer deduplicates by name.
+			for _, mod := range cd.mods {
+				if mod.Name == sm.name {
+					results <- mod
+					break
+				}
 			}
 		}(sm)
 	}
@@ -143,6 +161,11 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 	modules := make(map[string]*module.Module)
 	combined := Multi(sources...)
 
+	// Cache decoded files by path so multi-module files are only
+	// parsed once. Sibling modules are found through Find (which
+	// respects source precedence) rather than eagerly cached.
+	fileCache := make(map[string][]*module.Module) // path -> decoded modules
+
 	var loadOne func(name string) error
 	loadOne = func(name string) error {
 		if ctx.Err() != nil {
@@ -168,17 +191,31 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			return nil // skip missing modules
 		}
 
-		mod := decodeModule(result.Content, result.Path, name, cfg)
-		if mod == nil {
+		mods, ok := fileCache[result.Path]
+		if !ok {
+			mods = decodeModules(result.Content, result.Path, cfg)
+			fileCache[result.Path] = mods
+		}
+		if len(mods) == 0 {
 			return nil
 		}
 
-		modules[mod.Name] = mod
-		if mod.Name != name {
-			modules[name] = mod // also cache under requested name
+		// Store only the requested module. Sibling modules from the
+		// same file are loaded through Find when needed, so source
+		// precedence is respected per-module.
+		var target *module.Module
+		for _, mod := range mods {
+			if mod.Name == name {
+				target = mod
+				break
+			}
 		}
+		if target == nil {
+			return nil
+		}
+		modules[name] = target
 
-		for _, imp := range mod.Imports {
+		for _, imp := range target.Imports {
 			if err := loadOne(imp.Module); err != nil {
 				return err
 			}
@@ -203,8 +240,8 @@ func findModule(sources []Source, name string) (FindResult, error) {
 	return Multi(sources...).Find(name)
 }
 
-// collectModules adds missing base modules to the map, deduplicates,
-// and returns the modules sorted by name.
+// collectModules adds missing base modules to the map and returns the
+// modules sorted by name.
 func collectModules(modules map[string]*module.Module) []*module.Module {
 	for _, name := range module.BaseModuleNames() {
 		if _, ok := modules[name]; !ok {
@@ -213,32 +250,37 @@ func collectModules(modules map[string]*module.Module) []*module.Module {
 			}
 		}
 	}
-	mods := dedup(slices.Collect(maps.Values(modules)))
+	mods := slices.Collect(maps.Values(modules))
 	slices.SortFunc(mods, func(a, b *module.Module) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
 	return mods
 }
 
-// decodeModule runs the heuristic/parse/lower pipeline on raw MIB content.
-// Returns nil if the content doesn't look like a MIB.
-func decodeModule(content []byte, sourcePath, name string, cfg *loadConfig) *module.Module {
+// decodeModules runs the heuristic/parse/lower pipeline on raw MIB content.
+// A single file may contain multiple modules. Returns nil if the content
+// doesn't look like a MIB.
+func decodeModules(content []byte, sourcePath string, cfg *loadConfig) []*module.Module {
 	log := types.Logger{L: cfg.logger}
 
 	if !looksLikeMIBContent(content) {
 		log.Log(slog.LevelDebug, "content rejected by heuristic",
-			slog.String("module", name))
+			slog.String("path", sourcePath))
 		return nil
 	}
 
 	p := parser.New(content, componentLogger(cfg.logger, "parser"), cfg.diagConfig)
-	ast := p.ParseModule()
+	astModules := p.ParseModule()
 
-	mod := module.Lower(ast, content, componentLogger(cfg.logger, "module"), cfg.diagConfig)
-	if mod != nil {
-		mod.SourcePath = sourcePath
+	var mods []*module.Module
+	for _, am := range astModules {
+		mod := module.Lower(am, content, componentLogger(cfg.logger, "module"), cfg.diagConfig)
+		if mod != nil {
+			mod.SourcePath = sourcePath
+			mods = append(mods, mod)
+		}
 	}
-	return mod
+	return mods
 }
 
 var (

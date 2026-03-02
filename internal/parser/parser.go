@@ -102,10 +102,35 @@ func (p *Parser) validateValueReference(name string, span types.Span) {
 	}
 }
 
-// ParseModule parses a complete MIB module and returns its AST.
-// Parse errors are collected in the module's diagnostics rather
-// than causing immediate failure.
-func (p *Parser) ParseModule() *ast.Module {
+// ParseModule parses all MIB modules in the source and returns their ASTs.
+// A single file may contain multiple DEFINITIONS ::= BEGIN ... END blocks.
+// Parse errors are collected in each module's diagnostics rather than
+// causing immediate failure.
+func (p *Parser) ParseModule() []*ast.Module {
+	var modules []*ast.Module
+	for !p.isEOF() {
+		mod := p.parseOneModule()
+		modules = append(modules, mod)
+		if mod.Name.Name == "UNKNOWN" {
+			// Header parse failed, no point continuing.
+			break
+		}
+	}
+	if len(modules) == 0 {
+		// Empty or whitespace-only input: attempt a parse so we get a
+		// diagnostic explaining why it failed.
+		mod := p.parseOneModule()
+		modules = append(modules, mod)
+	}
+	return modules
+}
+
+// parseOneModule parses a single DEFINITIONS ::= BEGIN ... END block.
+func (p *Parser) parseOneModule() *ast.Module {
+	// Snapshot lexer diagnostic count so we only attach new ones to this module.
+	lexDiagsBefore := len(p.lex.Diagnostics())
+	p.diagnostics = p.diagnostics[:0]
+
 	start := p.currentSpan().Start
 
 	name, err := p.parseModuleHeader()
@@ -116,7 +141,7 @@ func (p *Parser) ParseModule() *ast.Module {
 		return &ast.Module{
 			Name:        ast.Ident{Name: "UNKNOWN", Span: span},
 			Span:        span,
-			Diagnostics: append(p.lex.Diagnostics(), p.diagnostics...),
+			Diagnostics: p.collectModuleDiagnostics(lexDiagsBefore),
 		}
 	}
 
@@ -161,7 +186,7 @@ func (p *Parser) ParseModule() *ast.Module {
 	}
 
 	module.Span = types.NewSpan(start, p.currentSpan().End)
-	module.Diagnostics = append(p.lex.Diagnostics(), p.diagnostics...)
+	module.Diagnostics = p.collectModuleDiagnostics(lexDiagsBefore)
 
 	p.Log(slog.LevelDebug, "parsing complete",
 		slog.String("module", name.Name),
@@ -169,6 +194,18 @@ func (p *Parser) ParseModule() *ast.Module {
 		slog.Int("diagnostics", len(p.diagnostics)))
 
 	return module
+}
+
+// collectModuleDiagnostics builds the diagnostics slice for a single module
+// by combining new lexer diagnostics (since lexDiagsBefore) with parser
+// diagnostics accumulated for this module.
+func (p *Parser) collectModuleDiagnostics(lexDiagsBefore int) []types.SpanDiagnostic {
+	lexDiags := p.lex.Diagnostics()
+	newLexDiags := lexDiags[lexDiagsBefore:]
+	combined := make([]types.SpanDiagnostic, 0, len(newLexDiags)+len(p.diagnostics))
+	combined = append(combined, newLexDiags...)
+	combined = append(combined, p.diagnostics...)
+	return combined
 }
 
 func (p *Parser) isEOF() bool {

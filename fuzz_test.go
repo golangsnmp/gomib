@@ -114,10 +114,11 @@ func FuzzLower(f *testing.F) {
 		cfg := types.PermissiveConfig()
 
 		p := parser.New(data, nil, cfg)
-		astMod := p.ParseModule()
-		if astMod == nil {
+		astMods := p.ParseModule()
+		if len(astMods) == 0 {
 			return
 		}
+		astMod := astMods[0]
 
 		mod := module.Lower(astMod, data, nil, cfg)
 		if mod == nil {
@@ -170,12 +171,12 @@ func FuzzPipeline(f *testing.F) {
 		cfg := types.PermissiveConfig()
 
 		p := parser.New(data, nil, cfg)
-		astMod := p.ParseModule()
-		if astMod == nil {
+		astMods := p.ParseModule()
+		if len(astMods) == 0 {
 			return
 		}
 
-		mod := module.Lower(astMod, data, nil, cfg)
+		mod := module.Lower(astMods[0], data, nil, cfg)
 		if mod == nil {
 			return
 		}
@@ -588,11 +589,11 @@ func FuzzMultiModule(f *testing.F) {
 		var mods []*module.Module
 		for _, data := range [][]byte{dataA, dataB} {
 			p := parser.New(data, nil, cfg)
-			astMod := p.ParseModule()
-			if astMod == nil {
+			astMods := p.ParseModule()
+			if len(astMods) == 0 {
 				continue
 			}
-			mod := module.Lower(astMod, data, nil, cfg)
+			mod := module.Lower(astMods[0], data, nil, cfg)
 			if mod != nil {
 				mods = append(mods, mod)
 			}

@@ -171,10 +171,10 @@ END
 `)
 
 	p := parser.New(source, nil, types.PermissiveConfig())
-	ast := p.ParseModule()
-	testutil.NotNil(t, ast, "parse returned nil")
+	mods := p.ParseModule()
+	testutil.Greater(t, len(mods), 0, "parse returned no modules")
 
-	mod := Lower(ast, source, nil, types.PermissiveConfig())
+	mod := Lower(mods[0], source, nil, types.PermissiveConfig())
 	testutil.NotNil(t, mod, "lower returned nil")
 
 	// Should have a diagnostic for the negative BITS position

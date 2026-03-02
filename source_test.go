@@ -33,34 +33,7 @@ func TestMustDirPanicsOnError(t *testing.T) {
 }
 
 func TestMustDirSucceeds(t *testing.T) {
-	src := MustDir(testutil.PrimaryCorpusDir() + "/ietf")
-	names, err := src.ListModules()
-	testutil.NoError(t, err, "ListModules")
-	testutil.Greater(t, len(names), 0, "should list modules")
-}
-
-func TestDirTreeNonExistentPath(t *testing.T) {
-	_, err := DirTree("/this/path/does/not/exist/at/all")
-	testutil.Error(t, err, "DirTree with non-existent path should fail")
-}
-
-func TestDirTreeNotADirectory(t *testing.T) {
-	_, err := DirTree(testutil.PrimaryCorpusDir() + "/ietf/IF-MIB.mib")
-	testutil.Error(t, err, "DirTree with a file path should fail")
-}
-
-func TestMustDirTreePanicsOnError(t *testing.T) {
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Error("MustDirTree with non-existent path should panic")
-		}
-	}()
-	MustDirTree("/this/path/does/not/exist")
-}
-
-func TestMustDirTreeSucceeds(t *testing.T) {
-	src := MustDirTree(testutil.PrimaryCorpusDir())
+	src := MustDir(testutil.PrimaryCorpusDir())
 	names, err := src.ListModules()
 	testutil.NoError(t, err, "ListModules")
 	testutil.Greater(t, len(names), 10, "should list many modules")
@@ -87,18 +60,18 @@ func TestDirSourceFindNotExist(t *testing.T) {
 	testutil.True(t, errors.Is(err, fs.ErrNotExist), "error should be fs.ErrNotExist, got %v", err)
 }
 
-func TestDirTreeSourceFindAcrossSubdirs(t *testing.T) {
-	src, err := DirTree(testutil.PrimaryCorpusDir())
-	testutil.NoError(t, err, "DirTree")
+func TestDirSourceFindAcrossSubdirs(t *testing.T) {
+	src, err := Dir(testutil.PrimaryCorpusDir())
+	testutil.NoError(t, err, "Dir")
 
 	result, err := src.Find("IF-MIB")
 	testutil.NoError(t, err, "Find IF-MIB across subdirs")
 	testutil.True(t, len(result.Content) > 0, "Content should not be empty")
 }
 
-func TestDirTreeSourceFindNotExist(t *testing.T) {
-	src, err := DirTree(testutil.PrimaryCorpusDir())
-	testutil.NoError(t, err, "DirTree")
+func TestDirSourceFindNotExistTree(t *testing.T) {
+	src, err := Dir(testutil.PrimaryCorpusDir())
+	testutil.NoError(t, err, "Dir")
 
 	_, err = src.Find("TOTALLY-NONEXISTENT-MODULE")
 	if err == nil {
@@ -131,7 +104,7 @@ END
 	result, err := src.Find("TEST-FS-MIB")
 	testutil.NoError(t, err, "Find TEST-FS-MIB in FS source")
 	testutil.True(t, len(result.Content) > 0, "Content should not be empty")
-	testutil.Contains(t, result.Path, "test-fs:", "Path should contain FS name prefix")
+	testutil.Contains(t, result.Path, "test-fs/", "Path should contain FS name prefix")
 
 	names, err := src.ListModules()
 	testutil.NoError(t, err, "ListModules")
@@ -240,14 +213,14 @@ func TestMultiSourceListModulesDeduplicates(t *testing.T) {
 	names, err := multi.ListModules()
 	testutil.NoError(t, err, "ListModules")
 
-	// Count occurrences of SHARED-MIB
+	// Content-based indexing: the module name is "X" (from content), not "SHARED-MIB" (from filename).
 	count := 0
 	for _, n := range names {
-		if n == "SHARED-MIB" {
+		if n == "X" {
 			count++
 		}
 	}
-	testutil.Equal(t, 1, count, "SHARED-MIB should appear exactly once, got %d", count)
+	testutil.Equal(t, 1, count, "X should appear exactly once, got %d", count)
 }
 
 func TestMultiSourceFindNotExist(t *testing.T) {
@@ -288,8 +261,8 @@ END
 }
 
 func TestLoadContextCancellation(t *testing.T) {
-	src, err := DirTree(testutil.PrimaryCorpusDir())
-	testutil.NoError(t, err, "DirTree")
+	src, err := Dir(testutil.PrimaryCorpusDir())
+	testutil.NoError(t, err, "Dir")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
@@ -301,8 +274,8 @@ func TestLoadContextCancellation(t *testing.T) {
 }
 
 func TestLoadWithModulesContextCancellation(t *testing.T) {
-	src, err := DirTree(testutil.PrimaryCorpusDir())
-	testutil.NoError(t, err, "DirTree")
+	src, err := Dir(testutil.PrimaryCorpusDir())
+	testutil.NoError(t, err, "Dir")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -339,28 +312,86 @@ func TestLooksLikeMIBContent(t *testing.T) {
 	}
 }
 
-func TestModuleNameFromPath(t *testing.T) {
+func TestScanModuleNames(t *testing.T) {
 	tests := []struct {
-		path string
-		want string
+		name    string
+		content string
+		want    []string
 	}{
-		{"/usr/share/snmp/mibs/IF-MIB.mib", "IF-MIB"},
-		{"/usr/share/snmp/mibs/IF-MIB", "IF-MIB"},
-		{"IF-MIB.mib", "IF-MIB"},
-		{"IF-MIB.smi", "IF-MIB"},
-		{"IF-MIB.txt", "IF-MIB"},
-		{"IF-MIB.my", "IF-MIB"},
-		{"IF-MIB", "IF-MIB"},
+		{"single module", "IF-MIB DEFINITIONS ::= BEGIN\nEND", []string{"IF-MIB"}},
+		{"two modules", "A-MIB DEFINITIONS ::= BEGIN\nEND\nB-MIB DEFINITIONS ::= BEGIN\nEND", []string{"A-MIB", "B-MIB"}},
+		{"with tag defaults", "FOO-MIB DEFINITIONS IMPLICIT TAGS ::= BEGIN\nEND", []string{"FOO-MIB"}},
+		{"empty", "", nil},
+		{"no DEFINITIONS", "just some text", nil},
+		{"lowercase ignored", "foo DEFINITIONS ::= BEGIN\nEND", nil},
+		{"commented out", "-- MY-MIB DEFINITIONS ::= BEGIN\nREAL-MIB DEFINITIONS ::= BEGIN\nEND", []string{"REAL-MIB"}},
+		{"inline comment terminated", "-- MY-MIB DEFINITIONS -- REAL-MIB DEFINITIONS ::= BEGIN\nEND", []string{"REAL-MIB"}},
+		{"no assign", "MY-MIB DEFINITIONS but no assign here", nil},
+		{"DEFINITIONS in description", "MY-MIB DEFINITIONS ::= BEGIN\nDESCRIPTION \"see DEFINITIONS\"\nEND", []string{"MY-MIB"}},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			got := moduleNameFromPath(tt.path)
-			if got != tt.want {
-				t.Errorf("moduleNameFromPath(%q) = %q, want %q", tt.path, got, tt.want)
+		t.Run(tt.name, func(t *testing.T) {
+			got := scanModuleNames([]byte(tt.content))
+			if len(got) != len(tt.want) {
+				t.Fatalf("scanModuleNames() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("scanModuleNames()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
 			}
 		})
 	}
+}
+
+func TestScanModuleNamesMultiFile(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join(testutil.ProblemsCorpusDir(), "PROBLEM-MULTIMOD.mib"))
+	testutil.NoError(t, err, "read file")
+
+	names := scanModuleNames(content)
+	testutil.Equal(t, 2, len(names), "should find two module names")
+	testutil.Equal(t, "PROBLEM-MULTIMOD-BASE-MIB", names[0], "first module name")
+	testutil.Equal(t, "PROBLEM-MULTIMOD-MIB", names[1], "second module name")
+}
+
+func TestContentBasedIndexing(t *testing.T) {
+	// Create a file whose filename doesn't match any module name inside.
+	tmpDir := t.TempDir()
+	content := []byte(`CONTENT-A-MIB DEFINITIONS ::= BEGIN
+IMPORTS enterprises FROM SNMPv2-SMI;
+contentARoot OBJECT IDENTIFIER ::= { enterprises 99994 }
+END
+
+CONTENT-B-MIB DEFINITIONS ::= BEGIN
+IMPORTS enterprises FROM SNMPv2-SMI;
+contentBRoot OBJECT IDENTIFIER ::= { enterprises 99995 }
+END
+`)
+	err := os.WriteFile(filepath.Join(tmpDir, "mismatched-filename.mib"), content, 0o644)
+	testutil.NoError(t, err, "write file")
+
+	src, err := Dir(tmpDir)
+	testutil.NoError(t, err, "Dir")
+
+	names, err := src.ListModules()
+	testutil.NoError(t, err, "ListModules")
+
+	nameSet := make(map[string]bool)
+	for _, n := range names {
+		nameSet[n] = true
+	}
+	testutil.True(t, nameSet["CONTENT-A-MIB"], "should find CONTENT-A-MIB by content")
+	testutil.True(t, nameSet["CONTENT-B-MIB"], "should find CONTENT-B-MIB by content")
+
+	// Find should work for both modules.
+	resultA, err := src.Find("CONTENT-A-MIB")
+	testutil.NoError(t, err, "Find CONTENT-A-MIB")
+	testutil.True(t, len(resultA.Content) > 0, "content should not be empty")
+
+	resultB, err := src.Find("CONTENT-B-MIB")
+	testutil.NoError(t, err, "Find CONTENT-B-MIB")
+	testutil.True(t, len(resultB.Content) > 0, "content should not be empty")
 }
 
 func TestDefaultExtensions(t *testing.T) {
@@ -391,8 +422,8 @@ func TestLoadEmptyDirProducesEmptyMib(t *testing.T) {
 }
 
 func TestLoadMultipleModules(t *testing.T) {
-	src, err := DirTree(testutil.PrimaryCorpusDir())
-	testutil.NoError(t, err, "DirTree")
+	src, err := Dir(testutil.PrimaryCorpusDir())
+	testutil.NoError(t, err, "Dir")
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB", "SNMPv2-MIB"))
@@ -403,8 +434,8 @@ func TestLoadMultipleModules(t *testing.T) {
 }
 
 func TestLoadModulesEmptyList(t *testing.T) {
-	src, err := DirTree(testutil.PrimaryCorpusDir())
-	testutil.NoError(t, err, "DirTree")
+	src, err := Dir(testutil.PrimaryCorpusDir())
+	testutil.NoError(t, err, "Dir")
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules())

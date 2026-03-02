@@ -83,13 +83,13 @@ func PrintError(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "error: "+format+"\n", args...)
 }
 
-// BuildSources creates gomib.Source values from directory paths using DirTree.
+// BuildSources creates gomib.Source values from directory paths using Dir.
 // Invalid paths are skipped with a warning to stderr. Returns only the
 // successfully created sources.
 func BuildSources(paths []string) []gomib.Source {
 	var sources []gomib.Source
 	for _, p := range paths {
-		src, err := gomib.DirTree(p)
+		src, err := gomib.Dir(p)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: skipping path %s: %v\n", p, err)
 			continue

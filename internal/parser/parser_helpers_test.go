@@ -5,15 +5,16 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// parseModule parses source with PermissiveConfig and returns the AST module.
+// parseModule parses source with PermissiveConfig and returns the first AST module.
 func parseModule(source string) *ast.Module {
 	return parseModuleWith(source, types.PermissiveConfig())
 }
 
-// parseModuleWith parses source with the given diagnostic config.
+// parseModuleWith parses source with the given diagnostic config and returns
+// the first module.
 func parseModuleWith(source string, config types.DiagnosticConfig) *ast.Module {
 	p := New([]byte(source), nil, config)
-	return p.ParseModule()
+	return p.ParseModule()[0]
 }
 
 // countDiagnostics returns how many diagnostics in the slice have the given code.

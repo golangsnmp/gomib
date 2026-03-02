@@ -11,7 +11,7 @@ import (
 )
 
 func TestLoadSingleMIB(t *testing.T) {
-	src := mustDirTree(t, testutil.PrimaryCorpusDir())
+	src := mustDir(t, testutil.PrimaryCorpusDir())
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB"))
@@ -35,7 +35,7 @@ func TestLoadAllCorpus(t *testing.T) {
 		t.Skip("skipping corpus load in short mode")
 	}
 
-	src := mustDirTree(t, testutil.PrimaryCorpusDir())
+	src := mustDir(t, testutil.PrimaryCorpusDir())
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src))
@@ -71,10 +71,10 @@ func TestDirSource(t *testing.T) {
 	testutil.Greater(t, len(names), 0, "should list modules")
 }
 
-func TestDirTreeSource(t *testing.T) {
-	src, err := DirTree(testutil.PrimaryCorpusDir())
+func TestDirSourceRecursive(t *testing.T) {
+	src, err := Dir(testutil.PrimaryCorpusDir())
 	if err != nil {
-		t.Fatalf("DirTree failed: %v", err)
+		t.Fatalf("Dir failed: %v", err)
 	}
 
 	names, err := src.ListModules()
@@ -85,8 +85,8 @@ func TestDirTreeSource(t *testing.T) {
 }
 
 func TestMultiSource(t *testing.T) {
-	primary := mustDirTree(t, testutil.PrimaryCorpusDir())
-	problems := mustDirTree(t, testutil.ProblemsCorpusDir())
+	primary := mustDir(t, testutil.PrimaryCorpusDir())
+	problems := mustDir(t, testutil.ProblemsCorpusDir())
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(primary, problems), WithModules("IF-MIB"))
@@ -97,7 +97,7 @@ func TestMultiSource(t *testing.T) {
 }
 
 func TestLoadNonexistentModule(t *testing.T) {
-	src := mustDirTree(t, testutil.PrimaryCorpusDir())
+	src := mustDir(t, testutil.PrimaryCorpusDir())
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST"))
@@ -110,7 +110,7 @@ func TestLoadNonexistentModule(t *testing.T) {
 }
 
 func TestLoadMissingModuleWithValidModule(t *testing.T) {
-	src := mustDirTree(t, testutil.PrimaryCorpusDir())
+	src := mustDir(t, testutil.PrimaryCorpusDir())
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB", "NONEXISTENT-MIB"))
@@ -211,8 +211,8 @@ func TestTablesAndScalars(t *testing.T) {
 }
 
 func TestStrictMIBsPassAtStrictLevel(t *testing.T) {
-	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
-	strict := mustDirTree(t, testutil.TestdataDir("strictness", "strict"))
+	corpus := mustDir(t, testutil.PrimaryCorpusDir())
+	strict := mustDir(t, testutil.TestdataDir("strictness", "strict"))
 
 	tests := []string{"STRICT-TEST-MIB", "STRICT-TABLE-MIB"}
 	for _, name := range tests {
@@ -260,8 +260,8 @@ func TestLongIdentifierViolationEmitsDiagnostic(t *testing.T) {
 }
 
 func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
-	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
-	problems := mustDirTree(t, testutil.ProblemsCorpusDir())
+	corpus := mustDir(t, testutil.PrimaryCorpusDir())
+	problems := mustDir(t, testutil.ProblemsCorpusDir())
 
 	ctx := context.Background()
 
@@ -338,8 +338,8 @@ func TestMissingImportFailsInNormalMode(t *testing.T) {
 }
 
 func TestDiagnosticThresholdEnforced(t *testing.T) {
-	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
-	violations := mustDirTree(t, testutil.TestdataDir("strictness", "violations"))
+	corpus := mustDir(t, testutil.PrimaryCorpusDir())
+	violations := mustDir(t, testutil.TestdataDir("strictness", "violations"))
 
 	ctx := context.Background()
 
@@ -496,8 +496,8 @@ func TestFindModulePropagatesFindError(t *testing.T) {
 
 func loadInvalidMIB(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
 	t.Helper()
-	corpus := mustDirTree(t, testutil.PrimaryCorpusDir())
-	invalid := mustDirTree(t, testutil.TestdataDir("strictness", "invalid"))
+	corpus := mustDir(t, testutil.PrimaryCorpusDir())
+	invalid := mustDir(t, testutil.TestdataDir("strictness", "invalid"))
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(corpus, invalid), WithModules(name), WithStrictness(level))
 	if err != nil {
@@ -587,4 +587,56 @@ func TestInvalidDuplicateOIDMIBBothObjectsLoad(t *testing.T) {
 		testutil.Equal(t, objs[0].OID().String(), objs[1].OID().String(),
 			"duplicate objects should share the same OID")
 	}
+}
+
+func TestMultiModuleFileLoadAll(t *testing.T) {
+	// PROBLEM-MULTIMOD.mib contains PROBLEM-MULTIMOD-BASE-MIB and
+	// PROBLEM-MULTIMOD-MIB. Both should be discovered and loaded.
+	corpus := mustDir(t, testutil.PrimaryCorpusDir())
+	problems := mustDir(t, testutil.ProblemsCorpusDir())
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(corpus, problems))
+	testutil.NoError(t, err, "Load")
+
+	testutil.NotNil(t, m.Module("PROBLEM-MULTIMOD-BASE-MIB"),
+		"base module from multi-module file should be loaded")
+	testutil.NotNil(t, m.Module("PROBLEM-MULTIMOD-MIB"),
+		"leaf module from multi-module file should be loaded")
+}
+
+func TestMultiModuleFileLoadByName(t *testing.T) {
+	// Loading the leaf module by name should also pick up the base module
+	// (it's in the same file, and the leaf imports from the base).
+	corpus := mustDir(t, testutil.PrimaryCorpusDir())
+	problems := mustDir(t, testutil.ProblemsCorpusDir())
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(corpus, problems),
+		WithModules("PROBLEM-MULTIMOD-MIB"))
+	testutil.NoError(t, err, "Load")
+
+	testutil.NotNil(t, m.Module("PROBLEM-MULTIMOD-MIB"),
+		"leaf module should be loaded")
+	testutil.NotNil(t, m.Module("PROBLEM-MULTIMOD-BASE-MIB"),
+		"base module should be loaded (same file + import dependency)")
+
+	// The leaf module's scalar should resolve.
+	obj := m.Object("problemMultimodScalar")
+	testutil.NotNil(t, obj, "problemMultimodScalar should resolve")
+}
+
+func TestMultiModuleFileLoadBaseByName(t *testing.T) {
+	// Loading the base module by name should find it even though the
+	// filename doesn't match.
+	corpus := mustDir(t, testutil.PrimaryCorpusDir())
+	problems := mustDir(t, testutil.ProblemsCorpusDir())
+
+	ctx := context.Background()
+	m, err := Load(ctx, WithSource(corpus, problems),
+		WithModules("PROBLEM-MULTIMOD-BASE-MIB"))
+	testutil.NoError(t, err, "Load")
+
+	testutil.NotNil(t, m.Module("PROBLEM-MULTIMOD-BASE-MIB"),
+		"base module should be found by content-derived name")
 }

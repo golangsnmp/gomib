@@ -14,9 +14,9 @@ import (
 // an external package perspective. It verifies that Load, Module, Object,
 // Node, and Type lookups work through the exported surface.
 func TestLoadAndQueryMib(t *testing.T) {
-	src, err := gomib.DirTree("testdata/corpus/primary")
+	src, err := gomib.Dir("testdata/corpus/primary")
 	if err != nil {
-		t.Fatalf("DirTree failed: %v", err)
+		t.Fatalf("Dir failed: %v", err)
 	}
 
 	ctx := context.Background()
@@ -147,9 +147,9 @@ func TestWithSystemPaths(t *testing.T) {
 }
 
 func TestWithSystemPathsCombinedWithExplicitSource(t *testing.T) {
-	src, err := gomib.DirTree("testdata/corpus/primary")
+	src, err := gomib.Dir("testdata/corpus/primary")
 	if err != nil {
-		t.Fatalf("DirTree failed: %v", err)
+		t.Fatalf("Dir failed: %v", err)
 	}
 
 	ctx := context.Background()
