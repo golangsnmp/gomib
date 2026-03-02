@@ -126,21 +126,39 @@ func formatObjectSyntax(obj *mib.Object) string {
 		return "INTEGER" // fallback
 	}
 
-	// The resolver stores effective enums/bits on the object, not necessarily
-	// on the type. Pass them explicitly for inline formatting.
-	return formatObjectTypeSyntax(t, obj.EffectiveEnums(), obj.EffectiveBits())
+	// The resolver stores effective enums/bits/ranges/sizes on the object.
+	// Enums and bits are always passed for inline formatting. Ranges and sizes
+	// are only passed when they differ from the type's own constraints, meaning
+	// they came from an inline subtype constraint on the OBJECT-TYPE rather
+	// than being inherited from the type definition.
+	var inlineRanges, inlineSizes []mib.Range
+	if objRanges := obj.EffectiveRanges(); !rangesEqual(objRanges, t.EffectiveRanges()) {
+		inlineRanges = objRanges
+	}
+	if objSizes := obj.EffectiveSizes(); !rangesEqual(objSizes, t.EffectiveSizes()) {
+		inlineSizes = objSizes
+	}
+
+	return formatObjectTypeSyntax(t, obj.EffectiveEnums(), obj.EffectiveBits(), inlineRanges, inlineSizes)
 }
 
 // formatObjectTypeSyntax formats the SYNTAX clause for an OBJECT-TYPE.
 //
 // The resolver stores effective enums/bits on the object rather than the type,
-// so they must be passed explicitly. For types without enums/bits, uses the
-// type's own direct constraints (sizes/ranges), falling back to the type name
-// or base keyword.
-func formatObjectTypeSyntax(t *mib.Type, enums, bits []mib.NamedValue) string {
+// so they must be passed explicitly. Inline ranges/sizes are constraints from
+// the OBJECT-TYPE's SYNTAX clause that differ from the type's own constraints.
+// For types without enums/bits, uses the type's own direct constraints
+// (sizes/ranges), falling back to the type name or base keyword.
+func formatObjectTypeSyntax(t *mib.Type, enums, bits []mib.NamedValue, inlineRanges, inlineSizes []mib.Range) string {
 	// Named type: preserve TC/type references, but not built-in keywords
 	// like INTEGER or BITS that may have inline enums/bits on the object.
 	if name := t.Name(); name != "" && !isBuiltinKeyword(name) {
+		if len(inlineSizes) > 0 {
+			return name + " " + formatSizes(inlineSizes)
+		}
+		if len(inlineRanges) > 0 {
+			return name + " " + formatRanges(inlineRanges)
+		}
 		return name
 	}
 
@@ -171,6 +189,19 @@ func formatObjectTypeSyntax(t *mib.Type, enums, bits []mib.NamedValue) string {
 	}
 
 	return prefix
+}
+
+// rangesEqual reports whether two Range slices are identical.
+func rangesEqual(a, b []mib.Range) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // sequenceTypeName converts a row entry name to the conventional SEQUENCE type name.

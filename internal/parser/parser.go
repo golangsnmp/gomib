@@ -496,10 +496,16 @@ func (p *Parser) parseDefinition() (ast.Definition, *types.SpanDiagnostic) {
 		return p.parseAgentCapabilities()
 
 	// Type assignment or TEXTUAL-CONVENTION: TypeName ::=
-	case first == lexer.TokUppercaseIdent && second == lexer.TokColonColonEqual:
+	// Accept lowercase type names (vendor violation) with diagnostic
+	case (first == lexer.TokUppercaseIdent || first == lexer.TokLowercaseIdent) && second == lexer.TokColonColonEqual:
 		// Check if this is a TC: TypeName ::= TEXTUAL-CONVENTION
 		if p.peekNth(2).Kind == lexer.TokKwTextualConvention {
 			return p.parseTextualConventionWithAssignment()
+		}
+		if first == lexer.TokLowercaseIdent {
+			name := p.text(p.peek().Span)
+			p.emitDiagnostic(types.DiagBadIdentifierCase, types.SeverityError, p.peek().Span,
+				fmt.Sprintf("type assignment %q should start with an uppercase letter", name))
 		}
 		return p.parseTypeAssignment()
 
@@ -915,9 +921,13 @@ func (p *Parser) parseTypeSyntax() (ast.TypeSyntax, *types.SpanDiagnostic) {
 			Name: ast.Ident{Name: name, Span: token.Span},
 		}
 
-	case lexer.TokUppercaseIdent:
+	case lexer.TokUppercaseIdent, lexer.TokLowercaseIdent:
 		token := p.advance()
 		name := p.text(token.Span)
+		if token.Kind == lexer.TokLowercaseIdent {
+			p.emitDiagnostic(types.DiagBadIdentifierCase, types.SeverityError, token.Span,
+				fmt.Sprintf("type reference %q should start with an uppercase letter", name))
+		}
 		ident := ast.Ident{Name: name, Span: token.Span}
 
 		switch {

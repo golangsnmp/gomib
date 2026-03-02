@@ -31,6 +31,7 @@ var keywords = map[string]TokenKind{
 	"INCLUDES":           TokKwIncludes,
 	"INDEX":              TokKwIndex,
 	"INTEGER":            TokKwInteger,
+	"Integer":            TokKwInteger,
 	"IpAddress":          TokKwIpAddress,
 	"LAST-UPDATED":       TokKwLastUpdated,
 	"MACRO":              TokKwMacro,

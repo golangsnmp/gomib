@@ -1169,3 +1169,72 @@ func TestProblemSharedOIDs(t *testing.T) {
 		}
 	})
 }
+
+// TestProblemCasefoldIntegerType verifies that "Integer" (non-standard casing
+// of INTEGER) is recognized as a base integer type.
+// Real: CT-SERIES-1000-MIB wirelessSimActive uses SYNTAX Integer.
+// net-snmp: accepts silently.
+func TestProblemCasefoldIntegerType(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-CASEFOLDING-MIB")
+
+	obj := m.Object("problemCasefoldInteger")
+	testutil.NotNil(t, obj, "Object(problemCasefoldInteger)")
+
+	typ := obj.Type()
+	testutil.NotNil(t, typ, "Type() for problemCasefoldInteger")
+	testutil.Equal(t, mib.BaseInteger32, typ.EffectiveBase(),
+		"Integer should resolve to BaseInteger32")
+}
+
+// TestProblemCasefoldLowercaseTable verifies that a table using a lowercase
+// SEQUENCE type name parses and resolves correctly in permissive mode.
+// Real: CT-SERIES-1000-MIB wirelessSimTableEntry uses lowercase for both
+// the SYNTAX type reference and the ::= SEQUENCE type assignment.
+// net-snmp: accepts silently.
+func TestProblemCasefoldLowercaseTable(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-CASEFOLDING-MIB")
+
+	// No error-level diagnostics for this module
+	for _, d := range m.Diagnostics() {
+		if d.Module == "PROBLEM-CASEFOLDING-MIB" && d.Severity <= mib.SeverityError {
+			t.Errorf("unexpected error diagnostic: code=%s msg=%s", d.Code, d.Message)
+		}
+	}
+
+	// Table object
+	tbl := m.Object("problemCasefoldTable")
+	testutil.NotNil(t, tbl, "Object(problemCasefoldTable)")
+	testutil.Equal(t, "table", normalizeKind(tbl.Kind()), "table kind")
+
+	// Row entry
+	entry := m.Object("problemCasefoldEntry")
+	testutil.NotNil(t, entry, "Object(problemCasefoldEntry)")
+	testutil.Equal(t, "row", normalizeKind(entry.Kind()), "entry kind")
+
+	// Index
+	indexes := normalizeIndexes(entry.Index())
+	testutil.Len(t, indexes, 1, "entry should have one index")
+	testutil.Equal(t, "problemCasefoldIndex", indexes[0].Name, "index name")
+
+	// Columns
+	columns := []struct {
+		name     string
+		wantBase mib.BaseType
+	}{
+		{"problemCasefoldIndex", mib.BaseInteger32},
+		{"problemCasefoldName", mib.BaseOctetString},
+		{"problemCasefoldValue", mib.BaseInteger32},
+	}
+	for _, col := range columns {
+		t.Run(col.name, func(t *testing.T) {
+			obj := m.Object(col.name)
+			testutil.NotNil(t, obj, "Object(%s)", col.name)
+			testutil.Equal(t, "column", normalizeKind(obj.Kind()), "column kind for %s", col.name)
+
+			typ := obj.Type()
+			testutil.NotNil(t, typ, "Type() for %s", col.name)
+			testutil.Equal(t, col.wantBase, typ.EffectiveBase(),
+				"base type for %s", col.name)
+		})
+	}
+}
