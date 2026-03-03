@@ -1050,6 +1050,10 @@ func checkNodeParentKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 				ctx.EmitDiagnostic(types.DiagParentRow, SeverityError,
 					ref.mod, obj.Span,
 					obj.Name+": row's parent node must be a table")
+			} else if node.Arc() != 1 {
+				ctx.EmitDiagnostic(types.DiagRowSubidentifierOne, SeverityError,
+					ref.mod, obj.Span,
+					obj.Name+": row node must have sub-identifier 1")
 			}
 		case KindColumn:
 			if parentKind != KindRow {

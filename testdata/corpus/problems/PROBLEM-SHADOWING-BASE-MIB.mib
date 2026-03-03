@@ -16,7 +16,7 @@ problemShadowingBaseMIB MODULE-IDENTITY
     DESCRIPTION  "Base module for import shadowing tests"
     REVISION     "202601300000Z"
     DESCRIPTION  "Initial version"
-    ::= { enterprises 99998 25 }
+    ::= { enterprises 99998 36 }
 
 problemShadowBaseObjects OBJECT IDENTIFIER ::= { problemShadowingBaseMIB 1 }
 

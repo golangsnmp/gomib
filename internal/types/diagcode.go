@@ -128,6 +128,9 @@ const (
 	DiagParentGroup              = "parent-group"
 	DiagParentCompliance         = "parent-compliance"
 	DiagParentCapabilities       = "parent-capabilities"
+	DiagRowSubidentifierOne      = "row-node-subidentifier-one"
+	DiagOidRegistered            = "oid-registered"
+	DiagOidReuse                 = "oid-reuse"
 	DiagSequenceNoColumn         = "sequence-no-column"
 	DiagSequenceMissingColumn    = "sequence-missing-column"
 	DiagSequenceOrder            = "sequence-order"
@@ -177,6 +180,9 @@ var resolverDiagCodes = []string{
 	DiagParentGroup,
 	DiagParentCompliance,
 	DiagParentCapabilities,
+	DiagRowSubidentifierOne,
+	DiagOidRegistered,
+	DiagOidReuse,
 	DiagSequenceNoColumn,
 	DiagSequenceMissingColumn,
 	DiagSequenceOrder,
