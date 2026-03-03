@@ -217,4 +217,5 @@ type Variation struct {
 	CreationRequires []string
 	DefVal           DefVal
 	Description      string
+	Span             types.Span
 }

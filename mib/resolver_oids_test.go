@@ -90,7 +90,7 @@ func TestCollectOidDefinitions(t *testing.T) {
 	// The empty notification should produce a diagnostic.
 	diags := ctx.Diagnostics()
 	testutil.Len(t, diags, 1, "diagnostics")
-	testutil.Equal(t, types.DiagNotificationNoOid, diags[0].Code, "diagnostic code")
+	testutil.Equal(t, types.DiagNotifNoOid, diags[0].Code, "diagnostic code")
 }
 
 func TestCollectOidDefinitionsEmpty(t *testing.T) {

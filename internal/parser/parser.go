@@ -274,7 +274,7 @@ func (p *Parser) recordParseError(diag types.SpanDiagnostic) {
 
 func (p *Parser) makeError(message string) types.SpanDiagnostic {
 	return types.SpanDiagnostic{
-		Severity: types.SeverityError,
+		Severity: types.SeverityForCode(types.DiagParseError),
 		Code:     types.DiagParseError,
 		Span:     p.currentSpan(),
 		Message:  message,
