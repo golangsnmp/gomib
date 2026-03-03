@@ -5,7 +5,7 @@ PROBLEM-RANGES-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE, Integer32, Unsigned32,
-    Counter64, enterprises
+    Counter32, Counter64, enterprises
         FROM SNMPv2-SMI
     TEXTUAL-CONVENTION
         FROM SNMPv2-TC;
@@ -118,5 +118,19 @@ ValidSize ::= TEXTUAL-CONVENTION
     STATUS      current
     DESCRIPTION "Valid SIZE constraint"
     SYNTAX      OCTET STRING (SIZE (0..255))
+
+-- Range on Counter32 (triggers counter-range-illegal)
+CounterWithRange ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "Counter32 with illegal range"
+    SYNTAX      Counter32 (0..1000)
+
+-- Object with Counter64 range (triggers counter-range-illegal)
+problemRangesCounterRangeObj OBJECT-TYPE
+    SYNTAX      Counter64 (100..999999)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Counter64 with illegal range"
+    ::= { problemRangesObjects 5 }
 
 END

@@ -485,7 +485,19 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 
 	case *ast.TypeSyntaxIntegerEnum:
 		namedNumbers := make([]NamedNumber, len(s.NamedNumbers))
+		seenNames := make(map[string]bool, len(s.NamedNumbers))
+		seenValues := make(map[int64]bool, len(s.NamedNumbers))
 		for i, nn := range s.NamedNumbers {
+			if seenNames[nn.Name.Name] {
+				ctx.emitDiagnostic(types.DiagEnumNameRedefinition, types.SeverityError, nn.Span,
+					fmt.Sprintf("duplicate enum name %q", nn.Name.Name))
+			}
+			seenNames[nn.Name.Name] = true
+			if seenValues[nn.Value] {
+				ctx.emitDiagnostic(types.DiagEnumValueRedefinition, types.SeverityError, nn.Span,
+					fmt.Sprintf("duplicate enum value %d", nn.Value))
+			}
+			seenValues[nn.Value] = true
 			namedNumbers[i] = NewNamedNumber(nn.Name.Name, nn.Value)
 		}
 		var base string
@@ -496,7 +508,19 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 
 	case *ast.TypeSyntaxBits:
 		namedBits := make([]NamedBit, len(s.NamedBits))
+		seenNames := make(map[string]bool, len(s.NamedBits))
+		seenPositions := make(map[int64]bool, len(s.NamedBits))
 		for i, nb := range s.NamedBits {
+			if seenNames[nb.Name.Name] {
+				ctx.emitDiagnostic(types.DiagBitsNameRedefinition, types.SeverityError, nb.Span,
+					fmt.Sprintf("duplicate BITS name %q", nb.Name.Name))
+			}
+			seenNames[nb.Name.Name] = true
+			if seenPositions[nb.Value] {
+				ctx.emitDiagnostic(types.DiagBitsValueRedefinition, types.SeverityError, nb.Span,
+					fmt.Sprintf("duplicate BITS position %d", nb.Value))
+			}
+			seenPositions[nb.Value] = true
 			pos := nb.Value
 			if pos < 0 || pos > math.MaxUint32 {
 				ctx.emitDiagnostic(types.DiagInvalidBitsPosition, types.SeverityWarning, nb.Span,

@@ -1048,6 +1048,60 @@ func TestProblemRangeIllegal(t *testing.T) {
 	testutil.True(t, n >= 2, "expected at least 2 range-illegal diagnostics, got %d", n)
 }
 
+// TestProblemCounterRangeIllegal verifies that range constraints on Counter32
+// or Counter64 types emit a counter-range-illegal diagnostic.
+func TestProblemCounterRangeIllegal(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-RANGES-MIB")
+
+	n := countDiagnostics(m, "counter-range-illegal")
+	testutil.True(t, n >= 2, "expected at least 2 counter-range-illegal diagnostics, got %d", n)
+}
+
+// TestProblemEnumNameRedefinition verifies that duplicate enum names
+// emit an enum-name-redefinition diagnostic.
+func TestProblemEnumNameRedefinition(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-ENUM-BITS-DUPES-MIB")
+
+	n := countDiagnostics(m, "enum-name-redefinition")
+	testutil.True(t, n >= 2, "expected at least 2 enum-name-redefinition diagnostics, got %d", n)
+}
+
+// TestProblemEnumValueRedefinition verifies that duplicate enum values
+// emit an enum-value-redefinition diagnostic.
+func TestProblemEnumValueRedefinition(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-ENUM-BITS-DUPES-MIB")
+
+	n := countDiagnostics(m, "enum-value-redefinition")
+	testutil.True(t, n >= 2, "expected at least 2 enum-value-redefinition diagnostics, got %d", n)
+}
+
+// TestProblemBitsNameRedefinition verifies that duplicate BITS names
+// emit a bits-name-redefinition diagnostic.
+func TestProblemBitsNameRedefinition(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-ENUM-BITS-DUPES-MIB")
+
+	n := countDiagnostics(m, "bits-name-redefinition")
+	testutil.True(t, n >= 1, "expected at least 1 bits-name-redefinition diagnostic, got %d", n)
+}
+
+// TestProblemBitsValueRedefinition verifies that duplicate BITS positions
+// emit a bits-value-redefinition diagnostic.
+func TestProblemBitsValueRedefinition(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-ENUM-BITS-DUPES-MIB")
+
+	n := countDiagnostics(m, "bits-value-redefinition")
+	testutil.True(t, n >= 1, "expected at least 1 bits-value-redefinition diagnostic, got %d", n)
+}
+
+// TestProblemSubtypeEnumIllegal verifies that derived enum types with values
+// not present in the parent emit a subtype-enumeration-illegal diagnostic.
+func TestProblemSubtypeEnumIllegal(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-ENUM-SUBTYPE-MIB")
+
+	n := countDiagnostics(m, "subtype-enumeration-illegal")
+	testutil.True(t, n >= 3, "expected at least 3 subtype-enumeration-illegal diagnostics, got %d", n)
+}
+
 // TestProblemImportsAliasNormal verifies that module alias resolution works
 // at normal strictness (safe fallback).
 // Ground truth: net-snmp fails on SNMPv2-SMI-v1 (unlike gomib which has alias table).

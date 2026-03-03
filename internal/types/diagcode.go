@@ -56,6 +56,10 @@ const (
 	DiagUnknownOidComponent   = "unknown-oid-component-type"
 	DiagUnknownDefvalType     = "unknown-defval-type"
 	DiagInvalidBitsPosition   = "invalid-bits-position"
+	DiagEnumNameRedefinition  = "enum-name-redefinition"
+	DiagEnumValueRedefinition = "enum-value-redefinition"
+	DiagBitsNameRedefinition  = "bits-name-redefinition"
+	DiagBitsValueRedefinition = "bits-value-redefinition"
 )
 
 var loweringDiagCodes = []string{
@@ -68,6 +72,10 @@ var loweringDiagCodes = []string{
 	DiagUnknownOidComponent,
 	DiagUnknownDefvalType,
 	DiagInvalidBitsPosition,
+	DiagEnumNameRedefinition,
+	DiagEnumValueRedefinition,
+	DiagBitsNameRedefinition,
+	DiagBitsValueRedefinition,
 }
 
 // Resolver diagnostic codes.
@@ -102,6 +110,9 @@ const (
 	DiagRangeAscending           = "range-ascending"
 	DiagSizeIllegal              = "size-illegal"
 	DiagRangeIllegal             = "range-illegal"
+	DiagCounterRangeIllegal      = "counter-range-illegal"
+	DiagSubtypeEnumIllegal       = "subtype-enumeration-illegal"
+	DiagSubtypeBitsIllegal       = "subtype-bits-illegal"
 )
 
 var resolverDiagCodes = []string{
@@ -135,6 +146,9 @@ var resolverDiagCodes = []string{
 	DiagRangeAscending,
 	DiagSizeIllegal,
 	DiagRangeIllegal,
+	DiagCounterRangeIllegal,
+	DiagSubtypeEnumIllegal,
+	DiagSubtypeBitsIllegal,
 }
 
 // diagPhases maps phase names to their diagnostic code slices.

@@ -23,6 +23,7 @@ func resolveSemantics(ctx *resolverContext) {
 	createResolvedCompliances(ctx)
 	createResolvedCapabilities(ctx)
 	checkIntegerMisuse(ctx)
+	checkEnumSubtyping(ctx)
 	checkRangeConstraints(ctx)
 	checkIndexConstraints(ctx, objRefs)
 	checkDefvalConstraints(ctx, objRefs)
@@ -1295,6 +1296,64 @@ func uvalueInRanges(v uint64, ranges []Range) bool {
 	return false
 }
 
+// checkEnumSubtyping validates that when a derived type or object restricts
+// an enum or BITS parent, every declared named value exists in the parent.
+func checkEnumSubtyping(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.TypeDef:
+				checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
+			case *module.ObjectType:
+				checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
+			}
+		}
+	}
+}
+
+// checkEnumSubtypingSyntax checks a single TypeSyntaxIntegerEnum for
+// named values not present in the parent type.
+func checkEnumSubtypingSyntax(ctx *resolverContext, syntax module.TypeSyntax, name string, mod *module.Module, span types.Span) {
+	enumSyntax, ok := syntax.(*module.TypeSyntaxIntegerEnum)
+	if !ok || enumSyntax.Base == "" || len(enumSyntax.NamedNumbers) == 0 {
+		return
+	}
+
+	parentType, ok := ctx.LookupTypeForModule(mod, enumSyntax.Base)
+	if !ok {
+		return
+	}
+
+	var parentValues []NamedValue
+	var diagCode string
+	var label string
+	if bits := parentType.EffectiveBits(); len(bits) > 0 {
+		parentValues, diagCode, label = bits, types.DiagSubtypeBitsIllegal, "BITS value"
+	} else if enums := parentType.EffectiveEnums(); len(enums) > 0 {
+		parentValues, diagCode, label = enums, types.DiagSubtypeEnumIllegal, "enum value"
+	} else {
+		return
+	}
+
+	for _, nn := range enumSyntax.NamedNumbers {
+		found := false
+		for _, pv := range parentValues {
+			if pv.Label == nn.Name && pv.Value == nn.Value {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ctx.EmitDiagnostic(diagCode, SeverityError,
+				mod, span,
+				name+": "+label+" "+nn.Name+"("+strconv.FormatInt(nn.Value, 10)+") not in parent type "+enumSyntax.Base)
+		}
+	}
+}
+
 // checkRangeConstraints validates range and SIZE constraints on type
 // definitions and object-type inline syntax. Checks for:
 //   - size-illegal: SIZE on non-OCTET-STRING type
@@ -1360,6 +1419,14 @@ func checkRangeList(ctx *resolverContext, ranges []Range, base BaseType, isSize 
 		ctx.EmitDiagnostic(types.DiagRangeIllegal, SeverityError,
 			mod, span,
 			name+": range constraint illegal for non-numerical type")
+		return
+	}
+
+	// Counter types must not have range restrictions (RFC 2578).
+	if !isSize && (base == BaseCounter32 || base == BaseCounter64) {
+		ctx.EmitDiagnostic(types.DiagCounterRangeIllegal, SeverityError,
+			mod, span,
+			name+": range constraint illegal for Counter type")
 		return
 	}
 
