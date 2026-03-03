@@ -1989,6 +1989,223 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		}
 		testutil.True(t, found, "expected DiagGroupMemberUnresolved diagnostic")
 	})
+
+	t.Run("notification member emits group-objects-notification", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "testGroup"},
+					Objects: []string{"notif1"},
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("testGroup")
+		ctx.registerModuleNodeSymbol(mod, "testGroup", grpNode)
+
+		n1 := buildOIDPath(root, 1, 2)
+		n1.setName("notif1")
+		n1.setKind(types.KindNotification)
+		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
+
+		createResolvedObjectGroups(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagGroupObjectsNotification {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagGroupObjectsNotification diagnostic")
+	})
+
+	t.Run("mixed members emit group-member-mixed", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "mixedGroup"},
+					Objects: []string{"obj1", "notif1"},
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("mixedGroup")
+		ctx.registerModuleNodeSymbol(mod, "mixedGroup", grpNode)
+
+		m1 := buildOIDPath(root, 1, 2)
+		m1.setName("obj1")
+		m1.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
+
+		n1 := buildOIDPath(root, 1, 3)
+		n1.setName("notif1")
+		n1.setKind(types.KindNotification)
+		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
+
+		createResolvedObjectGroups(ctx)
+
+		var foundMixed, foundObjNotif bool
+		for _, d := range ctx.Diagnostics() {
+			switch d.Code {
+			case types.DiagGroupMemberMixed:
+				foundMixed = true
+			case types.DiagGroupObjectsNotification:
+				foundObjNotif = true
+			}
+		}
+		testutil.True(t, foundMixed, "expected DiagGroupMemberMixed diagnostic")
+		testutil.True(t, foundObjNotif, "expected DiagGroupObjectsNotification diagnostic")
+	})
+
+	t.Run("obsolete member in current group emits group-object-status", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "currentGroup"},
+					Objects: []string{"obsoleteObj"},
+					Status:  types.StatusCurrent,
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("currentGroup")
+		ctx.registerModuleNodeSymbol(mod, "currentGroup", grpNode)
+
+		m1 := buildOIDPath(root, 1, 2)
+		m1.setName("obsoleteObj")
+		m1.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "obsoleteObj", m1)
+
+		obj := newObject("obsoleteObj")
+		obj.setStatus(types.StatusObsolete)
+		m1.setObject(obj)
+
+		createResolvedObjectGroups(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagGroupObjectStatus {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagGroupObjectStatus diagnostic")
+	})
+
+	t.Run("current member in current group no status diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "currentGroup"},
+					Objects: []string{"currentObj"},
+					Status:  types.StatusCurrent,
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("currentGroup")
+		ctx.registerModuleNodeSymbol(mod, "currentGroup", grpNode)
+
+		m1 := buildOIDPath(root, 1, 2)
+		m1.setName("currentObj")
+		m1.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "currentObj", m1)
+
+		obj := newObject("currentObj")
+		obj.setStatus(types.StatusCurrent)
+		m1.setObject(obj)
+
+		createResolvedObjectGroups(ctx)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagGroupObjectStatus {
+				t.Fatal("unexpected DiagGroupObjectStatus diagnostic")
+			}
+		}
+	})
+
+	t.Run("smiv1 status member skips status check", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "currentGroup"},
+					Objects: []string{"mandatoryObj"},
+					Status:  types.StatusCurrent,
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("currentGroup")
+		ctx.registerModuleNodeSymbol(mod, "currentGroup", grpNode)
+
+		m1 := buildOIDPath(root, 1, 2)
+		m1.setName("mandatoryObj")
+		m1.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "mandatoryObj", m1)
+
+		obj := newObject("mandatoryObj")
+		obj.setStatus(types.StatusMandatory)
+		m1.setObject(obj)
+
+		createResolvedObjectGroups(ctx)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagGroupObjectStatus {
+				t.Fatal("unexpected DiagGroupObjectStatus for SMIv1 status")
+			}
+		}
+	})
 }
 
 func TestCreateResolvedNotificationGroups(t *testing.T) {
@@ -2077,6 +2294,139 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 			}
 		}
 		testutil.True(t, found, "expected DiagGroupMemberUnresolved diagnostic")
+	})
+
+	t.Run("object member emits group-notifications-object", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.NotificationGroup{
+					DefBase:       module.DefBase{Name: "testNotifGroup"},
+					Notifications: []string{"obj1"},
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("testNotifGroup")
+		ctx.registerModuleNodeSymbol(mod, "testNotifGroup", grpNode)
+
+		m1 := buildOIDPath(root, 1, 2)
+		m1.setName("obj1")
+		m1.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
+
+		createResolvedNotificationGroups(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagGroupNotificationsObject {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagGroupNotificationsObject diagnostic")
+	})
+
+	t.Run("mixed members emit group-member-mixed", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.NotificationGroup{
+					DefBase:       module.DefBase{Name: "mixedNotifGroup"},
+					Notifications: []string{"notif1", "obj1"},
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("mixedNotifGroup")
+		ctx.registerModuleNodeSymbol(mod, "mixedNotifGroup", grpNode)
+
+		n1 := buildOIDPath(root, 1, 2)
+		n1.setName("notif1")
+		n1.setKind(types.KindNotification)
+		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
+
+		m1 := buildOIDPath(root, 1, 3)
+		m1.setName("obj1")
+		m1.setKind(types.KindColumn)
+		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
+
+		createResolvedNotificationGroups(ctx)
+
+		var foundMixed, foundNotifObj bool
+		for _, d := range ctx.Diagnostics() {
+			switch d.Code {
+			case types.DiagGroupMemberMixed:
+				foundMixed = true
+			case types.DiagGroupNotificationsObject:
+				foundNotifObj = true
+			}
+		}
+		testutil.True(t, foundMixed, "expected DiagGroupMemberMixed diagnostic")
+		testutil.True(t, foundNotifObj, "expected DiagGroupNotificationsObject diagnostic")
+	})
+
+	t.Run("deprecated member in current notification group emits status diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.NotificationGroup{
+					DefBase:       module.DefBase{Name: "currentNotifGroup"},
+					Notifications: []string{"depNotif"},
+					Status:        types.StatusCurrent,
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("currentNotifGroup")
+		ctx.registerModuleNodeSymbol(mod, "currentNotifGroup", grpNode)
+
+		n1 := buildOIDPath(root, 1, 2)
+		n1.setName("depNotif")
+		n1.setKind(types.KindNotification)
+		ctx.registerModuleNodeSymbol(mod, "depNotif", n1)
+
+		notif := newNotification("depNotif")
+		notif.setStatus(types.StatusDeprecated)
+		n1.setNotification(notif)
+
+		createResolvedNotificationGroups(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagGroupObjectStatus {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagGroupObjectStatus diagnostic")
 	})
 }
 
@@ -3843,6 +4193,852 @@ func TestCheckGroupMembership_MissingNotification(t *testing.T) {
 		}
 	}
 	testutil.True(t, found, "expected group-membership diagnostic for testNotif2")
+}
+
+func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
+	t.Run("obsolete group in current compliance emits diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "obsGroup"},
+					Objects: []string{"someObj"},
+					Status:  types.StatusObsolete,
+				},
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{MandatoryGroups: []string{"obsGroup"}},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("obsGroup")
+		ctx.registerModuleNodeSymbol(mod, "obsGroup", grpNode)
+
+		objNode := buildOIDPath(root, 1, 2)
+		objNode.setName("someObj")
+		objNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "someObj", objNode)
+		obj := newObject("someObj")
+		obj.setStatus(types.StatusObsolete)
+		objNode.setObject(obj)
+
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedObjectGroups(ctx)
+		createResolvedCompliances(ctx)
+		checkComplianceStatus(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceGroupStatus {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagComplianceGroupStatus diagnostic")
+	})
+
+	t.Run("current group in current compliance no diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "curGroup"},
+					Objects: []string{"someObj"},
+					Status:  types.StatusCurrent,
+				},
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{MandatoryGroups: []string{"curGroup"}},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("curGroup")
+		ctx.registerModuleNodeSymbol(mod, "curGroup", grpNode)
+
+		objNode := buildOIDPath(root, 1, 2)
+		objNode.setName("someObj")
+		objNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "someObj", objNode)
+		obj := newObject("someObj")
+		obj.setStatus(types.StatusCurrent)
+		objNode.setObject(obj)
+
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedObjectGroups(ctx)
+		createResolvedCompliances(ctx)
+		checkComplianceStatus(ctx)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceGroupStatus {
+				t.Fatal("unexpected DiagComplianceGroupStatus diagnostic")
+			}
+		}
+	})
+
+	t.Run("optional GROUP clause with obsolete group emits diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "optGroup"},
+					Objects: []string{"someObj"},
+					Status:  types.StatusObsolete,
+				},
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{Groups: []module.ComplianceGroup{{Group: "optGroup"}}},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("optGroup")
+		ctx.registerModuleNodeSymbol(mod, "optGroup", grpNode)
+
+		objNode := buildOIDPath(root, 1, 2)
+		objNode.setName("someObj")
+		objNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "someObj", objNode)
+		obj := newObject("someObj")
+		obj.setStatus(types.StatusObsolete)
+		objNode.setObject(obj)
+
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedObjectGroups(ctx)
+		createResolvedCompliances(ctx)
+		checkComplianceStatus(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceGroupStatus {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagComplianceGroupStatus for optional group")
+	})
+
+	t.Run("smiv1 compliance status skips check", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "obsGroup"},
+					Objects: []string{"someObj"},
+					Status:  types.StatusObsolete,
+				},
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusMandatory,
+					Modules: []module.ComplianceModule{
+						{MandatoryGroups: []string{"obsGroup"}},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("obsGroup")
+		ctx.registerModuleNodeSymbol(mod, "obsGroup", grpNode)
+
+		objNode := buildOIDPath(root, 1, 2)
+		objNode.setName("someObj")
+		objNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "someObj", objNode)
+		obj := newObject("someObj")
+		obj.setStatus(types.StatusObsolete)
+		objNode.setObject(obj)
+
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedObjectGroups(ctx)
+		createResolvedCompliances(ctx)
+		checkComplianceStatus(ctx)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceGroupStatus {
+				t.Fatal("unexpected DiagComplianceGroupStatus for SMIv1 compliance")
+			}
+		}
+	})
+}
+
+func TestCheckComplianceStatus_ObjectStatus(t *testing.T) {
+	t.Run("obsolete object in current compliance emits diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{Objects: []module.ComplianceObject{{Object: "obsObj"}}},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		objNode := buildOIDPath(root, 1, 2)
+		objNode.setName("obsObj")
+		objNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "obsObj", objNode)
+		obj := newObject("obsObj")
+		obj.setStatus(types.StatusObsolete)
+		objNode.setObject(obj)
+
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedCompliances(ctx)
+		checkComplianceStatus(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceObjectStatus {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagComplianceObjectStatus diagnostic")
+	})
+
+	t.Run("current object in current compliance no diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{Objects: []module.ComplianceObject{{Object: "curObj"}}},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		objNode := buildOIDPath(root, 1, 2)
+		objNode.setName("curObj")
+		objNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "curObj", objNode)
+		obj := newObject("curObj")
+		obj.setStatus(types.StatusCurrent)
+		objNode.setObject(obj)
+
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedCompliances(ctx)
+		checkComplianceStatus(ctx)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceObjectStatus {
+				t.Fatal("unexpected DiagComplianceObjectStatus diagnostic")
+			}
+		}
+	})
+
+	t.Run("deprecated object in deprecated compliance no diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusDeprecated,
+					Modules: []module.ComplianceModule{
+						{Objects: []module.ComplianceObject{{Object: "depObj"}}},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		objNode := buildOIDPath(root, 1, 2)
+		objNode.setName("depObj")
+		objNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "depObj", objNode)
+		obj := newObject("depObj")
+		obj.setStatus(types.StatusDeprecated)
+		objNode.setObject(obj)
+
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedCompliances(ctx)
+		checkComplianceStatus(ctx)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceObjectStatus {
+				t.Fatal("unexpected DiagComplianceObjectStatus for matching status")
+			}
+		}
+	})
+
+	t.Run("smiv1 object status skips check", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{Objects: []module.ComplianceObject{{Object: "mandObj"}}},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		objNode := buildOIDPath(root, 1, 2)
+		objNode.setName("mandObj")
+		objNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "mandObj", objNode)
+		obj := newObject("mandObj")
+		obj.setStatus(types.StatusMandatory)
+		objNode.setObject(obj)
+
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedCompliances(ctx)
+		checkComplianceStatus(ctx)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceObjectStatus {
+				t.Fatal("unexpected DiagComplianceObjectStatus for SMIv1 object status")
+			}
+		}
+	})
+}
+
+func TestCheckComplianceStructure(t *testing.T) {
+	t.Run("group both mandatory and optional emits compliance-group-invalid", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "sharedGroup"},
+					Objects: []string{"someObj"},
+					Status:  types.StatusCurrent,
+				},
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{
+							MandatoryGroups: []string{"sharedGroup"},
+							Groups:          []module.ComplianceGroup{{Group: "sharedGroup"}},
+						},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedCompliances(ctx)
+		checkComplianceStructure(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceGroupInvalid {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagComplianceGroupInvalid diagnostic")
+	})
+
+	t.Run("duplicate refinement emits refinement-exists", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{
+							Objects: []module.ComplianceObject{
+								{Object: "dupObj"},
+								{Object: "dupObj"},
+							},
+						},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedCompliances(ctx)
+		checkComplianceStructure(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagRefinementExists {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagRefinementExists diagnostic")
+	})
+
+	t.Run("duplicate optional group emits optional-group-exists", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{
+							Groups: []module.ComplianceGroup{
+								{Group: "dupGroup"},
+								{Group: "dupGroup"},
+							},
+						},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedCompliances(ctx)
+		checkComplianceStructure(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagOptionalGroupExists {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagOptionalGroupExists diagnostic")
+	})
+
+	t.Run("refinement not in any group emits refinement-not-listed", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "myGroup"},
+					Objects: []string{"memberObj"},
+					Status:  types.StatusCurrent,
+				},
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{
+							MandatoryGroups: []string{"myGroup"},
+							Objects:         []module.ComplianceObject{{Object: "unlistedObj"}},
+						},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("myGroup")
+		ctx.registerModuleNodeSymbol(mod, "myGroup", grpNode)
+
+		memberNode := buildOIDPath(root, 1, 2)
+		memberNode.setName("memberObj")
+		memberNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "memberObj", memberNode)
+		memberObj := newObject("memberObj")
+		memberObj.setStatus(types.StatusCurrent)
+		memberNode.setObject(memberObj)
+
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedObjectGroups(ctx)
+		createResolvedCompliances(ctx)
+		checkComplianceStructure(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagRefinementNotListed {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagRefinementNotListed diagnostic")
+	})
+
+	t.Run("refinement in mandatory group no diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "myGroup"},
+					Objects: []string{"listedObj"},
+					Status:  types.StatusCurrent,
+				},
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{
+							MandatoryGroups: []string{"myGroup"},
+							Objects:         []module.ComplianceObject{{Object: "listedObj"}},
+						},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("myGroup")
+		ctx.registerModuleNodeSymbol(mod, "myGroup", grpNode)
+
+		memberNode := buildOIDPath(root, 1, 2)
+		memberNode.setName("listedObj")
+		memberNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "listedObj", memberNode)
+		memberObj := newObject("listedObj")
+		memberObj.setStatus(types.StatusCurrent)
+		memberNode.setObject(memberObj)
+
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedObjectGroups(ctx)
+		createResolvedCompliances(ctx)
+		checkComplianceStructure(ctx)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagRefinementNotListed {
+				t.Fatal("unexpected DiagRefinementNotListed diagnostic")
+			}
+		}
+	})
+
+	t.Run("no duplicates no diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ModuleCompliance{
+					DefBase: module.DefBase{Name: "testCompliance"},
+					Status:  types.StatusCurrent,
+					Modules: []module.ComplianceModule{
+						{
+							MandatoryGroups: []string{"groupA"},
+							Groups:          []module.ComplianceGroup{{Group: "groupB"}},
+							Objects:         []module.ComplianceObject{{Object: "objA"}, {Object: "objB"}},
+						},
+					},
+					Oid: testOid("testNode", 10),
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+		compNode := buildOIDPath(root, 1, 10)
+		compNode.setName("testCompliance")
+		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
+
+		createResolvedCompliances(ctx)
+		checkComplianceStructure(ctx)
+
+		for _, d := range ctx.Diagnostics() {
+			switch d.Code {
+			case types.DiagComplianceGroupInvalid, types.DiagRefinementExists, types.DiagOptionalGroupExists:
+				t.Fatalf("unexpected diagnostic: %s", d.Code)
+			}
+		}
+	})
+}
+
+func TestCheckGroupMemberLocality(t *testing.T) {
+	t.Run("imported member emits compliance-member-not-local", func(t *testing.T) {
+		modA := &module.Module{Name: "SOURCE-MIB"}
+		modB := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "testGroup"},
+					Objects: []string{"importedObj"},
+					Status:  types.StatusCurrent,
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{modA, modB}, nil, StrictConfig())
+		ctx.moduleIndex[modA.Name] = []*module.Module{modA}
+		ctx.moduleIndex[modB.Name] = []*module.Module{modB}
+		resolvedModB := newModule(modB.Name)
+		ctx.moduleToResolved[modB] = resolvedModB
+		ctx.resolvedToModule[resolvedModB] = modB
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("testGroup")
+		ctx.registerModuleNodeSymbol(modB, "testGroup", grpNode)
+
+		// Register importedObj in modA (source) but not in modB (group's module).
+		objNode := buildOIDPath(root, 1, 2)
+		objNode.setName("importedObj")
+		objNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(modA, "importedObj", objNode)
+		// Make it available in modB via import.
+		if ctx.moduleImports[modB] == nil {
+			ctx.moduleImports[modB] = make(map[string]*module.Module)
+		}
+		ctx.moduleImports[modB]["importedObj"] = modA
+
+		checkGroupMemberLocality(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceMemberNotLocal {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagComplianceMemberNotLocal diagnostic")
+	})
+
+	t.Run("local member no diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.ObjectGroup{
+					DefBase: module.DefBase{Name: "testGroup"},
+					Objects: []string{"localObj"},
+					Status:  types.StatusCurrent,
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("testGroup")
+		ctx.registerModuleNodeSymbol(mod, "testGroup", grpNode)
+
+		objNode := buildOIDPath(root, 1, 2)
+		objNode.setName("localObj")
+		objNode.setKind(types.KindScalar)
+		ctx.registerModuleNodeSymbol(mod, "localObj", objNode)
+
+		checkGroupMemberLocality(ctx)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceMemberNotLocal {
+				t.Fatal("unexpected DiagComplianceMemberNotLocal diagnostic")
+			}
+		}
+	})
+
+	t.Run("notification group imported member emits diagnostic", func(t *testing.T) {
+		modA := &module.Module{Name: "SOURCE-MIB"}
+		modB := &module.Module{
+			Name: "TEST-MIB",
+			Definitions: []module.Definition{
+				&module.NotificationGroup{
+					DefBase:       module.DefBase{Name: "testNotifGroup"},
+					Notifications: []string{"importedNotif"},
+					Status:        types.StatusCurrent,
+				},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{modA, modB}, nil, StrictConfig())
+		ctx.moduleIndex[modA.Name] = []*module.Module{modA}
+		ctx.moduleIndex[modB.Name] = []*module.Module{modB}
+		resolvedModB := newModule(modB.Name)
+		ctx.moduleToResolved[modB] = resolvedModB
+		ctx.resolvedToModule[resolvedModB] = modB
+
+		root := ctx.mib.Root()
+
+		grpNode := buildOIDPath(root, 1, 1)
+		grpNode.setName("testNotifGroup")
+		ctx.registerModuleNodeSymbol(modB, "testNotifGroup", grpNode)
+
+		notifNode := buildOIDPath(root, 1, 2)
+		notifNode.setName("importedNotif")
+		notifNode.setKind(types.KindNotification)
+		ctx.registerModuleNodeSymbol(modA, "importedNotif", notifNode)
+		if ctx.moduleImports[modB] == nil {
+			ctx.moduleImports[modB] = make(map[string]*module.Module)
+		}
+		ctx.moduleImports[modB]["importedNotif"] = modA
+
+		checkGroupMemberLocality(ctx)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagComplianceMemberNotLocal {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagComplianceMemberNotLocal for notification group")
+	})
 }
 
 // makeTypedObject creates a minimal Object with a type of the given base type

@@ -33,6 +33,9 @@ func resolveSemantics(ctx *resolverContext) {
 	checkSequenceFields(ctx, objRefs)
 	checkAccessAndStatus(ctx, objRefs)
 	checkGroupMembership(ctx, objRefs)
+	checkComplianceStatus(ctx)
+	checkComplianceStructure(ctx)
+	checkGroupMemberLocality(ctx)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
@@ -434,20 +437,32 @@ func createResolvedObjectGroups(ctx *resolverContext) int {
 		resolved.setDescription(grp.Description)
 		resolved.setReference(grp.Reference)
 
+		var hasObjects, hasNotifications bool
 		for _, memberName := range grp.Objects {
 			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
 				resolved.addMember(memberNode)
+				kind := memberNode.Kind()
+				if kind == types.KindNotification {
+					hasNotifications = true
+					ctx.EmitDiagnostic(types.DiagGroupObjectsNotification,
+						ref.mod, grp.DefinitionSpan(),
+						fmt.Sprintf("object group %q includes notification %q", grp.Name, memberName))
+				} else if kind.IsObjectType() {
+					hasObjects = true
+				}
 				if obj := memberNode.Object(); obj != nil && obj.Access() == AccessNotAccessible {
 					ctx.EmitDiagnostic(types.DiagGroupNotAccessible,
 						ref.mod, grp.DefinitionSpan(),
 						fmt.Sprintf("object %q of group %q must not be not-accessible", memberName, grp.Name))
 				}
+				checkGroupMemberStatus(ctx, ref.mod, grp.DefinitionSpan(), grp.Status, grp.Name, memberNode, memberName)
 			} else {
 				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved,
 					ref.mod, grp.DefinitionSpan(),
 					fmt.Sprintf("group %q references unresolved member %q", grp.Name, memberName))
 			}
 		}
+		emitMixedGroupDiagnostic(ctx, ref.mod, grp.DefinitionSpan(), grp.Name, hasObjects, hasNotifications)
 
 		registerGroup(ctx, ref.mod, node, resolved)
 		created++
@@ -479,15 +494,27 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 		resolved.setReference(grp.Reference)
 		resolved.setIsNotificationGroup(true)
 
+		var hasObjects, hasNotifications bool
 		for _, memberName := range grp.Notifications {
 			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
 				resolved.addMember(memberNode)
+				kind := memberNode.Kind()
+				if kind.IsObjectType() {
+					hasObjects = true
+					ctx.EmitDiagnostic(types.DiagGroupNotificationsObject,
+						ref.mod, grp.DefinitionSpan(),
+						fmt.Sprintf("notification group %q includes object %q", grp.Name, memberName))
+				} else if kind == types.KindNotification {
+					hasNotifications = true
+				}
+				checkGroupMemberStatus(ctx, ref.mod, grp.DefinitionSpan(), grp.Status, grp.Name, memberNode, memberName)
 			} else {
 				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved,
 					ref.mod, grp.DefinitionSpan(),
 					fmt.Sprintf("notification group %q references unresolved member %q", grp.Name, memberName))
 			}
 		}
+		emitMixedGroupDiagnostic(ctx, ref.mod, grp.DefinitionSpan(), grp.Name, hasObjects, hasNotifications)
 
 		registerGroup(ctx, ref.mod, node, resolved)
 		created++
@@ -817,6 +844,259 @@ func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*N
 		return node, ok
 	}
 	return nil, false
+}
+
+// memberNodeStatus returns the status of a group member node from its
+// attached Object or Notification entity.
+func memberNodeStatus(n *Node) (Status, bool) {
+	if obj := n.Object(); obj != nil {
+		return obj.Status(), true
+	}
+	if notif := n.Notification(); notif != nil {
+		return notif.Status(), true
+	}
+	return 0, false
+}
+
+// checkGroupMemberStatus emits DiagGroupObjectStatus when a member's
+// SMIv2 status exceeds the group's status (e.g. obsolete member in a
+// current group). SMIv1 statuses are skipped since they aren't
+// comparable on the same scale.
+func checkGroupMemberStatus(ctx *resolverContext, mod *module.Module, span types.Span, groupStatus Status, groupName string, memberNode *Node, memberName string) {
+	ms, ok := memberNodeStatus(memberNode)
+	if !ok || ms.IsSMIv1() || groupStatus.IsSMIv1() {
+		return
+	}
+	if ms > groupStatus {
+		ctx.EmitDiagnostic(types.DiagGroupObjectStatus,
+			mod, span,
+			fmt.Sprintf("%s group %q includes %s member %q", groupStatus, groupName, ms, memberName))
+	}
+}
+
+// emitMixedGroupDiagnostic emits DiagGroupMemberMixed when a group
+// contains both object-type and notification-type members.
+func emitMixedGroupDiagnostic(ctx *resolverContext, mod *module.Module, span types.Span, groupName string, hasObjects, hasNotifications bool) {
+	if hasObjects && hasNotifications {
+		ctx.EmitDiagnostic(types.DiagGroupMemberMixed,
+			mod, span,
+			fmt.Sprintf("group %q contains scalars/columns and notifications", groupName))
+	}
+}
+
+// checkComplianceStatus emits DiagComplianceGroupStatus when a mandatory or
+// optional group's status exceeds the MODULE-COMPLIANCE's status, and
+// DiagComplianceObjectStatus when a refined object's status exceeds it.
+// SMIv1 statuses are skipped since they aren't comparable on the same scale.
+func checkComplianceStatus(ctx *resolverContext) {
+	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (complianceRef, bool) {
+		if comp, ok := def.(*module.ModuleCompliance); ok {
+			return complianceRef{mod: mod, comp: comp}, true
+		}
+		return complianceRef{}, false
+	}) {
+		comp := ref.comp
+		if comp.Status.IsSMIv1() {
+			continue
+		}
+		for _, cm := range comp.Modules {
+			// Check mandatory groups.
+			for _, groupName := range cm.MandatoryGroups {
+				checkComplianceGroupStatus(ctx, ref.mod, comp, cm.ModuleName, groupName)
+			}
+			// Check optional (GROUP) groups.
+			for _, cg := range cm.Groups {
+				checkComplianceGroupStatus(ctx, ref.mod, comp, cm.ModuleName, cg.Group)
+			}
+			// Check refined objects.
+			for _, co := range cm.Objects {
+				checkComplianceObjectStatus(ctx, ref.mod, comp, cm.ModuleName, co.Object)
+			}
+		}
+	}
+}
+
+func checkComplianceGroupStatus(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, moduleName, groupName string) {
+	node := lookupComplianceMember(ctx, mod, moduleName, groupName)
+	if node == nil {
+		return
+	}
+	grp := node.Group()
+	if grp == nil {
+		return
+	}
+	gs := grp.Status()
+	if gs.IsSMIv1() {
+		return
+	}
+	if gs > comp.Status {
+		ctx.EmitDiagnostic(types.DiagComplianceGroupStatus,
+			mod, comp.DefinitionSpan(),
+			fmt.Sprintf("%s compliance %q references %s group %q", comp.Status, comp.Name, gs, groupName))
+	}
+}
+
+func checkComplianceObjectStatus(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, moduleName, objectName string) {
+	node := lookupComplianceMember(ctx, mod, moduleName, objectName)
+	if node == nil {
+		return
+	}
+	ms, ok := memberNodeStatus(node)
+	if !ok || ms.IsSMIv1() {
+		return
+	}
+	if ms > comp.Status {
+		ctx.EmitDiagnostic(types.DiagComplianceObjectStatus,
+			mod, comp.DefinitionSpan(),
+			fmt.Sprintf("%s compliance %q references %s object %q", comp.Status, comp.Name, ms, objectName))
+	}
+}
+
+// lookupComplianceMember resolves a node referenced from a MODULE-COMPLIANCE
+// MODULE clause. When moduleName is non-empty, the lookup targets that specific
+// module; otherwise the compliance's own module is used.
+func lookupComplianceMember(ctx *resolverContext, compMod *module.Module, moduleName, name string) *Node {
+	if moduleName != "" {
+		node, ok := ctx.LookupNodeInModule(moduleName, name)
+		if ok {
+			return node
+		}
+	}
+	node, ok := lookupMemberNode(ctx, compMod, name)
+	if ok {
+		return node
+	}
+	return nil
+}
+
+// checkComplianceStructure validates MODULE-COMPLIANCE structural constraints:
+// - compliance-group-invalid: group both mandatory and optional
+// - refinement-exists: duplicate OBJECT refinement
+// - optional-group-exists: duplicate GROUP clause
+// - refinement-not-listed: refined object not in any listed group
+func checkComplianceStructure(ctx *resolverContext) {
+	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (complianceRef, bool) {
+		if comp, ok := def.(*module.ModuleCompliance); ok {
+			return complianceRef{mod: mod, comp: comp}, true
+		}
+		return complianceRef{}, false
+	}) {
+		comp := ref.comp
+		for _, cm := range comp.Modules {
+			checkComplianceDuplicates(ctx, ref.mod, comp, &cm)
+			checkRefinementListed(ctx, ref.mod, comp, &cm)
+		}
+	}
+}
+
+func checkComplianceDuplicates(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, cm *module.ComplianceModule) {
+	// Build mandatory group set.
+	mandatory := make(map[string]bool, len(cm.MandatoryGroups))
+	for _, g := range cm.MandatoryGroups {
+		mandatory[g] = true
+	}
+
+	// Check optional groups for duplicates and overlap with mandatory.
+	optionalSeen := make(map[string]bool, len(cm.Groups))
+	for _, cg := range cm.Groups {
+		if mandatory[cg.Group] {
+			ctx.EmitDiagnostic(types.DiagComplianceGroupInvalid,
+				mod, comp.DefinitionSpan(),
+				fmt.Sprintf("group %q is both mandatory and optional in %q", cg.Group, comp.Name))
+		}
+		if optionalSeen[cg.Group] {
+			ctx.EmitDiagnostic(types.DiagOptionalGroupExists,
+				mod, comp.DefinitionSpan(),
+				fmt.Sprintf("duplicate optional group %q in %q", cg.Group, comp.Name))
+		}
+		optionalSeen[cg.Group] = true
+	}
+
+	// Check for duplicate object refinements.
+	refinementSeen := make(map[string]bool, len(cm.Objects))
+	for _, co := range cm.Objects {
+		if refinementSeen[co.Object] {
+			ctx.EmitDiagnostic(types.DiagRefinementExists,
+				mod, comp.DefinitionSpan(),
+				fmt.Sprintf("duplicate refinement for %q in %q", co.Object, comp.Name))
+		}
+		refinementSeen[co.Object] = true
+	}
+}
+
+// checkRefinementListed verifies that each refined object in a MODULE-COMPLIANCE
+// MODULE clause is a member of at least one mandatory or optional group.
+func checkRefinementListed(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, cm *module.ComplianceModule) {
+	if len(cm.Objects) == 0 {
+		return
+	}
+
+	// Collect all group member names from mandatory and optional groups.
+	memberNames := make(map[string]bool)
+	for _, groupName := range cm.MandatoryGroups {
+		collectGroupMemberNames(ctx, mod, cm.ModuleName, groupName, memberNames)
+	}
+	for _, cg := range cm.Groups {
+		collectGroupMemberNames(ctx, mod, cm.ModuleName, cg.Group, memberNames)
+	}
+
+	for _, co := range cm.Objects {
+		if !memberNames[co.Object] {
+			ctx.EmitDiagnostic(types.DiagRefinementNotListed,
+				mod, comp.DefinitionSpan(),
+				fmt.Sprintf("refined object %q not in any mandatory or optional group of %q", co.Object, comp.Name))
+		}
+	}
+}
+
+// collectGroupMemberNames looks up a group and adds its member names to the set.
+func collectGroupMemberNames(ctx *resolverContext, mod *module.Module, moduleName, groupName string, names map[string]bool) {
+	node := lookupComplianceMember(ctx, mod, moduleName, groupName)
+	if node == nil {
+		return
+	}
+	grp := node.Group()
+	if grp == nil {
+		return
+	}
+	for _, member := range grp.Members() {
+		names[member.Name()] = true
+	}
+}
+
+// checkGroupMemberLocality validates that OBJECT-GROUP and NOTIFICATION-GROUP
+// members are defined in the same module as the group (RFC 2580 sections 3.1, 4.1).
+func checkGroupMemberLocality(ctx *resolverContext) {
+	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (objectGroupRef, bool) {
+		if grp, ok := def.(*module.ObjectGroup); ok {
+			return objectGroupRef{mod: mod, grp: grp}, true
+		}
+		return objectGroupRef{}, false
+	}) {
+		localSymbols := ctx.moduleSymbolToNode[ref.mod]
+		for _, memberName := range ref.grp.Objects {
+			if localSymbols == nil || localSymbols[memberName] == nil {
+				ctx.EmitDiagnostic(types.DiagComplianceMemberNotLocal,
+					ref.mod, ref.grp.DefinitionSpan(),
+					fmt.Sprintf("group member %q is not defined in module %q", memberName, ref.mod.Name))
+			}
+		}
+	}
+	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (notificationGroupRef, bool) {
+		if grp, ok := def.(*module.NotificationGroup); ok {
+			return notificationGroupRef{mod: mod, grp: grp}, true
+		}
+		return notificationGroupRef{}, false
+	}) {
+		localSymbols := ctx.moduleSymbolToNode[ref.mod]
+		for _, memberName := range ref.grp.Notifications {
+			if localSymbols == nil || localSymbols[memberName] == nil {
+				ctx.EmitDiagnostic(types.DiagComplianceMemberNotLocal,
+					ref.mod, ref.grp.DefinitionSpan(),
+					fmt.Sprintf("group member %q is not defined in module %q", memberName, ref.mod.Name))
+			}
+		}
+	}
 }
 
 func resolveSyntaxConstraints(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, ownerName string) *SyntaxConstraints {
@@ -2056,6 +2336,8 @@ func checkAccessPerVersion(ctx *resolverContext, mod *module.Module, obj *module
 				mod, obj.Span,
 				fmt.Sprintf("%q: write-only is no longer allowed in SMIv2", obj.Name))
 		}
+	case types.LanguageUnknown:
+		// Cannot validate version-specific access rules without known language.
 	}
 }
 
@@ -2079,6 +2361,8 @@ func checkAccessKeywordPerVersion(ctx *resolverContext, mod *module.Module, obj 
 				mod, obj.Span,
 				fmt.Sprintf("%q: ACCESS is SMIv1 style, use MAX-ACCESS in SMIv2", obj.Name))
 		}
+	case types.LanguageUnknown:
+		// Cannot validate version-specific keyword rules without known language.
 	}
 }
 
@@ -2173,6 +2457,8 @@ func checkStatusPerVersion(ctx *resolverContext) {
 						mod, def.DefinitionSpan(),
 						fmt.Sprintf("%q: invalid status %s in SMIv2", def.DefinitionName(), status.String()))
 				}
+			case types.LanguageUnknown:
+				// Cannot validate version-specific status rules without known language.
 			}
 		}
 	}

@@ -116,6 +116,17 @@ const (
 	DiagTypeStatusDeprecated     = "type-status-deprecated"
 	DiagTypeStatusObsolete       = "type-status-obsolete"
 	DiagGroupMembership          = "group-membership"
+	DiagGroupMemberMixed         = "group-member-mixed"
+	DiagGroupObjectsNotification = "group-objects-notification"
+	DiagGroupNotificationsObject = "group-notifications-object"
+	DiagGroupObjectStatus        = "group-object-status"
+	DiagComplianceGroupStatus    = "compliance-group-status"
+	DiagComplianceObjectStatus   = "compliance-object-status"
+	DiagComplianceGroupInvalid   = "compliance-group-invalid"
+	DiagRefinementExists         = "refinement-exists"
+	DiagOptionalGroupExists      = "optional-group-exists"
+	DiagRefinementNotListed      = "refinement-not-listed"
+	DiagComplianceMemberNotLocal = "compliance-member-not-local"
 )
 
 // codeEntry pairs a diagnostic code with its severity.
@@ -232,6 +243,17 @@ var resolverDiagCodes = []codeEntry{
 	{DiagTypeStatusDeprecated, SeverityWarning},
 	{DiagTypeStatusObsolete, SeverityWarning},
 	{DiagGroupMembership, SeverityMinor},
+	{DiagGroupMemberMixed, SeverityMinor},
+	{DiagGroupObjectsNotification, SeverityError},
+	{DiagGroupNotificationsObject, SeverityError},
+	{DiagGroupObjectStatus, SeverityWarning},
+	{DiagComplianceGroupStatus, SeverityWarning},
+	{DiagComplianceObjectStatus, SeverityWarning},
+	{DiagComplianceGroupInvalid, SeverityWarning},
+	{DiagRefinementExists, SeverityWarning},
+	{DiagOptionalGroupExists, SeverityWarning},
+	{DiagRefinementNotListed, SeverityWarning},
+	{DiagComplianceMemberNotLocal, SeverityWarning},
 }
 
 // diagPhases maps phase names to their diagnostic code entries.
