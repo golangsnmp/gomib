@@ -102,6 +102,7 @@ const (
 	DiagGroupMemberUnresolved    = "group-member-unresolved"
 	DiagIndexNotObject           = "index-not-object"
 	DiagAugmentsNotObject        = "augments-not-object"
+	DiagAugmentNested            = "augment-nested"
 	DiagNotificationNoOid        = "notification-no-oid"
 	DiagPrimitiveTypeMissing     = "primitive-type-missing"
 	DiagIntegerInSMIv2           = "integer-in-smiv2"
@@ -139,6 +140,7 @@ const (
 	DiagSequenceMissingColumn    = "sequence-missing-column"
 	DiagSequenceOrder            = "sequence-order"
 	DiagSequenceTypeMismatch     = "sequence-type-mismatch"
+	DiagIndexExceedsTooLarge     = "index-exceeds-too-large"
 )
 
 var resolverDiagCodes = []string{
@@ -158,6 +160,7 @@ var resolverDiagCodes = []string{
 	DiagGroupMemberUnresolved,
 	DiagIndexNotObject,
 	DiagAugmentsNotObject,
+	DiagAugmentNested,
 	DiagNotificationNoOid,
 	DiagPrimitiveTypeMissing,
 	DiagIntegerInSMIv2,
@@ -195,6 +198,7 @@ var resolverDiagCodes = []string{
 	DiagSequenceMissingColumn,
 	DiagSequenceOrder,
 	DiagSequenceTypeMismatch,
+	DiagIndexExceedsTooLarge,
 }
 
 // diagPhases maps phase names to their diagnostic code slices.

@@ -1600,6 +1600,118 @@ func TestLinkObjectIndexes(t *testing.T) {
 		testutil.True(t, found, "expected DiagAugmentsNotObject diagnostic")
 	})
 
+	t.Run("nested augments emits diagnostic", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		ctx.modules = append(ctx.modules, mod)
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+
+		root := ctx.mib.Root()
+
+		// Base row with its own INDEX.
+		baseNode := buildOIDPath(root, 1, 1, 1)
+		baseNode.setName("baseEntry")
+		ctx.registerModuleNodeSymbol(mod, "baseEntry", baseNode)
+		baseObj := newObject("baseEntry")
+		baseObj.setNode(baseNode)
+		baseNode.setObject(baseObj)
+		resolvedMod.addObject(baseObj)
+
+		// Middle row that augments the base.
+		midNode := buildOIDPath(root, 1, 2, 1)
+		midNode.setName("midEntry")
+		ctx.registerModuleNodeSymbol(mod, "midEntry", midNode)
+		midObj := newObject("midEntry")
+		midObj.setNode(midNode)
+		midNode.setObject(midObj)
+		resolvedMod.addObject(midObj)
+
+		// Leaf row that augments the middle (nested).
+		leafNode := buildOIDPath(root, 1, 3, 1)
+		leafNode.setName("leafEntry")
+		ctx.registerModuleNodeSymbol(mod, "leafEntry", leafNode)
+		leafObj := newObject("leafEntry")
+		leafObj.setNode(leafNode)
+		leafNode.setObject(leafObj)
+		resolvedMod.addObject(leafObj)
+
+		objRefs := []objectTypeRef{
+			{mod: mod, obj: &module.ObjectType{
+				DefBase:  module.DefBase{Name: "midEntry"},
+				Syntax:   &module.TypeSyntaxTypeRef{Name: "MidEntry"},
+				Augments: "baseEntry",
+			}},
+			{mod: mod, obj: &module.ObjectType{
+				DefBase:  module.DefBase{Name: "leafEntry"},
+				Syntax:   &module.TypeSyntaxTypeRef{Name: "LeafEntry"},
+				Augments: "midEntry",
+			}},
+		}
+
+		// Link first, then check nesting.
+		linkObjectIndexes(ctx, objRefs)
+		checkAugmentsNesting(ctx, objRefs)
+
+		// midEntry augments baseEntry (base row) - no diagnostic.
+		// leafEntry augments midEntry (itself an augmentation) - should emit diagnostic.
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagAugmentNested {
+				found = true
+				testutil.Contains(t, d.Message, "leafEntry", "diagnostic should mention augmenting row")
+				testutil.Contains(t, d.Message, "midEntry", "diagnostic should mention target row")
+				break
+			}
+		}
+		testutil.True(t, found, "expected DiagAugmentNested diagnostic for nested augments")
+	})
+
+	t.Run("augments base row emits no nesting diagnostic", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		ctx.modules = append(ctx.modules, mod)
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+
+		root := ctx.mib.Root()
+
+		// Base row with its own INDEX.
+		baseNode := buildOIDPath(root, 1, 1, 1)
+		baseNode.setName("baseEntry")
+		ctx.registerModuleNodeSymbol(mod, "baseEntry", baseNode)
+		baseObj := newObject("baseEntry")
+		baseObj.setNode(baseNode)
+		baseNode.setObject(baseObj)
+		resolvedMod.addObject(baseObj)
+
+		// Augmenting row that augments the base row.
+		augNode := buildOIDPath(root, 1, 2, 1)
+		augNode.setName("augEntry")
+		ctx.registerModuleNodeSymbol(mod, "augEntry", augNode)
+		augObj := newObject("augEntry")
+		augObj.setNode(augNode)
+		augNode.setObject(augObj)
+		resolvedMod.addObject(augObj)
+
+		objRefs := []objectTypeRef{
+			{mod: mod, obj: &module.ObjectType{
+				DefBase:  module.DefBase{Name: "augEntry"},
+				Syntax:   &module.TypeSyntaxTypeRef{Name: "AugEntry"},
+				Augments: "baseEntry",
+			}},
+		}
+
+		linkObjectIndexes(ctx, objRefs)
+		checkAugmentsNesting(ctx, objRefs)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagAugmentNested {
+				t.Fatalf("unexpected DiagAugmentNested for augments targeting a base row")
+			}
+		}
+	})
+
 	t.Run("bare type index creates TypeName entry", func(t *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
@@ -2705,4 +2817,196 @@ func TestCheckIndexIllegalBasetype(t *testing.T) {
 		}
 	}
 	testutil.True(t, found, "expected index-illegal-basetype diagnostic")
+}
+
+func TestCheckIndexOIDLength(t *testing.T) {
+	t.Run("exceeds 128 sub-identifiers", func(t *testing.T) {
+		ctx := newTestContextWithConfig(StrictConfig())
+		mod := &module.Module{Name: "TEST-MIB"}
+		ctx.modules = append(ctx.modules, mod)
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+
+		// Create an index object with a variable-length OCTET STRING
+		// with SIZE (0..255). This contributes 255+1=256 sub-ids
+		// (max size + length prefix).
+		idxObj := newObject("bigIndex")
+		typ := newType("BigString")
+		typ.setBase(BaseOctetString)
+		idxObj.setType(typ)
+		idxObj.setEffectiveSizes([]Range{{Min: 0, Max: 255}})
+		resolvedMod.addObject(idxObj)
+
+		root := ctx.mib.Root()
+		idxNode := buildOIDPath(root, 1, 3, 6, 1, 2, 1, 99, 1, 1, 1)
+		idxNode.setName("bigIndex")
+		idxNode.setObject(idxObj)
+		ctx.registerModuleNodeSymbol(mod, "bigIndex", idxNode)
+
+		// Create the row object at a path of length 9 (1.3.6.1.2.1.99.1.1).
+		rowObj := newObject("testEntry")
+		resolvedMod.addObject(rowObj)
+		rowObj.setIndex([]IndexEntry{{
+			Object:   idxObj,
+			Encoding: IndexEncodingLengthPrefixed,
+		}})
+
+		rowNode := buildOIDPath(root, 1, 3, 6, 1, 2, 1, 99, 1, 1)
+		rowNode.setName("testEntry")
+		rowNode.setObject(rowObj)
+		ctx.registerModuleNodeSymbol(mod, "testEntry", rowNode)
+
+		objRefs := []objectTypeRef{
+			{mod: mod, obj: &module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Index:   []module.IndexItem{{Object: "bigIndex"}},
+			}},
+		}
+
+		checkIndexConstraints(ctx, objRefs)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagIndexExceedsTooLarge {
+				testutil.Contains(t, d.Message, "testEntry", "diagnostic message")
+				found = true
+			}
+		}
+		testutil.True(t, found, "expected index-exceeds-too-large diagnostic")
+	})
+
+	t.Run("within 128 sub-identifiers", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		ctx.modules = append(ctx.modules, mod)
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+
+		// Integer index: contributes 1 sub-id.
+		idxObj := newObject("intIndex")
+		typ := newType("IntIdx")
+		typ.setBase(BaseInteger32)
+		idxObj.setType(typ)
+		idxObj.setEffectiveRanges([]Range{{Min: 0, Max: 255}})
+		resolvedMod.addObject(idxObj)
+
+		root := ctx.mib.Root()
+		idxNode := buildOIDPath(root, 1, 3, 6, 1, 2, 1, 100, 1, 1, 1)
+		idxNode.setName("intIndex")
+		idxNode.setObject(idxObj)
+		ctx.registerModuleNodeSymbol(mod, "intIndex", idxNode)
+
+		// Row OID: 1.3.6.1.2.1.100.1.1 = 9 arcs.
+		// Index: 1 sub-id. Total: 9 + 1 = 10. Well within 128.
+		rowObj := newObject("okEntry")
+		resolvedMod.addObject(rowObj)
+		rowObj.setIndex([]IndexEntry{{
+			Object:   idxObj,
+			Encoding: IndexEncodingInteger,
+		}})
+
+		rowNode := buildOIDPath(root, 1, 3, 6, 1, 2, 1, 100, 1, 1)
+		rowNode.setName("okEntry")
+		rowNode.setObject(rowObj)
+		ctx.registerModuleNodeSymbol(mod, "okEntry", rowNode)
+
+		objRefs := []objectTypeRef{
+			{mod: mod, obj: &module.ObjectType{
+				DefBase: module.DefBase{Name: "okEntry"},
+				Index:   []module.IndexItem{{Object: "intIndex"}},
+			}},
+		}
+
+		checkIndexConstraints(ctx, objRefs)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagIndexExceedsTooLarge {
+				t.Fatalf("unexpected index-exceeds-too-large diagnostic: %s", d.Message)
+			}
+		}
+	})
+}
+
+func TestIndexElementSubIds(t *testing.T) {
+	tests := []struct {
+		name   string
+		entry  IndexEntry
+		want   int
+		wantOK bool
+	}{
+		{
+			name:   "integer",
+			entry:  IndexEntry{Object: makeTypedObject(BaseInteger32, nil), Encoding: IndexEncodingInteger},
+			want:   1,
+			wantOK: true,
+		},
+		{
+			name:   "ip address",
+			entry:  IndexEntry{Object: makeTypedObject(BaseIpAddress, nil), Encoding: IndexEncodingIpAddress},
+			want:   4,
+			wantOK: true,
+		},
+		{
+			name:   "fixed string SIZE 8",
+			entry:  IndexEntry{Object: makeTypedObject(BaseOctetString, &[]Range{{Min: 8, Max: 8}}), Encoding: IndexEncodingFixedString},
+			want:   8,
+			wantOK: true,
+		},
+		{
+			name:   "variable string SIZE 0..32",
+			entry:  IndexEntry{Object: makeTypedObject(BaseOctetString, &[]Range{{Min: 0, Max: 32}}), Encoding: IndexEncodingLengthPrefixed},
+			want:   33,
+			wantOK: true,
+		},
+		{
+			name:   "implied string SIZE 0..32",
+			entry:  IndexEntry{Object: makeTypedObject(BaseOctetString, &[]Range{{Min: 0, Max: 32}}), Encoding: IndexEncodingImplied},
+			want:   32,
+			wantOK: true,
+		},
+		{
+			name:   "OID length-prefixed",
+			entry:  IndexEntry{Object: makeTypedObject(BaseObjectIdentifier, nil), Encoding: IndexEncodingLengthPrefixed},
+			want:   129,
+			wantOK: true,
+		},
+		{
+			name:   "OID implied",
+			entry:  IndexEntry{Object: makeTypedObject(BaseObjectIdentifier, nil), Encoding: IndexEncodingImplied},
+			want:   128,
+			wantOK: true,
+		},
+		{
+			name:   "nil object",
+			entry:  IndexEntry{Encoding: IndexEncodingInteger},
+			want:   0,
+			wantOK: false,
+		},
+		{
+			name:   "unknown encoding",
+			entry:  IndexEntry{Object: makeTypedObject(BaseOctetString, nil), Encoding: IndexEncodingUnknown},
+			want:   0,
+			wantOK: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := indexElementSubIds(tt.entry)
+			testutil.Equal(t, tt.wantOK, ok, "ok")
+			testutil.Equal(t, tt.want, got, "sub-id count")
+		})
+	}
+}
+
+// makeTypedObject creates a minimal Object with a type of the given base type
+// and optional sizes. Used for unit testing index helpers.
+func makeTypedObject(base BaseType, sizes *[]Range) *Object {
+	obj := newObject("x")
+	typ := newType("xType")
+	typ.setBase(base)
+	obj.setType(typ)
+	if sizes != nil {
+		obj.setEffectiveSizes(*sizes)
+	}
+	return obj
 }

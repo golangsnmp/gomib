@@ -22,6 +22,7 @@ func resolveSemantics(ctx *resolverContext) {
 	createResolvedGroups(ctx)
 	createResolvedCompliances(ctx)
 	createResolvedCapabilities(ctx)
+	checkAugmentsNesting(ctx, objRefs)
 	checkNodeParentKinds(ctx, objRefs)
 	checkIntegerMisuse(ctx)
 	checkEnumSubtyping(ctx)
@@ -271,6 +272,28 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 						"AUGMENTS target "+obj.Augments+" of "+obj.Name+" resolves to a node without an object definition")
 				}
 			}
+		}
+	}
+}
+
+// checkAugmentsNesting verifies that AUGMENTS targets are base table rows
+// (rows with their own INDEX clause), not rows that themselves use AUGMENTS.
+// This must run after linkObjectIndexes so all augments links are established.
+func checkAugmentsNesting(ctx *resolverContext, objRefs []objectTypeRef) {
+	for _, ref := range objRefs {
+		obj := ref.obj
+		if obj.Augments == "" {
+			continue
+		}
+		resolvedObj := ctx.lookupObjectInModuleScope(ref.mod, obj.Name)
+		if resolvedObj == nil || resolvedObj.Augments() == nil {
+			continue
+		}
+		target := resolvedObj.Augments()
+		if target.Augments() != nil {
+			ctx.EmitDiagnostic(types.DiagAugmentNested, SeverityError,
+				ref.mod, obj.Span,
+				obj.Name+" augments "+obj.Augments+" which is not a base table row")
 		}
 	}
 }
@@ -1001,6 +1024,70 @@ func isLegalIndexBasetype(base BaseType) bool {
 	}
 }
 
+// maxSizeFromRanges returns the maximum Max value across all size ranges,
+// or -1 if sizes is empty.
+func maxSizeFromRanges(sizes []Range) int64 {
+	if len(sizes) == 0 {
+		return -1
+	}
+	m := sizes[0].Max
+	for _, r := range sizes[1:] {
+		if r.Max > m {
+			m = r.Max
+		}
+	}
+	return m
+}
+
+// indexElementSubIds returns the maximum number of sub-identifiers an index
+// element contributes to an instance OID. Returns (count, true) if computable,
+// or (0, false) if the encoding or type constraints are insufficient.
+func indexElementSubIds(entry IndexEntry) (int, bool) {
+	obj := entry.Object
+	if obj == nil {
+		return 0, false
+	}
+	switch entry.Encoding {
+	case IndexEncodingInteger:
+		return 1, true
+	case IndexEncodingIpAddress:
+		return 4, true
+	case IndexEncodingFixedString:
+		if isFixedSize(obj.sizes) {
+			return int(obj.sizes[0].Max), true
+		}
+		return 0, false
+	case IndexEncodingLengthPrefixed:
+		t := obj.Type()
+		if t == nil {
+			return 0, false
+		}
+		if t.EffectiveBase() == BaseObjectIdentifier {
+			return 128 + 1, true
+		}
+		m := maxSizeFromRanges(obj.sizes)
+		if m < 0 {
+			return 0, false
+		}
+		return int(m) + 1, true
+	case IndexEncodingImplied:
+		t := obj.Type()
+		if t == nil {
+			return 0, false
+		}
+		if t.EffectiveBase() == BaseObjectIdentifier {
+			return 128, true
+		}
+		m := maxSizeFromRanges(obj.sizes)
+		if m < 0 {
+			return 0, false
+		}
+		return int(m), true
+	default:
+		return 0, false
+	}
+}
+
 // isBareTypeIndex returns true for primitive/global type names that can appear
 // directly in INDEX clauses without being object definitions.
 func isBareTypeIndex(name string) bool {
@@ -1165,9 +1252,10 @@ func isIntegerKeywordSyntax(syntax module.TypeSyntax) bool {
 }
 
 // checkIndexConstraints validates INDEX elements: illegal basetypes,
-// missing range restrictions, and negative ranges. Per RFC 2578 section 7.7,
-// index syntax must resolve to INTEGER, OCTET STRING, IpAddress, or
-// OBJECT IDENTIFIER.
+// missing range restrictions, negative ranges, and total OID length.
+// Per RFC 2578 section 7.7, index syntax must resolve to INTEGER,
+// OCTET STRING, IpAddress, or OBJECT IDENTIFIER. Per section 3.5,
+// an OID may have at most 128 sub-identifiers.
 func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 	for _, ref := range objRefs {
 		obj := ref.obj
@@ -1241,6 +1329,45 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 				}
 			}
 		}
+
+		// Check total index OID length against the 128 sub-identifier limit.
+		// Instance OID = row OID + index sub-identifiers.
+		checkIndexOIDLength(ctx, ref)
+	}
+}
+
+// checkIndexOIDLength checks that a row's instance OID does not exceed the
+// 128 sub-identifier maximum from RFC 2578 section 3.5. The instance OID
+// is the row's OID plus one sub-identifier per index encoding.
+func checkIndexOIDLength(ctx *resolverContext, ref objectTypeRef) {
+	rowNode, ok := ctx.LookupNodeForModule(ref.mod, ref.obj.Name)
+	if !ok {
+		return
+	}
+	rowOID := rowNode.OID()
+	if rowOID == nil {
+		return
+	}
+
+	resolvedObj := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+	if resolvedObj == nil {
+		return
+	}
+
+	totalLen := len(rowOID)
+	for _, entry := range resolvedObj.index {
+		n, ok := indexElementSubIds(entry)
+		if !ok {
+			return // can't compute, skip the check
+		}
+		totalLen += n
+	}
+
+	if totalLen > 128 {
+		excess := totalLen - 128
+		ctx.EmitDiagnostic(types.DiagIndexExceedsTooLarge, SeverityWarning,
+			ref.mod, ref.obj.Span,
+			ref.obj.Name+" index OID exceeds 128 sub-identifiers by "+strconv.Itoa(excess))
 	}
 }
 
