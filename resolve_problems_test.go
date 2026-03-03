@@ -7,6 +7,7 @@ package gomib
 // SMIv1/v2 mixing, index edge cases, DEFVAL variants, module aliases, and naming.
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -1410,5 +1411,46 @@ func TestProblemCasefoldLowercaseTable(t *testing.T) {
 			testutil.Equal(t, col.wantBase, typ.EffectiveBase(),
 				"base type for %s", col.name)
 		})
+	}
+}
+
+// TestProblemGroupMembership verifies that group-membership diagnostics are
+// emitted for accessible objects and notifications not in any conformance group.
+func TestProblemGroupMembership(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-GROUP-MEMBERSHIP-MIB")
+
+	// Collect all group-membership diagnostics.
+	var diags []string
+	for _, d := range m.Diagnostics() {
+		if d.Code == "group-membership" && d.Module == "PROBLEM-GROUP-MEMBERSHIP-MIB" {
+			diags = append(diags, d.Message)
+		}
+	}
+
+	// Expect diagnostics for uncovered objects.
+	wantMessages := []string{
+		`"problemGMUncoveredScalar" is not in any OBJECT-GROUP`,
+		`"problemGMUncoveredCol" is not in any OBJECT-GROUP`,
+		`"problemGMUncoveredNotif" is not in any NOTIFICATION-GROUP`,
+	}
+	for _, want := range wantMessages {
+		testutil.True(t, slices.Contains(diags, want), "expected diagnostic: %s", want)
+	}
+
+	// Should not report covered objects, not-accessible, tables, or rows.
+	noReport := []string{
+		"problemGMCoveredScalar",
+		"problemGMCoveredCol",
+		"problemGMCoveredNotif",
+		"problemGMIndex",
+		"problemGMTable",
+		"problemGMEntry",
+	}
+	for _, name := range noReport {
+		for _, msg := range diags {
+			if strings.Contains(msg, name) {
+				t.Errorf("should not report %s, got: %s", name, msg)
+			}
+		}
 	}
 }

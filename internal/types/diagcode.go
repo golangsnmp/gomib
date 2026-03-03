@@ -1,7 +1,8 @@
 package types
 
-// Diagnostic codes emitted by the parser, lowering, and resolver phases.
-// Centralizing these prevents silent breakage from typos in string literals.
+// Diagnostic codes emitted by the lexer, parser, lowering, and resolver phases.
+// Each code has a fixed severity defined here. Centralizing codes and severities
+// prevents silent breakage from typos and ensures 1:1 code-to-severity mapping.
 
 // Lexer diagnostic codes.
 const (
@@ -10,13 +11,6 @@ const (
 	DiagUnterminatedHexBinStr = "unterminated-hex-bin-string"
 	DiagMissingHexBinSuffix   = "missing-hex-bin-suffix"
 )
-
-var lexerDiagCodes = []string{
-	DiagUnexpectedCharacter,
-	DiagUnterminatedString,
-	DiagUnterminatedHexBinStr,
-	DiagMissingHexBinSuffix,
-}
 
 // Parser diagnostic codes.
 const (
@@ -31,19 +25,6 @@ const (
 	DiagKeywordReserved      = "keyword-reserved"
 	DiagInvalidHexRange      = "invalid-hex-range"
 )
-
-var parserDiagCodes = []string{
-	DiagIdentifierUnderscore,
-	DiagIdentifierHyphenEnd,
-	DiagIdentifierLength64,
-	DiagIdentifierLength32,
-	DiagBadIdentifierCase,
-	DiagParseError,
-	DiagInvalidU32,
-	DiagInvalidI64,
-	DiagKeywordReserved,
-	DiagInvalidHexRange,
-}
 
 // Lowering diagnostic codes.
 const (
@@ -64,25 +45,6 @@ const (
 	DiagBitsNameRedefinition  = "bits-name-redefinition"
 	DiagBitsValueRedefinition = "bits-value-redefinition"
 )
-
-var loweringDiagCodes = []string{
-	DiagMissingModuleIdentity,
-	DiagRevisionLastUpdated,
-	DiagUnknownDefinitionType,
-	DiagUnknownTypeSyntax,
-	DiagUnknownConstraintType,
-	DiagUnknownRangeValue,
-	DiagUnknownOidComponent,
-	DiagUnknownDefvalType,
-	DiagBitsNumberNegative,
-	DiagBitsNumberTooLarge,
-	DiagBitsNumberLarge,
-	DiagEnumZero,
-	DiagEnumNameRedefinition,
-	DiagEnumValueRedefinition,
-	DiagBitsNameRedefinition,
-	DiagBitsValueRedefinition,
-}
 
 // Resolver diagnostic codes.
 const (
@@ -153,82 +115,129 @@ const (
 	DiagStatusInvalidSMIv2       = "status-invalid-smiv2"
 	DiagTypeStatusDeprecated     = "type-status-deprecated"
 	DiagTypeStatusObsolete       = "type-status-obsolete"
+	DiagGroupMembership          = "group-membership"
 )
 
-var resolverDiagCodes = []string{
-	DiagImportNotFound,
-	DiagImportModuleNotFound,
-	DiagTypeUnknown,
-	DiagOidOrphan,
-	DiagIndexUnresolved,
-	DiagObjectsUnresolved,
-	DiagIdentifierHyphenSMI,
-	DiagGroupNotAccessible,
-	DiagNotifObjectNotObject,
-	DiagMalformedHexDefval,
-	DiagMalformedBinDefval,
-	DiagDefvalUnresolved,
-	DiagVariationAccessNotifOnly,
-	DiagGroupMemberUnresolved,
-	DiagIndexNotObject,
-	DiagAugmentsNotObject,
-	DiagAugmentNested,
-	DiagNotificationNoOid,
-	DiagPrimitiveTypeMissing,
-	DiagIntegerInSMIv2,
-	DiagIndexIntegerNoRange,
-	DiagIndexNegativeRange,
-	DiagDefvalBasetype,
-	DiagDefvalRange,
-	DiagDefvalEnum,
-	DiagRangeBounds,
-	DiagRangeExchanged,
-	DiagRangeOverlap,
-	DiagRangeAscending,
-	DiagSizeIllegal,
-	DiagRangeIllegal,
-	DiagCounterRangeIllegal,
-	DiagSubtypeEnumIllegal,
-	DiagSubtypeBitsIllegal,
-	DiagParentTable,
-	DiagParentRow,
-	DiagParentColumn,
-	DiagParentScalar,
-	DiagParentNode,
-	DiagParentNotification,
-	DiagParentGroup,
-	DiagParentCompliance,
-	DiagParentCapabilities,
-	DiagRowSubidentifierOne,
-	DiagIndexElementNoSize,
-	DiagIndexIllegalBasetype,
-	DiagLastSubidZero,
-	DiagOidRecursive,
-	DiagOidRegistered,
-	DiagOidReuse,
-	DiagSequenceNoColumn,
-	DiagSequenceMissingColumn,
-	DiagSequenceOrder,
-	DiagSequenceTypeMismatch,
-	DiagIndexExceedsTooLarge,
-	DiagAccessInvalidSMIv1,
-	DiagAccessWriteOnlySMIv2,
-	DiagAccessTableIllegal,
-	DiagAccessRowIllegal,
-	DiagAccessCounterIllegal,
-	DiagScalarNotCreatable,
-	DiagMaxAccessInSMIv1,
-	DiagAccessInSMIv2,
-	DiagStatusInvalidSMIv1,
-	DiagStatusInvalidSMIv2,
-	DiagTypeStatusDeprecated,
-	DiagTypeStatusObsolete,
+// codeEntry pairs a diagnostic code with its severity.
+type codeEntry struct {
+	code     string
+	severity Severity
 }
 
-// diagPhases maps phase names to their diagnostic code slices.
+var lexerDiagCodes = []codeEntry{
+	{DiagUnexpectedCharacter, SeverityError},
+	{DiagUnterminatedString, SeverityError},
+	{DiagUnterminatedHexBinStr, SeverityError},
+	{DiagMissingHexBinSuffix, SeverityError},
+}
+
+var parserDiagCodes = []codeEntry{
+	{DiagIdentifierUnderscore, SeverityStyle},
+	{DiagIdentifierHyphenEnd, SeverityError},
+	{DiagIdentifierLength64, SeverityError},
+	{DiagIdentifierLength32, SeverityWarning},
+	{DiagBadIdentifierCase, SeverityError},
+	{DiagParseError, SeverityError},
+	{DiagInvalidU32, SeverityError},
+	{DiagInvalidI64, SeverityError},
+	{DiagKeywordReserved, SeveritySevere},
+	{DiagInvalidHexRange, SeverityError},
+}
+
+var loweringDiagCodes = []codeEntry{
+	{DiagMissingModuleIdentity, SeverityWarning},
+	{DiagRevisionLastUpdated, SeverityMinor},
+	{DiagUnknownDefinitionType, SeverityWarning},
+	{DiagUnknownTypeSyntax, SeverityWarning},
+	{DiagUnknownConstraintType, SeverityWarning},
+	{DiagUnknownRangeValue, SeverityWarning},
+	{DiagUnknownOidComponent, SeverityWarning},
+	{DiagUnknownDefvalType, SeverityWarning},
+	{DiagBitsNumberNegative, SeverityError},
+	{DiagBitsNumberTooLarge, SeverityError},
+	{DiagBitsNumberLarge, SeverityStyle},
+	{DiagEnumZero, SeverityError},
+	{DiagEnumNameRedefinition, SeverityError},
+	{DiagEnumValueRedefinition, SeverityError},
+	{DiagBitsNameRedefinition, SeverityError},
+	{DiagBitsValueRedefinition, SeverityError},
+}
+
+var resolverDiagCodes = []codeEntry{
+	{DiagImportNotFound, SeverityError},
+	{DiagImportModuleNotFound, SeverityError},
+	{DiagTypeUnknown, SeverityError},
+	{DiagOidOrphan, SeverityError},
+	{DiagIndexUnresolved, SeverityError},
+	{DiagObjectsUnresolved, SeverityError},
+	{DiagIdentifierHyphenSMI, SeverityWarning},
+	{DiagGroupNotAccessible, SeverityMinor},
+	{DiagNotifObjectNotObject, SeverityMinor},
+	{DiagMalformedHexDefval, SeverityWarning},
+	{DiagMalformedBinDefval, SeverityWarning},
+	{DiagDefvalUnresolved, SeverityWarning},
+	{DiagVariationAccessNotifOnly, SeverityMinor},
+	{DiagGroupMemberUnresolved, SeverityError},
+	{DiagIndexNotObject, SeverityMinor},
+	{DiagAugmentsNotObject, SeverityMinor},
+	{DiagAugmentNested, SeverityError},
+	{DiagNotificationNoOid, SeverityMinor},
+	{DiagPrimitiveTypeMissing, SeverityError},
+	{DiagIntegerInSMIv2, SeverityWarning},
+	{DiagIndexIntegerNoRange, SeverityError},
+	{DiagIndexNegativeRange, SeverityError},
+	{DiagDefvalBasetype, SeverityWarning},
+	{DiagDefvalRange, SeverityWarning},
+	{DiagDefvalEnum, SeverityWarning},
+	{DiagRangeBounds, SeverityError},
+	{DiagRangeExchanged, SeverityError},
+	{DiagRangeOverlap, SeverityError},
+	{DiagRangeAscending, SeverityWarning},
+	{DiagSizeIllegal, SeverityError},
+	{DiagRangeIllegal, SeverityError},
+	{DiagCounterRangeIllegal, SeverityError},
+	{DiagSubtypeEnumIllegal, SeverityError},
+	{DiagSubtypeBitsIllegal, SeverityError},
+	{DiagParentTable, SeverityError},
+	{DiagParentRow, SeverityError},
+	{DiagParentColumn, SeverityError},
+	{DiagParentScalar, SeverityError},
+	{DiagParentNode, SeverityError},
+	{DiagParentNotification, SeverityError},
+	{DiagParentGroup, SeverityError},
+	{DiagParentCompliance, SeverityError},
+	{DiagParentCapabilities, SeverityError},
+	{DiagRowSubidentifierOne, SeverityError},
+	{DiagIndexElementNoSize, SeverityMinor},
+	{DiagIndexIllegalBasetype, SeveritySevere},
+	{DiagLastSubidZero, SeveritySevere},
+	{DiagOidRecursive, SeverityError},
+	{DiagOidRegistered, SeveritySevere},
+	{DiagOidReuse, SeverityWarning},
+	{DiagSequenceNoColumn, SeverityMinor},
+	{DiagSequenceMissingColumn, SeverityMinor},
+	{DiagSequenceOrder, SeverityWarning},
+	{DiagSequenceTypeMismatch, SeverityError},
+	{DiagIndexExceedsTooLarge, SeverityWarning},
+	{DiagAccessInvalidSMIv1, SeverityError},
+	{DiagAccessWriteOnlySMIv2, SeverityError},
+	{DiagAccessTableIllegal, SeverityMinor},
+	{DiagAccessRowIllegal, SeverityMinor},
+	{DiagAccessCounterIllegal, SeverityStyle},
+	{DiagScalarNotCreatable, SeverityMinor},
+	{DiagMaxAccessInSMIv1, SeverityError},
+	{DiagAccessInSMIv2, SeverityError},
+	{DiagStatusInvalidSMIv1, SeverityError},
+	{DiagStatusInvalidSMIv2, SeverityError},
+	{DiagTypeStatusDeprecated, SeverityWarning},
+	{DiagTypeStatusObsolete, SeverityWarning},
+	{DiagGroupMembership, SeverityMinor},
+}
+
+// diagPhases maps phase names to their diagnostic code entries.
 var diagPhases = []struct {
 	name  string
-	codes []string
+	codes []codeEntry
 }{
 	{"lexer", lexerDiagCodes},
 	{"parser", parserDiagCodes},
@@ -236,19 +245,46 @@ var diagPhases = []struct {
 	{"resolver", resolverDiagCodes},
 }
 
+// codeSeverity maps diagnostic codes to their fixed severity.
+var codeSeverity map[string]Severity
+
+func init() {
+	codeSeverity = make(map[string]Severity)
+	for _, phase := range diagPhases {
+		for _, entry := range phase.codes {
+			codeSeverity[entry.code] = entry.severity
+		}
+	}
+}
+
+// SeverityForCode returns the fixed severity for a diagnostic code.
+// Panics if the code is not registered - this is a programmer error.
+func SeverityForCode(code string) Severity {
+	sev, ok := codeSeverity[code]
+	if !ok {
+		panic("unknown diagnostic code: " + code)
+	}
+	return sev
+}
+
 // AllDiagnosticCodes returns all known diagnostic codes grouped by phase.
 func AllDiagnosticCodes() []DiagCodeInfo {
 	var result []DiagCodeInfo
 	for _, phase := range diagPhases {
-		for _, code := range phase.codes {
-			result = append(result, DiagCodeInfo{Code: code, Phase: phase.name})
+		for _, entry := range phase.codes {
+			result = append(result, DiagCodeInfo{
+				Code:     entry.code,
+				Phase:    phase.name,
+				Severity: entry.severity,
+			})
 		}
 	}
 	return result
 }
 
-// DiagCodeInfo describes a diagnostic code and the phase that emits it.
+// DiagCodeInfo describes a diagnostic code, its phase, and its severity.
 type DiagCodeInfo struct {
-	Code  string
-	Phase string
+	Code     string
+	Phase    string
+	Severity Severity
 }

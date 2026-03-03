@@ -3612,6 +3612,239 @@ func TestCheckTypeStatusCurrent_NoFalsePositive(t *testing.T) {
 	}
 }
 
+func TestCheckGroupMembership_NoGroups(t *testing.T) {
+	// Module with no groups should produce no group-membership diagnostics.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ModuleIdentity{
+				DefBase: module.DefBase{Name: "testMIB"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testScalar"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testMIB", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagGroupMembership {
+			t.Fatalf("unexpected group-membership diagnostic: %s", d.Message)
+		}
+	}
+}
+
+func TestCheckGroupMembership_AllCovered(t *testing.T) {
+	// Module with groups that cover all accessible objects - no diagnostic.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ModuleIdentity{
+				DefBase: module.DefBase{Name: "testMIB"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testScalar"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testMIB", 1),
+			},
+			&module.Notification{
+				DefBase: module.DefBase{Name: "testNotif"},
+				Status:  types.StatusCurrent,
+				Oid:     &module.OidAssignment{Components: testOid("testMIB", 2).Components, Span: types.Span{}},
+			},
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "testObjGroup"},
+				Objects: []string{"testScalar"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testMIB", 3),
+			},
+			&module.NotificationGroup{
+				DefBase:       module.DefBase{Name: "testNotifGroup"},
+				Notifications: []string{"testNotif"},
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testMIB", 4),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagGroupMembership {
+			t.Fatalf("unexpected group-membership diagnostic: %s", d.Message)
+		}
+	}
+}
+
+func TestCheckGroupMembership_MissingObject(t *testing.T) {
+	// Module with OBJECT-GROUP that does not cover testScalar2.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ModuleIdentity{
+				DefBase: module.DefBase{Name: "testMIB"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testScalar1"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testMIB", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testScalar2"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessReadWrite,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testMIB", 2),
+			},
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "testObjGroup"},
+				Objects: []string{"testScalar1"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testMIB", 3),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagGroupMembership && d.Module == "TEST-MIB" {
+			if d.Message == `"testScalar2" is not in any OBJECT-GROUP` {
+				found = true
+			}
+		}
+	}
+	testutil.True(t, found, "expected group-membership diagnostic for testScalar2")
+}
+
+func TestCheckGroupMembership_NotAccessibleExcluded(t *testing.T) {
+	// not-accessible objects should not trigger group-membership.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ModuleIdentity{
+				DefBase: module.DefBase{Name: "testMIB"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testMIB", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testIndex"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testValue"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 2),
+			},
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "testGroup"},
+				Objects: []string{"testValue"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testMIB", 2),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagGroupMembership {
+			t.Fatalf("unexpected group-membership diagnostic: %s", d.Message)
+		}
+	}
+}
+
+func TestCheckGroupMembership_MissingNotification(t *testing.T) {
+	// Module with NOTIFICATION-GROUP that doesn't cover testNotif2.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ModuleIdentity{
+				DefBase: module.DefBase{Name: "testMIB"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.Notification{
+				DefBase: module.DefBase{Name: "testNotif1"},
+				Status:  types.StatusCurrent,
+				Oid:     &module.OidAssignment{Components: testOid("testMIB", 1).Components, Span: types.Span{}},
+			},
+			&module.Notification{
+				DefBase: module.DefBase{Name: "testNotif2"},
+				Status:  types.StatusCurrent,
+				Oid:     &module.OidAssignment{Components: testOid("testMIB", 2).Components, Span: types.Span{}},
+			},
+			&module.NotificationGroup{
+				DefBase:       module.DefBase{Name: "testNotifGroup"},
+				Notifications: []string{"testNotif1"},
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testMIB", 3),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagGroupMembership && d.Module == "TEST-MIB" {
+			if d.Message == `"testNotif2" is not in any NOTIFICATION-GROUP` {
+				found = true
+			}
+		}
+	}
+	testutil.True(t, found, "expected group-membership diagnostic for testNotif2")
+}
+
 // makeTypedObject creates a minimal Object with a type of the given base type
 // and optional sizes. Used for unit testing index helpers.
 func makeTypedObject(base BaseType, sizes *[]Range) *Object {

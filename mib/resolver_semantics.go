@@ -2,6 +2,7 @@ package mib
 
 import (
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"math"
 	"slices"
@@ -31,6 +32,7 @@ func resolveSemantics(ctx *resolverContext) {
 	checkDefvalConstraints(ctx, objRefs)
 	checkSequenceFields(ctx, objRefs)
 	checkAccessAndStatus(ctx, objRefs)
+	checkGroupMembership(ctx, objRefs)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
@@ -247,9 +249,9 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 							Encoding: classifyIndexEncoding(idxObj, item.Implied),
 						})
 					} else if !isBareTypeIndex(item.Object) {
-						ctx.EmitDiagnostic(types.DiagIndexNotObject, SeverityMinor,
+						ctx.EmitDiagnostic(types.DiagIndexNotObject,
 							ref.mod, obj.Span,
-							"INDEX "+item.Object+" of "+obj.Name+" resolves to a node without an object definition")
+							fmt.Sprintf("INDEX %q of %q resolves to a node without an object definition", item.Object, obj.Name))
 					}
 				} else if isBareTypeIndex(item.Object) {
 					indexEntries = append(indexEntries, IndexEntry{
@@ -268,9 +270,9 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 					resolvedObj.setAugments(target)
 					target.addAugmentedBy(resolvedObj)
 				} else {
-					ctx.EmitDiagnostic(types.DiagAugmentsNotObject, SeverityMinor,
+					ctx.EmitDiagnostic(types.DiagAugmentsNotObject,
 						ref.mod, obj.Span,
-						"AUGMENTS target "+obj.Augments+" of "+obj.Name+" resolves to a node without an object definition")
+						fmt.Sprintf("AUGMENTS target %q of %q resolves to a node without an object definition", obj.Augments, obj.Name))
 				}
 			}
 		}
@@ -292,9 +294,9 @@ func checkAugmentsNesting(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 		target := resolvedObj.Augments()
 		if target.Augments() != nil {
-			ctx.EmitDiagnostic(types.DiagAugmentNested, SeverityError,
+			ctx.EmitDiagnostic(types.DiagAugmentNested,
 				ref.mod, obj.Span,
-				obj.Name+" augments "+obj.Augments+" which is not a base table row")
+				fmt.Sprintf("%q augments %q which is not a base table row", obj.Name, obj.Augments))
 		}
 	}
 }
@@ -376,8 +378,8 @@ func createResolvedNotifications(ctx *resolverContext) {
 			default:
 				// Node exists but has no object definition (intermediate node
 				// or non-object definition).
-				ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, SeverityMinor, ref.mod, notif.Span,
-					"notification "+notif.Name+" references "+objName+" which is not an object definition")
+				ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, ref.mod, notif.Span,
+					fmt.Sprintf("notification %q references %q which is not an object definition", notif.Name, objName))
 			}
 		}
 
@@ -436,14 +438,14 @@ func createResolvedObjectGroups(ctx *resolverContext) int {
 			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
 				resolved.addMember(memberNode)
 				if obj := memberNode.Object(); obj != nil && obj.Access() == AccessNotAccessible {
-					ctx.EmitDiagnostic(types.DiagGroupNotAccessible, SeverityMinor,
+					ctx.EmitDiagnostic(types.DiagGroupNotAccessible,
 						ref.mod, grp.DefinitionSpan(),
-						"object "+memberName+" of group "+grp.Name+" must not be not-accessible")
+						fmt.Sprintf("object %q of group %q must not be not-accessible", memberName, grp.Name))
 				}
 			} else {
-				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved, SeverityError,
+				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved,
 					ref.mod, grp.DefinitionSpan(),
-					"group "+grp.Name+" references unresolved member "+memberName)
+					fmt.Sprintf("group %q references unresolved member %q", grp.Name, memberName))
 			}
 		}
 
@@ -481,9 +483,9 @@ func createResolvedNotificationGroups(ctx *resolverContext) int {
 			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
 				resolved.addMember(memberNode)
 			} else {
-				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved, SeverityError,
+				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved,
 					ref.mod, grp.DefinitionSpan(),
-					"notification group "+grp.Name+" references unresolved member "+memberName)
+					fmt.Sprintf("notification group %q references unresolved member %q", grp.Name, memberName))
 			}
 		}
 
@@ -535,6 +537,85 @@ func registerCapability(ctx *resolverContext, mod *module.Module, node *Node, re
 		currentMod = c.Module()
 	}
 	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.mib.addCapability, node.setCapability, (*Module).addCapability)
+}
+
+// checkGroupMembership verifies that every accessible scalar, column, and
+// notification in a module appears in at least one conformance group defined
+// in the same module. Only modules that define groups are checked.
+func checkGroupMembership(ctx *resolverContext, objRefs []objectTypeRef) {
+	// Build per-module sets of grouped nodes.
+	type moduleGroupInfo struct {
+		hasObjectGroup       bool
+		hasNotificationGroup bool
+		groupedNodes         map[*Node]bool
+	}
+	modGroups := make(map[*module.Module]*moduleGroupInfo)
+
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		resolvedMod := ctx.moduleToResolved[mod]
+		if resolvedMod == nil {
+			continue
+		}
+		for _, grp := range resolvedMod.Groups() {
+			info := modGroups[mod]
+			if info == nil {
+				info = &moduleGroupInfo{groupedNodes: make(map[*Node]bool)}
+				modGroups[mod] = info
+			}
+			if grp.IsNotificationGroup() {
+				info.hasNotificationGroup = true
+			} else {
+				info.hasObjectGroup = true
+			}
+			for _, member := range grp.Members() {
+				info.groupedNodes[member] = true
+			}
+		}
+	}
+
+	// Check accessible scalars and columns.
+	for _, ref := range objRefs {
+		info := modGroups[ref.mod]
+		if info == nil || !info.hasObjectGroup {
+			continue
+		}
+		node, ok := ctx.LookupNodeForModule(ref.mod, ref.obj.Name)
+		if !ok {
+			continue
+		}
+		kind := node.Kind()
+		if kind != KindScalar && kind != KindColumn {
+			continue
+		}
+		if ref.obj.Access == types.AccessNotAccessible {
+			continue
+		}
+		if !info.groupedNodes[node] {
+			ctx.EmitDiagnostic(types.DiagGroupMembership,
+				ref.mod, ref.obj.Span,
+				fmt.Sprintf("%q is not in any OBJECT-GROUP", ref.obj.Name))
+		}
+	}
+
+	// Check notifications.
+	for _, ref := range collectNotificationRefs(ctx) {
+		info := modGroups[ref.mod]
+		if info == nil || !info.hasNotificationGroup {
+			continue
+		}
+		node, ok := ctx.LookupNodeForModule(ref.mod, ref.notif.Name)
+		if !ok {
+			continue
+		}
+		if !info.groupedNodes[node] {
+			ctx.EmitDiagnostic(types.DiagGroupMembership,
+				ref.mod, ref.notif.DefinitionSpan(),
+				fmt.Sprintf("%q is not in any NOTIFICATION-GROUP", ref.notif.Name))
+		}
+	}
 }
 
 type complianceRef struct {
@@ -666,9 +747,9 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 				if v.Access != nil {
 					nv.Access = v.Access
 					if *v.Access != AccessNotImplemented {
-						ctx.EmitDiagnostic(types.DiagVariationAccessNotifOnly, SeverityMinor,
+						ctx.EmitDiagnostic(types.DiagVariationAccessNotifOnly,
 							mod, types.Span{},
-							"notification variation "+v.Name+" ACCESS should be not-implemented per RFC 2580")
+							fmt.Sprintf("notification variation %q ACCESS should be not-implemented per RFC 2580", v.Name))
 					}
 				}
 				result[i].NotificationVariations = append(result[i].NotificationVariations, nv)
@@ -783,8 +864,8 @@ func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *modu
 		if t, ok := ctx.LookupType("INTEGER"); ok {
 			return t, true
 		}
-		ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing, SeverityError,
-			mod, span, "primitive type INTEGER not found for "+objectName)
+		ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing,
+			mod, span, fmt.Sprintf("primitive type INTEGER not found for %q", objectName))
 		return nil, false
 	case *module.TypeSyntaxBits:
 		return lookupPrimitiveType(ctx, mod, span, objectName, "BITS")
@@ -803,8 +884,8 @@ func lookupPrimitiveType(ctx *resolverContext, mod *module.Module, span types.Sp
 	if t, ok := ctx.LookupType(typeName); ok {
 		return t, true
 	}
-	ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing, SeverityError,
-		mod, span, "primitive type "+typeName+" not found for "+objectName)
+	ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing,
+		mod, span, fmt.Sprintf("primitive type %s not found for %q", typeName, objectName))
 	return nil, false
 }
 
@@ -833,6 +914,10 @@ func hasSequenceTypeDef(mod *module.Module, name string) bool {
 	return false
 }
 
+func emitDefvalUnresolved(ctx *resolverContext, mod *module.Module, message string) {
+	ctx.EmitDiagnostic(types.DiagDefvalUnresolved, mod, types.Span{}, message)
+}
+
 func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Module, syntax module.TypeSyntax) *DefVal {
 	switch v := defval.(type) {
 	case *module.DefValInteger:
@@ -851,8 +936,8 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		raw := "'" + v.Value + "'H"
 		bytes, err := hexToBytes(v.Value)
 		if err != nil {
-			ctx.EmitDiagnostic(types.DiagMalformedHexDefval, SeverityWarning,
-				mod, types.Span{}, "malformed hex DEFVAL "+raw+": "+err.Error())
+			ctx.EmitDiagnostic(types.DiagMalformedHexDefval,
+				mod, types.Span{}, fmt.Sprintf("malformed hex DEFVAL %q: %s", raw, err.Error()))
 			return nil
 		}
 		dv := newDefValBytes(bytes, raw)
@@ -862,8 +947,8 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		_, isBits := syntax.(*module.TypeSyntaxBits)
 		bytes, valid := binaryToBytes(v.Value, isBits)
 		if !valid {
-			ctx.EmitDiagnostic(types.DiagMalformedBinDefval, SeverityWarning,
-				mod, types.Span{}, "binary DEFVAL contains non-binary digits: "+raw)
+			ctx.EmitDiagnostic(types.DiagMalformedBinDefval,
+				mod, types.Span{}, fmt.Sprintf("binary DEFVAL contains non-binary digits: %q", raw))
 		}
 		dv := newDefValBytes(bytes, raw)
 		return &dv
@@ -876,8 +961,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 				dv := newDefValOID(oid, v.Name)
 				return &dv
 			}
-			ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
-				mod, types.Span{}, "DEFVAL OID reference "+v.Name+" could not be resolved")
+			emitDefvalUnresolved(ctx, mod, fmt.Sprintf("DEFVAL OID reference %q could not be resolved", v.Name))
 		}
 		dv := newDefValEnum(v.Name, v.Name)
 		return &dv
@@ -894,13 +978,11 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			dv := newDefValOID(oid, v.Name)
 			return &dv
 		}
-		ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
-			mod, types.Span{}, "DEFVAL OID reference "+v.Name+" could not be resolved")
+		emitDefvalUnresolved(ctx, mod, fmt.Sprintf("DEFVAL OID reference %q could not be resolved", v.Name))
 		return nil
 	case *module.DefValOidValue:
 		if len(v.Components) == 0 {
-			ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
-				mod, types.Span{}, "DEFVAL OID value has no components")
+			emitDefvalUnresolved(ctx, mod, "DEFVAL OID value has no components")
 			return nil
 		}
 		var name, qualModule string
@@ -917,8 +999,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			name = c.NameValue
 		}
 		if name == "" {
-			ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
-				mod, types.Span{}, "DEFVAL OID value has no named root component")
+			emitDefvalUnresolved(ctx, mod, "DEFVAL OID value has no named root component")
 			return nil
 		}
 		var node *Node
@@ -929,8 +1010,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			node, ok = ctx.LookupNodeForModule(mod, name)
 		}
 		if !ok {
-			ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
-				mod, types.Span{}, "DEFVAL OID root "+name+" could not be resolved")
+			emitDefvalUnresolved(ctx, mod, fmt.Sprintf("DEFVAL OID root %q could not be resolved", name))
 			return nil
 		}
 		oid := node.OID()
@@ -943,20 +1023,17 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			case *module.OidComponentQualifiedNamedNumber:
 				oid = append(oid, c.NumberValue)
 			case *module.OidComponentName:
-				ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
-					mod, types.Span{}, "DEFVAL OID component "+c.NameValue+" has no numeric value")
+				emitDefvalUnresolved(ctx, mod, fmt.Sprintf("DEFVAL OID component %q has no numeric value", c.NameValue))
 				return nil
 			case *module.OidComponentQualifiedName:
-				ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
-					mod, types.Span{}, "DEFVAL OID component "+c.ModuleValue+"."+c.NameValue+" has no numeric value")
+				emitDefvalUnresolved(ctx, mod, fmt.Sprintf("DEFVAL OID component %q has no numeric value", c.ModuleValue+"."+c.NameValue))
 				return nil
 			}
 		}
 		dv := newDefValOID(oid, name)
 		return &dv
 	default:
-		ctx.EmitDiagnostic(types.DiagDefvalUnresolved, SeverityWarning,
-			mod, types.Span{}, "DEFVAL could not be parsed")
+		emitDefvalUnresolved(ctx, mod, "DEFVAL could not be parsed")
 		return nil
 	}
 }
@@ -1141,31 +1218,31 @@ func checkNodeParentKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 		switch node.Kind() {
 		case KindTable:
 			if !isSimpleParentKind(parentKind) {
-				ctx.EmitDiagnostic(types.DiagParentTable, SeverityError,
+				ctx.EmitDiagnostic(types.DiagParentTable,
 					ref.mod, obj.Span,
-					obj.Name+": table's parent node must be a simple node")
+					fmt.Sprintf("%q: table's parent node must be a simple node", obj.Name))
 			}
 		case KindRow:
 			if parentKind != KindTable {
-				ctx.EmitDiagnostic(types.DiagParentRow, SeverityError,
+				ctx.EmitDiagnostic(types.DiagParentRow,
 					ref.mod, obj.Span,
-					obj.Name+": row's parent node must be a table")
+					fmt.Sprintf("%q: row's parent node must be a table", obj.Name))
 			} else if node.Arc() != 1 {
-				ctx.EmitDiagnostic(types.DiagRowSubidentifierOne, SeverityError,
+				ctx.EmitDiagnostic(types.DiagRowSubidentifierOne,
 					ref.mod, obj.Span,
-					obj.Name+": row node must have sub-identifier 1")
+					fmt.Sprintf("%q: row node must have sub-identifier 1", obj.Name))
 			}
 		case KindColumn:
 			if parentKind != KindRow {
-				ctx.EmitDiagnostic(types.DiagParentColumn, SeverityError,
+				ctx.EmitDiagnostic(types.DiagParentColumn,
 					ref.mod, obj.Span,
-					obj.Name+": column's parent node must be a row")
+					fmt.Sprintf("%q: column's parent node must be a row", obj.Name))
 			}
 		case KindScalar:
 			if !isSimpleParentKind(parentKind) {
-				ctx.EmitDiagnostic(types.DiagParentScalar, SeverityError,
+				ctx.EmitDiagnostic(types.DiagParentScalar,
 					ref.mod, obj.Span,
-					obj.Name+": scalar's parent node must be a simple node")
+					fmt.Sprintf("%q: scalar's parent node must be a simple node", obj.Name))
 			}
 		}
 	}
@@ -1202,9 +1279,9 @@ func checkNodeParentKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 				continue
 			}
 			if !isSimpleParentKind(node.Parent().Kind()) {
-				ctx.EmitDiagnostic(code, SeverityError,
+				ctx.EmitDiagnostic(code,
 					mod, def.DefinitionSpan(),
-					def.DefinitionName()+": "+label+"'s parent node must be a simple node")
+					fmt.Sprintf("%q: %s's parent node must be a simple node", def.DefinitionName(), label))
 			}
 		}
 	}
@@ -1224,15 +1301,15 @@ func checkIntegerMisuse(ctx *resolverContext) {
 			switch d := def.(type) {
 			case *module.ObjectType:
 				if isIntegerKeywordSyntax(d.Syntax) {
-					ctx.EmitDiagnostic(types.DiagIntegerInSMIv2, SeverityWarning,
+					ctx.EmitDiagnostic(types.DiagIntegerInSMIv2,
 						mod, d.Span,
-						d.Name+": use Integer32 instead of INTEGER in SMIv2")
+						fmt.Sprintf("%q: use Integer32 instead of INTEGER in SMIv2", d.Name))
 				}
 			case *module.TypeDef:
 				if isIntegerKeywordSyntax(d.Syntax) {
-					ctx.EmitDiagnostic(types.DiagIntegerInSMIv2, SeverityWarning,
+					ctx.EmitDiagnostic(types.DiagIntegerInSMIv2,
 						mod, d.Span,
-						d.Name+": use Integer32 instead of INTEGER in SMIv2")
+						fmt.Sprintf("%q: use Integer32 instead of INTEGER in SMIv2", d.Name))
 				}
 			}
 		}
@@ -1277,18 +1354,18 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			}
 			base := t.EffectiveBase()
 			if !isLegalIndexBasetype(base) {
-				ctx.EmitDiagnostic(types.DiagIndexIllegalBasetype, SeveritySevere,
+				ctx.EmitDiagnostic(types.DiagIndexIllegalBasetype,
 					ref.mod, obj.Span,
-					"INDEX "+item.Object+" of "+obj.Name+" has illegal base type "+base.String())
+					fmt.Sprintf("INDEX %q of %q has illegal base type %s", item.Object, obj.Name, base.String()))
 				continue
 			}
 			// OCTET STRING/Opaque index elements must have a SIZE constraint
 			// so the encoding length is bounded.
 			if base == BaseOctetString || base == BaseOpaque {
 				if len(idxObj.EffectiveSizes()) == 0 {
-					ctx.EmitDiagnostic(types.DiagIndexElementNoSize, SeverityMinor,
+					ctx.EmitDiagnostic(types.DiagIndexElementNoSize,
 						ref.mod, obj.Span,
-						"INDEX "+item.Object+" of "+obj.Name+" has no SIZE restriction")
+						fmt.Sprintf("INDEX %q of %q has no SIZE restriction", item.Object, obj.Name))
 				}
 				continue
 			}
@@ -1303,9 +1380,9 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			if len(enums) > 0 {
 				for _, e := range enums {
 					if e.Value < 0 {
-						ctx.EmitDiagnostic(types.DiagIndexNegativeRange, SeverityError,
+						ctx.EmitDiagnostic(types.DiagIndexNegativeRange,
 							ref.mod, obj.Span,
-							"INDEX "+item.Object+" of "+obj.Name+" has negative enumeration value "+e.Label)
+							fmt.Sprintf("INDEX %q of %q has negative enumeration value %q", item.Object, obj.Name, e.Label))
 						break
 					}
 				}
@@ -1314,18 +1391,18 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 
 			// No range restriction on an integer index.
 			if len(ranges) == 0 {
-				ctx.EmitDiagnostic(types.DiagIndexIntegerNoRange, SeverityError,
+				ctx.EmitDiagnostic(types.DiagIndexIntegerNoRange,
 					ref.mod, obj.Span,
-					"INDEX "+item.Object+" of "+obj.Name+" has no range restriction")
+					fmt.Sprintf("INDEX %q of %q has no range restriction", item.Object, obj.Name))
 				continue
 			}
 
 			// Range includes negative values.
 			for _, r := range ranges {
 				if r.Min < 0 {
-					ctx.EmitDiagnostic(types.DiagIndexNegativeRange, SeverityError,
+					ctx.EmitDiagnostic(types.DiagIndexNegativeRange,
 						ref.mod, obj.Span,
-						"INDEX "+item.Object+" of "+obj.Name+" has range permitting negative values")
+						fmt.Sprintf("INDEX %q of %q has range permitting negative values", item.Object, obj.Name))
 					break
 				}
 			}
@@ -1366,9 +1443,9 @@ func checkIndexOIDLength(ctx *resolverContext, ref objectTypeRef) {
 
 	if totalLen > 128 {
 		excess := totalLen - 128
-		ctx.EmitDiagnostic(types.DiagIndexExceedsTooLarge, SeverityWarning,
+		ctx.EmitDiagnostic(types.DiagIndexExceedsTooLarge,
 			ref.mod, ref.obj.Span,
-			ref.obj.Name+" index OID exceeds 128 sub-identifiers by "+strconv.Itoa(excess))
+			fmt.Sprintf("%q index OID exceeds 128 sub-identifiers by %d", ref.obj.Name, excess))
 	}
 }
 
@@ -1409,18 +1486,18 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			label, _ := DefValAs[string](dv)
 			if len(enums) > 0 {
 				if _, ok := findNamedValue(enums, label); !ok {
-					ctx.EmitDiagnostic(types.DiagDefvalEnum, SeverityWarning,
+					ctx.EmitDiagnostic(types.DiagDefvalEnum,
 						ref.mod, obj.Span,
-						obj.Name+": DEFVAL enum label "+label+" not defined in type")
+						fmt.Sprintf("%q: DEFVAL enum label %q not defined in type", obj.Name, label))
 				}
 			}
 		case DefValKindBits:
 			labels, _ := DefValAs[[]string](dv)
 			for _, label := range labels {
 				if _, ok := findNamedValue(bits, label); !ok {
-					ctx.EmitDiagnostic(types.DiagDefvalEnum, SeverityWarning,
+					ctx.EmitDiagnostic(types.DiagDefvalEnum,
 						ref.mod, obj.Span,
-						obj.Name+": DEFVAL BITS label "+label+" not defined in type")
+						fmt.Sprintf("%q: DEFVAL BITS label %q not defined in type", obj.Name, label))
 				}
 			}
 		case DefValKindUnset, DefValKindString, DefValKindBytes, DefValKindOID:
@@ -1434,24 +1511,24 @@ func checkDefvalInt(ctx *resolverContext, mod *module.Module, obj *module.Object
 	switch base {
 	case BaseInteger32:
 		if v < math.MinInt32 || v > math.MaxInt32 {
-			ctx.EmitDiagnostic(types.DiagDefvalBasetype, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagDefvalBasetype,
 				mod, obj.Span,
-				obj.Name+": DEFVAL "+strconv.FormatInt(v, 10)+" exceeds Integer32 range")
+				fmt.Sprintf("%q: DEFVAL %d exceeds Integer32 range", obj.Name, v))
 		}
 	case BaseUnsigned32, BaseGauge32, BaseCounter32, BaseTimeTicks:
 		if v < 0 || v > math.MaxUint32 {
-			ctx.EmitDiagnostic(types.DiagDefvalBasetype, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagDefvalBasetype,
 				mod, obj.Span,
-				obj.Name+": DEFVAL "+strconv.FormatInt(v, 10)+" exceeds unsigned32 range")
+				fmt.Sprintf("%q: DEFVAL %d exceeds unsigned32 range", obj.Name, v))
 		}
 	}
 
 	// Check RANGE constraints.
 	if len(ranges) > 0 {
 		if !valueInRanges(v, ranges) {
-			ctx.EmitDiagnostic(types.DiagDefvalRange, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagDefvalRange,
 				mod, obj.Span,
-				obj.Name+": DEFVAL "+strconv.FormatInt(v, 10)+" outside RANGE constraint")
+				fmt.Sprintf("%q: DEFVAL %d outside RANGE constraint", obj.Name, v))
 		}
 	}
 
@@ -1465,9 +1542,9 @@ func checkDefvalInt(ctx *resolverContext, mod *module.Module, obj *module.Object
 			}
 		}
 		if !found {
-			ctx.EmitDiagnostic(types.DiagDefvalEnum, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagDefvalEnum,
 				mod, obj.Span,
-				obj.Name+": DEFVAL "+strconv.FormatInt(v, 10)+" does not match any enumeration value")
+				fmt.Sprintf("%q: DEFVAL %d does not match any enumeration value", obj.Name, v))
 		}
 	}
 }
@@ -1477,24 +1554,24 @@ func checkDefvalUint(ctx *resolverContext, mod *module.Module, obj *module.Objec
 	switch base {
 	case BaseInteger32:
 		if v > math.MaxInt32 {
-			ctx.EmitDiagnostic(types.DiagDefvalBasetype, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagDefvalBasetype,
 				mod, obj.Span,
-				obj.Name+": DEFVAL "+strconv.FormatUint(v, 10)+" exceeds Integer32 range")
+				fmt.Sprintf("%q: DEFVAL %d exceeds Integer32 range", obj.Name, v))
 		}
 	case BaseUnsigned32, BaseGauge32, BaseCounter32, BaseTimeTicks:
 		if v > math.MaxUint32 {
-			ctx.EmitDiagnostic(types.DiagDefvalBasetype, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagDefvalBasetype,
 				mod, obj.Span,
-				obj.Name+": DEFVAL "+strconv.FormatUint(v, 10)+" exceeds unsigned32 range")
+				fmt.Sprintf("%q: DEFVAL %d exceeds unsigned32 range", obj.Name, v))
 		}
 	}
 
 	// Check RANGE constraints.
 	if len(ranges) > 0 {
 		if !uvalueInRanges(v, ranges) {
-			ctx.EmitDiagnostic(types.DiagDefvalRange, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagDefvalRange,
 				mod, obj.Span,
-				obj.Name+": DEFVAL "+strconv.FormatUint(v, 10)+" outside RANGE constraint")
+				fmt.Sprintf("%q: DEFVAL %d outside RANGE constraint", obj.Name, v))
 		}
 	}
 
@@ -1508,9 +1585,9 @@ func checkDefvalUint(ctx *resolverContext, mod *module.Module, obj *module.Objec
 			}
 		}
 		if !found {
-			ctx.EmitDiagnostic(types.DiagDefvalEnum, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagDefvalEnum,
 				mod, obj.Span,
-				obj.Name+": DEFVAL "+strconv.FormatUint(v, 10)+" does not match any enumeration value")
+				fmt.Sprintf("%q: DEFVAL %d does not match any enumeration value", obj.Name, v))
 		}
 	}
 }
@@ -1597,9 +1674,9 @@ func checkEnumSubtypingSyntax(ctx *resolverContext, syntax module.TypeSyntax, na
 			}
 		}
 		if !found {
-			ctx.EmitDiagnostic(diagCode, SeverityError,
+			ctx.EmitDiagnostic(diagCode,
 				mod, span,
-				name+": "+label+" "+nn.Name+"("+strconv.FormatInt(nn.Value, 10)+") not in parent type "+enumSyntax.Base)
+				fmt.Sprintf("%q: %s %s(%d) not in parent type %q", name, label, nn.Name, nn.Value, enumSyntax.Base))
 		}
 	}
 }
@@ -1658,25 +1735,25 @@ func checkRangeList(ctx *resolverContext, ranges []Range, base BaseType, isSize 
 
 	// SIZE only applies to OCTET STRING and Opaque (which is OCTET STRING-based).
 	if isSize && base != BaseOctetString && base != BaseOpaque {
-		ctx.EmitDiagnostic(types.DiagSizeIllegal, SeverityError,
+		ctx.EmitDiagnostic(types.DiagSizeIllegal,
 			mod, span,
-			name+": SIZE constraint illegal for non-octet-string type")
+			fmt.Sprintf("%q: SIZE constraint illegal for non-octet-string type", name))
 		return
 	}
 
 	// Value range only applies to numeric types.
 	if !isSize && !isNumericBase(base) {
-		ctx.EmitDiagnostic(types.DiagRangeIllegal, SeverityError,
+		ctx.EmitDiagnostic(types.DiagRangeIllegal,
 			mod, span,
-			name+": range constraint illegal for non-numerical type")
+			fmt.Sprintf("%q: range constraint illegal for non-numerical type", name))
 		return
 	}
 
 	// Counter types must not have range restrictions (RFC 2578).
 	if !isSize && (base == BaseCounter32 || base == BaseCounter64) {
-		ctx.EmitDiagnostic(types.DiagCounterRangeIllegal, SeverityError,
+		ctx.EmitDiagnostic(types.DiagCounterRangeIllegal,
 			mod, span,
-			name+": range constraint illegal for Counter type")
+			fmt.Sprintf("%q: range constraint illegal for Counter type", name))
 		return
 	}
 
@@ -1691,9 +1768,9 @@ func checkRangeList(ctx *resolverContext, ranges []Range, base BaseType, isSize 
 	for i, r := range ranges {
 		// Exchanged limits (min > max).
 		if r.Min > r.Max {
-			ctx.EmitDiagnostic(types.DiagRangeExchanged, SeverityError,
+			ctx.EmitDiagnostic(types.DiagRangeExchanged,
 				mod, span,
-				name+": range "+r.String()+" has exchanged limits")
+				fmt.Sprintf("%q: range %s has exchanged limits", name, r.String()))
 		}
 
 		// Bounds checking against basetype.
@@ -1706,14 +1783,14 @@ func checkRangeList(ctx *resolverContext, ranges []Range, base BaseType, isSize 
 		if i > 0 {
 			prev := ranges[i-1]
 			if r.Min < prev.Min {
-				ctx.EmitDiagnostic(types.DiagRangeAscending, SeverityWarning,
+				ctx.EmitDiagnostic(types.DiagRangeAscending,
 					mod, span,
-					name+": ranges not in ascending order")
+					fmt.Sprintf("%q: ranges not in ascending order", name))
 			}
 			if r.Min <= prev.Max {
-				ctx.EmitDiagnostic(types.DiagRangeOverlap, SeverityError,
+				ctx.EmitDiagnostic(types.DiagRangeOverlap,
 					mod, span,
-					name+": range "+r.String()+" overlaps with "+prev.String())
+					fmt.Sprintf("%q: range %s overlaps with %s", name, r.String(), prev.String()))
 			}
 		}
 	}
@@ -1727,9 +1804,9 @@ func checkRangeBound(ctx *resolverContext, v, boundsMin, boundsMax int64, name, 
 		return
 	}
 	if v < boundsMin || v > boundsMax {
-		ctx.EmitDiagnostic(types.DiagRangeBounds, SeverityError,
+		ctx.EmitDiagnostic(types.DiagRangeBounds,
 			mod, span,
-			name+": range "+which+" bound "+strconv.FormatInt(v, 10)+" exceeds basetype")
+			fmt.Sprintf("%q: range %s bound %d exceeds basetype", name, which, v))
 	}
 }
 
@@ -1798,18 +1875,18 @@ func checkSequenceFields(ctx *resolverContext, objRefs []objectTypeRef) {
 		// Check 1: sequence-no-column - SEQUENCE field has no matching column.
 		for _, field := range seqSyntax.Fields {
 			if _, found := columnByName[field.Name]; !found {
-				ctx.EmitDiagnostic(types.DiagSequenceNoColumn, SeverityMinor,
+				ctx.EmitDiagnostic(types.DiagSequenceNoColumn,
 					ref.mod, obj.Span,
-					"SEQUENCE "+syntaxRef.Name+" field "+field.Name+" is not a column of row "+obj.Name)
+					fmt.Sprintf("SEQUENCE %q field %q is not a column of row %q", syntaxRef.Name, field.Name, obj.Name))
 			}
 		}
 
 		// Check 2: sequence-missing-column - column not in SEQUENCE.
 		for _, col := range columns {
 			if _, found := fieldNames[col.Name()]; !found {
-				ctx.EmitDiagnostic(types.DiagSequenceMissingColumn, SeverityMinor,
+				ctx.EmitDiagnostic(types.DiagSequenceMissingColumn,
 					ref.mod, obj.Span,
-					"column "+col.Name()+" of row "+obj.Name+" is not in SEQUENCE "+syntaxRef.Name)
+					fmt.Sprintf("column %q of row %q is not in SEQUENCE %q", col.Name(), obj.Name, syntaxRef.Name))
 			}
 		}
 
@@ -1837,9 +1914,9 @@ func checkSequenceFields(ctx *resolverContext, objRefs []objectTypeRef) {
 				}
 			}
 			if mismatch {
-				ctx.EmitDiagnostic(types.DiagSequenceOrder, SeverityWarning,
+				ctx.EmitDiagnostic(types.DiagSequenceOrder,
 					ref.mod, obj.Span,
-					"SEQUENCE "+syntaxRef.Name+" field order does not match column OID order in row "+obj.Name)
+					fmt.Sprintf("SEQUENCE %q field order does not match column OID order in row %q", syntaxRef.Name, obj.Name))
 			}
 		}
 
@@ -1861,10 +1938,9 @@ func checkSequenceFields(ctx *resolverContext, objRefs []objectTypeRef) {
 			if sequenceTypesCompatible(fieldTypeName, colTypeName, colObj.Type().EffectiveBase()) {
 				continue
 			}
-			ctx.EmitDiagnostic(types.DiagSequenceTypeMismatch, SeverityError,
+			ctx.EmitDiagnostic(types.DiagSequenceTypeMismatch,
 				ref.mod, obj.Span,
-				"SEQUENCE "+syntaxRef.Name+" field "+field.Name+" type "+fieldTypeName+
-					" does not match column type "+colTypeName)
+				fmt.Sprintf("SEQUENCE %q field %q type %q does not match column type %q", syntaxRef.Name, field.Name, fieldTypeName, colTypeName))
 		}
 	}
 }
@@ -1970,15 +2046,15 @@ func checkAccessPerVersion(ctx *resolverContext, mod *module.Module, obj *module
 	switch mod.Language {
 	case types.LanguageSMIv1:
 		if obj.Access == types.AccessAccessibleForNotify || obj.Access == types.AccessReadCreate {
-			ctx.EmitDiagnostic(types.DiagAccessInvalidSMIv1, SeverityError,
+			ctx.EmitDiagnostic(types.DiagAccessInvalidSMIv1,
 				mod, obj.Span,
-				obj.Name+": invalid access "+obj.Access.String()+" in SMIv1")
+				fmt.Sprintf("%q: invalid access %s in SMIv1", obj.Name, obj.Access.String()))
 		}
 	case types.LanguageSMIv2:
 		if obj.Access == types.AccessWriteOnly {
-			ctx.EmitDiagnostic(types.DiagAccessWriteOnlySMIv2, SeverityError,
+			ctx.EmitDiagnostic(types.DiagAccessWriteOnlySMIv2,
 				mod, obj.Span,
-				obj.Name+": write-only is no longer allowed in SMIv2")
+				fmt.Sprintf("%q: write-only is no longer allowed in SMIv2", obj.Name))
 		}
 	}
 }
@@ -1993,15 +2069,15 @@ func checkAccessKeywordPerVersion(ctx *resolverContext, mod *module.Module, obj 
 	switch mod.Language {
 	case types.LanguageSMIv1:
 		if obj.AccessKeyword == types.AccessKeywordMaxAccess {
-			ctx.EmitDiagnostic(types.DiagMaxAccessInSMIv1, SeverityError,
+			ctx.EmitDiagnostic(types.DiagMaxAccessInSMIv1,
 				mod, obj.Span,
-				obj.Name+": MAX-ACCESS is SMIv2 style, use ACCESS in SMIv1")
+				fmt.Sprintf("%q: MAX-ACCESS is SMIv2 style, use ACCESS in SMIv1", obj.Name))
 		}
 	case types.LanguageSMIv2:
 		if obj.AccessKeyword == types.AccessKeywordAccess {
-			ctx.EmitDiagnostic(types.DiagAccessInSMIv2, SeverityError,
+			ctx.EmitDiagnostic(types.DiagAccessInSMIv2,
 				mod, obj.Span,
-				obj.Name+": ACCESS is SMIv1 style, use MAX-ACCESS in SMIv2")
+				fmt.Sprintf("%q: ACCESS is SMIv1 style, use MAX-ACCESS in SMIv2", obj.Name))
 		}
 	}
 }
@@ -2012,21 +2088,21 @@ func checkKindAccess(ctx *resolverContext, mod *module.Module, obj *module.Objec
 	switch node.Kind() {
 	case KindTable:
 		if obj.Access != types.AccessNotAccessible {
-			ctx.EmitDiagnostic(types.DiagAccessTableIllegal, SeverityMinor,
+			ctx.EmitDiagnostic(types.DiagAccessTableIllegal,
 				mod, obj.Span,
-				obj.Name+": table must be not-accessible")
+				fmt.Sprintf("%q: table must be not-accessible", obj.Name))
 		}
 	case KindRow:
 		if obj.Access != types.AccessNotAccessible {
-			ctx.EmitDiagnostic(types.DiagAccessRowIllegal, SeverityMinor,
+			ctx.EmitDiagnostic(types.DiagAccessRowIllegal,
 				mod, obj.Span,
-				obj.Name+": row must be not-accessible")
+				fmt.Sprintf("%q: row must be not-accessible", obj.Name))
 		}
 	case KindScalar:
 		if obj.Access == types.AccessReadCreate {
-			ctx.EmitDiagnostic(types.DiagScalarNotCreatable, SeverityMinor,
+			ctx.EmitDiagnostic(types.DiagScalarNotCreatable,
 				mod, obj.Span,
-				obj.Name+": scalar must not be read-create")
+				fmt.Sprintf("%q: scalar must not be read-create", obj.Name))
 		}
 	}
 }
@@ -2047,9 +2123,9 @@ func checkCounterAccess(ctx *resolverContext, mod *module.Module, obj *module.Ob
 	}
 	base := t.EffectiveBase()
 	if base == BaseCounter32 || base == BaseCounter64 {
-		ctx.EmitDiagnostic(types.DiagAccessCounterIllegal, SeverityStyle,
+		ctx.EmitDiagnostic(types.DiagAccessCounterIllegal,
 			mod, obj.Span,
-			obj.Name+": counter must be read-only or accessible-for-notify")
+			fmt.Sprintf("%q: counter must be read-only or accessible-for-notify", obj.Name))
 	}
 }
 
@@ -2087,15 +2163,15 @@ func checkStatusPerVersion(ctx *resolverContext) {
 			switch mod.Language {
 			case types.LanguageSMIv1:
 				if status == types.StatusCurrent {
-					ctx.EmitDiagnostic(types.DiagStatusInvalidSMIv1, SeverityError,
+					ctx.EmitDiagnostic(types.DiagStatusInvalidSMIv1,
 						mod, def.DefinitionSpan(),
-						def.DefinitionName()+": invalid status current in SMIv1")
+						fmt.Sprintf("%q: invalid status current in SMIv1", def.DefinitionName()))
 				}
 			case types.LanguageSMIv2:
 				if status == types.StatusMandatory || status == types.StatusOptional {
-					ctx.EmitDiagnostic(types.DiagStatusInvalidSMIv2, SeverityError,
+					ctx.EmitDiagnostic(types.DiagStatusInvalidSMIv2,
 						mod, def.DefinitionSpan(),
-						def.DefinitionName()+": invalid status "+status.String()+" in SMIv2")
+						fmt.Sprintf("%q: invalid status %s in SMIv2", def.DefinitionName(), status.String()))
 				}
 			}
 		}
@@ -2119,13 +2195,13 @@ func checkTypeStatusUsage(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 		switch t.Status() {
 		case StatusDeprecated:
-			ctx.EmitDiagnostic(types.DiagTypeStatusDeprecated, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagTypeStatusDeprecated,
 				ref.mod, ref.obj.Span,
-				"type "+t.Name()+" used by "+ref.obj.Name+" is deprecated")
+				fmt.Sprintf("type %q used by %q is deprecated", t.Name(), ref.obj.Name))
 		case StatusObsolete:
-			ctx.EmitDiagnostic(types.DiagTypeStatusObsolete, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagTypeStatusObsolete,
 				ref.mod, ref.obj.Span,
-				"type "+t.Name()+" used by "+ref.obj.Name+" is obsolete")
+				fmt.Sprintf("type %q used by %q is obsolete", t.Name(), ref.obj.Name))
 		}
 	}
 }
