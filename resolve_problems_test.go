@@ -280,6 +280,73 @@ func TestProblemNotifBadGroup(t *testing.T) {
 		"should emit group-not-accessible diagnostic for not-accessible index in OBJECT-GROUP")
 }
 
+// TestProblemNotifObjectAccess verifies that a diagnostic is emitted when a
+// NOTIFICATION-TYPE OBJECTS clause references a not-accessible object.
+// Ground truth: smilint [3] "object must not be not-accessible"
+func TestProblemNotifObjectAccess(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-NOTIFICATIONS-MIB")
+
+	found := false
+	for _, d := range m.Diagnostics() {
+		if d.Code == "notification-object-access" && d.Module == "PROBLEM-NOTIFICATIONS-MIB" {
+			found = true
+			if !strings.Contains(d.Message, "problemNotifIndex") {
+				t.Errorf("diagnostic should mention problemNotifIndex, got: %s", d.Message)
+			}
+			if !strings.Contains(d.Message, "problemNotifWithIndex") {
+				t.Errorf("diagnostic should mention problemNotifWithIndex, got: %s", d.Message)
+			}
+		}
+	}
+	testutil.True(t, found,
+		"should emit notification-object-access diagnostic for not-accessible object in OBJECTS")
+}
+
+// TestProblemNotifNotReversible verifies that a diagnostic is emitted when a
+// SMIv2 notification's parent node has a non-zero sub-identifier.
+// Ground truth: smilint [5] "notification is not reverse mappable"
+func TestProblemNotifNotReversible(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-NOTIFICATIONS-MIB")
+
+	found := false
+	for _, d := range m.Diagnostics() {
+		if d.Code == "notification-not-reversible" && d.Module == "PROBLEM-NOTIFICATIONS-MIB" {
+			found = true
+			if !strings.Contains(d.Message, "problemNotifNotReversible") {
+				t.Errorf("diagnostic should mention problemNotifNotReversible, got: %s", d.Message)
+			}
+		}
+	}
+	testutil.True(t, found,
+		"should emit notification-not-reversible for notification under non-zero parent")
+
+	// Notifications under .0. prefix should not trigger the diagnostic.
+	for _, d := range m.Diagnostics() {
+		if d.Code == "notification-not-reversible" && strings.Contains(d.Message, "problemNotifNormal") {
+			t.Errorf("problemNotifNormal is under .0. prefix and should not trigger not-reversible")
+		}
+	}
+}
+
+// TestProblemNotifIdTooLarge verifies that a diagnostic is emitted when a
+// notification's last sub-identifier exceeds INT32_MAX.
+// Ground truth: smilint [5] "last sub-identifier of notification too large"
+func TestProblemNotifIdTooLarge(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-NOTIFICATIONS-MIB")
+
+	found := false
+	for _, d := range m.Diagnostics() {
+		if d.Code == "notification-id-too-large" && d.Module == "PROBLEM-NOTIFICATIONS-MIB" {
+			found = true
+			if !strings.Contains(d.Message, "problemNotifIdTooLarge") {
+				t.Errorf("diagnostic should mention problemNotifIdTooLarge, got: %s", d.Message)
+			}
+		}
+	}
+	testutil.True(t, found,
+		"should emit notification-id-too-large for sub-id > 2147483647")
+}
+
 // TestProblemRevisions verifies that MODULE-IDENTITY revision handling works
 // for out-of-order revisions and pre-identity object declarations.
 // Ground truth: net-snmp resolves all objects regardless of declaration order.

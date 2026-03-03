@@ -32,6 +32,7 @@ func resolveSemantics(ctx *resolverContext) {
 	checkSequenceFields(ctx, objRefs)
 	checkAccessAndStatus(ctx, objRefs)
 	checkGroupMembership(ctx, objRefs)
+	checkNotificationReversibility(ctx)
 	checkComplianceStatus(ctx)
 	checkComplianceStructure(ctx)
 	checkGroupMemberLocality(ctx)
@@ -375,6 +376,11 @@ func createResolvedNotifications(ctx *resolverContext) {
 			switch {
 			case ok && objNode.Object() != nil:
 				resolved.addObject(objNode.Object())
+				if objNode.Object().Access() == AccessNotAccessible {
+					ctx.EmitDiagnostic(types.DiagNotifObjectAccess,
+						ref.mod, notif.Span,
+						fmt.Sprintf("notification %q references %q which is not-accessible", notif.Name, objName))
+				}
 			case !ok:
 				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
 			default:
