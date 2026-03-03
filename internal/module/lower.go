@@ -3,6 +3,7 @@ package module
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/golangsnmp/gomib/internal/ast"
 	"github.com/golangsnmp/gomib/internal/types"
@@ -89,6 +90,8 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 	ctx.Log(slog.LevelDebug, "lowering complete",
 		slog.String("module", module.Name),
 		slog.Int("definitions", len(module.Definitions)))
+
+	checkModuleNameSuffix(ctx, module)
 
 	if module.Language == types.LanguageSMIv2 && !IsBaseModule(module.Name) {
 		var moduleIdentities []*ModuleIdentity
@@ -191,6 +194,35 @@ func optionalStatus(s *ast.StatusClause, defaultStatus types.Status) types.Statu
 	return defaultStatus
 }
 
+// checkEmptyOptionalString emits a diagnostic when an optional quoted string
+// clause is present but empty.
+func checkEmptyOptionalString(ctx *LoweringContext, qs *ast.QuotedString, span types.Span, defName, clause, code string) {
+	if qs != nil && qs.Value == "" {
+		ctx.emitDiagnostic(code, span,
+			fmt.Sprintf("%q: empty %s clause", defName, clause))
+	}
+}
+
+// checkEmptyRequiredString emits a diagnostic when a required string clause
+// has an empty value.
+func checkEmptyRequiredString(ctx *LoweringContext, value string, span types.Span, defName, clause, code string) {
+	if value == "" {
+		ctx.emitDiagnostic(code, span,
+			fmt.Sprintf("%q: empty %s clause", defName, clause))
+	}
+}
+
+// checkModuleNameSuffix warns when an SMIv2 module name does not end with -MIB.
+func checkModuleNameSuffix(ctx *LoweringContext, mod *Module) {
+	if mod.Language != types.LanguageSMIv2 || IsBaseModule(mod.Name) {
+		return
+	}
+	if !strings.HasSuffix(mod.Name, "-MIB") {
+		ctx.emitDiagnostic(types.DiagModuleNameSuffix, mod.Span,
+			fmt.Sprintf("module name %q does not end with -MIB", mod.Name))
+	}
+}
+
 // lowerImports flattens import clauses and detects the SMI language.
 func lowerImports(importClauses []ast.ImportClause, ctx *LoweringContext) []Import {
 	var imports []Import
@@ -258,19 +290,25 @@ func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 		augments = def.Augments.Target.Name
 	}
 
+	name := def.Name.Name
+	checkEmptyOptionalString(ctx, def.Description, def.Span, name, "DESCRIPTION", types.DiagEmptyDescription)
+	checkEmptyOptionalString(ctx, def.Reference, def.Span, name, "REFERENCE", types.DiagEmptyReference)
+	checkEmptyOptionalString(ctx, def.Units, def.Span, name, "UNITS", types.DiagEmptyUnits)
+
 	return &ObjectType{
-		DefBase:       DefBase{Name: def.Name.Name, Span: def.Span},
-		Syntax:        lowerTypeSyntax(def.Syntax.Syntax, ctx),
-		Units:         optionalString(def.Units),
-		Access:        def.Access.Value,
-		AccessKeyword: def.Access.Keyword,
-		Status:        optionalStatus(def.Status, types.StatusCurrent),
-		Description:   optionalString(def.Description),
-		Reference:     optionalString(def.Reference),
-		Index:         lowerIndexClause(def.Index),
-		Augments:      augments,
-		DefVal:        lowerOptionalDefVal(def.DefVal, ctx),
-		Oid:           lowerOidAssignment(def.OidAssignment, ctx),
+		DefBase:        DefBase{Name: def.Name.Name, Span: def.Span},
+		Syntax:         lowerTypeSyntax(def.Syntax.Syntax, ctx),
+		Units:          optionalString(def.Units),
+		Access:         def.Access.Value,
+		AccessKeyword:  def.Access.Keyword,
+		Status:         optionalStatus(def.Status, types.StatusCurrent),
+		Description:    optionalString(def.Description),
+		HasDescription: def.Description != nil,
+		Reference:      optionalString(def.Reference),
+		Index:          lowerIndexClause(def.Index),
+		Augments:       augments,
+		DefVal:         lowerOptionalDefVal(def.DefVal, ctx),
+		Oid:            lowerOidAssignment(def.OidAssignment, ctx),
 	}
 }
 
@@ -282,6 +320,11 @@ func lowerModuleIdentity(def *ast.ModuleIdentityDef, ctx *LoweringContext) *Modu
 			Description: r.Description.Value,
 		}
 	}
+
+	name := def.Name.Name
+	checkEmptyRequiredString(ctx, def.Description.Value, def.Span, name, "DESCRIPTION", types.DiagEmptyDescription)
+	checkEmptyRequiredString(ctx, def.Organization.Value, def.Span, name, "ORGANIZATION", types.DiagEmptyOrganization)
+	checkEmptyRequiredString(ctx, def.ContactInfo.Value, def.Span, name, "CONTACT-INFO", types.DiagEmptyContact)
 
 	return &ModuleIdentity{
 		DefBase:      DefBase{Name: def.Name.Name, Span: def.Span},
@@ -363,6 +406,10 @@ func checkMacroImports(ctx *LoweringContext, astMod *ast.Module, mod *Module) {
 }
 
 func lowerObjectIdentity(def *ast.ObjectIdentityDef, ctx *LoweringContext) *ObjectIdentity {
+	name := def.Name.Name
+	checkEmptyRequiredString(ctx, def.Description.Value, def.Span, name, "DESCRIPTION", types.DiagEmptyDescription)
+	checkEmptyOptionalString(ctx, def.Reference, def.Span, name, "REFERENCE", types.DiagEmptyReference)
+
 	return &ObjectIdentity{
 		DefBase:     DefBase{Name: def.Name.Name, Span: def.Span},
 		Status:      def.Status.Value,
@@ -374,24 +421,34 @@ func lowerObjectIdentity(def *ast.ObjectIdentityDef, ctx *LoweringContext) *Obje
 
 func lowerNotificationType(def *ast.NotificationTypeDef, ctx *LoweringContext) *Notification {
 	oid := lowerOidAssignment(def.OidAssignment, ctx)
+	name := def.Name.Name
+
+	checkEmptyRequiredString(ctx, def.Description.Value, def.Span, name, "DESCRIPTION", types.DiagEmptyDescription)
+	checkEmptyOptionalString(ctx, def.Reference, def.Span, name, "REFERENCE", types.DiagEmptyReference)
 
 	return &Notification{
-		DefBase:     DefBase{Name: def.Name.Name, Span: def.Span},
-		Objects:     identNames(def.Objects),
-		Status:      def.Status.Value,
-		Description: def.Description.Value,
-		Reference:   optionalString(def.Reference),
-		Oid:         &oid,
+		DefBase:        DefBase{Name: def.Name.Name, Span: def.Span},
+		Objects:        identNames(def.Objects),
+		Status:         def.Status.Value,
+		Description:    def.Description.Value,
+		HasDescription: true, // NOTIFICATION-TYPE DESCRIPTION is required
+		Reference:      optionalString(def.Reference),
+		Oid:            &oid,
 	}
 }
 
-func lowerTrapType(def *ast.TrapTypeDef, _ *LoweringContext) *Notification {
+func lowerTrapType(def *ast.TrapTypeDef, ctx *LoweringContext) *Notification {
+	name := def.Name.Name
+	checkEmptyOptionalString(ctx, def.Description, def.Span, name, "DESCRIPTION", types.DiagEmptyDescription)
+	checkEmptyOptionalString(ctx, def.Reference, def.Span, name, "REFERENCE", types.DiagEmptyReference)
+
 	return &Notification{
-		DefBase:     DefBase{Name: def.Name.Name, Span: def.Span},
-		Objects:     identNames(def.Variables),
-		Status:      types.StatusCurrent, // TRAP-TYPE has no STATUS clause
-		Description: optionalString(def.Description),
-		Reference:   optionalString(def.Reference),
+		DefBase:        DefBase{Name: def.Name.Name, Span: def.Span},
+		Objects:        identNames(def.Variables),
+		Status:         types.StatusCurrent, // TRAP-TYPE has no STATUS clause
+		Description:    optionalString(def.Description),
+		HasDescription: def.Description != nil,
+		Reference:      optionalString(def.Reference),
 		TrapInfo: &TrapInfo{
 			Enterprise: def.Enterprise.Name,
 			TrapNumber: def.TrapNumber,
@@ -400,6 +457,11 @@ func lowerTrapType(def *ast.TrapTypeDef, _ *LoweringContext) *Notification {
 }
 
 func lowerTextualConvention(def *ast.TextualConventionDef, ctx *LoweringContext) *TypeDef {
+	name := def.Name.Name
+	checkEmptyRequiredString(ctx, def.Description.Value, def.Span, name, "DESCRIPTION", types.DiagEmptyDescription)
+	checkEmptyOptionalString(ctx, def.Reference, def.Span, name, "REFERENCE", types.DiagEmptyReference)
+	checkEmptyOptionalString(ctx, def.DisplayHint, def.Span, name, "DISPLAY-HINT", types.DiagEmptyFormat)
+
 	return &TypeDef{
 		DefBase:             DefBase{Name: def.Name.Name, Span: def.Span},
 		Syntax:              lowerTypeSyntax(def.Syntax.Syntax, ctx),
@@ -427,6 +489,10 @@ func lowerValueAssignment(def *ast.ValueAssignmentDef, ctx *LoweringContext) *Va
 }
 
 func lowerObjectGroup(def *ast.ObjectGroupDef, ctx *LoweringContext) *ObjectGroup {
+	name := def.Name.Name
+	checkEmptyRequiredString(ctx, def.Description.Value, def.Span, name, "DESCRIPTION", types.DiagEmptyDescription)
+	checkEmptyOptionalString(ctx, def.Reference, def.Span, name, "REFERENCE", types.DiagEmptyReference)
+
 	return &ObjectGroup{
 		DefBase:     DefBase{Name: def.Name.Name, Span: def.Span},
 		Objects:     identNames(def.Objects),
@@ -438,6 +504,10 @@ func lowerObjectGroup(def *ast.ObjectGroupDef, ctx *LoweringContext) *ObjectGrou
 }
 
 func lowerNotificationGroup(def *ast.NotificationGroupDef, ctx *LoweringContext) *NotificationGroup {
+	name := def.Name.Name
+	checkEmptyRequiredString(ctx, def.Description.Value, def.Span, name, "DESCRIPTION", types.DiagEmptyDescription)
+	checkEmptyOptionalString(ctx, def.Reference, def.Span, name, "REFERENCE", types.DiagEmptyReference)
+
 	return &NotificationGroup{
 		DefBase:       DefBase{Name: def.Name.Name, Span: def.Span},
 		Notifications: identNames(def.Notifications),
@@ -453,6 +523,10 @@ func lowerModuleCompliance(def *ast.ModuleComplianceDef, ctx *LoweringContext) *
 	for i, m := range def.Modules {
 		modules[i] = lowerComplianceModule(m, ctx)
 	}
+
+	name := def.Name.Name
+	checkEmptyRequiredString(ctx, def.Description.Value, def.Span, name, "DESCRIPTION", types.DiagEmptyDescription)
+	checkEmptyOptionalString(ctx, def.Reference, def.Span, name, "REFERENCE", types.DiagEmptyReference)
 
 	return &ModuleCompliance{
 		DefBase:     DefBase{Name: def.Name.Name, Span: def.Span},
@@ -522,6 +596,10 @@ func lowerAgentCapabilities(def *ast.AgentCapabilitiesDef, ctx *LoweringContext)
 	for i := range def.Supports {
 		supports[i] = lowerSupportsModule(&def.Supports[i], ctx)
 	}
+
+	name := def.Name.Name
+	checkEmptyRequiredString(ctx, def.Description.Value, def.Span, name, "DESCRIPTION", types.DiagEmptyDescription)
+	checkEmptyOptionalString(ctx, def.Reference, def.Span, name, "REFERENCE", types.DiagEmptyReference)
 
 	return &AgentCapabilities{
 		DefBase:        DefBase{Name: def.Name.Name, Span: def.Span},

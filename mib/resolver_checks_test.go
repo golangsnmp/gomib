@@ -2589,11 +2589,12 @@ func TestCheckDescriptionMissing_WithDescription_NoDiag(t *testing.T) {
 				Oid:     testOid("enterprises", 99999),
 			},
 			&module.ObjectType{
-				DefBase:     module.DefBase{Name: "hasDesc"},
-				Syntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
-				Status:      types.StatusCurrent,
-				Description: "This object has a description",
-				Oid:         testOid("testRoot", 1),
+				DefBase:        module.DefBase{Name: "hasDesc"},
+				Syntax:         &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:         types.StatusCurrent,
+				Description:    "This object has a description",
+				HasDescription: true,
+				Oid:            testOid("testRoot", 1),
 			},
 		},
 	}

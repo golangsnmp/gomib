@@ -59,6 +59,13 @@ const (
 	DiagModuleIdentityNotFirst = "module-identity-not-first"
 	DiagModuleIdentityMultiple = "module-identity-multiple"
 	DiagMacroNotImported       = "macro-not-imported"
+	DiagEmptyDescription       = "empty-description"
+	DiagEmptyReference         = "empty-reference"
+	DiagEmptyOrganization      = "empty-organization"
+	DiagEmptyContact           = "empty-contact"
+	DiagEmptyUnits             = "empty-units"
+	DiagEmptyFormat            = "empty-format"
+	DiagModuleNameSuffix       = "module-name-suffix"
 )
 
 // Resolver diagnostic codes.
@@ -220,6 +227,13 @@ var loweringDiagCodes = []codeEntry{
 	{DiagModuleIdentityNotFirst, SeverityWarning},
 	{DiagModuleIdentityMultiple, SeverityError},
 	{DiagMacroNotImported, SeverityMinor},
+	{DiagEmptyDescription, SeverityStyle},
+	{DiagEmptyReference, SeverityStyle},
+	{DiagEmptyOrganization, SeverityStyle},
+	{DiagEmptyContact, SeverityStyle},
+	{DiagEmptyUnits, SeverityStyle},
+	{DiagEmptyFormat, SeverityStyle},
+	{DiagModuleNameSuffix, SeverityStyle},
 }
 
 var resolverDiagCodes = []codeEntry{

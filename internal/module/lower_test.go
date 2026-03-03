@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golangsnmp/gomib/internal/parser"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
@@ -537,4 +538,365 @@ END
 
 	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagMacroNotImported)
 	testutil.Nil(t, d, "SMIv1 module should not get %s", types.DiagMacroNotImported)
+}
+
+// --- empty text clause checks ---
+
+func TestLower_EmptyDescription_ObjectType(t *testing.T) {
+	source := []byte(`EMPTY-DESC-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+emptyDescTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+emptyDescObj OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION ""
+    ::= { emptyDescTest 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyDescription)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyDescription)
+	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
+}
+
+func TestLower_EmptyDescription_NoDiag(t *testing.T) {
+	source := []byte(`NONEMPTY-DESC-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+nonemptyDescTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+goodObj OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "A proper description"
+    ::= { nonemptyDescTest 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyDescription)
+	testutil.Nil(t, d, "should not get %s with non-empty DESCRIPTION", types.DiagEmptyDescription)
+}
+
+func TestLower_EmptyDescription_ModuleIdentity(t *testing.T) {
+	source := []byte(`MI-DESC-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, enterprises
+        FROM SNMPv2-SMI;
+
+miDescTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION ""
+    REVISION "200001010000Z"
+    DESCRIPTION "Rev"
+    ::= { enterprises 99999 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyDescription)
+	testutil.NotNil(t, d, "expected %s diagnostic for MODULE-IDENTITY with empty DESCRIPTION", types.DiagEmptyDescription)
+}
+
+func TestLower_EmptyOrganization(t *testing.T) {
+	source := []byte(`EMPTY-ORG-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, enterprises
+        FROM SNMPv2-SMI;
+
+emptyOrgTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION ""
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyOrganization)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyOrganization)
+	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
+}
+
+func TestLower_EmptyContact(t *testing.T) {
+	source := []byte(`EMPTY-CONTACT-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, enterprises
+        FROM SNMPv2-SMI;
+
+emptyContactTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO ""
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyContact)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyContact)
+	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
+}
+
+func TestLower_EmptyReference(t *testing.T) {
+	source := []byte(`EMPTY-REF-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+emptyRefTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+refObj OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    REFERENCE   ""
+    ::= { emptyRefTest 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyReference)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyReference)
+	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
+}
+
+func TestLower_EmptyUnits(t *testing.T) {
+	source := []byte(`EMPTY-UNITS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+emptyUnitsTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+unitsObj OBJECT-TYPE
+    SYNTAX      Integer32
+    UNITS       ""
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    ::= { emptyUnitsTest 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyUnits)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyUnits)
+	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
+}
+
+func TestLower_EmptyFormat(t *testing.T) {
+	source := []byte(`EMPTY-FMT-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, Integer32, enterprises
+        FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION
+        FROM SNMPv2-TC;
+
+emptyFmtTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+EmptyHintTC ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT ""
+    STATUS      current
+    DESCRIPTION "A TC with empty display hint"
+    SYNTAX      Integer32
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyFormat)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyFormat)
+	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
+}
+
+func TestLower_EmptyDescription_HasDescription(t *testing.T) {
+	// Verify that an OBJECT-TYPE with DESCRIPTION "" sets HasDescription
+	// so the resolver's description-missing check doesn't also fire.
+	source := []byte(`HAS-DESC-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+hasDescTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+emptyButPresent OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION ""
+    ::= { hasDescTest 1 }
+
+END
+`)
+
+	b := source
+	p := parser.New(b, nil, types.StrictConfig())
+	mods := p.ParseModule()
+	testutil.Greater(t, len(mods), 0, "parse returned no modules")
+	mod := Lower(mods[0], b, nil, types.StrictConfig())
+	testutil.NotNil(t, mod, "lower returned nil")
+
+	for _, def := range mod.Definitions {
+		if ot, ok := def.(*ObjectType); ok && ot.Name == "emptyButPresent" {
+			testutil.True(t, ot.HasDescription, "HasDescription should be true for DESCRIPTION \"\"")
+			testutil.Equal(t, "", ot.Description, "Description should be empty string")
+			return
+		}
+	}
+	t.Fatal("emptyButPresent ObjectType not found")
+}
+
+// --- module-name-suffix ---
+
+func TestLower_ModuleNameSuffix(t *testing.T) {
+	source := []byte(`MY-MODULE DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, enterprises
+        FROM SNMPv2-SMI;
+
+myModule MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleNameSuffix)
+	testutil.NotNil(t, d, "expected %s diagnostic for module without -MIB suffix", types.DiagModuleNameSuffix)
+	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
+	testutil.True(t, strings.Contains(d.Message, "MY-MODULE"), "message should mention module name: %s", d.Message)
+}
+
+func TestLower_ModuleNameSuffix_WithMIB_NoDiag(t *testing.T) {
+	source := []byte(`MY-MODULE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, enterprises
+        FROM SNMPv2-SMI;
+
+myModule MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleNameSuffix)
+	testutil.Nil(t, d, "should not get %s with -MIB suffix", types.DiagModuleNameSuffix)
+}
+
+func TestLower_ModuleNameSuffix_SMIv1_NoDiag(t *testing.T) {
+	// SMIv1 modules should not get module-name-suffix check.
+	source := []byte(`MY-MODULE DEFINITIONS ::= BEGIN
+
+IMPORTS
+    enterprises
+        FROM RFC1155-SMI;
+
+testObj OBJECT-TYPE
+    SYNTAX      INTEGER
+    ACCESS      read-only
+    STATUS      mandatory
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleNameSuffix)
+	testutil.Nil(t, d, "SMIv1 module should not get %s", types.DiagModuleNameSuffix)
+}
+
+func TestLower_ModuleNameSuffix_BaseModule_NoDiag(t *testing.T) {
+	// Base modules (e.g. SNMPv2-TC) should not get module-name-suffix check.
+	source := []byte(`SNMPv2-TC DEFINITIONS ::= BEGIN
+
+IMPORTS
+    ;
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleNameSuffix)
+	testutil.Nil(t, d, "base module should not get %s", types.DiagModuleNameSuffix)
 }

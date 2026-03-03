@@ -1574,71 +1574,20 @@ func normalizeTypeName(name string) string {
 	}
 }
 
-// checkDescriptionMissing flags SMIv2 definitions that lack a DESCRIPTION
-// clause. DESCRIPTION is mandatory for most SMIv2 definition types per
-// RFC 2578/2579/2580. SMIv1 definitions are exempt since DESCRIPTION was
-// optional in RFC 1212.
+// checkDescriptionMissing flags SMIv2 OBJECT-TYPE definitions that lack a
+// DESCRIPTION clause. OBJECT-TYPE is the only definition type where
+// DESCRIPTION is grammatically optional (also TRAP-TYPE, but that is SMIv1).
+// For all other SMIv2 types, DESCRIPTION is a required clause in the grammar,
+// and empty descriptions are caught by the empty-description lowering check.
 func checkDescriptionMissing(ctx *resolverContext, objRefs []objectTypeRef) {
 	for _, ref := range objRefs {
 		if ref.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(ref.mod.Name) {
 			continue
 		}
-		if ref.obj.Description == "" {
+		if !ref.obj.HasDescription {
 			ctx.EmitDiagnostic(types.DiagDescriptionMissing,
 				ref.mod, ref.obj.Span,
 				fmt.Sprintf("%q: OBJECT-TYPE should have a DESCRIPTION clause", ref.obj.Name))
-		}
-	}
-
-	for _, mod := range ctx.modules {
-		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
-			continue
-		}
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectIdentity:
-				if d.Description == "" {
-					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
-						mod, d.Span,
-						fmt.Sprintf("%q: OBJECT-IDENTITY should have a DESCRIPTION clause", d.Name))
-				}
-			case *module.Notification:
-				if !d.IsTrap() && d.Description == "" {
-					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
-						mod, d.Span,
-						fmt.Sprintf("%q: NOTIFICATION-TYPE should have a DESCRIPTION clause", d.Name))
-				}
-			case *module.TypeDef:
-				if d.IsTextualConvention && d.Description == "" {
-					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
-						mod, d.Span,
-						fmt.Sprintf("%q: TEXTUAL-CONVENTION should have a DESCRIPTION clause", d.Name))
-				}
-			case *module.ObjectGroup:
-				if d.Description == "" {
-					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
-						mod, d.Span,
-						fmt.Sprintf("%q: OBJECT-GROUP should have a DESCRIPTION clause", d.Name))
-				}
-			case *module.NotificationGroup:
-				if d.Description == "" {
-					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
-						mod, d.Span,
-						fmt.Sprintf("%q: NOTIFICATION-GROUP should have a DESCRIPTION clause", d.Name))
-				}
-			case *module.ModuleCompliance:
-				if d.Description == "" {
-					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
-						mod, d.Span,
-						fmt.Sprintf("%q: MODULE-COMPLIANCE should have a DESCRIPTION clause", d.Name))
-				}
-			case *module.AgentCapabilities:
-				if d.Description == "" {
-					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
-						mod, d.Span,
-						fmt.Sprintf("%q: AGENT-CAPABILITIES should have a DESCRIPTION clause", d.Name))
-				}
-			}
 		}
 	}
 }
