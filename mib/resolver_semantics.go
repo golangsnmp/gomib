@@ -23,6 +23,7 @@ func resolveSemantics(ctx *resolverContext) {
 	createResolvedCompliances(ctx)
 	createResolvedCapabilities(ctx)
 	checkIntegerMisuse(ctx)
+	checkRangeConstraints(ctx)
 	checkIndexConstraints(ctx, objRefs)
 	checkDefvalConstraints(ctx, objRefs)
 }
@@ -1292,4 +1293,145 @@ func uvalueInRanges(v uint64, ranges []Range) bool {
 		}
 	}
 	return false
+}
+
+// checkRangeConstraints validates range and SIZE constraints on type
+// definitions and object-type inline syntax. Checks for:
+//   - size-illegal: SIZE on non-OCTET-STRING type
+//   - range-illegal: range on non-numeric type
+//   - range-exchanged: min > max
+//   - range-bounds: limits exceed basetype
+//   - range-overlap: adjacent ranges overlap
+//   - range-ascending: ranges not in ascending order
+func checkRangeConstraints(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.TypeDef:
+				if _, isSeq := d.Syntax.(*module.TypeSyntaxSequence); isSeq {
+					continue
+				}
+				typ, ok := ctx.LookupTypeForModule(mod, d.Name)
+				if !ok {
+					continue
+				}
+				base := typ.EffectiveBase()
+				sizes, ranges := extractConstraints(d.Syntax)
+				checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
+				checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
+
+			case *module.ObjectType:
+				sizes, ranges := extractConstraints(d.Syntax)
+				if len(sizes) == 0 && len(ranges) == 0 {
+					continue
+				}
+				resolved := ctx.lookupObjectInModuleScope(mod, d.Name)
+				if resolved == nil || resolved.Type() == nil {
+					continue
+				}
+				base := resolved.Type().EffectiveBase()
+				checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
+				checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
+			}
+		}
+	}
+}
+
+// checkRangeList validates a slice of ranges for internal consistency
+// and basetype conformance.
+func checkRangeList(ctx *resolverContext, ranges []Range, base BaseType, isSize bool, name string, mod *module.Module, span types.Span) {
+	if len(ranges) == 0 {
+		return
+	}
+
+	// SIZE only applies to OCTET STRING and Opaque (which is OCTET STRING-based).
+	if isSize && base != BaseOctetString && base != BaseOpaque {
+		ctx.EmitDiagnostic(types.DiagSizeIllegal, SeverityError,
+			mod, span,
+			name+": SIZE constraint illegal for non-octet-string type")
+		return
+	}
+
+	// Value range only applies to numeric types.
+	if !isSize && !isNumericBase(base) {
+		ctx.EmitDiagnostic(types.DiagRangeIllegal, SeverityError,
+			mod, span,
+			name+": range constraint illegal for non-numerical type")
+		return
+	}
+
+	var boundsMin, boundsMax int64
+	var hasBounds bool
+	if isSize {
+		boundsMin, boundsMax, hasBounds = 0, 65535, true
+	} else {
+		boundsMin, boundsMax, hasBounds = basetypeBounds(base)
+	}
+
+	for i, r := range ranges {
+		// Exchanged limits (min > max).
+		if r.Min > r.Max {
+			ctx.EmitDiagnostic(types.DiagRangeExchanged, SeverityError,
+				mod, span,
+				name+": range "+r.String()+" has exchanged limits")
+		}
+
+		// Bounds checking against basetype.
+		if hasBounds {
+			checkRangeBound(ctx, r.Min, boundsMin, boundsMax, name, "lower", mod, span)
+			checkRangeBound(ctx, r.Max, boundsMin, boundsMax, name, "upper", mod, span)
+		}
+
+		// Multi-range checks against previous range.
+		if i > 0 {
+			prev := ranges[i-1]
+			if r.Min < prev.Min {
+				ctx.EmitDiagnostic(types.DiagRangeAscending, SeverityWarning,
+					mod, span,
+					name+": ranges not in ascending order")
+			}
+			if r.Min <= prev.Max {
+				ctx.EmitDiagnostic(types.DiagRangeOverlap, SeverityError,
+					mod, span,
+					name+": range "+r.String()+" overlaps with "+prev.String())
+			}
+		}
+	}
+}
+
+// checkRangeBound emits a range-bounds diagnostic if v falls outside
+// boundsMin..boundsMax. Values equal to MinInt64 or MaxInt64 are skipped
+// because they represent the MIN/MAX keywords.
+func checkRangeBound(ctx *resolverContext, v, boundsMin, boundsMax int64, name, which string, mod *module.Module, span types.Span) {
+	if v == math.MinInt64 || v == math.MaxInt64 {
+		return
+	}
+	if v < boundsMin || v > boundsMax {
+		ctx.EmitDiagnostic(types.DiagRangeBounds, SeverityError,
+			mod, span,
+			name+": range "+which+" bound "+strconv.FormatInt(v, 10)+" exceeds basetype")
+	}
+}
+
+// basetypeBounds returns the valid min/max range for a basetype.
+func basetypeBounds(base BaseType) (min, max int64, ok bool) {
+	switch base {
+	case BaseInteger32:
+		return math.MinInt32, math.MaxInt32, true
+	case BaseUnsigned32, BaseGauge32, BaseTimeTicks, BaseCounter32:
+		return 0, math.MaxUint32, true
+	case BaseCounter64:
+		return 0, math.MaxInt64, true
+	default:
+		return 0, 0, false
+	}
+}
+
+// isNumericBase reports whether the base type supports value range constraints.
+func isNumericBase(base BaseType) bool {
+	_, _, ok := basetypeBounds(base)
+	return ok
 }
