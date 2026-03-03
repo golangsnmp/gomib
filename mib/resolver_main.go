@@ -56,6 +56,8 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "types"),
 		slog.Int("types", len(ctx.mib.types)))
 
+	checkBasetypeImports(ctx)
+
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "oids"))
 	resolveOids(ctx)
 	nodeCount := 0
@@ -68,6 +70,8 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "semantics"))
 	resolveSemantics(ctx)
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "semantics"))
+
+	checkUnusedImports(ctx)
 
 	ctx.DropModules()
 

@@ -62,6 +62,10 @@ type resolverContext struct {
 	unresolvedIndexes      []unresolvedIndex
 	unresolvedNotifObjects []unresolvedNotifObject
 
+	// usedImports tracks which imported symbols are actually referenced during resolution.
+	// Populated by markImportUsed, consumed by checkUnusedImports.
+	usedImports map[*module.Module]map[string]struct{}
+
 	// Diagnostic configuration and collection
 	diagConfig  DiagnosticConfig
 	diagnostics []Diagnostic
@@ -118,6 +122,7 @@ func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig D
 		moduleSymbolToType: make(map[*module.Module]map[string]*Type, n),
 		moduleDefNames:     make(map[*module.Module]map[string]struct{}, n),
 		moduleOidDefNames:  make(map[*module.Module]map[string]struct{}, n),
+		usedImports:        make(map[*module.Module]map[string]struct{}, n),
 		diagConfig:         diagConfig,
 		Logger:             types.Logger{L: logger},
 	}
@@ -251,11 +256,13 @@ func (c *resolverContext) LookupTypeForModule(mod *module.Module, name string) (
 // lookupInModuleScope looks up a symbol in the module's own symbols, then
 // follows a single import hop. ModuleImports entries are expected to already
 // be transitively resolved to the defining module by resolveTransitiveImports.
+// If onImportHit is non-nil, it is called when a symbol is resolved via import.
 func lookupInModuleScope[T any](
 	mod *module.Module,
 	name string,
 	getSymbols func(*module.Module) map[string]T,
 	getImports func(*module.Module) map[string]*module.Module,
+	onImportHit func(*module.Module, string),
 ) (T, bool) {
 	var zero T
 
@@ -269,6 +276,9 @@ func lookupInModuleScope[T any](
 		if source, ok := imports[name]; ok {
 			if symbols := getSymbols(source); symbols != nil {
 				if val, ok := symbols[name]; ok {
+					if onImportHit != nil {
+						onImportHit(mod, name)
+					}
 					return val, true
 				}
 			}
@@ -282,6 +292,7 @@ func (c *resolverContext) lookupNodeInModuleScope(mod *module.Module, name strin
 	return lookupInModuleScope(mod, name,
 		func(m *module.Module) map[string]*Node { return c.moduleSymbolToNode[m] },
 		func(m *module.Module) map[string]*module.Module { return c.moduleImports[m] },
+		c.markImportUsed,
 	)
 }
 
@@ -289,6 +300,7 @@ func (c *resolverContext) lookupTypeInModuleScope(mod *module.Module, name strin
 	return lookupInModuleScope(mod, name,
 		func(m *module.Module) map[string]*Type { return c.moduleSymbolToType[m] },
 		func(m *module.Module) map[string]*module.Module { return c.moduleImports[m] },
+		c.markImportUsed,
 	)
 }
 
@@ -307,12 +319,23 @@ func (c *resolverContext) lookupObjectInModuleScope(mod *module.Module, name str
 		if source, ok := imports[name]; ok {
 			if resolved := c.moduleToResolved[source]; resolved != nil {
 				if obj := resolved.Object(name); obj != nil {
+					c.markImportUsed(mod, name)
 					return obj
 				}
 			}
 		}
 	}
 	return nil
+}
+
+// markImportUsed records that an imported symbol was referenced during resolution.
+func (c *resolverContext) markImportUsed(mod *module.Module, name string) {
+	used := c.usedImports[mod]
+	if used == nil {
+		used = make(map[string]struct{})
+		c.usedImports[mod] = used
+	}
+	used[name] = struct{}{}
 }
 
 // registerImport maps a symbol in importingModule to its source module.

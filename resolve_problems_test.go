@@ -434,6 +434,19 @@ func TestProblemRevisions(t *testing.T) {
 		testutil.True(t, found,
 			"should emit revision-last-updated diagnostic for missing revision")
 	})
+
+	t.Run("out-of-order revisions emit not-descending diagnostic", func(t *testing.T) {
+		// Revisions are 2024, 2025, 2023 - 2025 after 2024 violates descending order.
+		// smilint [3]: "revision not in reverse chronological order"
+		found := false
+		for _, d := range m.Diagnostics() {
+			if d.Code == "revision-not-descending" && d.Module == "PROBLEM-REVISIONS-MIB" {
+				found = true
+			}
+		}
+		testutil.True(t, found,
+			"should emit revision-not-descending diagnostic for out-of-order revisions")
+	})
 }
 
 // TestProblemAccess verifies access level resolution for edge cases.
