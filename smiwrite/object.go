@@ -111,6 +111,9 @@ func formatObjectSyntax(obj *mib.Object) string {
 	// Table: SEQUENCE OF <SequenceName>
 	if obj.Kind() == mib.KindTable {
 		if entry := obj.Entry(); entry != nil {
+			if name := entry.SequenceTypeName(); name != "" {
+				return "SEQUENCE OF " + name
+			}
 			return "SEQUENCE OF " + sequenceTypeName(entry.Name())
 		}
 		return "SEQUENCE OF " + sequenceTypeName(obj.Name()+"Entry")
@@ -118,6 +121,9 @@ func formatObjectSyntax(obj *mib.Object) string {
 
 	// Row: emit the sequence type name
 	if obj.Kind() == mib.KindRow {
+		if name := obj.SequenceTypeName(); name != "" {
+			return name
+		}
 		return sequenceTypeName(obj.Name())
 	}
 

@@ -14,7 +14,10 @@ func (e *emitter) emitSequence(row *mib.Object) error {
 		return nil
 	}
 
-	seqName := sequenceTypeName(row.Name())
+	seqName := row.SequenceTypeName()
+	if seqName == "" {
+		seqName = sequenceTypeName(row.Name())
+	}
 	if _, err := fmt.Fprintf(e.w, "%s ::= SEQUENCE {\n", seqName); err != nil {
 		return err
 	}
