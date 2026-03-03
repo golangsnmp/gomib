@@ -1394,6 +1394,58 @@ func checkTypeStatusUsage(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 }
 
+// checkNotificationReversibility validates notification OID structure per
+// RFC 2578 section 8.5. In SMIv2, the next-to-last sub-identifier of a
+// notification's OID must be 0 for SNMPv1/v2 reverse mapping. Also checks
+// that the last sub-identifier fits in a signed 32-bit integer.
+// Five well-known notifications predate the .0. convention and are exempt.
+func checkNotificationReversibility(ctx *resolverContext) {
+	for _, ref := range collectNotificationRefs(ctx) {
+		if ref.mod.Language != types.LanguageSMIv2 {
+			continue
+		}
+
+		node, ok := ctx.LookupNodeForModule(ref.mod, ref.notif.Name)
+		if !ok || node.Parent() == nil {
+			continue
+		}
+
+		// Check last sub-id fits in int32 (for SNMPv1 specific-trap field).
+		if node.Arc() > math.MaxInt32 {
+			ctx.EmitDiagnostic(types.DiagNotifIdTooLarge,
+				ref.mod, ref.notif.Span,
+				fmt.Sprintf("last sub-identifier of notification %q is too large", ref.notif.Name))
+		}
+
+		// Five well-known notifications predate the .0. convention.
+		if isExemptNotification(ref.mod.Name, ref.notif.Name) {
+			continue
+		}
+
+		// Parent's arc must be 0 for reverse mapping to SNMPv1 traps.
+		if node.Parent().Arc() != 0 {
+			ctx.EmitDiagnostic(types.DiagNotifNotReversible,
+				ref.mod, ref.notif.Span,
+				fmt.Sprintf("notification %q is not reverse mappable", ref.notif.Name))
+		}
+	}
+}
+
+// isExemptNotification returns true for the five well-known notifications that
+// predate the .0. convention (RFC 2578 section 8.5).
+func isExemptNotification(moduleName, notifName string) bool {
+	switch moduleName {
+	case "SNMPv2-MIB":
+		return notifName == "coldStart" ||
+			notifName == "warmStart" ||
+			notifName == "authenticationFailure"
+	case "IF-MIB":
+		return notifName == "linkDown" ||
+			notifName == "linkUp"
+	}
+	return false
+}
+
 // normalizeTypeName maps SMIv1 type names to their SMIv2 equivalents.
 func normalizeTypeName(name string) string {
 	switch name {

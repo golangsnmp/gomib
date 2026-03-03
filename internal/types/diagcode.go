@@ -57,6 +57,9 @@ const (
 	DiagIdentifierHyphenSMI      = "identifier-hyphen-smiv2"
 	DiagGroupNotAccessible       = "group-not-accessible"
 	DiagNotifObjectNotObject     = "notification-object-not-object"
+	DiagNotifObjectAccess        = "notification-object-access"
+	DiagNotifNotReversible       = "notification-not-reversible"
+	DiagNotifIdTooLarge          = "notification-id-too-large"
 	DiagMalformedHexDefval       = "malformed-hex-defval"
 	DiagMalformedBinDefval       = "malformed-bin-defval"
 	DiagDefvalUnresolved         = "defval-unresolved"
@@ -184,6 +187,9 @@ var resolverDiagCodes = []codeEntry{
 	{DiagIdentifierHyphenSMI, SeverityWarning},
 	{DiagGroupNotAccessible, SeverityMinor},
 	{DiagNotifObjectNotObject, SeverityMinor},
+	{DiagNotifObjectAccess, SeverityMinor},
+	{DiagNotifNotReversible, SeverityWarning},
+	{DiagNotifIdTooLarge, SeverityWarning},
 	{DiagMalformedHexDefval, SeverityWarning},
 	{DiagMalformedBinDefval, SeverityWarning},
 	{DiagDefvalUnresolved, SeverityWarning},
