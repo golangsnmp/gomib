@@ -55,7 +55,10 @@ const (
 	DiagUnknownRangeValue     = "unknown-range-value"
 	DiagUnknownOidComponent   = "unknown-oid-component-type"
 	DiagUnknownDefvalType     = "unknown-defval-type"
-	DiagInvalidBitsPosition   = "invalid-bits-position"
+	DiagBitsNumberNegative    = "bits-number-negative"
+	DiagBitsNumberTooLarge    = "bits-number-too-large"
+	DiagBitsNumberLarge       = "bits-number-large"
+	DiagEnumZero              = "enum-zero"
 	DiagEnumNameRedefinition  = "enum-name-redefinition"
 	DiagEnumValueRedefinition = "enum-value-redefinition"
 	DiagBitsNameRedefinition  = "bits-name-redefinition"
@@ -71,7 +74,10 @@ var loweringDiagCodes = []string{
 	DiagUnknownRangeValue,
 	DiagUnknownOidComponent,
 	DiagUnknownDefvalType,
-	DiagInvalidBitsPosition,
+	DiagBitsNumberNegative,
+	DiagBitsNumberTooLarge,
+	DiagBitsNumberLarge,
+	DiagEnumZero,
 	DiagEnumNameRedefinition,
 	DiagEnumValueRedefinition,
 	DiagBitsNameRedefinition,
@@ -113,6 +119,15 @@ const (
 	DiagCounterRangeIllegal      = "counter-range-illegal"
 	DiagSubtypeEnumIllegal       = "subtype-enumeration-illegal"
 	DiagSubtypeBitsIllegal       = "subtype-bits-illegal"
+	DiagParentTable              = "parent-table"
+	DiagParentRow                = "parent-row"
+	DiagParentColumn             = "parent-column"
+	DiagParentScalar             = "parent-scalar"
+	DiagParentNode               = "parent-node"
+	DiagParentNotification       = "parent-notification"
+	DiagParentGroup              = "parent-group"
+	DiagParentCompliance         = "parent-compliance"
+	DiagParentCapabilities       = "parent-capabilities"
 )
 
 var resolverDiagCodes = []string{
@@ -149,6 +164,15 @@ var resolverDiagCodes = []string{
 	DiagCounterRangeIllegal,
 	DiagSubtypeEnumIllegal,
 	DiagSubtypeBitsIllegal,
+	DiagParentTable,
+	DiagParentRow,
+	DiagParentColumn,
+	DiagParentScalar,
+	DiagParentNode,
+	DiagParentNotification,
+	DiagParentGroup,
+	DiagParentCompliance,
+	DiagParentCapabilities,
 }
 
 // diagPhases maps phase names to their diagnostic code slices.

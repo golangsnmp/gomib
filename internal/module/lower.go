@@ -3,7 +3,6 @@ package module
 import (
 	"fmt"
 	"log/slog"
-	"math"
 
 	"github.com/golangsnmp/gomib/internal/ast"
 	"github.com/golangsnmp/gomib/internal/types"
@@ -498,6 +497,10 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 					fmt.Sprintf("duplicate enum value %d", nn.Value))
 			}
 			seenValues[nn.Value] = true
+			if nn.Value == 0 && ctx.Language == types.LanguageSMIv1 {
+				ctx.emitDiagnostic(types.DiagEnumZero, types.SeverityError, nn.Span,
+					fmt.Sprintf("enumeration contains zero value %q(0) in SMIv1 module", nn.Name.Name))
+			}
 			namedNumbers[i] = NewNamedNumber(nn.Name.Name, nn.Value)
 		}
 		var base string
@@ -522,10 +525,18 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 			}
 			seenPositions[nb.Value] = true
 			pos := nb.Value
-			if pos < 0 || pos > math.MaxUint32 {
-				ctx.emitDiagnostic(types.DiagInvalidBitsPosition, types.SeverityWarning, nb.Span,
-					fmt.Sprintf("invalid BITS position %d for %q, must be 0..%d", pos, nb.Name.Name, math.MaxUint32))
+			switch {
+			case pos < 0:
+				ctx.emitDiagnostic(types.DiagBitsNumberNegative, types.SeverityError, nb.Span,
+					fmt.Sprintf("negative BITS position %d for %q", pos, nb.Name.Name))
 				pos = 0
+			case pos >= 65535*8:
+				ctx.emitDiagnostic(types.DiagBitsNumberTooLarge, types.SeverityError, nb.Span,
+					fmt.Sprintf("BITS position %d for %q exceeds maximum (%d)", pos, nb.Name.Name, 65535*8-1))
+				pos = 0
+			case pos >= 128:
+				ctx.emitDiagnostic(types.DiagBitsNumberLarge, types.SeverityStyle, nb.Span,
+					fmt.Sprintf("BITS position %d for %q may cause interoperability problems", pos, nb.Name.Name))
 			}
 			namedBits[i] = NewNamedBit(nb.Name.Name, uint32(pos))
 		}
