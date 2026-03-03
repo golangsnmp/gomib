@@ -1,6 +1,7 @@
 package mib
 
 import (
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -82,7 +83,7 @@ func resolveOids(ctx *resolverContext) {
 			if oid == nil || len(oid.Components) == 0 {
 				continue
 			}
-			recordUnresolvedFirstComponent(ctx, def, oid)
+			recordRecursiveOid(ctx, def, scc)
 		}
 	}
 
@@ -163,22 +164,30 @@ func findOidDefiningModule(ctx *resolverContext, fromMod *module.Module, name st
 	return ""
 }
 
-// recordUnresolvedFirstComponent records an unresolved OID based on its first component.
-func recordUnresolvedFirstComponent(ctx *resolverContext, def oidDefinition, oid *module.OidAssignment) {
+// recordRecursiveOid records an OID definition that participates in a dependency cycle.
+func recordRecursiveOid(ctx *resolverContext, def oidDefinition, scc []graph.Symbol) {
 	defName := def.defName()
-	span := oid.Span
-	first := oid.Components[0]
+	span := def.oid().Span
 
-	switch c := first.(type) {
-	case *module.OidComponentName:
-		ctx.RecordUnresolvedOid(def.mod, defName, c.NameValue, span)
-	case *module.OidComponentNamedNumber:
-		ctx.RecordUnresolvedOid(def.mod, defName, c.NameValue, span)
-	case *module.OidComponentQualifiedName:
-		ctx.RecordUnresolvedOid(def.mod, defName, c.ModuleValue+"."+c.NameValue, span)
-	case *module.OidComponentQualifiedNamedNumber:
-		ctx.RecordUnresolvedOid(def.mod, defName, c.ModuleValue+"."+c.NameValue, span)
+	others := make([]string, 0, len(scc)-1)
+	for _, s := range scc {
+		name := s.Module + "::" + s.Name
+		if s.Module == def.mod.Name && s.Name == defName {
+			continue
+		}
+		others = append(others, name)
 	}
+
+	var msg string
+	if len(others) == 0 {
+		msg = fmt.Sprintf("recursive OID: %s references itself", defName)
+	} else {
+		msg = fmt.Sprintf("recursive OID: %s is in a cycle with %s", defName, strings.Join(others, ", "))
+	}
+
+	recordUnresolved(ctx, &ctx.unresolvedOids, unresolvedOid{
+		module: def.mod, definition: defName, span: span,
+	}, def.mod, span, types.DiagOidRecursive, msg)
 }
 
 // checkSmiv2IdentifierHyphens emits a diagnostic for OID definition names
@@ -441,6 +450,20 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 		node.setKind(KindCapability)
 	}
 	node.setName(label)
+
+	// RFC 2578 section 7.10: the last sub-identifier of an administrative
+	// OID assignment must not be zero. Exempt NODE kinds (MODULE-IDENTITY,
+	// OBJECT-IDENTITY, value assignments) and zeroDotZero (0.0).
+	if def.kind != defModuleIdentity && def.kind != defObjectIdentity && def.kind != defValueAssignment {
+		oid := node.OID()
+		if len(oid) > 0 && oid[len(oid)-1] == 0 {
+			if len(oid) != 2 || oid[0] != 0 { // exempt zeroDotZero
+				ctx.EmitDiagnostic(types.DiagLastSubidZero, SeveritySevere,
+					def.mod, def.def.DefinitionSpan(),
+					label+": last sub-identifier must not be zero")
+			}
+		}
+	}
 
 	// Prefer SMIv2 over SMIv1 when multiple modules define the same OID
 	newMod := ctx.moduleToResolved[def.mod]

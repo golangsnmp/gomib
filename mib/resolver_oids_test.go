@@ -1164,70 +1164,6 @@ func TestCreateNamedChild(t *testing.T) {
 	})
 }
 
-func TestRecordUnresolvedFirstComponent(t *testing.T) {
-	tests := []struct {
-		name          string
-		component     module.OidComponent
-		wantRecorded  bool
-		wantComponent string
-	}{
-		{
-			name:          "OidComponentName",
-			component:     &module.OidComponentName{NameValue: "enterprises"},
-			wantRecorded:  true,
-			wantComponent: "enterprises",
-		},
-		{
-			name:          "OidComponentNamedNumber",
-			component:     &module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
-			wantRecorded:  true,
-			wantComponent: "org",
-		},
-		{
-			name:          "OidComponentQualifiedName",
-			component:     &module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"},
-			wantRecorded:  true,
-			wantComponent: "SNMPv2-SMI.enterprises",
-		},
-		{
-			name:          "OidComponentQualifiedNamedNumber",
-			component:     &module.OidComponentQualifiedNamedNumber{ModuleValue: "RFC1155-SMI", NameValue: "private", NumberValue: 4},
-			wantRecorded:  true,
-			wantComponent: "RFC1155-SMI.private",
-		},
-		{
-			name:         "OidComponentNumber produces no diagnostic",
-			component:    &module.OidComponentNumber{Value: 42},
-			wantRecorded: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mod := &module.Module{Name: "TEST-MIB"}
-			ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-
-			oid := module.NewOidAssignment([]module.OidComponent{tt.component}, types.Synthetic)
-			def := oidDefinition{
-				mod:  mod,
-				def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "testDef"}, Oid: oid},
-				kind: defValueAssignment,
-			}
-
-			recordUnresolvedFirstComponent(ctx, def, &oid)
-
-			diags := ctx.Diagnostics()
-			if tt.wantRecorded {
-				testutil.Len(t, diags, 1, "expected 1 diagnostic")
-				testutil.Equal(t, types.DiagOidOrphan, diags[0].Code, "diagnostic code")
-				testutil.Contains(t, diags[0].Message, tt.wantComponent, "diagnostic should reference component")
-			} else {
-				testutil.Len(t, diags, 0, "expected no diagnostics")
-			}
-		})
-	}
-}
-
 func TestResolveOidComponentDispatch(t *testing.T) {
 	t.Run("NamedNumber dispatches correctly", func(t *testing.T) {
 		mod := &module.Module{Name: "TEST-MIB"}
@@ -1522,6 +1458,167 @@ func TestOidReuse_SameNameNoDiagnostic(t *testing.T) {
 			t.Fatalf("unexpected diagnostic %s: %s", d.Code, d.Message)
 		}
 	}
+}
+
+func TestResolveOidsRecursiveCycle(t *testing.T) {
+	// Two definitions that reference each other: A's OID starts with B, B's OID starts with A.
+	mod := &module.Module{
+		Name:     "CYCLE-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+	}
+
+	oidA := module.NewOidAssignment([]module.OidComponent{
+		&module.OidComponentName{NameValue: "nodeB"},
+		&module.OidComponentNumber{Value: 1},
+	}, types.Span{})
+	oidB := module.NewOidAssignment([]module.OidComponent{
+		&module.OidComponentName{NameValue: "nodeA"},
+		&module.OidComponentNumber{Value: 2},
+	}, types.Span{})
+
+	mod.Definitions = []module.Definition{
+		&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeA"}, Oid: oidA},
+		&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeB"}, Oid: oidB},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+
+	var recursiveDiags []Diagnostic
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagOidRecursive {
+			recursiveDiags = append(recursiveDiags, d)
+		}
+	}
+	testutil.Len(t, recursiveDiags, 2, "expected 2 oid-recursive diagnostics")
+	for _, d := range recursiveDiags {
+		testutil.Contains(t, d.Message, "recursive OID", "diagnostic message")
+		testutil.Contains(t, d.Message, "cycle", "diagnostic message should mention cycle")
+	}
+}
+
+func TestResolveOidsSelfReference(t *testing.T) {
+	// A definition whose OID references itself.
+	mod := &module.Module{
+		Name:     "SELF-REF-MIB",
+		Language: types.LanguageSMIv2,
+	}
+
+	oid := module.NewOidAssignment([]module.OidComponent{
+		&module.OidComponentName{NameValue: "selfNode"},
+		&module.OidComponentNumber{Value: 1},
+	}, types.Span{})
+
+	mod.Definitions = []module.Definition{
+		&module.ValueAssignment{DefBase: module.DefBase{Name: "selfNode"}, Oid: oid},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+
+	var recursiveDiags []Diagnostic
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagOidRecursive {
+			recursiveDiags = append(recursiveDiags, d)
+		}
+	}
+	testutil.Len(t, recursiveDiags, 1, "expected 1 oid-recursive diagnostic")
+	testutil.Contains(t, recursiveDiags[0].Message, "references itself", "self-reference message")
+}
+
+func TestLastSubidZero(t *testing.T) {
+	t.Run("object-type with last subid zero emits diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TEST-MIB",
+			Language: types.LanguageSMIv2,
+			Imports: []module.Import{
+				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			},
+		}
+
+		// enterprises.1.0 - last subid is zero
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "enterprises"},
+			&module.OidComponentNumber{Value: 1},
+			&module.OidComponentNumber{Value: 0},
+		}, types.Span{})
+
+		mod.Definitions = []module.Definition{
+			&module.ObjectType{DefBase: module.DefBase{Name: "badObj"}, Oid: oid},
+		}
+
+		cfg := StrictConfig()
+		m := Resolve([]*module.Module{mod}, nil, &cfg)
+
+		var found bool
+		for _, d := range m.Diagnostics() {
+			if d.Code == types.DiagLastSubidZero {
+				testutil.Contains(t, d.Message, "badObj", "diagnostic message")
+				found = true
+			}
+		}
+		testutil.True(t, found, "expected last-subid-zero diagnostic")
+	})
+
+	t.Run("value-assignment with last subid zero is exempt", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TEST-MIB",
+			Language: types.LanguageSMIv2,
+			Imports: []module.Import{
+				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			},
+		}
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "enterprises"},
+			&module.OidComponentNumber{Value: 1},
+			&module.OidComponentNumber{Value: 0},
+		}, types.Span{})
+
+		mod.Definitions = []module.Definition{
+			&module.ValueAssignment{DefBase: module.DefBase{Name: "okNode"}, Oid: oid},
+		}
+
+		cfg := StrictConfig()
+		m := Resolve([]*module.Module{mod}, nil, &cfg)
+
+		for _, d := range m.Diagnostics() {
+			if d.Code == types.DiagLastSubidZero {
+				t.Fatalf("unexpected last-subid-zero diagnostic for value assignment: %s", d.Message)
+			}
+		}
+	})
+
+	t.Run("non-zero last subid emits no diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TEST-MIB",
+			Language: types.LanguageSMIv2,
+			Imports: []module.Import{
+				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			},
+		}
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "enterprises"},
+			&module.OidComponentNumber{Value: 1},
+		}, types.Span{})
+
+		mod.Definitions = []module.Definition{
+			&module.ObjectType{DefBase: module.DefBase{Name: "goodObj"}, Oid: oid},
+		}
+
+		cfg := StrictConfig()
+		m := Resolve([]*module.Module{mod}, nil, &cfg)
+
+		for _, d := range m.Diagnostics() {
+			if d.Code == types.DiagLastSubidZero {
+				t.Fatalf("unexpected last-subid-zero diagnostic: %s", d.Message)
+			}
+		}
+	})
 }
 
 // Ensure we use the graph.Symbol type correctly in tests.
