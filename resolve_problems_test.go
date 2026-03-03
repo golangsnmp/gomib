@@ -994,6 +994,60 @@ func TestProblemDefvalIntForEnum(t *testing.T) {
 	testutil.True(t, n >= 1, "expected at least 1 defval-enum diagnostic for int not matching enum, got %d", n)
 }
 
+// TestProblemRangeExchanged verifies that exchanged range limits (min > max)
+// emit a range-exchanged diagnostic.
+func TestProblemRangeExchanged(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-RANGES-MIB")
+
+	n := countDiagnostics(m, "range-exchanged")
+	testutil.True(t, n >= 1, "expected at least 1 range-exchanged diagnostic, got %d", n)
+}
+
+// TestProblemRangeBounds verifies that range limits exceeding basetype bounds
+// emit a range-bounds diagnostic.
+func TestProblemRangeBounds(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-RANGES-MIB")
+
+	n := countDiagnostics(m, "range-bounds")
+	testutil.True(t, n >= 1, "expected at least 1 range-bounds diagnostic, got %d", n)
+}
+
+// TestProblemRangeOverlap verifies that overlapping ranges emit a
+// range-overlap diagnostic.
+func TestProblemRangeOverlap(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-RANGES-MIB")
+
+	n := countDiagnostics(m, "range-overlap")
+	testutil.True(t, n >= 1, "expected at least 1 range-overlap diagnostic, got %d", n)
+}
+
+// TestProblemRangeAscending verifies that non-ascending ranges emit a
+// range-ascending diagnostic.
+func TestProblemRangeAscending(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-RANGES-MIB")
+
+	n := countDiagnostics(m, "range-ascending")
+	testutil.True(t, n >= 1, "expected at least 1 range-ascending diagnostic, got %d", n)
+}
+
+// TestProblemSizeIllegal verifies that SIZE constraints on non-OCTET-STRING
+// types emit a size-illegal diagnostic.
+func TestProblemSizeIllegal(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-RANGES-MIB")
+
+	n := countDiagnostics(m, "size-illegal")
+	testutil.True(t, n >= 2, "expected at least 2 size-illegal diagnostics, got %d", n)
+}
+
+// TestProblemRangeIllegal verifies that range constraints on non-numeric
+// types emit a range-illegal diagnostic.
+func TestProblemRangeIllegal(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-RANGES-MIB")
+
+	n := countDiagnostics(m, "range-illegal")
+	testutil.True(t, n >= 2, "expected at least 2 range-illegal diagnostics, got %d", n)
+}
+
 // TestProblemImportsAliasNormal verifies that module alias resolution works
 // at normal strictness (safe fallback).
 // Ground truth: net-snmp fails on SNMPv2-SMI-v1 (unlike gomib which has alias table).

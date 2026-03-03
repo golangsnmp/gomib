@@ -96,6 +96,12 @@ const (
 	DiagDefvalBasetype           = "defval-basetype"
 	DiagDefvalRange              = "defval-range"
 	DiagDefvalEnum               = "defval-enum"
+	DiagRangeBounds              = "range-bounds"
+	DiagRangeExchanged           = "range-exchanged"
+	DiagRangeOverlap             = "range-overlap"
+	DiagRangeAscending           = "range-ascending"
+	DiagSizeIllegal              = "size-illegal"
+	DiagRangeIllegal             = "range-illegal"
 )
 
 var resolverDiagCodes = []string{
@@ -123,6 +129,12 @@ var resolverDiagCodes = []string{
 	DiagDefvalBasetype,
 	DiagDefvalRange,
 	DiagDefvalEnum,
+	DiagRangeBounds,
+	DiagRangeExchanged,
+	DiagRangeOverlap,
+	DiagRangeAscending,
+	DiagSizeIllegal,
+	DiagRangeIllegal,
 }
 
 // diagPhases maps phase names to their diagnostic code slices.
