@@ -771,7 +771,7 @@ func TestProblemDefvalTypeMismatch(t *testing.T) {
 }
 
 // TestProblemDefvalBadEnum verifies that a DEFVAL with an undefined enum label
-// is handled without crashing.
+// is handled without crashing and emits a defval-enum diagnostic.
 // Ground truth: smilint flags mismatch; net-snmp silently accepts.
 // PROBLEMS.md: PROBLEM-DEFVAL-MIB / DEFVAL with undefined enum label
 func TestProblemDefvalBadEnum(t *testing.T) {
@@ -786,6 +786,9 @@ func TestProblemDefvalBadEnum(t *testing.T) {
 	testutil.True(t, !dv.IsZero(), "DEFVAL should be parsed even with undefined enum label")
 	testutil.Equal(t, mib.DefValKindEnum, dv.Kind(), "bad enum DEFVAL kind")
 	testutil.Equal(t, "unknown", dv.String(), "bad enum DEFVAL preserved as raw label")
+
+	n := countDiagnostics(m, "defval-enum")
+	testutil.True(t, n >= 1, "expected at least 1 defval-enum diagnostic for bad enum label, got %d", n)
 }
 
 // TestProblemDefvalLargeHex verifies that a 16-byte hex DEFVAL is parsed.
@@ -926,6 +929,69 @@ func TestProblemDefvalSpecialString(t *testing.T) {
 	if got != `"default-value"` {
 		t.Errorf("string defval: got %q, want %q", got, `"default-value"`)
 	}
+}
+
+// TestProblemDefvalNegativeUnsigned verifies that a negative DEFVAL for an
+// unsigned type emits a defval-basetype diagnostic.
+func TestProblemDefvalNegativeUnsigned(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
+
+	obj := m.Object("problemDefvalNegativeUnsigned")
+	testutil.NotNil(t, obj, "Object(problemDefvalNegativeUnsigned)")
+
+	dv := obj.DefaultValue()
+	testutil.True(t, !dv.IsZero(), "DEFVAL should be set")
+
+	n := countDiagnostics(m, "defval-basetype")
+	testutil.True(t, n >= 1, "expected at least 1 defval-basetype diagnostic, got %d", n)
+}
+
+// TestProblemDefvalOutOfRange verifies that a DEFVAL outside the RANGE
+// constraint emits a defval-range diagnostic.
+func TestProblemDefvalOutOfRange(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
+
+	obj := m.Object("problemDefvalOutOfRange")
+	testutil.NotNil(t, obj, "Object(problemDefvalOutOfRange)")
+
+	dv := obj.DefaultValue()
+	testutil.True(t, !dv.IsZero(), "DEFVAL should be set")
+
+	n := countDiagnostics(m, "defval-range")
+	testutil.True(t, n >= 1, "expected at least 1 defval-range diagnostic, got %d", n)
+}
+
+// TestProblemDefvalBadBitsLabel verifies that a DEFVAL with a BITS label
+// not defined in the type emits a defval-enum diagnostic.
+func TestProblemDefvalBadBitsLabel(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
+
+	obj := m.Object("problemDefvalBadBitsLabel")
+	testutil.NotNil(t, obj, "Object(problemDefvalBadBitsLabel)")
+
+	dv := obj.DefaultValue()
+	testutil.True(t, !dv.IsZero(), "DEFVAL should be set")
+	testutil.Equal(t, mib.DefValKindBits, dv.Kind(), "kind")
+
+	n := countDiagnostics(m, "defval-enum")
+	// At least 1 for the bad label "c" (may have more from other test objects)
+	testutil.True(t, n >= 1, "expected at least 1 defval-enum diagnostic for bad BITS label, got %d", n)
+}
+
+// TestProblemDefvalIntForEnum verifies that an integer DEFVAL not matching
+// any enumeration value emits a defval-enum diagnostic.
+func TestProblemDefvalIntForEnum(t *testing.T) {
+	m := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
+
+	obj := m.Object("problemDefvalIntForEnum")
+	testutil.NotNil(t, obj, "Object(problemDefvalIntForEnum)")
+
+	dv := obj.DefaultValue()
+	testutil.True(t, !dv.IsZero(), "DEFVAL should be set")
+	testutil.Equal(t, mib.DefValKindInt, dv.Kind(), "kind")
+
+	n := countDiagnostics(m, "defval-enum")
+	testutil.True(t, n >= 1, "expected at least 1 defval-enum diagnostic for int not matching enum, got %d", n)
 }
 
 // TestProblemImportsAliasNormal verifies that module alias resolution works
