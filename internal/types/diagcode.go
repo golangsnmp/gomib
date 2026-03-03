@@ -152,6 +152,14 @@ const (
 	DiagStatusInvalidCapabilities = "status-invalid-capabilities"
 	DiagImportUnused              = "import-unused"
 	DiagBasetypeNotImported       = "basetype-not-imported"
+	DiagDescriptionMissing        = "description-missing"
+	DiagTCNested                  = "textual-convention-nested"
+	DiagTypeAssignmentSMIv2       = "type-assignment-smiv2"
+	DiagTableNameTable            = "table-name-table"
+	DiagRowNameEntry              = "row-name-entry"
+	DiagRowNameTableName          = "row-name-table-name"
+	DiagNamedNumbersAscending     = "named-numbers-ascending"
+	DiagHyphenInLabel             = "hyphen-in-label"
 )
 
 // codeEntry pairs a diagnostic code with its severity.
@@ -304,6 +312,14 @@ var resolverDiagCodes = []codeEntry{
 	{DiagStatusInvalidCapabilities, SeverityError},
 	{DiagImportUnused, SeverityStyle},
 	{DiagBasetypeNotImported, SeverityMinor},
+	{DiagDescriptionMissing, SeverityMinor},
+	{DiagTCNested, SeverityStyle},
+	{DiagTypeAssignmentSMIv2, SeverityStyle},
+	{DiagTableNameTable, SeverityStyle},
+	{DiagRowNameEntry, SeverityStyle},
+	{DiagRowNameTableName, SeverityStyle},
+	{DiagNamedNumbersAscending, SeverityStyle},
+	{DiagHyphenInLabel, SeverityStyle},
 }
 
 // diagPhases maps phase names to their diagnostic code entries.

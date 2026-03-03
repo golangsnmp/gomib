@@ -2504,3 +2504,588 @@ func TestCheckBasetypeNotImported_WhenImported(t *testing.T) {
 		}
 	}
 }
+
+// --- description-missing ---
+
+func TestCheckDescriptionMissing_ObjectType(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "noDesc"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:      types.StatusCurrent,
+				Description: "",
+				Oid:         testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagDescriptionMissing {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for OBJECT-TYPE without DESCRIPTION", types.DiagDescriptionMissing)
+}
+
+func TestCheckDescriptionMissing_SMIv1_NoDiag(t *testing.T) {
+	// SMIv1 modules should not trigger description-missing.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv1,
+		Imports: []module.Import{
+			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+			module.NewImport("RFC1155-SMI", "INTEGER", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "noDesc"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Status:      types.StatusMandatory,
+				Description: "",
+				Oid:         testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagDescriptionMissing {
+			t.Fatalf("unexpected %s diagnostic for SMIv1 module: %s", types.DiagDescriptionMissing, d.Message)
+		}
+	}
+}
+
+func TestCheckDescriptionMissing_WithDescription_NoDiag(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "hasDesc"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:      types.StatusCurrent,
+				Description: "This object has a description",
+				Oid:         testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagDescriptionMissing {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagDescriptionMissing, d.Message)
+		}
+	}
+}
+
+// --- textual-convention-nested ---
+
+func TestCheckTCNested(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "ParentTC"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				Status:              types.StatusCurrent,
+				Description:         "A parent TC",
+				IsTextualConvention: true,
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "ChildTC"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "ParentTC"},
+				Status:              types.StatusCurrent,
+				Description:         "A nested TC",
+				IsTextualConvention: true,
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTCNested {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for TC derived from TC", types.DiagTCNested)
+}
+
+func TestCheckTCNested_FromBase_NoDiag(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "MyString"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				Status:              types.StatusCurrent,
+				Description:         "A TC from base type",
+				IsTextualConvention: true,
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTCNested {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagTCNested, d.Message)
+		}
+	}
+}
+
+// --- type-assignment-smiv2 ---
+
+func TestCheckTypeAssignmentSMIv2(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "MyType"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Status:              types.StatusCurrent,
+				IsTextualConvention: false,
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTypeAssignmentSMIv2 {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for type assignment in SMIv2", types.DiagTypeAssignmentSMIv2)
+}
+
+func TestCheckTypeAssignmentSMIv2_TC_NoDiag(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "MyTC"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				Status:              types.StatusCurrent,
+				Description:         "A proper TC",
+				IsTextualConvention: true,
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTypeAssignmentSMIv2 {
+			t.Fatalf("unexpected %s diagnostic for TC: %s", types.DiagTypeAssignmentSMIv2, d.Message)
+		}
+	}
+}
+
+// --- table/row naming ---
+
+func TestCheckTableRowNaming_BadTableName(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "badTbl"},
+				Syntax:      &module.TypeSyntaxSequenceOf{EntryType: "BadRow"},
+				Status:      types.StatusCurrent,
+				Description: "A table without Table suffix",
+				Oid:         testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "badRow"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "BadRow"},
+				Status:      types.StatusCurrent,
+				Description: "A row without Entry suffix",
+				Index:       []module.IndexItem{{Object: "badIdx"}},
+				Oid:         testOid("badTbl", 1),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "badIdx"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:      types.StatusCurrent,
+				Description: "Index",
+				Oid:         testOid("badRow", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var foundTable, foundRow bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTableNameTable {
+			foundTable = true
+		}
+		if d.Code == types.DiagRowNameEntry {
+			foundRow = true
+		}
+	}
+	testutil.True(t, foundTable, "expected %s diagnostic for table not ending in Table", types.DiagTableNameTable)
+	testutil.True(t, foundRow, "expected %s diagnostic for row not ending in Entry", types.DiagRowNameEntry)
+}
+
+func TestCheckTableRowNaming_Good_NoDiag(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "goodTable"},
+				Syntax:      &module.TypeSyntaxSequenceOf{EntryType: "GoodEntry"},
+				Status:      types.StatusCurrent,
+				Description: "A properly named table",
+				Oid:         testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "goodEntry"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "GoodEntry"},
+				Status:      types.StatusCurrent,
+				Description: "A properly named entry",
+				Index:       []module.IndexItem{{Object: "goodIndex"}},
+				Oid:         testOid("goodTable", 1),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "goodIndex"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:      types.StatusCurrent,
+				Description: "Index",
+				Oid:         testOid("goodEntry", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTableNameTable || d.Code == types.DiagRowNameEntry || d.Code == types.DiagRowNameTableName {
+			t.Fatalf("unexpected naming diagnostic: %s: %s", d.Code, d.Message)
+		}
+	}
+}
+
+func TestCheckTableRowNaming_PrefixMismatch(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "fooTable"},
+				Syntax:      &module.TypeSyntaxSequenceOf{EntryType: "BarEntry"},
+				Status:      types.StatusCurrent,
+				Description: "Table with mismatched prefix",
+				Oid:         testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "barEntry"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "BarEntry"},
+				Status:      types.StatusCurrent,
+				Description: "Entry with mismatched prefix",
+				Index:       []module.IndexItem{{Object: "barIndex"}},
+				Oid:         testOid("fooTable", 1),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "barIndex"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:      types.StatusCurrent,
+				Description: "Index",
+				Oid:         testOid("barEntry", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagRowNameTableName {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for prefix mismatch", types.DiagRowNameTableName)
+}
+
+// --- named-numbers-ascending ---
+
+func TestCheckNamedNumbersAscending(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badOrder"},
+				Syntax: &module.TypeSyntaxIntegerEnum{
+					NamedNumbers: []module.NamedNumber{
+						{Name: "high", Value: 5},
+						{Name: "low", Value: 1},
+					},
+				},
+				Status:      types.StatusCurrent,
+				Description: "Descending enum",
+				Oid:         testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagNamedNumbersAscending {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for non-ascending named numbers", types.DiagNamedNumbersAscending)
+}
+
+func TestCheckNamedNumbersAscending_OK_NoDiag(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "goodOrder"},
+				Syntax: &module.TypeSyntaxIntegerEnum{
+					NamedNumbers: []module.NamedNumber{
+						{Name: "low", Value: 1},
+						{Name: "high", Value: 5},
+					},
+				},
+				Status:      types.StatusCurrent,
+				Description: "Ascending enum",
+				Oid:         testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagNamedNumbersAscending {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagNamedNumbersAscending, d.Message)
+		}
+	}
+}
+
+// --- hyphen-in-label ---
+
+func TestCheckHyphenInLabel(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badLabel"},
+				Syntax: &module.TypeSyntaxIntegerEnum{
+					NamedNumbers: []module.NamedNumber{
+						{Name: "my-value", Value: 1},
+					},
+				},
+				Status:      types.StatusCurrent,
+				Description: "Enum with hyphenated label",
+				Oid:         testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagHyphenInLabel {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for hyphenated named number", types.DiagHyphenInLabel)
+}
+
+func TestCheckHyphenInLabel_SMIv1_NoDiag(t *testing.T) {
+	// Hyphenated labels are allowed in SMIv1.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv1,
+		Imports: []module.Import{
+			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "okLabel"},
+				Syntax: &module.TypeSyntaxIntegerEnum{
+					NamedNumbers: []module.NamedNumber{
+						{Name: "my-value", Value: 1},
+					},
+				},
+				Status:      types.StatusMandatory,
+				Description: "Hyphen is OK in SMIv1",
+				Oid:         testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagHyphenInLabel {
+			t.Fatalf("unexpected %s diagnostic for SMIv1 module: %s", types.DiagHyphenInLabel, d.Message)
+		}
+	}
+}
+
+func TestCheckHyphenInLabel_NoHyphen_NoDiag(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "goodLabel"},
+				Syntax: &module.TypeSyntaxIntegerEnum{
+					NamedNumbers: []module.NamedNumber{
+						{Name: "myValue", Value: 1},
+					},
+				},
+				Status:      types.StatusCurrent,
+				Description: "Clean label",
+				Oid:         testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagHyphenInLabel {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagHyphenInLabel, d.Message)
+		}
+	}
+}
