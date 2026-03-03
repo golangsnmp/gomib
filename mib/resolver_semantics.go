@@ -36,6 +36,12 @@ func resolveSemantics(ctx *resolverContext) {
 	checkComplianceStatus(ctx)
 	checkComplianceStructure(ctx)
 	checkGroupMemberLocality(ctx)
+	checkDescriptionMissing(ctx, objRefs)
+	checkTextualConventionNested(ctx)
+	checkTypeAssignmentSMIv2(ctx)
+	checkTableRowNaming(ctx, objRefs)
+	checkNamedNumberOrdering(ctx)
+	checkHyphenInLabel(ctx)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {

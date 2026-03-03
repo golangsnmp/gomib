@@ -3,6 +3,7 @@ package mib
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
@@ -1571,4 +1572,260 @@ func normalizeTypeName(name string) string {
 	default:
 		return name
 	}
+}
+
+// checkDescriptionMissing flags SMIv2 definitions that lack a DESCRIPTION
+// clause. DESCRIPTION is mandatory for most SMIv2 definition types per
+// RFC 2578/2579/2580. SMIv1 definitions are exempt since DESCRIPTION was
+// optional in RFC 1212.
+func checkDescriptionMissing(ctx *resolverContext, objRefs []objectTypeRef) {
+	for _, ref := range objRefs {
+		if ref.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(ref.mod.Name) {
+			continue
+		}
+		if ref.obj.Description == "" {
+			ctx.EmitDiagnostic(types.DiagDescriptionMissing,
+				ref.mod, ref.obj.Span,
+				fmt.Sprintf("%q: OBJECT-TYPE should have a DESCRIPTION clause", ref.obj.Name))
+		}
+	}
+
+	for _, mod := range ctx.modules {
+		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.ObjectIdentity:
+				if d.Description == "" {
+					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
+						mod, d.Span,
+						fmt.Sprintf("%q: OBJECT-IDENTITY should have a DESCRIPTION clause", d.Name))
+				}
+			case *module.Notification:
+				if !d.IsTrap() && d.Description == "" {
+					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
+						mod, d.Span,
+						fmt.Sprintf("%q: NOTIFICATION-TYPE should have a DESCRIPTION clause", d.Name))
+				}
+			case *module.TypeDef:
+				if d.IsTextualConvention && d.Description == "" {
+					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
+						mod, d.Span,
+						fmt.Sprintf("%q: TEXTUAL-CONVENTION should have a DESCRIPTION clause", d.Name))
+				}
+			case *module.ObjectGroup:
+				if d.Description == "" {
+					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
+						mod, d.Span,
+						fmt.Sprintf("%q: OBJECT-GROUP should have a DESCRIPTION clause", d.Name))
+				}
+			case *module.NotificationGroup:
+				if d.Description == "" {
+					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
+						mod, d.Span,
+						fmt.Sprintf("%q: NOTIFICATION-GROUP should have a DESCRIPTION clause", d.Name))
+				}
+			case *module.ModuleCompliance:
+				if d.Description == "" {
+					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
+						mod, d.Span,
+						fmt.Sprintf("%q: MODULE-COMPLIANCE should have a DESCRIPTION clause", d.Name))
+				}
+			case *module.AgentCapabilities:
+				if d.Description == "" {
+					ctx.EmitDiagnostic(types.DiagDescriptionMissing,
+						mod, d.Span,
+						fmt.Sprintf("%q: AGENT-CAPABILITIES should have a DESCRIPTION clause", d.Name))
+				}
+			}
+		}
+	}
+}
+
+// checkTextualConventionNested flags TEXTUAL-CONVENTIONs whose parent type
+// is itself a TEXTUAL-CONVENTION. RFC 2579 section 3.5 specifies that a TC's
+// SYNTAX clause should reference a base type, not another TC. Many real MIBs
+// violate this, so it is reported at style severity.
+func checkTextualConventionNested(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			td, ok := def.(*module.TypeDef)
+			if !ok || !td.IsTextualConvention {
+				continue
+			}
+			resolved, ok := ctx.LookupTypeForModule(mod, td.Name)
+			if !ok {
+				continue
+			}
+			parent := resolved.Parent()
+			if parent != nil && parent.IsTextualConvention() {
+				ctx.EmitDiagnostic(types.DiagTCNested,
+					mod, td.Span,
+					fmt.Sprintf("%q: textual convention derived from textual convention %q", td.Name, parent.Name()))
+			}
+		}
+	}
+}
+
+// checkTypeAssignmentSMIv2 flags plain type assignments in SMIv2 modules.
+// RFC 2579 recommends using TEXTUAL-CONVENTION instead of bare type
+// assignments in SMIv2.
+func checkTypeAssignmentSMIv2(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			td, ok := def.(*module.TypeDef)
+			if !ok || td.IsTextualConvention {
+				continue
+			}
+			// Skip SEQUENCE type assignments (used for table rows, not real types).
+			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
+				continue
+			}
+			ctx.EmitDiagnostic(types.DiagTypeAssignmentSMIv2,
+				mod, td.Span,
+				fmt.Sprintf("%q: type assignment in SMIv2 should be a TEXTUAL-CONVENTION", td.Name))
+		}
+	}
+}
+
+// checkTableRowNaming validates table/row naming conventions:
+//   - Table names should end in "Table"
+//   - Row names should end in "Entry"
+//   - Row name prefix should match table name prefix
+func checkTableRowNaming(ctx *resolverContext, objRefs []objectTypeRef) {
+	for _, ref := range objRefs {
+		if module.IsBaseModule(ref.mod.Name) {
+			continue
+		}
+		node, ok := ctx.LookupNodeForModule(ref.mod, ref.obj.Name)
+		if !ok {
+			continue
+		}
+		switch node.Kind() {
+		case KindTable:
+			if !strings.HasSuffix(ref.obj.Name, "Table") {
+				ctx.EmitDiagnostic(types.DiagTableNameTable,
+					ref.mod, ref.obj.Span,
+					fmt.Sprintf("%q: table name should end in \"Table\"", ref.obj.Name))
+			}
+		case KindRow:
+			if !strings.HasSuffix(ref.obj.Name, "Entry") {
+				ctx.EmitDiagnostic(types.DiagRowNameEntry,
+					ref.mod, ref.obj.Span,
+					fmt.Sprintf("%q: row name should end in \"Entry\"", ref.obj.Name))
+			}
+			// Check that row name prefix matches table name prefix.
+			if node.Parent() != nil && node.Parent().Kind() == KindTable {
+				tableName := node.Parent().Name()
+				tablePrefix := strings.TrimSuffix(tableName, "Table")
+				rowPrefix := strings.TrimSuffix(ref.obj.Name, "Entry")
+				if tablePrefix != "" && rowPrefix != "" && tablePrefix != rowPrefix {
+					ctx.EmitDiagnostic(types.DiagRowNameTableName,
+						ref.mod, ref.obj.Span,
+						fmt.Sprintf("%q: row prefix %q does not match table prefix %q", ref.obj.Name, rowPrefix, tablePrefix))
+				}
+			}
+		}
+	}
+}
+
+// forEachDefinitionSyntax calls fn for each ObjectType and TypeDef definition
+// across all non-base modules. The callback receives the unwrapped syntax
+// (TypeSyntaxConstrained layers stripped), definition name, module, and span.
+func forEachDefinitionSyntax(ctx *resolverContext, fn func(module.TypeSyntax, string, *module.Module, types.Span)) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.ObjectType:
+				fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Span)
+			case *module.TypeDef:
+				fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Span)
+			}
+		}
+	}
+}
+
+// unwrapConstrainedSyntax strips TypeSyntaxConstrained wrappers to reach the
+// underlying enum, bits, or type reference syntax.
+func unwrapConstrainedSyntax(syntax module.TypeSyntax) module.TypeSyntax {
+	for {
+		c, ok := syntax.(*module.TypeSyntaxConstrained)
+		if !ok {
+			return syntax
+		}
+		syntax = c.Base
+	}
+}
+
+// checkNamedNumberOrdering flags enumerations and BITS where named values
+// are not in ascending order by value. This is a style recommendation per
+// common MIB authoring practice.
+func checkNamedNumberOrdering(ctx *resolverContext) {
+	forEachDefinitionSyntax(ctx, func(syntax module.TypeSyntax, name string, mod *module.Module, span types.Span) {
+		switch s := syntax.(type) {
+		case *module.TypeSyntaxIntegerEnum:
+			for i := 1; i < len(s.NamedNumbers); i++ {
+				if s.NamedNumbers[i].Value < s.NamedNumbers[i-1].Value {
+					ctx.EmitDiagnostic(types.DiagNamedNumbersAscending,
+						mod, span,
+						fmt.Sprintf("%q: named numbers not in ascending order (%s(%d) before %s(%d))",
+							name,
+							s.NamedNumbers[i-1].Name, s.NamedNumbers[i-1].Value,
+							s.NamedNumbers[i].Name, s.NamedNumbers[i].Value))
+					return
+				}
+			}
+		case *module.TypeSyntaxBits:
+			for i := 1; i < len(s.NamedBits); i++ {
+				if s.NamedBits[i].Position < s.NamedBits[i-1].Position {
+					ctx.EmitDiagnostic(types.DiagNamedNumbersAscending,
+						mod, span,
+						fmt.Sprintf("%q: BITS positions not in ascending order (%s(%d) before %s(%d))",
+							name,
+							s.NamedBits[i-1].Name, s.NamedBits[i-1].Position,
+							s.NamedBits[i].Name, s.NamedBits[i].Position))
+					return
+				}
+			}
+		}
+	})
+}
+
+// checkHyphenInLabel flags named numbers and BITS labels that contain hyphens
+// in SMIv2 modules. RFC 2578 section 7.1.4 says named values must not use
+// hyphens in SMIv2 (they are lowercase identifiers without hyphens).
+func checkHyphenInLabel(ctx *resolverContext) {
+	forEachDefinitionSyntax(ctx, func(syntax module.TypeSyntax, name string, mod *module.Module, span types.Span) {
+		if mod.Language != types.LanguageSMIv2 {
+			return
+		}
+		switch s := syntax.(type) {
+		case *module.TypeSyntaxIntegerEnum:
+			for _, nn := range s.NamedNumbers {
+				if strings.Contains(nn.Name, "-") {
+					ctx.EmitDiagnostic(types.DiagHyphenInLabel,
+						mod, span,
+						fmt.Sprintf("%q: named number %q contains a hyphen", name, nn.Name))
+				}
+			}
+		case *module.TypeSyntaxBits:
+			for _, nb := range s.NamedBits {
+				if strings.Contains(nb.Name, "-") {
+					ctx.EmitDiagnostic(types.DiagHyphenInLabel,
+						mod, span,
+						fmt.Sprintf("%q: BITS label %q contains a hyphen", name, nb.Name))
+				}
+			}
+		}
+	})
 }
