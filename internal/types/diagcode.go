@@ -128,6 +128,10 @@ const (
 	DiagParentGroup              = "parent-group"
 	DiagParentCompliance         = "parent-compliance"
 	DiagParentCapabilities       = "parent-capabilities"
+	DiagSequenceNoColumn         = "sequence-no-column"
+	DiagSequenceMissingColumn    = "sequence-missing-column"
+	DiagSequenceOrder            = "sequence-order"
+	DiagSequenceTypeMismatch     = "sequence-type-mismatch"
 )
 
 var resolverDiagCodes = []string{
@@ -173,6 +177,10 @@ var resolverDiagCodes = []string{
 	DiagParentGroup,
 	DiagParentCompliance,
 	DiagParentCapabilities,
+	DiagSequenceNoColumn,
+	DiagSequenceMissingColumn,
+	DiagSequenceOrder,
+	DiagSequenceTypeMismatch,
 }
 
 // diagPhases maps phase names to their diagnostic code slices.
