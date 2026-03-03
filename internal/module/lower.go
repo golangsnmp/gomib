@@ -475,6 +475,7 @@ func lowerVariation(v *ast.Variation, ctx *LoweringContext) Variation {
 		CreationRequires: creationRequires,
 		DefVal:           lowerOptionalDefVal(v.DefVal, ctx),
 		Description:      v.Description.Value,
+		Span:             v.Span,
 	}
 }
 

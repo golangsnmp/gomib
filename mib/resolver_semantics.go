@@ -123,6 +123,15 @@ func collectNotificationRefs(ctx *resolverContext) []notificationRef {
 	})
 }
 
+func collectComplianceRefs(ctx *resolverContext) []complianceRef {
+	return collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (complianceRef, bool) {
+		if comp, ok := def.(*module.ModuleCompliance); ok {
+			return complianceRef{mod: mod, comp: comp}, true
+		}
+		return complianceRef{}, false
+	})
+}
+
 func resolveTableSemantics(ctx *resolverContext, objRefs []objectTypeRef) {
 	for _, ref := range objRefs {
 		obj := ref.obj
@@ -184,7 +193,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 
 		if obj.DefVal != nil {
-			resolved.setDefaultValue(convertDefVal(ctx, obj.DefVal, ref.mod, obj.Syntax))
+			resolved.setDefaultValue(convertDefVal(ctx, obj.DefVal, ref.mod, obj.Syntax, obj.Span))
 		}
 
 		computeEffectiveValues(resolved)
@@ -400,131 +409,103 @@ func createResolvedNotifications(ctx *resolverContext) {
 	}
 }
 
-type objectGroupRef struct {
-	mod *module.Module
-	grp *module.ObjectGroup
-}
-
-type notificationGroupRef struct {
-	mod *module.Module
-	grp *module.NotificationGroup
+// groupInfo holds the common fields extracted from ObjectGroup or NotificationGroup
+// for the shared group resolution logic.
+type groupInfo struct {
+	mod         *module.Module
+	name        string
+	span        types.Span
+	status      Status
+	description string
+	reference   string
+	members     []string
+	isNotifGrp  bool
 }
 
 func createResolvedGroups(ctx *resolverContext) {
-	objCount := createResolvedObjectGroups(ctx)
-	notifCount := createResolvedNotificationGroups(ctx)
+	var groups []groupInfo
+	for _, mod := range ctx.modules {
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.ObjectGroup:
+				groups = append(groups, groupInfo{
+					mod: mod, name: d.Name, span: d.DefinitionSpan(),
+					status: d.Status, description: d.Description,
+					reference: d.Reference, members: d.Objects,
+				})
+			case *module.NotificationGroup:
+				groups = append(groups, groupInfo{
+					mod: mod, name: d.Name, span: d.DefinitionSpan(),
+					status: d.Status, description: d.Description,
+					reference: d.Reference, members: d.Notifications,
+					isNotifGrp: true,
+				})
+			}
+		}
+	}
+
+	created := 0
+	for _, gi := range groups {
+		node, ok := ctx.LookupNodeForModule(gi.mod, gi.name)
+		if !ok {
+			continue
+		}
+
+		resolved := newGroup(gi.name)
+		resolved.setNode(node)
+		if resolvedMod := ctx.moduleToResolved[gi.mod]; resolvedMod != nil {
+			resolved.setModule(resolvedMod)
+		}
+		resolved.setStatus(gi.status)
+		resolved.setDescription(gi.description)
+		resolved.setReference(gi.reference)
+		resolved.setIsNotificationGroup(gi.isNotifGrp)
+
+		var hasObjects, hasNotifications bool
+		for _, memberName := range gi.members {
+			if memberNode, ok := lookupMemberNode(ctx, gi.mod, memberName); ok {
+				resolved.addMember(memberNode)
+				kind := memberNode.Kind()
+				if gi.isNotifGrp {
+					if kind.IsObjectType() {
+						hasObjects = true
+						ctx.EmitDiagnostic(types.DiagGroupNotificationsObject,
+							gi.mod, gi.span,
+							fmt.Sprintf("notification group %q includes object %q", gi.name, memberName))
+					} else if kind == types.KindNotification {
+						hasNotifications = true
+					}
+				} else {
+					if kind == types.KindNotification {
+						hasNotifications = true
+						ctx.EmitDiagnostic(types.DiagGroupObjectsNotification,
+							gi.mod, gi.span,
+							fmt.Sprintf("object group %q includes notification %q", gi.name, memberName))
+					} else if kind.IsObjectType() {
+						hasObjects = true
+					}
+					if obj := memberNode.Object(); obj != nil && obj.Access() == AccessNotAccessible {
+						ctx.EmitDiagnostic(types.DiagGroupNotAccessible,
+							gi.mod, gi.span,
+							fmt.Sprintf("object %q of group %q must not be not-accessible", memberName, gi.name))
+					}
+				}
+				checkGroupMemberStatus(ctx, gi.mod, gi.span, gi.status, gi.name, memberNode, memberName)
+			} else {
+				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved,
+					gi.mod, gi.span,
+					fmt.Sprintf("group %q references unresolved member %q", gi.name, memberName))
+			}
+		}
+		emitMixedGroupDiagnostic(ctx, gi.mod, gi.span, gi.name, hasObjects, hasNotifications)
+
+		registerGroup(ctx, gi.mod, node, resolved)
+		created++
+	}
 
 	if ctx.TraceEnabled() {
-		ctx.Trace("created resolved groups", slog.Int("count", objCount+notifCount))
+		ctx.Trace("created resolved groups", slog.Int("count", created))
 	}
-}
-
-func createResolvedObjectGroups(ctx *resolverContext) int {
-	created := 0
-	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (objectGroupRef, bool) {
-		if grp, ok := def.(*module.ObjectGroup); ok {
-			return objectGroupRef{mod: mod, grp: grp}, true
-		}
-		return objectGroupRef{}, false
-	}) {
-		grp := ref.grp
-		node, ok := ctx.LookupNodeForModule(ref.mod, grp.Name)
-		if !ok {
-			continue
-		}
-
-		resolved := newGroup(grp.Name)
-		resolved.setNode(node)
-		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
-			resolved.setModule(resolvedMod)
-		}
-		resolved.setStatus(grp.Status)
-		resolved.setDescription(grp.Description)
-		resolved.setReference(grp.Reference)
-
-		var hasObjects, hasNotifications bool
-		for _, memberName := range grp.Objects {
-			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
-				resolved.addMember(memberNode)
-				kind := memberNode.Kind()
-				if kind == types.KindNotification {
-					hasNotifications = true
-					ctx.EmitDiagnostic(types.DiagGroupObjectsNotification,
-						ref.mod, grp.DefinitionSpan(),
-						fmt.Sprintf("object group %q includes notification %q", grp.Name, memberName))
-				} else if kind.IsObjectType() {
-					hasObjects = true
-				}
-				if obj := memberNode.Object(); obj != nil && obj.Access() == AccessNotAccessible {
-					ctx.EmitDiagnostic(types.DiagGroupNotAccessible,
-						ref.mod, grp.DefinitionSpan(),
-						fmt.Sprintf("object %q of group %q must not be not-accessible", memberName, grp.Name))
-				}
-				checkGroupMemberStatus(ctx, ref.mod, grp.DefinitionSpan(), grp.Status, grp.Name, memberNode, memberName)
-			} else {
-				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved,
-					ref.mod, grp.DefinitionSpan(),
-					fmt.Sprintf("group %q references unresolved member %q", grp.Name, memberName))
-			}
-		}
-		emitMixedGroupDiagnostic(ctx, ref.mod, grp.DefinitionSpan(), grp.Name, hasObjects, hasNotifications)
-
-		registerGroup(ctx, ref.mod, node, resolved)
-		created++
-	}
-	return created
-}
-
-func createResolvedNotificationGroups(ctx *resolverContext) int {
-	created := 0
-	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (notificationGroupRef, bool) {
-		if grp, ok := def.(*module.NotificationGroup); ok {
-			return notificationGroupRef{mod: mod, grp: grp}, true
-		}
-		return notificationGroupRef{}, false
-	}) {
-		grp := ref.grp
-		node, ok := ctx.LookupNodeForModule(ref.mod, grp.Name)
-		if !ok {
-			continue
-		}
-
-		resolved := newGroup(grp.Name)
-		resolved.setNode(node)
-		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
-			resolved.setModule(resolvedMod)
-		}
-		resolved.setStatus(grp.Status)
-		resolved.setDescription(grp.Description)
-		resolved.setReference(grp.Reference)
-		resolved.setIsNotificationGroup(true)
-
-		var hasObjects, hasNotifications bool
-		for _, memberName := range grp.Notifications {
-			if memberNode, ok := lookupMemberNode(ctx, ref.mod, memberName); ok {
-				resolved.addMember(memberNode)
-				kind := memberNode.Kind()
-				if kind.IsObjectType() {
-					hasObjects = true
-					ctx.EmitDiagnostic(types.DiagGroupNotificationsObject,
-						ref.mod, grp.DefinitionSpan(),
-						fmt.Sprintf("notification group %q includes object %q", grp.Name, memberName))
-				} else if kind == types.KindNotification {
-					hasNotifications = true
-				}
-				checkGroupMemberStatus(ctx, ref.mod, grp.DefinitionSpan(), grp.Status, grp.Name, memberNode, memberName)
-			} else {
-				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved,
-					ref.mod, grp.DefinitionSpan(),
-					fmt.Sprintf("notification group %q references unresolved member %q", grp.Name, memberName))
-			}
-		}
-		emitMixedGroupDiagnostic(ctx, ref.mod, grp.DefinitionSpan(), grp.Name, hasObjects, hasNotifications)
-
-		registerGroup(ctx, ref.mod, node, resolved)
-		created++
-	}
-	return created
 }
 
 // registerResolvedEntity handles the common pattern for registering a resolved entity:
@@ -583,12 +564,7 @@ type capabilitiesRef struct {
 
 func createResolvedCompliances(ctx *resolverContext) {
 	created := 0
-	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (complianceRef, bool) {
-		if comp, ok := def.(*module.ModuleCompliance); ok {
-			return complianceRef{mod: mod, comp: comp}, true
-		}
-		return complianceRef{}, false
-	}) {
+	for _, ref := range collectComplianceRefs(ctx) {
 		comp := ref.comp
 		node, ok := ctx.LookupNodeForModule(ref.mod, comp.Name)
 		if !ok {
@@ -701,7 +677,7 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 					nv.Access = v.Access
 					if *v.Access != AccessNotImplemented {
 						ctx.EmitDiagnostic(types.DiagVariationAccessNotifOnly,
-							mod, types.Span{},
+							mod, v.Span,
 							fmt.Sprintf("notification variation %q ACCESS should be not-implemented per RFC 2580", v.Name))
 					}
 				}
@@ -720,7 +696,7 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 					ov.Access = v.Access
 				}
 				if v.DefVal != nil {
-					if dv := convertDefVal(ctx, v.DefVal, mod, v.Syntax); dv != nil {
+					if dv := convertDefVal(ctx, v.DefVal, mod, v.Syntax, v.Span); dv != nil {
 						ov.DefVal = *dv
 					}
 				}
@@ -905,11 +881,11 @@ func hasSequenceTypeDef(mod *module.Module, name string) bool {
 	return false
 }
 
-func emitDefvalUnresolved(ctx *resolverContext, mod *module.Module, message string) {
-	ctx.EmitDiagnostic(types.DiagDefvalUnresolved, mod, types.Span{}, message)
+func emitDefvalUnresolved(ctx *resolverContext, mod *module.Module, span types.Span, message string) {
+	ctx.EmitDiagnostic(types.DiagDefvalUnresolved, mod, span, message)
 }
 
-func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Module, syntax module.TypeSyntax) *DefVal {
+func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Module, syntax module.TypeSyntax, span types.Span) *DefVal {
 	switch v := defval.(type) {
 	case *module.DefValInteger:
 		raw := strconv.FormatInt(v.Value, 10)
@@ -928,7 +904,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		bytes, err := hexToBytes(v.Value)
 		if err != nil {
 			ctx.EmitDiagnostic(types.DiagMalformedHexDefval,
-				mod, types.Span{}, fmt.Sprintf("malformed hex DEFVAL %q: %s", raw, err.Error()))
+				mod, span, fmt.Sprintf("malformed hex DEFVAL %q: %s", raw, err.Error()))
 			return nil
 		}
 		dv := newDefValBytes(bytes, raw)
@@ -939,7 +915,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		bytes, valid := binaryToBytes(v.Value, isBits)
 		if !valid {
 			ctx.EmitDiagnostic(types.DiagMalformedBinDefval,
-				mod, types.Span{}, fmt.Sprintf("binary DEFVAL contains non-binary digits: %q", raw))
+				mod, span, fmt.Sprintf("binary DEFVAL contains non-binary digits: %q", raw))
 		}
 		dv := newDefValBytes(bytes, raw)
 		return &dv
@@ -952,7 +928,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 				dv := newDefValOID(oid, v.Name)
 				return &dv
 			}
-			emitDefvalUnresolved(ctx, mod, fmt.Sprintf("DEFVAL OID reference %q could not be resolved", v.Name))
+			emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID reference %q could not be resolved", v.Name))
 		}
 		dv := newDefValEnum(v.Name, v.Name)
 		return &dv
@@ -969,11 +945,11 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			dv := newDefValOID(oid, v.Name)
 			return &dv
 		}
-		emitDefvalUnresolved(ctx, mod, fmt.Sprintf("DEFVAL OID reference %q could not be resolved", v.Name))
+		emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID reference %q could not be resolved", v.Name))
 		return nil
 	case *module.DefValOidValue:
 		if len(v.Components) == 0 {
-			emitDefvalUnresolved(ctx, mod, "DEFVAL OID value has no components")
+			emitDefvalUnresolved(ctx, mod, span, "DEFVAL OID value has no components")
 			return nil
 		}
 		var name, qualModule string
@@ -990,7 +966,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			name = c.NameValue
 		}
 		if name == "" {
-			emitDefvalUnresolved(ctx, mod, "DEFVAL OID value has no named root component")
+			emitDefvalUnresolved(ctx, mod, span, "DEFVAL OID value has no named root component")
 			return nil
 		}
 		var node *Node
@@ -1001,7 +977,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			node, ok = ctx.LookupNodeForModule(mod, name)
 		}
 		if !ok {
-			emitDefvalUnresolved(ctx, mod, fmt.Sprintf("DEFVAL OID root %q could not be resolved", name))
+			emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID root %q could not be resolved", name))
 			return nil
 		}
 		oid := node.OID()
@@ -1014,17 +990,17 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			case *module.OidComponentQualifiedNamedNumber:
 				oid = append(oid, c.NumberValue)
 			case *module.OidComponentName:
-				emitDefvalUnresolved(ctx, mod, fmt.Sprintf("DEFVAL OID component %q has no numeric value", c.NameValue))
+				emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID component %q has no numeric value", c.NameValue))
 				return nil
 			case *module.OidComponentQualifiedName:
-				emitDefvalUnresolved(ctx, mod, fmt.Sprintf("DEFVAL OID component %q has no numeric value", c.ModuleValue+"."+c.NameValue))
+				emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID component %q has no numeric value", c.ModuleValue+"."+c.NameValue))
 				return nil
 			}
 		}
 		dv := newDefValOID(oid, name)
 		return &dv
 	default:
-		emitDefvalUnresolved(ctx, mod, "DEFVAL could not be parsed")
+		emitDefvalUnresolved(ctx, mod, span, "DEFVAL could not be parsed")
 		return nil
 	}
 }

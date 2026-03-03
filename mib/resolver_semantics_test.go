@@ -248,7 +248,7 @@ func TestConvertDefValInteger(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	syntax := &module.TypeSyntaxTypeRef{Name: "Integer32"}
 
-	dv := convertDefVal(ctx, &module.DefValInteger{Value: 42}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValInteger{Value: 42}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindInt, dv.Kind(), "kind")
 	v, ok := DefValAs[int64](*dv)
@@ -262,7 +262,7 @@ func TestConvertDefValNegativeInteger(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	syntax := &module.TypeSyntaxTypeRef{Name: "Integer32"}
 
-	dv := convertDefVal(ctx, &module.DefValInteger{Value: -1}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValInteger{Value: -1}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindInt, dv.Kind(), "kind")
 	v, ok := DefValAs[int64](*dv)
@@ -276,7 +276,7 @@ func TestConvertDefValUnsigned(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	syntax := &module.TypeSyntaxTypeRef{Name: "Counter64"}
 
-	dv := convertDefVal(ctx, &module.DefValUnsigned{Value: 12345}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValUnsigned{Value: 12345}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindUint, dv.Kind(), "kind")
 	v, ok := DefValAs[uint64](*dv)
@@ -290,7 +290,7 @@ func TestConvertDefValString(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	syntax := &module.TypeSyntaxTypeRef{Name: "DisplayString"}
 
-	dv := convertDefVal(ctx, &module.DefValString{Value: "public"}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValString{Value: "public"}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindString, dv.Kind(), "kind")
 	v, ok := DefValAs[string](*dv)
@@ -304,7 +304,7 @@ func TestConvertDefValHexString(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	syntax := &module.TypeSyntaxOctetString{}
 
-	dv := convertDefVal(ctx, &module.DefValHexString{Value: "FF00"}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValHexString{Value: "FF00"}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindBytes, dv.Kind(), "kind")
 	bytes, ok := DefValAs[[]byte](*dv)
@@ -322,7 +322,7 @@ func TestConvertDefValBinaryString(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	syntax := &module.TypeSyntaxOctetString{}
 
-	dv := convertDefVal(ctx, &module.DefValBinaryString{Value: "10101010"}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValBinaryString{Value: "10101010"}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindBytes, dv.Kind(), "kind")
 	bytes, ok := DefValAs[[]byte](*dv)
@@ -342,7 +342,7 @@ func TestConvertDefValEnum(t *testing.T) {
 		},
 	}
 
-	dv := convertDefVal(ctx, &module.DefValEnum{Name: "enabled"}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValEnum{Name: "enabled"}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindEnum, dv.Kind(), "kind")
 	v, ok := DefValAs[string](*dv)
@@ -365,7 +365,7 @@ func TestConvertDefValEnumOnOIDType(t *testing.T) {
 	ctx.registerModuleNodeSymbol(mod, "myTarget", grandchild)
 
 	syntax := &module.TypeSyntaxObjectIdentifier{}
-	dv := convertDefVal(ctx, &module.DefValEnum{Name: "myTarget"}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValEnum{Name: "myTarget"}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindOID, dv.Kind(), "kind")
 	oid, ok := DefValAs[OID](*dv)
@@ -381,7 +381,7 @@ func TestConvertDefValEnumOnOIDTypeFallback(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	syntax := &module.TypeSyntaxObjectIdentifier{}
 
-	dv := convertDefVal(ctx, &module.DefValEnum{Name: "unknownOid"}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValEnum{Name: "unknownOid"}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindEnum, dv.Kind(), "kind")
 }
@@ -391,7 +391,7 @@ func TestConvertDefValBits(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	syntax := &module.TypeSyntaxBits{}
 
-	dv := convertDefVal(ctx, &module.DefValBits{Labels: []string{"flag1", "flag2"}}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValBits{Labels: []string{"flag1", "flag2"}}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindBits, dv.Kind(), "kind")
 	labels, ok := DefValAs[[]string](*dv)
@@ -407,7 +407,7 @@ func TestConvertDefValBitsEmpty(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	syntax := &module.TypeSyntaxBits{}
 
-	dv := convertDefVal(ctx, &module.DefValBits{Labels: []string{}}, mod, syntax)
+	dv := convertDefVal(ctx, &module.DefValBits{Labels: []string{}}, mod, syntax, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, "{ }", dv.Raw(), "raw")
 }
@@ -421,7 +421,7 @@ func TestConvertDefValOidRef(t *testing.T) {
 	child.setName("sysName")
 	ctx.registerModuleNodeSymbol(mod, "sysName", child)
 
-	dv := convertDefVal(ctx, &module.DefValOidRef{Name: "sysName"}, mod, nil)
+	dv := convertDefVal(ctx, &module.DefValOidRef{Name: "sysName"}, mod, nil, types.Span{})
 	testutil.NotNil(t, dv, "convertDefVal returned nil")
 	testutil.Equal(t, DefValKindOID, dv.Kind(), "kind")
 }
@@ -430,7 +430,7 @@ func TestConvertDefValOidRefUnresolved(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}
 
-	dv := convertDefVal(ctx, &module.DefValOidRef{Name: "missing"}, mod, nil)
+	dv := convertDefVal(ctx, &module.DefValOidRef{Name: "missing"}, mod, nil, types.Span{})
 	testutil.Nil(t, dv, "expected nil for unresolved OID ref, got")
 }
 
@@ -438,7 +438,7 @@ func TestConvertDefValUnknown(t *testing.T) {
 	ctx := newResolverContext(nil, nil, PermissiveConfig())
 	mod := &module.Module{Name: "TEST-MIB"}
 
-	dv := convertDefVal(ctx, &module.DefValUnparsed{}, mod, nil)
+	dv := convertDefVal(ctx, &module.DefValUnparsed{}, mod, nil, types.Span{})
 	testutil.Nil(t, dv, "expected nil for unparsed DefVal, got")
 
 	var found bool
@@ -1015,7 +1015,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 				&module.OidComponentNumber{Value: 42},
 				&module.OidComponentNumber{Value: 1},
 			},
-		}, mod, nil)
+		}, mod, nil, types.Span{})
 		testutil.NotNil(t, dv, "expected non-nil")
 		testutil.Equal(t, DefValKindOID, dv.Kind(), "kind")
 		oid, ok := DefValAs[OID](*dv)
@@ -1029,7 +1029,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 			Components: []module.OidComponent{
 				&module.OidComponentName{NameValue: "enterprises"},
 			},
-		}, mod, nil)
+		}, mod, nil, types.Span{})
 		testutil.NotNil(t, dv, "expected non-nil")
 		oid, ok := DefValAs[OID](*dv)
 		testutil.True(t, ok, "expected OID value")
@@ -1043,7 +1043,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 				&module.OidComponentNamedNumber{NameValue: "enterprises", NumberValue: 1},
 				&module.OidComponentNumber{Value: 5},
 			},
-		}, mod, nil)
+		}, mod, nil, types.Span{})
 		testutil.NotNil(t, dv, "expected non-nil")
 		oid, ok := DefValAs[OID](*dv)
 		testutil.True(t, ok, "expected OID value")
@@ -1056,7 +1056,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 			Components: []module.OidComponent{
 				&module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"},
 			},
-		}, mod, nil)
+		}, mod, nil, types.Span{})
 		testutil.NotNil(t, dv, "expected non-nil")
 		testutil.Equal(t, DefValKindOID, dv.Kind(), "kind")
 		oid, ok := DefValAs[OID](*dv)
@@ -1074,7 +1074,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 					NumberValue: 1,
 				},
 			},
-		}, mod, nil)
+		}, mod, nil, types.Span{})
 		testutil.NotNil(t, dv, "expected non-nil")
 		testutil.Equal(t, DefValKindOID, dv.Kind(), "kind")
 		oid, ok := DefValAs[OID](*dv)
@@ -1088,14 +1088,14 @@ func TestConvertDefValOidValue(t *testing.T) {
 			Components: []module.OidComponent{
 				&module.OidComponentName{NameValue: "nonexistent"},
 			},
-		}, mod, nil)
+		}, mod, nil, types.Span{})
 		testutil.Nil(t, dv, "expected nil for unresolved name, got")
 	})
 
 	t.Run("returns nil for empty components", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
 			Components: nil,
-		}, mod, nil)
+		}, mod, nil, types.Span{})
 		testutil.Nil(t, dv, "expected nil for empty components, got")
 	})
 
@@ -1104,7 +1104,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 			Components: []module.OidComponent{
 				&module.OidComponentNumber{Value: 1},
 			},
-		}, mod, nil)
+		}, mod, nil, types.Span{})
 		testutil.Nil(t, dv, "expected nil when first component is numeric, got")
 	})
 }
@@ -1861,8 +1861,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		m2.setName("obj2")
 		ctx.registerModuleNodeSymbol(mod, "obj2", m2)
 
-		count := createResolvedObjectGroups(ctx)
-		testutil.Equal(t, 1, count, "created count")
+		createResolvedGroups(ctx)
 
 		groups := ctx.mib.Groups()
 		testutil.Len(t, groups, 1, "mib groups")
@@ -1912,7 +1911,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		memberObj.setAccess(types.AccessNotAccessible)
 		memberNode.setObject(memberObj)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 
 		var found bool
 		for _, d := range ctx.Diagnostics() {
@@ -1941,8 +1940,8 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		ctx.moduleToResolved[mod] = resolvedMod
 		ctx.resolvedToModule[resolvedMod] = mod
 
-		count := createResolvedObjectGroups(ctx)
-		testutil.Equal(t, 0, count, "should create no groups when node is missing")
+		createResolvedGroups(ctx)
+		testutil.Len(t, ctx.mib.Groups(), 0, "should create no groups when node is missing")
 	})
 
 	t.Run("unresolved member emits diagnostic", func(t *testing.T) {
@@ -1973,7 +1972,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
 		// "missing" is not registered.
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 
 		groups := ctx.mib.Groups()
 		testutil.Len(t, groups, 1, "mib groups")
@@ -2018,7 +2017,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		n1.setKind(types.KindNotification)
 		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 
 		var found bool
 		for _, d := range ctx.Diagnostics() {
@@ -2063,7 +2062,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		n1.setKind(types.KindNotification)
 		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 
 		var foundMixed, foundObjNotif bool
 		for _, d := range ctx.Diagnostics() {
@@ -2111,7 +2110,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		obj.setStatus(types.StatusObsolete)
 		m1.setObject(obj)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 
 		var found bool
 		for _, d := range ctx.Diagnostics() {
@@ -2156,7 +2155,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		obj.setStatus(types.StatusCurrent)
 		m1.setObject(obj)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 
 		for _, d := range ctx.Diagnostics() {
 			if d.Code == types.DiagGroupObjectStatus {
@@ -2198,7 +2197,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		obj.setStatus(types.StatusMandatory)
 		m1.setObject(obj)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 
 		for _, d := range ctx.Diagnostics() {
 			if d.Code == types.DiagGroupObjectStatus {
@@ -2242,8 +2241,7 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 		n2.setName("notif2")
 		ctx.registerModuleNodeSymbol(mod, "notif2", n2)
 
-		count := createResolvedNotificationGroups(ctx)
-		testutil.Equal(t, 1, count, "created count")
+		createResolvedGroups(ctx)
 
 		groups := ctx.mib.Groups()
 		testutil.Len(t, groups, 1, "mib groups")
@@ -2279,7 +2277,7 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
 		// "missing" is not registered.
 
-		createResolvedNotificationGroups(ctx)
+		createResolvedGroups(ctx)
 
 		groups := ctx.mib.Groups()
 		testutil.Len(t, groups, 1, "mib groups")
@@ -2324,7 +2322,7 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 		m1.setKind(types.KindScalar)
 		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
 
-		createResolvedNotificationGroups(ctx)
+		createResolvedGroups(ctx)
 
 		var found bool
 		for _, d := range ctx.Diagnostics() {
@@ -2369,7 +2367,7 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 		m1.setKind(types.KindColumn)
 		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
 
-		createResolvedNotificationGroups(ctx)
+		createResolvedGroups(ctx)
 
 		var foundMixed, foundNotifObj bool
 		for _, d := range ctx.Diagnostics() {
@@ -2417,7 +2415,7 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 		notif.setStatus(types.StatusDeprecated)
 		n1.setNotification(notif)
 
-		createResolvedNotificationGroups(ctx)
+		createResolvedGroups(ctx)
 
 		var found bool
 		for _, d := range ctx.Diagnostics() {

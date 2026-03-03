@@ -283,7 +283,7 @@ func collectOidDefinitions(ctx *resolverContext) collectedOidDefinitions {
 					defs.trapDefs = append(defs.trapDefs, trapTypeRef{mod: mod, notif: d})
 					continue
 				default:
-					ctx.EmitDiagnostic(types.DiagNotificationNoOid,
+					ctx.EmitDiagnostic(types.DiagNotifNoOid,
 						mod, d.Span,
 						fmt.Sprintf("notification %q has no OID or trap info", d.Name))
 					continue

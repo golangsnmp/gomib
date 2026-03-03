@@ -92,12 +92,7 @@ func checkGroupMembership(ctx *resolverContext, objRefs []objectTypeRef) {
 // DiagComplianceObjectStatus when a refined object's status exceeds it.
 // SMIv1 statuses are skipped since they aren't comparable on the same scale.
 func checkComplianceStatus(ctx *resolverContext) {
-	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (complianceRef, bool) {
-		if comp, ok := def.(*module.ModuleCompliance); ok {
-			return complianceRef{mod: mod, comp: comp}, true
-		}
-		return complianceRef{}, false
-	}) {
+	for _, ref := range collectComplianceRefs(ctx) {
 		comp := ref.comp
 		if comp.Status.IsSMIv1() {
 			continue
@@ -178,12 +173,7 @@ func lookupComplianceMember(ctx *resolverContext, compMod *module.Module, module
 // - optional-group-exists: duplicate GROUP clause
 // - refinement-not-listed: refined object not in any listed group
 func checkComplianceStructure(ctx *resolverContext) {
-	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (complianceRef, bool) {
-		if comp, ok := def.(*module.ModuleCompliance); ok {
-			return complianceRef{mod: mod, comp: comp}, true
-		}
-		return complianceRef{}, false
-	}) {
+	for _, ref := range collectComplianceRefs(ctx) {
 		comp := ref.comp
 		for _, cm := range comp.Modules {
 			checkComplianceDuplicates(ctx, ref.mod, comp, &cm)
@@ -270,34 +260,25 @@ func collectGroupMemberNames(ctx *resolverContext, mod *module.Module, moduleNam
 // checkGroupMemberLocality validates that OBJECT-GROUP and NOTIFICATION-GROUP
 // members are defined in the same module as the group (RFC 2580 sections 3.1, 4.1).
 func checkGroupMemberLocality(ctx *resolverContext) {
-	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (objectGroupRef, bool) {
-		if grp, ok := def.(*module.ObjectGroup); ok {
-			return objectGroupRef{mod: mod, grp: grp}, true
-		}
-		return objectGroupRef{}, false
-	}) {
-		localSymbols := ctx.moduleSymbolToNode[ref.mod]
-		for _, memberName := range ref.grp.Objects {
-			if localSymbols == nil || localSymbols[memberName] == nil {
-				ctx.EmitDiagnostic(types.DiagComplianceMemberNotLocal,
-					ref.mod, ref.grp.DefinitionSpan(),
-					fmt.Sprintf("group member %q is not defined in module %q", memberName, ref.mod.Name))
+	for _, mod := range ctx.modules {
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.ObjectGroup:
+				checkMemberLocality(ctx, mod, d.DefinitionSpan(), d.Objects)
+			case *module.NotificationGroup:
+				checkMemberLocality(ctx, mod, d.DefinitionSpan(), d.Notifications)
 			}
 		}
 	}
-	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (notificationGroupRef, bool) {
-		if grp, ok := def.(*module.NotificationGroup); ok {
-			return notificationGroupRef{mod: mod, grp: grp}, true
-		}
-		return notificationGroupRef{}, false
-	}) {
-		localSymbols := ctx.moduleSymbolToNode[ref.mod]
-		for _, memberName := range ref.grp.Notifications {
-			if localSymbols == nil || localSymbols[memberName] == nil {
-				ctx.EmitDiagnostic(types.DiagComplianceMemberNotLocal,
-					ref.mod, ref.grp.DefinitionSpan(),
-					fmt.Sprintf("group member %q is not defined in module %q", memberName, ref.mod.Name))
-			}
+}
+
+func checkMemberLocality(ctx *resolverContext, mod *module.Module, span types.Span, members []string) {
+	localSymbols := ctx.moduleSymbolToNode[mod]
+	for _, memberName := range members {
+		if localSymbols == nil || localSymbols[memberName] == nil {
+			ctx.EmitDiagnostic(types.DiagComplianceMemberNotLocal,
+				mod, span,
+				fmt.Sprintf("group member %q is not defined in module %q", memberName, mod.Name))
 		}
 	}
 }
@@ -306,7 +287,7 @@ func checkGroupMemberLocality(ctx *resolverContext) {
 // elements per RFC 2578 section 7.7.
 func isLegalIndexBasetype(base BaseType) bool {
 	switch base {
-	case BaseInteger32, BaseUnsigned32, BaseCounter32, BaseGauge32, BaseTimeTicks,
+	case BaseInteger32, BaseUnsigned32, BaseGauge32, BaseTimeTicks,
 		BaseIpAddress, BaseOctetString, BaseOpaque, BaseBits, BaseObjectIdentifier:
 		return true
 	default:
@@ -535,7 +516,13 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 				continue
 			}
 			base := t.EffectiveBase()
-			if !isLegalIndexBasetype(base) {
+			if base == BaseCounter32 {
+				// Counter32 is forbidden per RFC 2578 s7.7 but used in real MIBs.
+				// Emit warning but continue - Counter32 is functionally valid for indexing.
+				ctx.EmitDiagnostic(types.DiagIndexCounterIllegal,
+					ref.mod, obj.Span,
+					fmt.Sprintf("INDEX %q of %q has counter base type", item.Object, obj.Name))
+			} else if !isLegalIndexBasetype(base) {
 				ctx.EmitDiagnostic(types.DiagIndexIllegalBasetype,
 					ref.mod, obj.Span,
 					fmt.Sprintf("INDEX %q of %q has illegal base type %s", item.Object, obj.Name, base.String()))
@@ -653,6 +640,15 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			continue
 		}
 		base := t.EffectiveBase()
+
+		// Counter32 and Counter64 must not have DEFVAL (RFC 2578 s7.9).
+		if base == BaseCounter32 || base == BaseCounter64 {
+			ctx.EmitDiagnostic(types.DiagCounterDefvalIllegal,
+				ref.mod, obj.Span,
+				fmt.Sprintf("%q: DEFVAL not allowed for counter type", obj.Name))
+			continue
+		}
+
 		ranges := resolved.EffectiveRanges()
 		enums := resolved.EffectiveEnums()
 		bits := resolved.EffectiveBits()
@@ -660,10 +656,10 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 		switch dv.Kind() {
 		case DefValKindInt:
 			v, _ := DefValAs[int64](dv)
-			checkDefvalInt(ctx, ref.mod, obj, v, base, ranges, enums)
+			checkDefvalNumeric(ctx, ref.mod, obj, v, 0, false, base, ranges, enums)
 		case DefValKindUint:
 			v, _ := DefValAs[uint64](dv)
-			checkDefvalUint(ctx, ref.mod, obj, v, base, ranges, enums)
+			checkDefvalNumeric(ctx, ref.mod, obj, 0, v, true, base, ranges, enums)
 		case DefValKindEnum:
 			label, _ := DefValAs[string](dv)
 			if len(enums) > 0 {
@@ -677,7 +673,7 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			labels, _ := DefValAs[[]string](dv)
 			for _, label := range labels {
 				if _, ok := findNamedValue(bits, label); !ok {
-					ctx.EmitDiagnostic(types.DiagDefvalEnum,
+					ctx.EmitDiagnostic(types.DiagDefvalBits,
 						ref.mod, obj.Span,
 						fmt.Sprintf("%q: DEFVAL BITS label %q not defined in type", obj.Name, label))
 				}
@@ -688,88 +684,86 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 }
 
-func checkDefvalInt(ctx *resolverContext, mod *module.Module, obj *module.ObjectType, v int64, base BaseType, ranges []Range, enums []NamedValue) {
+// checkDefvalNumeric validates a numeric DEFVAL value against basetype limits,
+// RANGE constraints, and enum membership. Works for both signed and unsigned
+// values: signed values have isUnsigned=false and uval=0, unsigned values have
+// isUnsigned=true and ival=0.
+func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.ObjectType, ival int64, uval uint64, isUnsigned bool, base BaseType, ranges []Range, enums []NamedValue) {
 	// Check basetype limits.
 	switch base {
 	case BaseInteger32:
-		if v < math.MinInt32 || v > math.MaxInt32 {
-			ctx.EmitDiagnostic(types.DiagDefvalBasetype,
-				mod, obj.Span,
-				fmt.Sprintf("%q: DEFVAL %d exceeds Integer32 range", obj.Name, v))
+		if isUnsigned {
+			if uval > math.MaxInt32 {
+				ctx.EmitDiagnostic(types.DiagDefvalBasetype,
+					mod, obj.Span,
+					fmt.Sprintf("%q: DEFVAL %d exceeds Integer32 range", obj.Name, uval))
+			}
+		} else {
+			if ival < math.MinInt32 || ival > math.MaxInt32 {
+				ctx.EmitDiagnostic(types.DiagDefvalBasetype,
+					mod, obj.Span,
+					fmt.Sprintf("%q: DEFVAL %d exceeds Integer32 range", obj.Name, ival))
+			}
 		}
 	case BaseUnsigned32, BaseGauge32, BaseCounter32, BaseTimeTicks:
-		if v < 0 || v > math.MaxUint32 {
-			ctx.EmitDiagnostic(types.DiagDefvalBasetype,
-				mod, obj.Span,
-				fmt.Sprintf("%q: DEFVAL %d exceeds unsigned32 range", obj.Name, v))
+		if isUnsigned {
+			if uval > math.MaxUint32 {
+				ctx.EmitDiagnostic(types.DiagDefvalBasetype,
+					mod, obj.Span,
+					fmt.Sprintf("%q: DEFVAL %d exceeds unsigned32 range", obj.Name, uval))
+			}
+		} else {
+			if ival < 0 || ival > math.MaxUint32 {
+				ctx.EmitDiagnostic(types.DiagDefvalBasetype,
+					mod, obj.Span,
+					fmt.Sprintf("%q: DEFVAL %d exceeds unsigned32 range", obj.Name, ival))
+			}
 		}
 	}
 
 	// Check RANGE constraints.
 	if len(ranges) > 0 {
-		if !valueInRanges(v, ranges) {
+		var inRange bool
+		if isUnsigned {
+			inRange = uvalueInRanges(uval, ranges)
+		} else {
+			inRange = valueInRanges(ival, ranges)
+		}
+		if !inRange {
+			v := any(ival)
+			if isUnsigned {
+				v = uval
+			}
 			ctx.EmitDiagnostic(types.DiagDefvalRange,
 				mod, obj.Span,
-				fmt.Sprintf("%q: DEFVAL %d outside RANGE constraint", obj.Name, v))
+				fmt.Sprintf("%q: DEFVAL %v outside RANGE constraint", obj.Name, v))
 		}
 	}
 
-	// Check enum membership for integer DEFVALs.
+	// Check enum membership.
 	if len(enums) > 0 {
 		found := false
 		for _, e := range enums {
-			if e.Value == v {
-				found = true
-				break
+			if isUnsigned {
+				if e.Value >= 0 && uint64(e.Value) == uval {
+					found = true
+					break
+				}
+			} else {
+				if e.Value == ival {
+					found = true
+					break
+				}
 			}
 		}
 		if !found {
-			ctx.EmitDiagnostic(types.DiagDefvalEnum,
-				mod, obj.Span,
-				fmt.Sprintf("%q: DEFVAL %d does not match any enumeration value", obj.Name, v))
-		}
-	}
-}
-
-func checkDefvalUint(ctx *resolverContext, mod *module.Module, obj *module.ObjectType, v uint64, base BaseType, ranges []Range, enums []NamedValue) {
-	// Check basetype limits.
-	switch base {
-	case BaseInteger32:
-		if v > math.MaxInt32 {
-			ctx.EmitDiagnostic(types.DiagDefvalBasetype,
-				mod, obj.Span,
-				fmt.Sprintf("%q: DEFVAL %d exceeds Integer32 range", obj.Name, v))
-		}
-	case BaseUnsigned32, BaseGauge32, BaseCounter32, BaseTimeTicks:
-		if v > math.MaxUint32 {
-			ctx.EmitDiagnostic(types.DiagDefvalBasetype,
-				mod, obj.Span,
-				fmt.Sprintf("%q: DEFVAL %d exceeds unsigned32 range", obj.Name, v))
-		}
-	}
-
-	// Check RANGE constraints.
-	if len(ranges) > 0 {
-		if !uvalueInRanges(v, ranges) {
-			ctx.EmitDiagnostic(types.DiagDefvalRange,
-				mod, obj.Span,
-				fmt.Sprintf("%q: DEFVAL %d outside RANGE constraint", obj.Name, v))
-		}
-	}
-
-	// Check enum membership for unsigned integer DEFVALs.
-	if len(enums) > 0 {
-		found := false
-		for _, e := range enums {
-			if e.Value >= 0 && uint64(e.Value) == v {
-				found = true
-				break
+			v := any(ival)
+			if isUnsigned {
+				v = uval
 			}
-		}
-		if !found {
 			ctx.EmitDiagnostic(types.DiagDefvalEnum,
 				mod, obj.Span,
-				fmt.Sprintf("%q: DEFVAL %d does not match any enumeration value", obj.Name, v))
+				fmt.Sprintf("%q: DEFVAL %v does not match any enumeration value", obj.Name, v))
 		}
 	}
 }
@@ -939,6 +933,14 @@ func checkRangeList(ctx *resolverContext, ranges []Range, base BaseType, isSize 
 		return
 	}
 
+	// TimeTicks may not be sub-typed (RFC 2578 s7.1.8).
+	if !isSize && base == BaseTimeTicks {
+		ctx.EmitDiagnostic(types.DiagTimeticksRangeIllegal,
+			mod, span,
+			fmt.Sprintf("%q: range constraint illegal for TimeTicks type", name))
+		return
+	}
+
 	var boundsMin, boundsMax int64
 	var hasBounds bool
 	if isSize {
@@ -1000,6 +1002,8 @@ func basetypeBounds(base BaseType) (min, max int64, ok bool) {
 	case BaseUnsigned32, BaseGauge32, BaseTimeTicks, BaseCounter32:
 		return 0, math.MaxUint32, true
 	case BaseCounter64:
+		// Bounds are never used (counter range/DEFVAL checks reject earlier),
+		// but Counter64 must return ok=true so isNumericBase reports correctly.
 		return 0, math.MaxInt64, true
 	default:
 		return 0, 0, false
@@ -1219,6 +1223,7 @@ func checkAccessAndStatus(ctx *resolverContext, objRefs []objectTypeRef) {
 		checkCounterAccess(ctx, mod, obj)
 	}
 	checkStatusPerVersion(ctx)
+	checkCapabilitiesStatus(ctx)
 	checkTypeStatusUsage(ctx, objRefs)
 }
 
@@ -1331,8 +1336,18 @@ func checkStatusPerVersion(ctx *resolverContext) {
 			case *module.ObjectIdentity:
 				status, hasStatus = d.Status, true
 			case *module.Notification:
+				// TRAP-TYPE has no STATUS clause; the synthetic default
+				// would produce false positives.
+				if d.IsTrap() {
+					continue
+				}
 				status, hasStatus = d.Status, true
 			case *module.TypeDef:
+				// Only textual conventions have a STATUS clause; plain
+				// type assignments and SEQUENCE defs default to current.
+				if !d.IsTextualConvention {
+					continue
+				}
 				status, hasStatus = d.Status, true
 			case *module.ObjectGroup:
 				status, hasStatus = d.Status, true
@@ -1361,6 +1376,27 @@ func checkStatusPerVersion(ctx *resolverContext) {
 				}
 			case types.LanguageUnknown:
 				// Cannot validate version-specific status rules without known language.
+			}
+		}
+	}
+}
+
+// checkCapabilitiesStatus validates that AGENT-CAPABILITIES STATUS is
+// either current or obsolete (RFC 2580 s6.2).
+func checkCapabilitiesStatus(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			ac, ok := def.(*module.AgentCapabilities)
+			if !ok {
+				continue
+			}
+			if ac.Status != types.StatusCurrent && ac.Status != types.StatusObsolete {
+				ctx.EmitDiagnostic(types.DiagStatusInvalidCapabilities,
+					mod, ac.DefinitionSpan(),
+					fmt.Sprintf("%q: AGENT-CAPABILITIES STATUS must be current or obsolete, got %s", ac.Name, ac.Status.String()))
 			}
 		}
 	}

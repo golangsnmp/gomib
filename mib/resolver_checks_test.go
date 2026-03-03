@@ -428,7 +428,7 @@ func TestCheckIndexElementNoSize(t *testing.T) {
 
 func TestIsLegalIndexBasetype(t *testing.T) {
 	legal := []BaseType{
-		BaseInteger32, BaseUnsigned32, BaseCounter32, BaseGauge32,
+		BaseInteger32, BaseUnsigned32, BaseGauge32,
 		BaseTimeTicks, BaseIpAddress, BaseOctetString, BaseOpaque,
 		BaseBits, BaseObjectIdentifier,
 	}
@@ -436,7 +436,7 @@ func TestIsLegalIndexBasetype(t *testing.T) {
 		testutil.True(t, isLegalIndexBasetype(b), b.String()+" should be legal")
 	}
 
-	illegal := []BaseType{BaseCounter64, BaseSequence, BaseUnknown}
+	illegal := []BaseType{BaseCounter32, BaseCounter64, BaseSequence, BaseUnknown}
 	for _, b := range illegal {
 		testutil.False(t, isLegalIndexBasetype(b), b.String()+" should be illegal")
 	}
@@ -1551,7 +1551,7 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 		compNode.setName("testCompliance")
 		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 		createResolvedCompliances(ctx)
 		checkComplianceStatus(ctx)
 
@@ -1609,7 +1609,7 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 		compNode.setName("testCompliance")
 		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 		createResolvedCompliances(ctx)
 		checkComplianceStatus(ctx)
 
@@ -1664,7 +1664,7 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 		compNode.setName("testCompliance")
 		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 		createResolvedCompliances(ctx)
 		checkComplianceStatus(ctx)
 
@@ -1722,7 +1722,7 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 		compNode.setName("testCompliance")
 		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 		createResolvedCompliances(ctx)
 		checkComplianceStatus(ctx)
 
@@ -2102,7 +2102,7 @@ func TestCheckComplianceStructure(t *testing.T) {
 		compNode.setName("testCompliance")
 		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 		createResolvedCompliances(ctx)
 		checkComplianceStructure(ctx)
 
@@ -2163,7 +2163,7 @@ func TestCheckComplianceStructure(t *testing.T) {
 		compNode.setName("testCompliance")
 		ctx.registerModuleNodeSymbol(mod, "testCompliance", compNode)
 
-		createResolvedObjectGroups(ctx)
+		createResolvedGroups(ctx)
 		createResolvedCompliances(ctx)
 		checkComplianceStructure(ctx)
 
