@@ -556,74 +556,48 @@ func TestRegisterModuleTypeSymbol(t *testing.T) {
 
 func TestEmitDiagnostic(t *testing.T) {
 	tests := []struct {
-		name     string
-		config   DiagnosticConfig
-		severity Severity
-		want     int
+		name   string
+		config DiagnosticConfig
+		code   string // must be a registered diagnostic code
+		want   int
 	}{
 		{
-			name:     "default reports error",
-			config:   DefaultConfig(),
-			severity: SeverityError,
-			want:     1,
+			name:   "default reports error",
+			config: DefaultConfig(),
+			code:   types.DiagParseError, // SeverityError
+			want:   1,
 		},
 		{
-			name:     "default reports minor",
-			config:   DefaultConfig(),
-			severity: SeverityMinor,
-			want:     1,
+			name:   "default reports minor",
+			config: DefaultConfig(),
+			code:   types.DiagGroupNotAccessible, // SeverityMinor
+			want:   1,
 		},
 		{
-			name:     "default suppresses style",
-			config:   DefaultConfig(),
-			severity: SeverityStyle,
-			want:     0,
+			name:   "default suppresses style",
+			config: DefaultConfig(),
+			code:   types.DiagIdentifierUnderscore, // SeverityStyle
+			want:   0,
 		},
 		{
-			name:     "default suppresses warning",
-			config:   DefaultConfig(),
-			severity: SeverityWarning,
-			want:     0,
+			name:   "default suppresses warning",
+			config: DefaultConfig(),
+			code:   types.DiagIdentifierHyphenSMI, // SeverityWarning
+			want:   0,
 		},
 		{
-			name:     "default suppresses info",
-			config:   DefaultConfig(),
-			severity: SeverityInfo,
-			want:     0,
-		},
-		{
-			name:     "strict reports info",
-			config:   StrictConfig(),
-			severity: SeverityInfo,
-			want:     1,
-		},
-		{
-			name:     "permissive reports warning",
-			config:   PermissiveConfig(),
-			severity: SeverityWarning,
-			want:     1,
-		},
-		{
-			name:     "permissive suppresses info",
-			config:   PermissiveConfig(),
-			severity: SeverityInfo,
-			want:     0,
+			name:   "permissive reports warning",
+			config: PermissiveConfig(),
+			code:   types.DiagIdentifierHyphenSMI, // SeverityWarning
+			want:   1,
 		},
 		{
 			name: "silent suppresses non-fatal",
 			config: DiagnosticConfig{
 				Level: StrictnessSilent,
 			},
-			severity: SeverityInfo,
-			want:     0,
-		},
-		{
-			name: "silent still reports fatal",
-			config: DiagnosticConfig{
-				Level: StrictnessSilent,
-			},
-			severity: SeverityFatal,
-			want:     1,
+			code: types.DiagParseError, // SeverityError
+			want: 0,
 		},
 	}
 
@@ -631,25 +605,33 @@ func TestEmitDiagnostic(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := newResolverContext(nil, nil, tt.config)
 			mod := &module.Module{Name: "MOD"}
-			ctx.EmitDiagnostic("test-code", tt.severity, mod, types.Span{}, "test message")
+			ctx.EmitDiagnostic(tt.code, mod, types.Span{}, "test message")
 			got := len(ctx.Diagnostics())
 			testutil.Equal(t, tt.want, got, "diagnostics")
 		})
 	}
 }
 
+func TestShouldReport_FatalAlwaysReported(t *testing.T) {
+	// No diagnostic codes map to SeverityFatal, but ShouldReport must still
+	// pass fatal-severity diagnostics even in silent mode.
+	config := DiagnosticConfig{Level: StrictnessSilent}
+	testutil.True(t, config.ShouldReport("any-code", SeverityFatal),
+		"fatal should be reported even in silent mode")
+}
+
 func TestEmitDiagnostic_IgnoredCode(t *testing.T) {
 	config := DiagnosticConfig{
 		Level:  StrictnessStrict,
-		Ignore: []string{"test-*"},
+		Ignore: []string{"import-*"},
 	}
 	ctx := newResolverContext(nil, nil, config)
 	mod := &module.Module{Name: "MOD"}
-	ctx.EmitDiagnostic("test-foo", SeverityError, mod, types.Span{}, "ignored")
+	ctx.EmitDiagnostic(types.DiagImportNotFound, mod, types.Span{}, "ignored")
 	testutil.Len(t, ctx.Diagnostics(), 0, "expected ignored code to produce no diagnostics")
 
 	// Non-matching code should still be reported.
-	ctx.EmitDiagnostic("other-code", SeverityError, mod, types.Span{}, "not ignored")
+	ctx.EmitDiagnostic(types.DiagParseError, mod, types.Span{}, "not ignored")
 	testutil.Len(t, ctx.Diagnostics(), 1, "expected non-ignored code to produce a diagnostic")
 }
 
@@ -670,12 +652,12 @@ func TestEmitDiagnostic_Fields(t *testing.T) {
 		LineTable: types.BuildLineTable(source),
 	}
 	span := types.NewSpan(94, 95) // line 10, column 5
-	ctx.EmitDiagnostic("my-code", SeverityMinor, mod, span, "something happened")
+	ctx.EmitDiagnostic(types.DiagGroupNotAccessible, mod, span, "something happened")
 
 	diags := ctx.Diagnostics()
 	testutil.Len(t, diags, 1, "expected 1 diagnostic, got")
 	d := diags[0]
-	testutil.Equal(t, "my-code", d.Code, "Code")
+	testutil.Equal(t, types.DiagGroupNotAccessible, d.Code, "Code")
 	testutil.Equal(t, SeverityMinor, d.Severity, "Severity")
 	testutil.Equal(t, "TEST-MIB", d.Module, "Module")
 	testutil.Equal(t, 10, d.Line, "Line")

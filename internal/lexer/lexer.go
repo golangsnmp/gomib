@@ -37,15 +37,17 @@ type Lexer struct {
 	pos         int
 	state       lexerState
 	diagnostics []types.SpanDiagnostic
+	diagConfig  types.DiagnosticConfig
 	types.Logger
 }
 
 // New returns a Lexer that tokenizes the given source bytes.
-func New(source []byte, logger *slog.Logger) *Lexer {
+func New(source []byte, logger *slog.Logger, diagConfig types.DiagnosticConfig) *Lexer {
 	l := &Lexer{
-		source: source,
-		state:  stateNormal, // stateNormal == 0, explicit for clarity
-		Logger: types.Logger{L: logger},
+		source:     source,
+		state:      stateNormal, // stateNormal == 0, explicit for clarity
+		diagConfig: diagConfig,
+		Logger:     types.Logger{L: logger},
 	}
 	l.Log(slog.LevelDebug, "lexer initialized", slog.Int("bytes", len(source)))
 	return l
@@ -174,9 +176,13 @@ func (l *Lexer) skipToEOL() {
 }
 
 func (l *Lexer) emitDiagnostic(code string, span types.Span, message string) {
+	sev := types.SeverityForCode(code)
+	if !l.diagConfig.ShouldReport(code, sev) {
+		return
+	}
 	l.diagnostics = append(l.diagnostics, types.SpanDiagnostic{
 		Code:     code,
-		Severity: types.SeverityError,
+		Severity: sev,
 		Span:     span,
 		Message:  message,
 	})

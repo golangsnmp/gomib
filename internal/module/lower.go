@@ -39,13 +39,14 @@ func LineColFromLineTable(lineTable []int, span types.Span) (line, col int) {
 
 // emitDiagnostic records a diagnostic if the current config allows it.
 // The span is converted to line/column using the precomputed line table.
-func (ctx *LoweringContext) emitDiagnostic(code string, severity types.Severity, span types.Span, message string) {
-	if !ctx.DiagConfig.ShouldReport(code, severity) {
+func (ctx *LoweringContext) emitDiagnostic(code string, span types.Span, message string) {
+	sev := types.SeverityForCode(code)
+	if !ctx.DiagConfig.ShouldReport(code, sev) {
 		return
 	}
 	line, col := types.LineColFromTable(ctx.lineTable, span.Start)
 	ctx.Diagnostics = append(ctx.Diagnostics, types.Diagnostic{
-		Severity: severity,
+		Severity: sev,
 		Code:     code,
 		Message:  message,
 		Module:   ctx.moduleName,
@@ -99,7 +100,7 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 			}
 		}
 		if !hasModuleIdentity {
-			ctx.emitDiagnostic(types.DiagMissingModuleIdentity, types.SeverityWarning, module.Span,
+			ctx.emitDiagnostic(types.DiagMissingModuleIdentity, module.Span,
 				fmt.Sprintf("SMIv2 module %s lacks MODULE-IDENTITY", module.Name))
 		}
 	}
@@ -216,7 +217,7 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 		// Non-semantic definitions
 		return nil
 	default:
-		ctx.emitDiagnostic(types.DiagUnknownDefinitionType, types.SeverityWarning, def.DefinitionSpan(),
+		ctx.emitDiagnostic(types.DiagUnknownDefinitionType, def.DefinitionSpan(),
 			fmt.Sprintf("unknown definition type %T", def))
 		return nil
 	}
@@ -274,7 +275,7 @@ func checkRevisionLastUpdated(ctx *LoweringContext, mi *ModuleIdentity) {
 			return
 		}
 	}
-	ctx.emitDiagnostic(types.DiagRevisionLastUpdated, types.SeverityMinor, mi.Span,
+	ctx.emitDiagnostic(types.DiagRevisionLastUpdated, mi.Span,
 		fmt.Sprintf("revision for LAST-UPDATED %s is missing", mi.LastUpdated))
 }
 
@@ -488,17 +489,17 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 		seenValues := make(map[int64]bool, len(s.NamedNumbers))
 		for i, nn := range s.NamedNumbers {
 			if seenNames[nn.Name.Name] {
-				ctx.emitDiagnostic(types.DiagEnumNameRedefinition, types.SeverityError, nn.Span,
+				ctx.emitDiagnostic(types.DiagEnumNameRedefinition, nn.Span,
 					fmt.Sprintf("duplicate enum name %q", nn.Name.Name))
 			}
 			seenNames[nn.Name.Name] = true
 			if seenValues[nn.Value] {
-				ctx.emitDiagnostic(types.DiagEnumValueRedefinition, types.SeverityError, nn.Span,
+				ctx.emitDiagnostic(types.DiagEnumValueRedefinition, nn.Span,
 					fmt.Sprintf("duplicate enum value %d", nn.Value))
 			}
 			seenValues[nn.Value] = true
 			if nn.Value == 0 && ctx.Language == types.LanguageSMIv1 {
-				ctx.emitDiagnostic(types.DiagEnumZero, types.SeverityError, nn.Span,
+				ctx.emitDiagnostic(types.DiagEnumZero, nn.Span,
 					fmt.Sprintf("enumeration contains zero value %q(0) in SMIv1 module", nn.Name.Name))
 			}
 			namedNumbers[i] = NewNamedNumber(nn.Name.Name, nn.Value)
@@ -515,27 +516,27 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 		seenPositions := make(map[int64]bool, len(s.NamedBits))
 		for i, nb := range s.NamedBits {
 			if seenNames[nb.Name.Name] {
-				ctx.emitDiagnostic(types.DiagBitsNameRedefinition, types.SeverityError, nb.Span,
+				ctx.emitDiagnostic(types.DiagBitsNameRedefinition, nb.Span,
 					fmt.Sprintf("duplicate BITS name %q", nb.Name.Name))
 			}
 			seenNames[nb.Name.Name] = true
 			if seenPositions[nb.Value] {
-				ctx.emitDiagnostic(types.DiagBitsValueRedefinition, types.SeverityError, nb.Span,
+				ctx.emitDiagnostic(types.DiagBitsValueRedefinition, nb.Span,
 					fmt.Sprintf("duplicate BITS position %d", nb.Value))
 			}
 			seenPositions[nb.Value] = true
 			pos := nb.Value
 			switch {
 			case pos < 0:
-				ctx.emitDiagnostic(types.DiagBitsNumberNegative, types.SeverityError, nb.Span,
+				ctx.emitDiagnostic(types.DiagBitsNumberNegative, nb.Span,
 					fmt.Sprintf("negative BITS position %d for %q", pos, nb.Name.Name))
 				pos = 0
 			case pos >= 65535*8:
-				ctx.emitDiagnostic(types.DiagBitsNumberTooLarge, types.SeverityError, nb.Span,
+				ctx.emitDiagnostic(types.DiagBitsNumberTooLarge, nb.Span,
 					fmt.Sprintf("BITS position %d for %q exceeds maximum (%d)", pos, nb.Name.Name, 65535*8-1))
 				pos = 0
 			case pos >= 128:
-				ctx.emitDiagnostic(types.DiagBitsNumberLarge, types.SeverityStyle, nb.Span,
+				ctx.emitDiagnostic(types.DiagBitsNumberLarge, nb.Span,
 					fmt.Sprintf("BITS position %d for %q may cause interoperability problems", pos, nb.Name.Name))
 			}
 			namedBits[i] = NewNamedBit(nb.Name.Name, uint32(pos))
@@ -573,7 +574,7 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 		return &TypeSyntaxObjectIdentifier{}
 
 	default:
-		ctx.emitDiagnostic(types.DiagUnknownTypeSyntax, types.SeverityWarning, syntax.SyntaxSpan(),
+		ctx.emitDiagnostic(types.DiagUnknownTypeSyntax, syntax.SyntaxSpan(),
 			fmt.Sprintf("unknown type syntax %T, defaulting to OCTET STRING", syntax))
 		return &TypeSyntaxOctetString{}
 	}
@@ -588,7 +589,7 @@ func lowerConstraint(constraint ast.Constraint, ctx *LoweringContext) Constraint
 		return &ConstraintRange{Ranges: lowerRanges(c.Ranges, ctx)}
 
 	default:
-		ctx.emitDiagnostic(types.DiagUnknownConstraintType, types.SeverityWarning, constraint.ConstraintSpan(),
+		ctx.emitDiagnostic(types.DiagUnknownConstraintType, constraint.ConstraintSpan(),
 			fmt.Sprintf("unknown constraint type %T, defaulting to empty range", constraint))
 		return &ConstraintRange{}
 	}
@@ -628,13 +629,13 @@ func lowerRangeValue(value ast.RangeValue, ctx *LoweringContext) RangeValue {
 		case "MAX":
 			return &RangeValueMax{}
 		default:
-			ctx.emitDiagnostic(types.DiagUnknownRangeValue, types.SeverityWarning, v.Name.Span,
+			ctx.emitDiagnostic(types.DiagUnknownRangeValue, v.Name.Span,
 				fmt.Sprintf("unknown range identifier %s, defaulting to 0", v.Name.Name))
 			return &RangeValueUnsigned{Value: 0}
 		}
 
 	default:
-		ctx.emitDiagnostic(types.DiagUnknownRangeValue, types.SeverityWarning, types.Span{},
+		ctx.emitDiagnostic(types.DiagUnknownRangeValue, types.Span{},
 			fmt.Sprintf("unknown range value type %T, defaulting to 0", value))
 		return &RangeValueUnsigned{Value: 0}
 	}
@@ -676,7 +677,7 @@ func lowerOidComponent(comp ast.OidComponent, ctx *LoweringContext) OidComponent
 		}
 
 	default:
-		ctx.emitDiagnostic(types.DiagUnknownOidComponent, types.SeverityWarning, comp.ComponentSpan(),
+		ctx.emitDiagnostic(types.DiagUnknownOidComponent, comp.ComponentSpan(),
 			fmt.Sprintf("unknown OID component type %T, defaulting to sub-id 0", comp))
 		return &OidComponentNumber{Value: 0}
 	}
@@ -730,7 +731,7 @@ func lowerDefValValue(content ast.DefVal, ctx *LoweringContext) DefVal {
 		return &DefValOidValue{Components: components}
 
 	default:
-		ctx.emitDiagnostic(types.DiagUnknownDefvalType, types.SeverityWarning, types.Span{},
+		ctx.emitDiagnostic(types.DiagUnknownDefvalType, types.Span{},
 			fmt.Sprintf("unknown DEFVAL content type %T, defaulting to integer 0", content))
 		return &DefValInteger{Value: 0}
 	}

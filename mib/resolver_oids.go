@@ -199,9 +199,9 @@ func checkSmiv2IdentifierHyphens(ctx *resolverContext, defs []oidDefinition) {
 		}
 		name := def.defName()
 		if strings.Contains(name, "-") {
-			ctx.EmitDiagnostic(types.DiagIdentifierHyphenSMI, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagIdentifierHyphenSMI,
 				def.mod, def.def.DefinitionSpan(),
-				"identifier "+name+" should not contain hyphens in SMIv2 MIB")
+				fmt.Sprintf("identifier %q should not contain hyphens in SMIv2 MIB", name))
 		}
 	}
 }
@@ -283,9 +283,9 @@ func collectOidDefinitions(ctx *resolverContext) collectedOidDefinitions {
 					defs.trapDefs = append(defs.trapDefs, trapTypeRef{mod: mod, notif: d})
 					continue
 				default:
-					ctx.EmitDiagnostic(types.DiagNotificationNoOid, SeverityMinor,
+					ctx.EmitDiagnostic(types.DiagNotificationNoOid,
 						mod, d.Span,
-						"notification "+d.Name+" has no OID or trap info")
+						fmt.Sprintf("notification %q has no OID or trap info", d.Name))
 					continue
 				}
 			case *module.ValueAssignment:
@@ -425,13 +425,13 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 	// RFC1213-MIB and SNMPv2-MIB both defining sysDescr) is expected.
 	if existing := node.Name(); existing != "" && existing != label {
 		if isRegisteredKind(node.Kind()) {
-			ctx.EmitDiagnostic(types.DiagOidRegistered, SeveritySevere,
+			ctx.EmitDiagnostic(types.DiagOidRegistered,
 				def.mod, def.def.DefinitionSpan(),
-				label+": registers OID already registered by "+existing)
+				fmt.Sprintf("%q: registers OID already registered by %q", label, existing))
 		} else {
-			ctx.EmitDiagnostic(types.DiagOidReuse, SeverityWarning,
+			ctx.EmitDiagnostic(types.DiagOidReuse,
 				def.mod, def.def.DefinitionSpan(),
-				label+": reuses OID assigned to "+existing)
+				fmt.Sprintf("%q: reuses OID assigned to %q", label, existing))
 		}
 	}
 
@@ -458,9 +458,9 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 		oid := node.OID()
 		if len(oid) > 0 && oid[len(oid)-1] == 0 {
 			if len(oid) != 2 || oid[0] != 0 { // exempt zeroDotZero
-				ctx.EmitDiagnostic(types.DiagLastSubidZero, SeveritySevere,
+				ctx.EmitDiagnostic(types.DiagLastSubidZero,
 					def.mod, def.def.DefinitionSpan(),
-					label+": last sub-identifier must not be zero")
+					fmt.Sprintf("%q: last sub-identifier must not be zero", label))
 			}
 		}
 	}

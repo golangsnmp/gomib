@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func FuzzTokenize(f *testing.F) {
@@ -28,7 +29,7 @@ func FuzzTokenize(f *testing.F) {
 			return
 		}
 
-		l := New(data, nil)
+		l := New(data, nil, types.DiagnosticConfig{})
 		tokens, diags := l.Tokenize()
 
 		if len(tokens) == 0 {
