@@ -25,17 +25,18 @@ func (d *DefBase) DefinitionSpan() types.Span { return d.Span }
 // ObjectType is an OBJECT-TYPE definition.
 type ObjectType struct {
 	DefBase
-	Syntax        TypeSyntax
-	Units         string
-	Access        types.Access
-	AccessKeyword types.AccessKeyword
-	Status        types.Status
-	Description   string
-	Reference     string
-	Index         []IndexItem
-	Augments      string
-	DefVal        DefVal
-	Oid           OidAssignment
+	Syntax         TypeSyntax
+	Units          string
+	Access         types.Access
+	AccessKeyword  types.AccessKeyword
+	Status         types.Status
+	Description    string
+	HasDescription bool // true when DESCRIPTION clause was present in source
+	Reference      string
+	Index          []IndexItem
+	Augments       string
+	DefVal         DefVal
+	Oid            OidAssignment
 }
 
 func (d *ObjectType) DefinitionOid() *OidAssignment { return &d.Oid }
@@ -79,10 +80,11 @@ func (d *ObjectIdentity) DefinitionOid() *OidAssignment { return &d.Oid }
 // Notification represents both SMIv1 TRAP-TYPE and SMIv2 NOTIFICATION-TYPE.
 type Notification struct {
 	DefBase
-	Objects     []string
-	Status      types.Status
-	Description string
-	Reference   string
+	Objects        []string
+	Status         types.Status
+	Description    string
+	HasDescription bool // true when DESCRIPTION clause was present in source
+	Reference      string
 	// TrapInfo holds SMIv1 TRAP-TYPE fields. Nil for NOTIFICATION-TYPE.
 	TrapInfo *TrapInfo
 	// Oid is nil for TRAP-TYPE; its OID is derived from enterprise + trap number.
