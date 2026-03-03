@@ -30,6 +30,7 @@ func resolveSemantics(ctx *resolverContext) {
 	checkIndexConstraints(ctx, objRefs)
 	checkDefvalConstraints(ctx, objRefs)
 	checkSequenceFields(ctx, objRefs)
+	checkAccessAndStatus(ctx, objRefs)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
@@ -1937,6 +1938,196 @@ func sequenceTypesCompatible(fieldType, colType string, colBase BaseType) bool {
 		return true
 	}
 	return false
+}
+
+// checkAccessAndStatus validates access values, access keywords, and status
+// values per SMI version, and checks kind-specific access constraints.
+func checkAccessAndStatus(ctx *resolverContext, objRefs []objectTypeRef) {
+	for _, ref := range objRefs {
+		obj := ref.obj
+		mod := ref.mod
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+
+		node, ok := ctx.LookupNodeForModule(mod, obj.Name)
+		if !ok {
+			continue
+		}
+
+		checkAccessPerVersion(ctx, mod, obj)
+		checkAccessKeywordPerVersion(ctx, mod, obj)
+		checkKindAccess(ctx, mod, obj, node)
+		checkCounterAccess(ctx, mod, obj)
+	}
+	checkStatusPerVersion(ctx)
+	checkTypeStatusUsage(ctx, objRefs)
+}
+
+// checkAccessPerVersion validates that the access value is legal for the
+// module's SMI version.
+func checkAccessPerVersion(ctx *resolverContext, mod *module.Module, obj *module.ObjectType) {
+	switch mod.Language {
+	case types.LanguageSMIv1:
+		if obj.Access == types.AccessAccessibleForNotify || obj.Access == types.AccessReadCreate {
+			ctx.EmitDiagnostic(types.DiagAccessInvalidSMIv1, SeverityError,
+				mod, obj.Span,
+				obj.Name+": invalid access "+obj.Access.String()+" in SMIv1")
+		}
+	case types.LanguageSMIv2:
+		if obj.Access == types.AccessWriteOnly {
+			ctx.EmitDiagnostic(types.DiagAccessWriteOnlySMIv2, SeverityError,
+				mod, obj.Span,
+				obj.Name+": write-only is no longer allowed in SMIv2")
+		}
+	}
+}
+
+// checkAccessKeywordPerVersion validates that ACCESS is used in SMIv1 and
+// MAX-ACCESS in SMIv2.
+func checkAccessKeywordPerVersion(ctx *resolverContext, mod *module.Module, obj *module.ObjectType) {
+	// MIN-ACCESS is always SMIv2 (MODULE-COMPLIANCE) and not applicable here.
+	if obj.AccessKeyword == types.AccessKeywordMinAccess {
+		return
+	}
+	switch mod.Language {
+	case types.LanguageSMIv1:
+		if obj.AccessKeyword == types.AccessKeywordMaxAccess {
+			ctx.EmitDiagnostic(types.DiagMaxAccessInSMIv1, SeverityError,
+				mod, obj.Span,
+				obj.Name+": MAX-ACCESS is SMIv2 style, use ACCESS in SMIv1")
+		}
+	case types.LanguageSMIv2:
+		if obj.AccessKeyword == types.AccessKeywordAccess {
+			ctx.EmitDiagnostic(types.DiagAccessInSMIv2, SeverityError,
+				mod, obj.Span,
+				obj.Name+": ACCESS is SMIv1 style, use MAX-ACCESS in SMIv2")
+		}
+	}
+}
+
+// checkKindAccess validates access values for specific node kinds:
+// tables and rows must be not-accessible, scalars must not be read-create.
+func checkKindAccess(ctx *resolverContext, mod *module.Module, obj *module.ObjectType, node *Node) {
+	switch node.Kind() {
+	case KindTable:
+		if obj.Access != types.AccessNotAccessible {
+			ctx.EmitDiagnostic(types.DiagAccessTableIllegal, SeverityMinor,
+				mod, obj.Span,
+				obj.Name+": table must be not-accessible")
+		}
+	case KindRow:
+		if obj.Access != types.AccessNotAccessible {
+			ctx.EmitDiagnostic(types.DiagAccessRowIllegal, SeverityMinor,
+				mod, obj.Span,
+				obj.Name+": row must be not-accessible")
+		}
+	case KindScalar:
+		if obj.Access == types.AccessReadCreate {
+			ctx.EmitDiagnostic(types.DiagScalarNotCreatable, SeverityMinor,
+				mod, obj.Span,
+				obj.Name+": scalar must not be read-create")
+		}
+	}
+}
+
+// checkCounterAccess validates that Counter32/Counter64 objects have read-only
+// or accessible-for-notify access.
+func checkCounterAccess(ctx *resolverContext, mod *module.Module, obj *module.ObjectType) {
+	if obj.Access == types.AccessReadOnly || obj.Access == types.AccessAccessibleForNotify {
+		return
+	}
+	resolved := ctx.lookupObjectInModuleScope(mod, obj.Name)
+	if resolved == nil {
+		return
+	}
+	t := resolved.Type()
+	if t == nil {
+		return
+	}
+	base := t.EffectiveBase()
+	if base == BaseCounter32 || base == BaseCounter64 {
+		ctx.EmitDiagnostic(types.DiagAccessCounterIllegal, SeverityStyle,
+			mod, obj.Span,
+			obj.Name+": counter must be read-only or accessible-for-notify")
+	}
+}
+
+// checkStatusPerVersion validates that status values are legal for the
+// module's SMI version across all definition types.
+func checkStatusPerVersion(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			var status types.Status
+			var hasStatus bool
+			switch d := def.(type) {
+			case *module.ObjectType:
+				status, hasStatus = d.Status, true
+			case *module.ObjectIdentity:
+				status, hasStatus = d.Status, true
+			case *module.Notification:
+				status, hasStatus = d.Status, true
+			case *module.TypeDef:
+				status, hasStatus = d.Status, true
+			case *module.ObjectGroup:
+				status, hasStatus = d.Status, true
+			case *module.NotificationGroup:
+				status, hasStatus = d.Status, true
+			case *module.ModuleCompliance:
+				status, hasStatus = d.Status, true
+			case *module.AgentCapabilities:
+				status, hasStatus = d.Status, true
+			}
+			if !hasStatus {
+				continue
+			}
+			switch mod.Language {
+			case types.LanguageSMIv1:
+				if status == types.StatusCurrent {
+					ctx.EmitDiagnostic(types.DiagStatusInvalidSMIv1, SeverityError,
+						mod, def.DefinitionSpan(),
+						def.DefinitionName()+": invalid status current in SMIv1")
+				}
+			case types.LanguageSMIv2:
+				if status == types.StatusMandatory || status == types.StatusOptional {
+					ctx.EmitDiagnostic(types.DiagStatusInvalidSMIv2, SeverityError,
+						mod, def.DefinitionSpan(),
+						def.DefinitionName()+": invalid status "+status.String()+" in SMIv2")
+				}
+			}
+		}
+	}
+}
+
+// checkTypeStatusUsage warns when an OBJECT-TYPE references a type whose
+// status is deprecated or obsolete.
+func checkTypeStatusUsage(ctx *resolverContext, objRefs []objectTypeRef) {
+	for _, ref := range objRefs {
+		if module.IsBaseModule(ref.mod.Name) {
+			continue
+		}
+		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		if resolved == nil {
+			continue
+		}
+		t := resolved.Type()
+		if t == nil {
+			continue
+		}
+		switch t.Status() {
+		case StatusDeprecated:
+			ctx.EmitDiagnostic(types.DiagTypeStatusDeprecated, SeverityWarning,
+				ref.mod, ref.obj.Span,
+				"type "+t.Name()+" used by "+ref.obj.Name+" is deprecated")
+		case StatusObsolete:
+			ctx.EmitDiagnostic(types.DiagTypeStatusObsolete, SeverityWarning,
+				ref.mod, ref.obj.Span,
+				"type "+t.Name()+" used by "+ref.obj.Name+" is obsolete")
+		}
+	}
 }
 
 // normalizeTypeName maps SMIv1 type names to their SMIv2 equivalents.
