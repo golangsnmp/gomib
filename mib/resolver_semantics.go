@@ -28,6 +28,7 @@ func resolveSemantics(ctx *resolverContext) {
 	checkRangeConstraints(ctx)
 	checkIndexConstraints(ctx, objRefs)
 	checkDefvalConstraints(ctx, objRefs)
+	checkSequenceFields(ctx, objRefs)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
@@ -1589,4 +1590,207 @@ func basetypeBounds(base BaseType) (min, max int64, ok bool) {
 func isNumericBase(base BaseType) bool {
 	_, _, ok := basetypeBounds(base)
 	return ok
+}
+
+// checkSequenceFields validates that SEQUENCE definitions match their row's
+// actual columnar children: fields exist as columns, columns appear in the
+// SEQUENCE, field order matches column OID order, and field types match.
+func checkSequenceFields(ctx *resolverContext, objRefs []objectTypeRef) {
+	for _, ref := range objRefs {
+		obj := ref.obj
+		if len(obj.Index) == 0 && obj.Augments == "" {
+			continue
+		}
+
+		// Get the SEQUENCE type name from the row's SYNTAX clause.
+		syntaxRef, ok := obj.Syntax.(*module.TypeSyntaxTypeRef)
+		if !ok {
+			continue
+		}
+
+		td := findSequenceTypeDef(ctx, ref.mod, syntaxRef.Name)
+		if td == nil {
+			continue
+		}
+		seqSyntax, ok := td.Syntax.(*module.TypeSyntaxSequence)
+		if !ok {
+			continue
+		}
+
+		// Get the row node and its column children in OID order.
+		rowNode, ok := ctx.LookupNodeForModule(ref.mod, obj.Name)
+		if !ok {
+			continue
+		}
+		columns := rowNode.sortedChildren()
+
+		// Build lookup maps.
+		columnByName := make(map[string]*Node, len(columns))
+		for _, col := range columns {
+			columnByName[col.Name()] = col
+		}
+		fieldNames := make(map[string]struct{}, len(seqSyntax.Fields))
+		for _, f := range seqSyntax.Fields {
+			fieldNames[f.Name] = struct{}{}
+		}
+
+		// Check 1: sequence-no-column - SEQUENCE field has no matching column.
+		for _, field := range seqSyntax.Fields {
+			if _, found := columnByName[field.Name]; !found {
+				ctx.EmitDiagnostic(types.DiagSequenceNoColumn, SeverityMinor,
+					ref.mod, obj.Span,
+					"SEQUENCE "+syntaxRef.Name+" field "+field.Name+" is not a column of row "+obj.Name)
+			}
+		}
+
+		// Check 2: sequence-missing-column - column not in SEQUENCE.
+		for _, col := range columns {
+			if _, found := fieldNames[col.Name()]; !found {
+				ctx.EmitDiagnostic(types.DiagSequenceMissingColumn, SeverityMinor,
+					ref.mod, obj.Span,
+					"column "+col.Name()+" of row "+obj.Name+" is not in SEQUENCE "+syntaxRef.Name)
+			}
+		}
+
+		// Check 3: sequence-order - field order doesn't match column OID order.
+		// Filter SEQUENCE fields to only those that are actual columns,
+		// then compare against columns that are in the SEQUENCE.
+		var seqOrder []string
+		for _, field := range seqSyntax.Fields {
+			if _, found := columnByName[field.Name]; found {
+				seqOrder = append(seqOrder, field.Name)
+			}
+		}
+		var colOrder []string
+		for _, col := range columns {
+			if _, found := fieldNames[col.Name()]; found {
+				colOrder = append(colOrder, col.Name())
+			}
+		}
+		if len(seqOrder) > 0 && len(colOrder) > 0 {
+			mismatch := false
+			for i := range seqOrder {
+				if i >= len(colOrder) || seqOrder[i] != colOrder[i] {
+					mismatch = true
+					break
+				}
+			}
+			if mismatch {
+				ctx.EmitDiagnostic(types.DiagSequenceOrder, SeverityWarning,
+					ref.mod, obj.Span,
+					"SEQUENCE "+syntaxRef.Name+" field order does not match column OID order in row "+obj.Name)
+			}
+		}
+
+		// Check 4: sequence-type-mismatch - field type doesn't match column type.
+		for _, field := range seqSyntax.Fields {
+			col, found := columnByName[field.Name]
+			if !found {
+				continue
+			}
+			colObj := col.Object()
+			if colObj == nil || colObj.Type() == nil {
+				continue
+			}
+			fieldTypeName := sequenceFieldTypeName(field.Syntax)
+			if fieldTypeName == "" {
+				continue
+			}
+			colTypeName := colObj.Type().Name()
+			if sequenceTypesCompatible(fieldTypeName, colTypeName, colObj.Type().EffectiveBase()) {
+				continue
+			}
+			ctx.EmitDiagnostic(types.DiagSequenceTypeMismatch, SeverityError,
+				ref.mod, obj.Span,
+				"SEQUENCE "+syntaxRef.Name+" field "+field.Name+" type "+fieldTypeName+
+					" does not match column type "+colTypeName)
+		}
+	}
+}
+
+// findSequenceTypeDef looks up the SEQUENCE TypeDef by name in the module or
+// its imports. Returns nil if not found.
+func findSequenceTypeDef(ctx *resolverContext, mod *module.Module, name string) *module.TypeDef {
+	if td := getSequenceTypeDef(mod, name); td != nil {
+		return td
+	}
+	if imports := ctx.moduleImports[mod]; imports != nil {
+		if srcMod := imports[name]; srcMod != nil {
+			return getSequenceTypeDef(srcMod, name)
+		}
+	}
+	return nil
+}
+
+func getSequenceTypeDef(mod *module.Module, name string) *module.TypeDef {
+	for _, def := range mod.Definitions {
+		if td, ok := def.(*module.TypeDef); ok && td.Name == name {
+			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
+				return td
+			}
+		}
+	}
+	return nil
+}
+
+// sequenceFieldTypeName extracts the type name from a SEQUENCE field's syntax.
+func sequenceFieldTypeName(syntax module.TypeSyntax) string {
+	switch s := syntax.(type) {
+	case *module.TypeSyntaxTypeRef:
+		return s.Name
+	case *module.TypeSyntaxIntegerEnum:
+		return "INTEGER"
+	case *module.TypeSyntaxBits:
+		return "BITS"
+	case *module.TypeSyntaxOctetString:
+		return "OCTET STRING"
+	case *module.TypeSyntaxObjectIdentifier:
+		return "OBJECT IDENTIFIER"
+	case *module.TypeSyntaxConstrained:
+		return sequenceFieldTypeName(s.Base)
+	default:
+		return ""
+	}
+}
+
+// sequenceTypesCompatible checks whether a SEQUENCE field type name is
+// compatible with the column's resolved type. Handles cases where the
+// SEQUENCE uses a primitive name but the column uses a named type with
+// compatible base, including SMIv1/SMIv2 aliases.
+func sequenceTypesCompatible(fieldType, colType string, colBase BaseType) bool {
+	if fieldType == colType {
+		return true
+	}
+	// Normalize SMIv1 type names to their SMIv2 equivalents for comparison.
+	fieldNorm := normalizeTypeName(fieldType)
+	colNorm := normalizeTypeName(colType)
+	if fieldNorm == colNorm {
+		return true
+	}
+	// INTEGER/Integer32 in SEQUENCE is compatible with Integer32-based columns (covers enums).
+	if (fieldNorm == "Integer32") && colBase == BaseInteger32 {
+		return true
+	}
+	// OCTET STRING/BITS in SEQUENCE is compatible with BITS-based columns
+	// (BITS is encoded as OCTET STRING at wire level).
+	if (fieldType == "OCTET STRING" || fieldType == "BITS") && colBase == BaseBits {
+		return true
+	}
+	return false
+}
+
+// normalizeTypeName maps SMIv1 type names to their SMIv2 equivalents.
+func normalizeTypeName(name string) string {
+	switch name {
+	case "Counter":
+		return "Counter32"
+	case "Gauge":
+		return "Gauge32"
+	case "INTEGER":
+		return "Integer32"
+	case "NetworkAddress":
+		return "IpAddress"
+	default:
+		return name
+	}
 }
