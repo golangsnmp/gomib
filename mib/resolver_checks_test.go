@@ -3090,3 +3090,236 @@ func TestCheckHyphenInLabel_NoHyphen_NoDiag(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateDisplayHintInteger(t *testing.T) {
+	valid := []string{"d", "x", "o", "b", "d-1", "d-2", "d-10"}
+	for _, h := range valid {
+		if !validateDisplayHintInteger(h) {
+			t.Errorf("expected valid integer hint %q", h)
+		}
+	}
+
+	invalid := []string{"", "a", "t", "dd", "d-", "d-x", "x1", "d--2", "D", "X"}
+	for _, h := range invalid {
+		if validateDisplayHintInteger(h) {
+			t.Errorf("expected invalid integer hint %q", h)
+		}
+	}
+}
+
+func TestValidateDisplayHintOctetString(t *testing.T) {
+	valid := []string{
+		"255a",                         // DisplayString
+		"1x:",                          // PhysAddress - hex with colon separator
+		"2d-1d-1d,1d:1d:1d.1d,1a1d:1d", // DateAndTime
+		"1d.1d.1d.1d",                  // IpAddress
+		"2x:2x:2x:2x:2x:2x:2x:2x",      // IPv6 address
+		"1x",                           // single hex octet
+		"4d",                           // 4-octet decimal
+		"*1x:",                         // repeat indicator
+		"*1x:.",                        // repeat with separator and terminator
+		"0a[1a",                        // zero-width prefix, last spec consumes
+		"0a[2x]0a:2d",                  // TransportAddress style, last spec consumes
+	}
+	for _, h := range valid {
+		if !validateDisplayHintOctetString(h) {
+			t.Errorf("expected valid octet string hint %q", h)
+		}
+	}
+
+	invalid := []string{
+		"",     // empty
+		"a",    // no octet count
+		"1",    // missing format char
+		"1z",   // bad format char
+		"*",    // repeat without count
+		"*a",   // repeat without digits before format
+		"1x*",  // * at position where digit expected for next spec
+		"0a",   // zero-width final spec would loop forever
+		"0d",   // zero-width final spec (decimal)
+		"1d0a", // last spec is zero-width
+	}
+	for _, h := range invalid {
+		if validateDisplayHintOctetString(h) {
+			t.Errorf("expected invalid octet string hint %q", h)
+		}
+	}
+}
+
+func TestCheckInvalidFormat_BadIntegerHint(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "BadHint"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				DisplayHint:         "zz",
+				Status:              types.StatusCurrent,
+				Description:         "bad integer hint",
+				IsTextualConvention: true,
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagInvalidFormat {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for bad integer hint", types.DiagInvalidFormat)
+}
+
+func TestCheckInvalidFormat_ValidIntegerHint(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "GoodHint"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				DisplayHint:         "d-2",
+				Status:              types.StatusCurrent,
+				Description:         "valid integer hint",
+				IsTextualConvention: true,
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagInvalidFormat {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagInvalidFormat, d.Message)
+		}
+	}
+}
+
+func TestCheckInvalidFormat_BadOctetStringHint(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "BadOSHint"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				DisplayHint:         "xyz",
+				Status:              types.StatusCurrent,
+				Description:         "bad octet string hint",
+				IsTextualConvention: true,
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagInvalidFormat {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for bad octet string hint", types.DiagInvalidFormat)
+}
+
+func TestCheckInvalidFormat_ValidOctetStringHint(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "GoodOSHint"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				DisplayHint:         "1x:",
+				Status:              types.StatusCurrent,
+				Description:         "valid octet string hint",
+				IsTextualConvention: true,
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagInvalidFormat {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagInvalidFormat, d.Message)
+		}
+	}
+}
+
+func TestCheckInvalidFormat_UnsupportedBasetype(t *testing.T) {
+	// Counter32 should not have a DISPLAY-HINT
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "BadCounterHint"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Counter32"},
+				DisplayHint:         "d",
+				Status:              types.StatusCurrent,
+				Description:         "counter with hint",
+				IsTextualConvention: true,
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagInvalidFormat {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for counter with hint", types.DiagInvalidFormat)
+}

@@ -652,6 +652,46 @@ func TestExportsEOFWithoutSemicolon(t *testing.T) {
 	testutil.SliceEqual(t, expected, kinds, "exports EOF without semicolon")
 }
 
+func TestNumberLeadingZero(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   string
+		wantDiag bool
+	}{
+		{"plain zero", "0", false},
+		{"single digit", "5", false},
+		{"multi digit", "42", false},
+		{"leading zero", "007", true},
+		{"leading zeros", "00123", true},
+		{"zero prefix", "01", true},
+		{"negative no leading zero", "-5", false},
+		{"negative leading zero", "-007", true},
+		{"negative zero prefix", "-01", true},
+		{"negative plain zero", "-0", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := types.StrictConfig()
+			lexer := New([]byte(tc.source), nil, cfg)
+			_, diags := lexer.Tokenize()
+			var found bool
+			for _, d := range diags {
+				if d.Code == types.DiagNumberLeadingZero {
+					found = true
+					break
+				}
+			}
+			if tc.wantDiag && !found {
+				t.Errorf("expected %s diagnostic for %q", types.DiagNumberLeadingZero, tc.source)
+			}
+			if !tc.wantDiag && found {
+				t.Errorf("unexpected %s diagnostic for %q", types.DiagNumberLeadingZero, tc.source)
+			}
+		})
+	}
+}
+
 func TestLibsmiNamesCompleteness(t *testing.T) {
 	// Every valid TokenKind (excluding the sentinel) must have a
 	// non-empty entry in libsmiNames so that LibsmiName() never
