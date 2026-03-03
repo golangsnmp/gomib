@@ -15,11 +15,12 @@ type Object struct {
 	augmentedBy []*Object
 	index       []IndexEntry
 
-	hint   string
-	sizes  []Range
-	ranges []Range
-	enums  []NamedValue
-	bits   []NamedValue
+	hint             string
+	sizes            []Range
+	ranges           []Range
+	enums            []NamedValue
+	bits             []NamedValue
+	sequenceTypeName string
 }
 
 func newObject(name string) *Object {
@@ -72,6 +73,11 @@ func (o *Object) EffectiveEnums() []NamedValue { return slices.Clone(o.enums) }
 
 // EffectiveBits returns bit definitions resolved through the type chain.
 func (o *Object) EffectiveBits() []NamedValue { return slices.Clone(o.bits) }
+
+// SequenceTypeName returns the original SEQUENCE type name from the row's
+// SYNTAX clause, or "" if not available. This preserves the original casing
+// (e.g., "DSLConnectionTableEntry") that would otherwise be lost.
+func (o *Object) SequenceTypeName() string { return o.sequenceTypeName }
 
 // Index returns the declared INDEX entries for this object.
 func (o *Object) Index() []IndexEntry { return slices.Clone(o.index) }
@@ -225,6 +231,7 @@ func (o *Object) setEffectiveSizes(s []Range)      { o.sizes = s }
 func (o *Object) setEffectiveRanges(r []Range)     { o.ranges = r }
 func (o *Object) setEffectiveEnums(e []NamedValue) { o.enums = e }
 func (o *Object) setEffectiveBits(b []NamedValue)  { o.bits = b }
+func (o *Object) setSequenceTypeName(s string)     { o.sequenceTypeName = s }
 
 func objectsByKind(objs []*Object, kind Kind) []*Object {
 	var result []*Object

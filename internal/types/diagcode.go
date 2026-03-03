@@ -90,6 +90,9 @@ const (
 	DiagAugmentsNotObject        = "augments-not-object"
 	DiagNotificationNoOid        = "notification-no-oid"
 	DiagPrimitiveTypeMissing     = "primitive-type-missing"
+	DiagIntegerInSMIv2           = "integer-in-smiv2"
+	DiagIndexIntegerNoRange      = "index-integer-no-range"
+	DiagIndexNegativeRange       = "index-negative-range"
 )
 
 var resolverDiagCodes = []string{
@@ -111,6 +114,9 @@ var resolverDiagCodes = []string{
 	DiagAugmentsNotObject,
 	DiagNotificationNoOid,
 	DiagPrimitiveTypeMissing,
+	DiagIntegerInSMIv2,
+	DiagIndexIntegerNoRange,
+	DiagIndexNegativeRange,
 }
 
 // diagPhases maps phase names to their diagnostic code slices.

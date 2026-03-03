@@ -21,6 +21,8 @@ func resolveSemantics(ctx *resolverContext) {
 	createResolvedGroups(ctx)
 	createResolvedCompliances(ctx)
 	createResolvedCapabilities(ctx)
+	checkIntegerMisuse(ctx)
+	checkIndexConstraints(ctx, objRefs)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
@@ -173,6 +175,13 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 
 		computeEffectiveValues(resolved)
+
+		// Preserve the SEQUENCE type name from the row's SYNTAX clause.
+		if node.Kind() == KindRow {
+			if ref, ok := obj.Syntax.(*module.TypeSyntaxTypeRef); ok {
+				resolved.setSequenceTypeName(ref.Name)
+			}
+		}
 
 		ctx.mib.addObject(resolved)
 
@@ -1001,5 +1010,110 @@ func isOIDType(ctx *resolverContext, mod *module.Module, syntax module.TypeSynta
 		return isOIDType(ctx, mod, s.Base)
 	default:
 		return false
+	}
+}
+
+// checkIntegerMisuse flags bare INTEGER usage in SMIv2 modules. RFC 2578
+// section 7.1.1 says INTEGER and Integer32 are "indistinguishable" for
+// non-enum use, and RFC 3584 section 2.1.1 item (2) says bare INTEGER
+// SHOULD become Integer32. INTEGER with named-number enumerations is the
+// only correct use of the INTEGER keyword in SMIv2.
+func checkIntegerMisuse(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.ObjectType:
+				if isIntegerKeywordSyntax(d.Syntax) {
+					ctx.EmitDiagnostic(types.DiagIntegerInSMIv2, SeverityWarning,
+						mod, d.Span,
+						d.Name+": use Integer32 instead of INTEGER in SMIv2")
+				}
+			case *module.TypeDef:
+				if isIntegerKeywordSyntax(d.Syntax) {
+					ctx.EmitDiagnostic(types.DiagIntegerInSMIv2, SeverityWarning,
+						mod, d.Span,
+						d.Name+": use Integer32 instead of INTEGER in SMIv2")
+				}
+			}
+		}
+	}
+}
+
+// isIntegerKeywordSyntax returns true if the syntax uses the INTEGER keyword
+// without named-number enumerations (bare INTEGER or INTEGER with range).
+func isIntegerKeywordSyntax(syntax module.TypeSyntax) bool {
+	switch s := syntax.(type) {
+	case *module.TypeSyntaxTypeRef:
+		return s.Name == "INTEGER"
+	case *module.TypeSyntaxConstrained:
+		return isIntegerKeywordSyntax(s.Base)
+	default:
+		return false
+	}
+}
+
+// checkIndexConstraints checks integer-valued INDEX elements for missing
+// range restrictions and negative ranges. Per RFC 2578 section 7.7,
+// integer index values encode as a single OID sub-identifier, which
+// requires non-negative bounded values.
+func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
+	for _, ref := range objRefs {
+		obj := ref.obj
+		if len(obj.Index) == 0 {
+			continue
+		}
+		for _, item := range obj.Index {
+			if isBareTypeIndex(item.Object) {
+				continue
+			}
+			idxObj := ctx.lookupObjectInModuleScope(ref.mod, item.Object)
+			if idxObj == nil {
+				continue
+			}
+			t := idxObj.Type()
+			if t == nil {
+				continue
+			}
+			if t.EffectiveBase() != BaseInteger32 {
+				continue
+			}
+
+			ranges := idxObj.EffectiveRanges()
+			enums := idxObj.EffectiveEnums()
+
+			// Enum-valued indexes: check for negative enum values.
+			if len(enums) > 0 {
+				for _, e := range enums {
+					if e.Value < 0 {
+						ctx.EmitDiagnostic(types.DiagIndexNegativeRange, SeverityError,
+							ref.mod, obj.Span,
+							"INDEX "+item.Object+" of "+obj.Name+" has negative enumeration value "+e.Label)
+						break
+					}
+				}
+				continue
+			}
+
+			// No range restriction on an integer index.
+			if len(ranges) == 0 {
+				ctx.EmitDiagnostic(types.DiagIndexIntegerNoRange, SeverityError,
+					ref.mod, obj.Span,
+					"INDEX "+item.Object+" of "+obj.Name+" has no range restriction")
+				continue
+			}
+
+			// Range includes negative values.
+			for _, r := range ranges {
+				if r.Min < 0 {
+					ctx.EmitDiagnostic(types.DiagIndexNegativeRange, SeverityError,
+						ref.mod, obj.Span,
+						"INDEX "+item.Object+" of "+obj.Name+" has range permitting negative values")
+					break
+				}
+			}
+		}
 	}
 }
