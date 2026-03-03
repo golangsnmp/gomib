@@ -2998,6 +2998,620 @@ func TestIndexElementSubIds(t *testing.T) {
 	}
 }
 
+// --- P1 access/status enforcement tests ---
+
+func TestCheckAccessInvalidSMIv1(t *testing.T) {
+	// accessible-for-notify is SMIv2-only.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv1,
+		Imports: []module.Import{
+			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badAccess"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessAccessibleForNotify,
+				Status:  types.StatusMandatory,
+				Oid:     testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagAccessInvalidSMIv1 {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for accessible-for-notify in SMIv1", types.DiagAccessInvalidSMIv1)
+}
+
+func TestCheckAccessInvalidSMIv1_ReadCreate(t *testing.T) {
+	// read-create is SMIv2-only.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv1,
+		Imports: []module.Import{
+			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badAccess"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessReadCreate,
+				Status:  types.StatusMandatory,
+				Oid:     testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagAccessInvalidSMIv1 {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for read-create in SMIv1", types.DiagAccessInvalidSMIv1)
+}
+
+func TestCheckAccessWriteOnlySMIv2(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "badAccess"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:        types.AccessWriteOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagAccessWriteOnlySMIv2 {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for write-only in SMIv2", types.DiagAccessWriteOnlySMIv2)
+}
+
+func TestCheckAccessValid_NoFalsePositive(t *testing.T) {
+	// read-write in SMIv1 should not produce any access diagnostic.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv1,
+		Imports: []module.Import{
+			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "validObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessReadWrite,
+				Status:  types.StatusMandatory,
+				Oid:     testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagAccessInvalidSMIv1 || d.Code == types.DiagAccessWriteOnlySMIv2 {
+			t.Fatalf("unexpected access diagnostic: %s: %s", d.Code, d.Message)
+		}
+	}
+}
+
+func TestCheckMaxAccessInSMIv1(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv1,
+		Imports: []module.Import{
+			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "badKeyword"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusMandatory,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagMaxAccessInSMIv1 {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for MAX-ACCESS in SMIv1", types.DiagMaxAccessInSMIv1)
+}
+
+func TestCheckAccessInSMIv2(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "badKeyword"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagAccessInSMIv2 {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for ACCESS in SMIv2", types.DiagAccessInSMIv2)
+}
+
+func TestCheckAccessTableIllegal(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "badTable"},
+				Syntax:        &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagAccessTableIllegal {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for table with read-only access", types.DiagAccessTableIllegal)
+}
+
+func TestCheckAccessRowIllegal(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "testTable"},
+				Syntax:        &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Access:        types.AccessNotAccessible,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "testEntry"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Index:         []module.IndexItem{{Object: "testCol"}},
+				Oid:           testOid("testTable", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagAccessRowIllegal {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for row with read-only access", types.DiagAccessRowIllegal)
+}
+
+func TestCheckScalarNotCreatable(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "badScalar"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:        types.AccessReadCreate,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagScalarNotCreatable {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for scalar with read-create", types.DiagScalarNotCreatable)
+}
+
+func TestCheckAccessCounterIllegal(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "badCounter"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Counter32"},
+				Access:        types.AccessReadWrite,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagAccessCounterIllegal {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for counter with read-write", types.DiagAccessCounterIllegal)
+}
+
+func TestCheckAccessCounterReadOnly_NoFalsePositive(t *testing.T) {
+	// Counter32 with read-only should not trigger.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "goodCounter"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Counter32"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagAccessCounterIllegal {
+			t.Fatalf("unexpected %s diagnostic for read-only counter", types.DiagAccessCounterIllegal)
+		}
+	}
+}
+
+func TestCheckStatusInvalidSMIv1(t *testing.T) {
+	// "current" is SMIv2-only.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv1,
+		Imports: []module.Import{
+			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badStatus"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagStatusInvalidSMIv1 {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for current status in SMIv1", types.DiagStatusInvalidSMIv1)
+}
+
+func TestCheckStatusInvalidSMIv2(t *testing.T) {
+	// "mandatory" is SMIv1-only.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "badStatus"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusMandatory,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagStatusInvalidSMIv2 {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for mandatory status in SMIv2", types.DiagStatusInvalidSMIv2)
+}
+
+func TestCheckStatusValid_NoFalsePositive(t *testing.T) {
+	// "mandatory" in SMIv1 should not produce status diagnostic.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv1,
+		Imports: []module.Import{
+			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "validObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusMandatory,
+				Oid:     testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagStatusInvalidSMIv1 || d.Code == types.DiagStatusInvalidSMIv2 {
+			t.Fatalf("unexpected status diagnostic: %s: %s", d.Code, d.Message)
+		}
+	}
+}
+
+func TestCheckTypeStatusDeprecated(t *testing.T) {
+	// Define a deprecated TC, then use it in an object.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "DeprecatedType"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:              types.StatusDeprecated,
+				Description:         "deprecated type for testing",
+				IsTextualConvention: true,
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "usesDeprecated"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "DeprecatedType"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTypeStatusDeprecated {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for object using deprecated type", types.DiagTypeStatusDeprecated)
+}
+
+func TestCheckTypeStatusObsolete(t *testing.T) {
+	// Define an obsolete TC, then use it in an object.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "ObsoleteType"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:              types.StatusObsolete,
+				Description:         "obsolete type for testing",
+				IsTextualConvention: true,
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "usesObsolete"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "ObsoleteType"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTypeStatusObsolete {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for object using obsolete type", types.DiagTypeStatusObsolete)
+}
+
+func TestCheckTypeStatusCurrent_NoFalsePositive(t *testing.T) {
+	// A current type should not trigger type-status diagnostics.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "validObj"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTypeStatusDeprecated || d.Code == types.DiagTypeStatusObsolete {
+			t.Fatalf("unexpected type status diagnostic: %s: %s", d.Code, d.Message)
+		}
+	}
+}
+
 // makeTypedObject creates a minimal Object with a type of the given base type
 // and optional sizes. Used for unit testing index helpers.
 func makeTypedObject(base BaseType, sizes *[]Range) *Object {

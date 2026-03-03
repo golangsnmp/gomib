@@ -141,6 +141,18 @@ const (
 	DiagSequenceOrder            = "sequence-order"
 	DiagSequenceTypeMismatch     = "sequence-type-mismatch"
 	DiagIndexExceedsTooLarge     = "index-exceeds-too-large"
+	DiagAccessInvalidSMIv1       = "access-invalid-smiv1"
+	DiagAccessWriteOnlySMIv2     = "access-write-only-smiv2"
+	DiagAccessTableIllegal       = "access-table-illegal"
+	DiagAccessRowIllegal         = "access-row-illegal"
+	DiagAccessCounterIllegal     = "access-counter-illegal"
+	DiagScalarNotCreatable       = "scalar-not-creatable"
+	DiagMaxAccessInSMIv1         = "maxaccess-in-smiv1"
+	DiagAccessInSMIv2            = "access-in-smiv2"
+	DiagStatusInvalidSMIv1       = "status-invalid-smiv1"
+	DiagStatusInvalidSMIv2       = "status-invalid-smiv2"
+	DiagTypeStatusDeprecated     = "type-status-deprecated"
+	DiagTypeStatusObsolete       = "type-status-obsolete"
 )
 
 var resolverDiagCodes = []string{
@@ -199,6 +211,18 @@ var resolverDiagCodes = []string{
 	DiagSequenceOrder,
 	DiagSequenceTypeMismatch,
 	DiagIndexExceedsTooLarge,
+	DiagAccessInvalidSMIv1,
+	DiagAccessWriteOnlySMIv2,
+	DiagAccessTableIllegal,
+	DiagAccessRowIllegal,
+	DiagAccessCounterIllegal,
+	DiagScalarNotCreatable,
+	DiagMaxAccessInSMIv1,
+	DiagAccessInSMIv2,
+	DiagStatusInvalidSMIv1,
+	DiagStatusInvalidSMIv2,
+	DiagTypeStatusDeprecated,
+	DiagTypeStatusObsolete,
 }
 
 // diagPhases maps phase names to their diagnostic code slices.
