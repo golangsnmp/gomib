@@ -93,6 +93,9 @@ const (
 	DiagIntegerInSMIv2           = "integer-in-smiv2"
 	DiagIndexIntegerNoRange      = "index-integer-no-range"
 	DiagIndexNegativeRange       = "index-negative-range"
+	DiagDefvalBasetype           = "defval-basetype"
+	DiagDefvalRange              = "defval-range"
+	DiagDefvalEnum               = "defval-enum"
 )
 
 var resolverDiagCodes = []string{
@@ -117,6 +120,9 @@ var resolverDiagCodes = []string{
 	DiagIntegerInSMIv2,
 	DiagIndexIntegerNoRange,
 	DiagIndexNegativeRange,
+	DiagDefvalBasetype,
+	DiagDefvalRange,
+	DiagDefvalEnum,
 }
 
 // diagPhases maps phase names to their diagnostic code slices.

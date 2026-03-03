@@ -3,6 +3,7 @@ package mib
 import (
 	"encoding/hex"
 	"log/slog"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ func resolveSemantics(ctx *resolverContext) {
 	createResolvedCapabilities(ctx)
 	checkIntegerMisuse(ctx)
 	checkIndexConstraints(ctx, objRefs)
+	checkDefvalConstraints(ctx, objRefs)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
@@ -1116,4 +1118,178 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			}
 		}
 	}
+}
+
+// checkDefvalConstraints validates DEFVAL values against the object's type.
+// Checks basetype range, RANGE constraints, and enum/BITS label validity.
+func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
+	for _, ref := range objRefs {
+		obj := ref.obj
+		if obj.DefVal == nil {
+			continue
+		}
+
+		resolved := ctx.lookupObjectInModuleScope(ref.mod, obj.Name)
+		if resolved == nil {
+			continue
+		}
+		dv := resolved.DefaultValue()
+		if dv.IsZero() {
+			continue
+		}
+		t := resolved.Type()
+		if t == nil {
+			continue
+		}
+		base := t.EffectiveBase()
+		ranges := resolved.EffectiveRanges()
+		enums := resolved.EffectiveEnums()
+		bits := resolved.EffectiveBits()
+
+		switch dv.Kind() {
+		case DefValKindInt:
+			v, _ := DefValAs[int64](dv)
+			checkDefvalInt(ctx, ref.mod, obj, v, base, ranges, enums)
+		case DefValKindUint:
+			v, _ := DefValAs[uint64](dv)
+			checkDefvalUint(ctx, ref.mod, obj, v, base, ranges, enums)
+		case DefValKindEnum:
+			label, _ := DefValAs[string](dv)
+			if len(enums) > 0 {
+				if _, ok := findNamedValue(enums, label); !ok {
+					ctx.EmitDiagnostic(types.DiagDefvalEnum, SeverityWarning,
+						ref.mod, obj.Span,
+						obj.Name+": DEFVAL enum label "+label+" not defined in type")
+				}
+			}
+		case DefValKindBits:
+			labels, _ := DefValAs[[]string](dv)
+			for _, label := range labels {
+				if _, ok := findNamedValue(bits, label); !ok {
+					ctx.EmitDiagnostic(types.DiagDefvalEnum, SeverityWarning,
+						ref.mod, obj.Span,
+						obj.Name+": DEFVAL BITS label "+label+" not defined in type")
+				}
+			}
+		case DefValKindUnset, DefValKindString, DefValKindBytes, DefValKindOID:
+			// No validation for these kinds.
+		}
+	}
+}
+
+func checkDefvalInt(ctx *resolverContext, mod *module.Module, obj *module.ObjectType, v int64, base BaseType, ranges []Range, enums []NamedValue) {
+	// Check basetype limits.
+	switch base {
+	case BaseInteger32:
+		if v < math.MinInt32 || v > math.MaxInt32 {
+			ctx.EmitDiagnostic(types.DiagDefvalBasetype, SeverityWarning,
+				mod, obj.Span,
+				obj.Name+": DEFVAL "+strconv.FormatInt(v, 10)+" exceeds Integer32 range")
+		}
+	case BaseUnsigned32, BaseGauge32, BaseCounter32, BaseTimeTicks:
+		if v < 0 || v > math.MaxUint32 {
+			ctx.EmitDiagnostic(types.DiagDefvalBasetype, SeverityWarning,
+				mod, obj.Span,
+				obj.Name+": DEFVAL "+strconv.FormatInt(v, 10)+" exceeds unsigned32 range")
+		}
+	}
+
+	// Check RANGE constraints.
+	if len(ranges) > 0 {
+		if !valueInRanges(v, ranges) {
+			ctx.EmitDiagnostic(types.DiagDefvalRange, SeverityWarning,
+				mod, obj.Span,
+				obj.Name+": DEFVAL "+strconv.FormatInt(v, 10)+" outside RANGE constraint")
+		}
+	}
+
+	// Check enum membership for integer DEFVALs.
+	if len(enums) > 0 {
+		found := false
+		for _, e := range enums {
+			if e.Value == v {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ctx.EmitDiagnostic(types.DiagDefvalEnum, SeverityWarning,
+				mod, obj.Span,
+				obj.Name+": DEFVAL "+strconv.FormatInt(v, 10)+" does not match any enumeration value")
+		}
+	}
+}
+
+func checkDefvalUint(ctx *resolverContext, mod *module.Module, obj *module.ObjectType, v uint64, base BaseType, ranges []Range, enums []NamedValue) {
+	// Check basetype limits.
+	switch base {
+	case BaseInteger32:
+		if v > math.MaxInt32 {
+			ctx.EmitDiagnostic(types.DiagDefvalBasetype, SeverityWarning,
+				mod, obj.Span,
+				obj.Name+": DEFVAL "+strconv.FormatUint(v, 10)+" exceeds Integer32 range")
+		}
+	case BaseUnsigned32, BaseGauge32, BaseCounter32, BaseTimeTicks:
+		if v > math.MaxUint32 {
+			ctx.EmitDiagnostic(types.DiagDefvalBasetype, SeverityWarning,
+				mod, obj.Span,
+				obj.Name+": DEFVAL "+strconv.FormatUint(v, 10)+" exceeds unsigned32 range")
+		}
+	}
+
+	// Check RANGE constraints.
+	if len(ranges) > 0 {
+		if !uvalueInRanges(v, ranges) {
+			ctx.EmitDiagnostic(types.DiagDefvalRange, SeverityWarning,
+				mod, obj.Span,
+				obj.Name+": DEFVAL "+strconv.FormatUint(v, 10)+" outside RANGE constraint")
+		}
+	}
+
+	// Check enum membership for unsigned integer DEFVALs.
+	if len(enums) > 0 {
+		found := false
+		for _, e := range enums {
+			if e.Value >= 0 && uint64(e.Value) == v {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ctx.EmitDiagnostic(types.DiagDefvalEnum, SeverityWarning,
+				mod, obj.Span,
+				obj.Name+": DEFVAL "+strconv.FormatUint(v, 10)+" does not match any enumeration value")
+		}
+	}
+}
+
+func valueInRanges(v int64, ranges []Range) bool {
+	for _, r := range ranges {
+		if v >= r.Min && v <= r.Max {
+			return true
+		}
+	}
+	return false
+}
+
+func uvalueInRanges(v uint64, ranges []Range) bool {
+	for _, r := range ranges {
+		// Range Min/Max are int64. A uint64 value can only fall within a range
+		// if it fits in int64 (i.e. v <= MaxInt64) and the range bound is non-negative.
+		if r.Max < 0 {
+			continue
+		}
+		min := uint64(0)
+		if r.Min > 0 {
+			min = uint64(r.Min)
+		}
+		if v > math.MaxInt64 {
+			// v exceeds int64 range, so it can't match any Range (which uses int64).
+			continue
+		}
+		if v >= min && int64(v) <= r.Max {
+			return true
+		}
+	}
+	return false
 }
