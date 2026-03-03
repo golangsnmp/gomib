@@ -16,7 +16,7 @@ problemEnumBitsDupesMIB MODULE-IDENTITY
     DESCRIPTION  "Tests enum and BITS duplicate detection"
     REVISION     "202603030000Z"
     DESCRIPTION  "Initial version"
-    ::= { enterprises 99998 8 }
+    ::= { enterprises 99998 35 }
 
 problemEnumBitsDupesObjects OBJECT IDENTIFIER ::= { problemEnumBitsDupesMIB 1 }
 

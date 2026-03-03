@@ -1388,5 +1388,141 @@ func TestResolveNameComponentBranches(t *testing.T) {
 	})
 }
 
+func TestOidReuse_DifferentValueAssignments(t *testing.T) {
+	// Two VALUE-ASSIGNMENTs at the same OID with different names.
+	// Should emit oid-reuse (warning) since VALUE-ASSIGNMENT is not a registered kind.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "firstNode"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "enterprises"},
+					&module.OidComponentNumber{Value: 99999},
+				}, types.Span{}),
+			},
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "secondNode"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "enterprises"},
+					&module.OidComponentNumber{Value: 99999},
+				}, types.Span{}),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagOidReuse {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for duplicate VALUE-ASSIGNMENTs", types.DiagOidReuse)
+}
+
+func TestOidRegistered_DifferentObjectTypes(t *testing.T) {
+	// Two OBJECT-TYPEs at the same OID with different names.
+	// Should emit oid-registered (severe) since the first is a registered kind.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "enterprises"},
+					&module.OidComponentNumber{Value: 99999},
+				}, types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "firstObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "testRoot"},
+					&module.OidComponentNumber{Value: 1},
+				}, types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "secondObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "testRoot"},
+					&module.OidComponentNumber{Value: 1},
+				}, types.Span{}),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagOidRegistered {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for duplicate OBJECT-TYPEs", types.DiagOidRegistered)
+}
+
+func TestOidReuse_SameNameNoDiagnostic(t *testing.T) {
+	// Two modules defining the same OID with the same name (cross-module overlap).
+	// Should NOT emit any oid-reuse/oid-registered diagnostic.
+	mod1 := &module.Module{
+		Name:     "TEST-MIB-V1",
+		Language: types.LanguageSMIv1,
+		Imports: []module.Import{
+			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testNode"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "enterprises"},
+					&module.OidComponentNumber{Value: 99999},
+				}, types.Span{}),
+			},
+		},
+	}
+	mod2 := &module.Module{
+		Name:     "TEST-MIB-V2",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testNode"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "enterprises"},
+					&module.OidComponentNumber{Value: 99999},
+				}, types.Span{}),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod1, mod2}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagOidReuse || d.Code == types.DiagOidRegistered {
+			t.Fatalf("unexpected diagnostic %s: %s", d.Code, d.Message)
+		}
+	}
+}
+
 // Ensure we use the graph.Symbol type correctly in tests.
 var _ = graph.Symbol{Module: "test", Name: "test"}

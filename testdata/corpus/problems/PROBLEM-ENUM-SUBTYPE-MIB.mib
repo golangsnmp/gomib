@@ -16,7 +16,7 @@ problemEnumSubtypeMIB MODULE-IDENTITY
     DESCRIPTION  "Tests enum subtyping validation"
     REVISION     "202603030000Z"
     DESCRIPTION  "Initial version"
-    ::= { enterprises 99998 9 }
+    ::= { enterprises 99998 33 }
 
 problemEnumSubtypeObjects OBJECT IDENTIFIER ::= { problemEnumSubtypeMIB 1 }
 

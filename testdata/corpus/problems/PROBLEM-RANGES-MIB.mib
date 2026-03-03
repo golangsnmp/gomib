@@ -17,7 +17,7 @@ problemRangesMIB MODULE-IDENTITY
     DESCRIPTION  "Tests range constraint validation"
     REVISION     "202603030000Z"
     DESCRIPTION  "Initial version"
-    ::= { enterprises 99998 7 }
+    ::= { enterprises 99998 34 }
 
 problemRangesObjects OBJECT IDENTIFIER ::= { problemRangesMIB 1 }
 

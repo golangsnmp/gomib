@@ -411,6 +411,21 @@ func createNamedChild(ctx *resolverContext, def oidDefinition, currentNode *Node
 }
 
 func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, label string) {
+	// Check for OID reuse: another definition already claimed this node
+	// with a different name. Same-name cross-module overlap (e.g.,
+	// RFC1213-MIB and SNMPv2-MIB both defining sysDescr) is expected.
+	if existing := node.Name(); existing != "" && existing != label {
+		if isRegisteredKind(node.Kind()) {
+			ctx.EmitDiagnostic(types.DiagOidRegistered, SeveritySevere,
+				def.mod, def.def.DefinitionSpan(),
+				label+": registers OID already registered by "+existing)
+		} else {
+			ctx.EmitDiagnostic(types.DiagOidReuse, SeverityWarning,
+				def.mod, def.def.DefinitionSpan(),
+				label+": reuses OID assigned to "+existing)
+		}
+	}
+
 	switch def.kind {
 	case defObjectType:
 		node.setKind(KindScalar)
@@ -552,6 +567,19 @@ var snmpTrapsOID = OID{1, 3, 6, 1, 6, 3, 1, 1, 5}
 // identifying the enterprise node for the six standard generic traps.
 func isSnmpTrapsOID(oid OID) bool {
 	return oid.Equal(snmpTrapsOID)
+}
+
+// isRegisteredKind reports whether a node kind represents an actual SMI
+// definition (OBJECT-TYPE, NOTIFICATION-TYPE, etc.) as opposed to an
+// intermediate or value-assignment node.
+func isRegisteredKind(k Kind) bool {
+	switch k {
+	case KindScalar, KindTable, KindRow, KindColumn,
+		KindNotification, KindGroup, KindCompliance, KindCapability:
+		return true
+	default:
+		return false
+	}
 }
 
 func wellKnownRootArc(name string) int {

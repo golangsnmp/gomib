@@ -2449,6 +2449,87 @@ func TestCheckNodeParentKinds_GroupUnderTable(t *testing.T) {
 	testutil.True(t, found, "expected %s diagnostic for group under table", types.DiagParentGroup)
 }
 
+func TestCheckNodeParentKinds_RowSubidOne(t *testing.T) {
+	// Valid: row at sub-identifier 1 under its table. No diagnostic expected.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagRowSubidentifierOne {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagRowSubidentifierOne, d.Message)
+		}
+	}
+}
+
+func TestCheckNodeParentKinds_RowSubidNotOne(t *testing.T) {
+	// Invalid: row at sub-identifier 2 under its table.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 2),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagRowSubidentifierOne {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for row with sub-id != 1", types.DiagRowSubidentifierOne)
+}
+
 func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 	// When a notification references an object whose node exists but has no
 	// Object (e.g., an intermediate node), a diagnostic should be
