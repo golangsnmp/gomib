@@ -2188,6 +2188,267 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 	})
 }
 
+// testOid builds an OID assignment as { parentName subid }.
+func testOid(parentName string, subid uint32) module.OidAssignment {
+	return module.NewOidAssignment([]module.OidComponent{
+		&module.OidComponentName{NameValue: parentName},
+		&module.OidComponentNumber{Value: subid},
+	}, types.Span{})
+}
+
+func TestCheckNodeParentKinds_RowUnderTable(t *testing.T) {
+	// Valid: row's parent is a table. Should produce no diagnostic.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagParentRow {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagParentRow, d.Message)
+		}
+	}
+}
+
+func TestCheckNodeParentKinds_RowUnderScalar(t *testing.T) {
+	// Invalid: row's parent is a scalar, not a table.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badParent"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badRow"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testCol"}},
+				Oid:     testOid("badParent", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagParentRow {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for row under scalar", types.DiagParentRow)
+}
+
+func TestCheckNodeParentKinds_TableUnderTable(t *testing.T) {
+	// Invalid: table's parent is another table.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "outerTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "OuterEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "innerTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "InnerEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("outerTable", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagParentTable {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for table under table", types.DiagParentTable)
+}
+
+func TestCheckNodeParentKinds_ScalarUnderRow(t *testing.T) {
+	// A scalar child of a row is reclassified as a column by inferNodeKinds.
+	// So this should NOT trigger parent-scalar.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testCol"}},
+				Oid:     testOid("testTable", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testCol"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagParentScalar || d.Code == types.DiagParentColumn {
+			t.Fatalf("unexpected parent diagnostic: %s: %s", d.Code, d.Message)
+		}
+	}
+}
+
+func TestCheckNodeParentKinds_NotificationUnderTable(t *testing.T) {
+	// Invalid: notification's parent is a table.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.Notification{
+				DefBase: module.DefBase{Name: "badNotif"},
+				Status:  types.StatusCurrent,
+				Oid: func() *module.OidAssignment {
+					oid := testOid("testTable", 2)
+					return &oid
+				}(),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagParentNotification {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for notification under table", types.DiagParentNotification)
+}
+
+func TestCheckNodeParentKinds_GroupUnderTable(t *testing.T) {
+	// Invalid: group's parent is a table.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "badGroup"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testTable", 2),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagParentGroup {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for group under table", types.DiagParentGroup)
+}
+
 func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 	// When a notification references an object whose node exists but has no
 	// Object (e.g., an intermediate node), a diagnostic should be

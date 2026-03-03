@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golangsnmp/gomib/internal/parser"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
@@ -142,9 +141,7 @@ END
 	testutil.Nil(t, d, "base module SNMPv2-SMI should not get %s diagnostic", types.DiagMissingModuleIdentity)
 }
 
-func TestLower_NegativeBitsPosition(t *testing.T) {
-	// A BITS type with a negative position value should produce a diagnostic.
-	// Negative positions are invalid per RFC 2578.
+func TestLower_BitsNumberNegative(t *testing.T) {
 	source := []byte(`BITS-TEST DEFINITIONS ::= BEGIN
 
 IMPORTS
@@ -164,28 +161,166 @@ badBitsObject OBJECT-TYPE
     SYNTAX      BITS { goodBit(0), badBit(-1) }
     MAX-ACCESS  read-only
     STATUS      current
-    DESCRIPTION "Test object with invalid negative BITS position"
+    DESCRIPTION "Test"
     ::= { bitsTest 1 }
 
 END
 `)
 
-	p := parser.New(source, nil, types.PermissiveConfig())
-	mods := p.ParseModule()
-	testutil.Greater(t, len(mods), 0, "parse returned no modules")
+	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagBitsNumberNegative)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagBitsNumberNegative)
+	testutil.Equal(t, types.SeverityError, d.Severity, "severity")
+	testutil.True(t, strings.Contains(d.Message, "badBit"), "message should mention badBit: %s", d.Message)
+}
 
-	mod := Lower(mods[0], source, nil, types.PermissiveConfig())
-	testutil.NotNil(t, mod, "lower returned nil")
+func TestLower_BitsNumberTooLarge(t *testing.T) {
+	source := []byte(`BITS-TEST DEFINITIONS ::= BEGIN
 
-	// Should have a diagnostic for the negative BITS position
-	var found bool
-	for _, d := range mod.Diagnostics {
-		if strings.Contains(d.Message, "BITS") || strings.Contains(d.Message, "position") || strings.Contains(d.Message, "negative") {
-			found = true
-			break
-		}
-	}
-	testutil.True(t, found, "expected diagnostic for negative BITS position, got none")
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE
+        FROM SNMPv2-SMI;
+
+bitsTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { 1 3 6 1 4 1 99999 }
+
+hugeBitsObject OBJECT-TYPE
+    SYNTAX      BITS { goodBit(0), hugeBit(524280) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    ::= { bitsTest 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagBitsNumberTooLarge)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagBitsNumberTooLarge)
+	testutil.Equal(t, types.SeverityError, d.Severity, "severity")
+	testutil.True(t, strings.Contains(d.Message, "hugeBit"), "message should mention hugeBit: %s", d.Message)
+}
+
+func TestLower_BitsNumberLarge(t *testing.T) {
+	source := []byte(`BITS-TEST DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE
+        FROM SNMPv2-SMI;
+
+bitsTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { 1 3 6 1 4 1 99999 }
+
+largeBitsObject OBJECT-TYPE
+    SYNTAX      BITS { goodBit(0), largeBit(128) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    ::= { bitsTest 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagBitsNumberLarge)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagBitsNumberLarge)
+	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
+	testutil.True(t, strings.Contains(d.Message, "largeBit"), "message should mention largeBit: %s", d.Message)
+}
+
+func TestLower_BitsNumberLarge_NotForSmall(t *testing.T) {
+	// Positions under 128 should not trigger the large warning.
+	source := []byte(`BITS-TEST DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE
+        FROM SNMPv2-SMI;
+
+bitsTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { 1 3 6 1 4 1 99999 }
+
+okBitsObject OBJECT-TYPE
+    SYNTAX      BITS { bit0(0), bit127(127) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    ::= { bitsTest 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagBitsNumberLarge)
+	testutil.Nil(t, d, "position 127 should not trigger %s", types.DiagBitsNumberLarge)
+}
+
+func TestLower_EnumZero_SMIv1(t *testing.T) {
+	// Zero enum value in SMIv1 should produce a diagnostic.
+	source := []byte(`ENUM-TEST DEFINITIONS ::= BEGIN
+
+IMPORTS
+    enterprises
+        FROM RFC1155-SMI;
+
+testObject OBJECT-TYPE
+    SYNTAX      INTEGER { off(0), on(1) }
+    ACCESS      read-only
+    STATUS      mandatory
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagEnumZero)
+	testutil.NotNil(t, d, "expected %s diagnostic for SMIv1 enum with zero", types.DiagEnumZero)
+	testutil.Equal(t, types.SeverityError, d.Severity, "severity")
+	testutil.True(t, strings.Contains(d.Message, "off"), "message should mention off: %s", d.Message)
+}
+
+func TestLower_EnumZero_SMIv2_NoDiag(t *testing.T) {
+	// Zero enum value in SMIv2 is allowed.
+	source := []byte(`ENUM-TEST DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+enumTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+testObject OBJECT-TYPE
+    SYNTAX      INTEGER { off(0), on(1) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    ::= { enumTest 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagEnumZero)
+	testutil.Nil(t, d, "SMIv2 enum with zero should not trigger %s", types.DiagEnumZero)
 }
 
 func TestLower_MissingModuleIdentity_AlwaysWarning(t *testing.T) {

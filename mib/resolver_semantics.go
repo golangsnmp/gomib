@@ -22,6 +22,7 @@ func resolveSemantics(ctx *resolverContext) {
 	createResolvedGroups(ctx)
 	createResolvedCompliances(ctx)
 	createResolvedCapabilities(ctx)
+	checkNodeParentKinds(ctx, objRefs)
 	checkIntegerMisuse(ctx)
 	checkEnumSubtyping(ctx)
 	checkRangeConstraints(ctx)
@@ -1014,6 +1015,93 @@ func isOIDType(ctx *resolverContext, mod *module.Module, syntax module.TypeSynta
 		return isOIDType(ctx, mod, s.Base)
 	default:
 		return false
+	}
+}
+
+// isSimpleParentKind returns true for kinds that are valid parents of most
+// definition types: plain nodes, internal path components, and unknown nodes.
+func isSimpleParentKind(k Kind) bool {
+	return k == KindNode || k == KindInternal || k == KindUnknown
+}
+
+// checkNodeParentKinds validates that each node's parent has the correct kind
+// per SMI structural rules. For example, a column's parent must be a row,
+// a row's parent must be a table, and most other definitions must have a
+// simple node parent.
+func checkNodeParentKinds(ctx *resolverContext, objRefs []objectTypeRef) {
+	// Check OBJECT-TYPE definitions (table, row, column, scalar).
+	for _, ref := range objRefs {
+		obj := ref.obj
+		node, ok := ctx.LookupNodeForModule(ref.mod, obj.Name)
+		if !ok || node.Parent() == nil || node.Parent().IsRoot() {
+			continue
+		}
+		parentKind := node.Parent().Kind()
+		switch node.Kind() {
+		case KindTable:
+			if !isSimpleParentKind(parentKind) {
+				ctx.EmitDiagnostic(types.DiagParentTable, SeverityError,
+					ref.mod, obj.Span,
+					obj.Name+": table's parent node must be a simple node")
+			}
+		case KindRow:
+			if parentKind != KindTable {
+				ctx.EmitDiagnostic(types.DiagParentRow, SeverityError,
+					ref.mod, obj.Span,
+					obj.Name+": row's parent node must be a table")
+			}
+		case KindColumn:
+			if parentKind != KindRow {
+				ctx.EmitDiagnostic(types.DiagParentColumn, SeverityError,
+					ref.mod, obj.Span,
+					obj.Name+": column's parent node must be a row")
+			}
+		case KindScalar:
+			if !isSimpleParentKind(parentKind) {
+				ctx.EmitDiagnostic(types.DiagParentScalar, SeverityError,
+					ref.mod, obj.Span,
+					obj.Name+": scalar's parent node must be a simple node")
+			}
+		}
+	}
+
+	// Check definitions with OIDs that aren't OBJECT-TYPE.
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			var code string
+			var label string
+			switch def.(type) {
+			case *module.Notification:
+				code = types.DiagParentNotification
+				label = "notification"
+			case *module.ObjectIdentity, *module.ModuleIdentity, *module.ValueAssignment:
+				code = types.DiagParentNode
+				label = "node"
+			case *module.ObjectGroup, *module.NotificationGroup:
+				code = types.DiagParentGroup
+				label = "group"
+			case *module.ModuleCompliance:
+				code = types.DiagParentCompliance
+				label = "compliance"
+			case *module.AgentCapabilities:
+				code = types.DiagParentCapabilities
+				label = "capabilities"
+			default:
+				continue
+			}
+			node, ok := ctx.LookupNodeForModule(mod, def.DefinitionName())
+			if !ok || node.Parent() == nil || node.Parent().IsRoot() {
+				continue
+			}
+			if !isSimpleParentKind(node.Parent().Kind()) {
+				ctx.EmitDiagnostic(code, SeverityError,
+					mod, def.DefinitionSpan(),
+					def.DefinitionName()+": "+label+"'s parent node must be a simple node")
+			}
+		}
 	}
 }
 
