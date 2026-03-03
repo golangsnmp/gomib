@@ -2574,3 +2574,135 @@ func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 	}
 	testutil.True(t, found, "expected diagnostic for notification object with nil Object, got none")
 }
+
+func TestCheckIndexElementNoSize(t *testing.T) {
+	t.Run("OCTET STRING index without SIZE emits diagnostic", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		ctx.modules = append(ctx.modules, mod)
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+
+		idxObj := newObject("strIndex")
+		typ := newType("DisplayString")
+		typ.setBase(BaseOctetString)
+		idxObj.setType(typ)
+		resolvedMod.addObject(idxObj)
+
+		root := ctx.mib.Root()
+		idxNode := buildOIDPath(root, 1, 1, 1, 1)
+		idxNode.setName("strIndex")
+		idxNode.setObject(idxObj)
+		ctx.registerModuleNodeSymbol(mod, "strIndex", idxNode)
+
+		objRefs := []objectTypeRef{
+			{mod: mod, obj: &module.ObjectType{
+				DefBase: module.DefBase{Name: "myEntry"},
+				Index:   []module.IndexItem{{Object: "strIndex"}},
+			}},
+		}
+
+		checkIndexConstraints(ctx, objRefs)
+
+		var found bool
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagIndexElementNoSize {
+				testutil.Contains(t, d.Message, "strIndex", "diagnostic message")
+				found = true
+			}
+		}
+		testutil.True(t, found, "expected index-element-no-size diagnostic")
+	})
+
+	t.Run("OCTET STRING index with SIZE is ok", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		ctx.modules = append(ctx.modules, mod)
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+
+		idxObj := newObject("strIndex")
+		typ := newType("DisplayString")
+		typ.setBase(BaseOctetString)
+		idxObj.setType(typ)
+		idxObj.setEffectiveSizes([]Range{{Min: 0, Max: 255}})
+		resolvedMod.addObject(idxObj)
+
+		root := ctx.mib.Root()
+		idxNode := buildOIDPath(root, 1, 1, 1, 1)
+		idxNode.setName("strIndex")
+		idxNode.setObject(idxObj)
+		ctx.registerModuleNodeSymbol(mod, "strIndex", idxNode)
+
+		objRefs := []objectTypeRef{
+			{mod: mod, obj: &module.ObjectType{
+				DefBase: module.DefBase{Name: "myEntry"},
+				Index:   []module.IndexItem{{Object: "strIndex"}},
+			}},
+		}
+
+		checkIndexConstraints(ctx, objRefs)
+
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagIndexElementNoSize {
+				t.Fatalf("unexpected index-element-no-size diagnostic: %s", d.Message)
+			}
+		}
+	})
+}
+
+func TestIsLegalIndexBasetype(t *testing.T) {
+	legal := []BaseType{
+		BaseInteger32, BaseUnsigned32, BaseCounter32, BaseGauge32,
+		BaseTimeTicks, BaseIpAddress, BaseOctetString, BaseOpaque,
+		BaseBits, BaseObjectIdentifier,
+	}
+	for _, b := range legal {
+		testutil.True(t, isLegalIndexBasetype(b), b.String()+" should be legal")
+	}
+
+	illegal := []BaseType{BaseCounter64, BaseSequence, BaseUnknown}
+	for _, b := range illegal {
+		testutil.False(t, isLegalIndexBasetype(b), b.String()+" should be illegal")
+	}
+}
+
+func TestCheckIndexIllegalBasetype(t *testing.T) {
+	ctx := newTestContext()
+	mod := &module.Module{Name: "TEST-MIB"}
+	ctx.modules = append(ctx.modules, mod)
+	resolvedMod := newModule(mod.Name)
+	ctx.moduleToResolved[mod] = resolvedMod
+
+	// Create index object with Counter64 base type (illegal for INDEX).
+	idxObj := newObject("badIndex")
+	typ := newType("Counter64")
+	typ.setBase(BaseCounter64)
+	idxObj.setType(typ)
+	resolvedMod.addObject(idxObj)
+
+	root := ctx.mib.Root()
+	idxNode := buildOIDPath(root, 1, 1, 1, 1)
+	idxNode.setName("badIndex")
+	idxNode.setObject(idxObj)
+	ctx.registerModuleNodeSymbol(mod, "badIndex", idxNode)
+
+	objRefs := []objectTypeRef{
+		{mod: mod, obj: &module.ObjectType{
+			DefBase: module.DefBase{Name: "myEntry"},
+			Index:   []module.IndexItem{{Object: "badIndex"}},
+		}},
+	}
+
+	checkIndexConstraints(ctx, objRefs)
+
+	var found bool
+	for _, d := range ctx.Diagnostics() {
+		if d.Code == types.DiagIndexIllegalBasetype {
+			testutil.Contains(t, d.Message, "badIndex", "diagnostic message")
+			testutil.Contains(t, d.Message, "Counter64", "diagnostic should mention type")
+			found = true
+		}
+	}
+	testutil.True(t, found, "expected index-illegal-basetype diagnostic")
+}

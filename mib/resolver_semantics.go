@@ -989,6 +989,18 @@ func binaryToBytes(s string, rightPad bool) ([]byte, bool) {
 	return result, valid
 }
 
+// isLegalIndexBasetype reports whether a base type is legal for INDEX
+// elements per RFC 2578 section 7.7.
+func isLegalIndexBasetype(base BaseType) bool {
+	switch base {
+	case BaseInteger32, BaseUnsigned32, BaseCounter32, BaseGauge32, BaseTimeTicks,
+		BaseIpAddress, BaseOctetString, BaseOpaque, BaseBits, BaseObjectIdentifier:
+		return true
+	default:
+		return false
+	}
+}
+
 // isBareTypeIndex returns true for primitive/global type names that can appear
 // directly in INDEX clauses without being object definitions.
 func isBareTypeIndex(name string) bool {
@@ -1152,10 +1164,10 @@ func isIntegerKeywordSyntax(syntax module.TypeSyntax) bool {
 	}
 }
 
-// checkIndexConstraints checks integer-valued INDEX elements for missing
-// range restrictions and negative ranges. Per RFC 2578 section 7.7,
-// integer index values encode as a single OID sub-identifier, which
-// requires non-negative bounded values.
+// checkIndexConstraints validates INDEX elements: illegal basetypes,
+// missing range restrictions, and negative ranges. Per RFC 2578 section 7.7,
+// index syntax must resolve to INTEGER, OCTET STRING, IpAddress, or
+// OBJECT IDENTIFIER.
 func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 	for _, ref := range objRefs {
 		obj := ref.obj
@@ -1174,7 +1186,24 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			if t == nil {
 				continue
 			}
-			if t.EffectiveBase() != BaseInteger32 {
+			base := t.EffectiveBase()
+			if !isLegalIndexBasetype(base) {
+				ctx.EmitDiagnostic(types.DiagIndexIllegalBasetype, SeveritySevere,
+					ref.mod, obj.Span,
+					"INDEX "+item.Object+" of "+obj.Name+" has illegal base type "+base.String())
+				continue
+			}
+			// OCTET STRING/Opaque index elements must have a SIZE constraint
+			// so the encoding length is bounded.
+			if base == BaseOctetString || base == BaseOpaque {
+				if len(idxObj.EffectiveSizes()) == 0 {
+					ctx.EmitDiagnostic(types.DiagIndexElementNoSize, SeverityMinor,
+						ref.mod, obj.Span,
+						"INDEX "+item.Object+" of "+obj.Name+" has no SIZE restriction")
+				}
+				continue
+			}
+			if base != BaseInteger32 {
 				continue
 			}
 

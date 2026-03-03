@@ -129,6 +129,10 @@ const (
 	DiagParentCompliance         = "parent-compliance"
 	DiagParentCapabilities       = "parent-capabilities"
 	DiagRowSubidentifierOne      = "row-node-subidentifier-one"
+	DiagIndexElementNoSize       = "index-element-no-size"
+	DiagIndexIllegalBasetype     = "index-illegal-basetype"
+	DiagLastSubidZero            = "last-subid-zero"
+	DiagOidRecursive             = "oid-recursive"
 	DiagOidRegistered            = "oid-registered"
 	DiagOidReuse                 = "oid-reuse"
 	DiagSequenceNoColumn         = "sequence-no-column"
@@ -181,6 +185,10 @@ var resolverDiagCodes = []string{
 	DiagParentCompliance,
 	DiagParentCapabilities,
 	DiagRowSubidentifierOne,
+	DiagIndexElementNoSize,
+	DiagIndexIllegalBasetype,
+	DiagLastSubidZero,
+	DiagOidRecursive,
 	DiagOidRegistered,
 	DiagOidReuse,
 	DiagSequenceNoColumn,
