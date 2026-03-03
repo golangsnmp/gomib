@@ -1482,6 +1482,81 @@ func isExemptNotification(moduleName, notifName string) bool {
 	return false
 }
 
+// smiBaseTypes lists types that must be explicitly imported in SMIv2 modules.
+// ASN.1 primitives (INTEGER, OCTET STRING, OBJECT IDENTIFIER, BITS) are excluded
+// because they're implicitly available.
+var smiBaseTypes = map[string]string{
+	"Integer32":  moduleSNMPv2SMI,
+	"Counter32":  moduleSNMPv2SMI,
+	"Counter64":  moduleSNMPv2SMI,
+	"Gauge32":    moduleSNMPv2SMI,
+	"Unsigned32": moduleSNMPv2SMI,
+	"TimeTicks":  moduleSNMPv2SMI,
+	"IpAddress":  moduleSNMPv2SMI,
+	"Opaque":     moduleSNMPv2SMI,
+}
+
+// checkBasetypeImports verifies that SMIv2 modules explicitly import SMI base
+// types they reference. RFC 2578 requires these to be imported from SNMPv2-SMI.
+func checkBasetypeImports(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		if mod.Language != types.LanguageSMIv2 {
+			continue
+		}
+
+		// Collect imported symbol names for this module.
+		imported := make(map[string]struct{})
+		for _, imp := range mod.Imports {
+			imported[imp.Symbol] = struct{}{}
+		}
+
+		// Collect base types referenced in definitions.
+		referenced := make(map[string]struct{})
+		for _, def := range mod.Definitions {
+			collectBaseTypeRefs(def, referenced)
+		}
+
+		for typeName := range referenced {
+			if _, ok := imported[typeName]; ok {
+				continue
+			}
+			expectedMod := smiBaseTypes[typeName]
+			ctx.EmitDiagnostic(types.DiagBasetypeNotImported, mod, mod.Span,
+				fmt.Sprintf("%s used but not imported from %s in %s", typeName, expectedMod, mod.Name))
+		}
+	}
+}
+
+// collectBaseTypeRefs adds SMI base type names referenced by a definition to the set.
+func collectBaseTypeRefs(def module.Definition, refs map[string]struct{}) {
+	switch d := def.(type) {
+	case *module.ObjectType:
+		collectSyntaxBaseTypeRefs(d.Syntax, refs)
+	case *module.TypeDef:
+		collectSyntaxBaseTypeRefs(d.Syntax, refs)
+	}
+}
+
+func collectSyntaxBaseTypeRefs(syntax module.TypeSyntax, refs map[string]struct{}) {
+	switch s := syntax.(type) {
+	case *module.TypeSyntaxTypeRef:
+		if _, ok := smiBaseTypes[s.Name]; ok {
+			refs[s.Name] = struct{}{}
+		}
+	case *module.TypeSyntaxConstrained:
+		collectSyntaxBaseTypeRefs(s.Base, refs)
+	case *module.TypeSyntaxIntegerEnum:
+		if s.Base != "" {
+			if _, ok := smiBaseTypes[s.Base]; ok {
+				refs[s.Base] = struct{}{}
+			}
+		}
+	}
+}
+
 // normalizeTypeName maps SMIv1 type names to their SMIv2 equivalents.
 func normalizeTypeName(name string) string {
 	switch name {

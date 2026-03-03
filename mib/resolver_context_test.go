@@ -201,6 +201,7 @@ func TestLookupInModuleScope_Direct(t *testing.T) {
 	got, ok := lookupInModuleScope(modA, "x",
 		func(m *module.Module) map[string]*Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
+		nil,
 	)
 	testutil.True(t, ok, "expected to find nodeX directly")
 	testutil.Equal(t, nodeX, got, "expected nodeX directly")
@@ -222,6 +223,7 @@ func TestLookupInModuleScope_ImportChain(t *testing.T) {
 	got, ok := lookupInModuleScope(modA, "x",
 		func(m *module.Module) map[string]*Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
+		nil,
 	)
 	testutil.True(t, ok, "expected to find nodeX via import chain")
 	testutil.Equal(t, nodeX, got, "expected nodeX via import chain")
@@ -240,6 +242,7 @@ func TestLookupInModuleScope_ImportTargetLacksSymbol(t *testing.T) {
 	_, ok := lookupInModuleScope(modA, "x",
 		func(m *module.Module) map[string]*Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
+		nil,
 	)
 	testutil.False(t, ok, "expected false when import target lacks the symbol")
 }
@@ -253,6 +256,7 @@ func TestLookupInModuleScope_NotFound(t *testing.T) {
 	_, ok := lookupInModuleScope(modA, "x",
 		func(m *module.Module) map[string]*Node { return symbols[m] },
 		func(m *module.Module) map[string]*module.Module { return imports[m] },
+		nil,
 	)
 	testutil.False(t, ok, "expected not found for missing symbol")
 }

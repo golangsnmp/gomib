@@ -2,6 +2,7 @@ package mib
 
 import (
 	"cmp"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
@@ -361,6 +362,38 @@ func resolveUltimateDefiner(ctx *resolverContext, mod *module.Module, symbol str
 		}
 
 		return current
+	}
+}
+
+// checkUnusedImports emits diagnostics for imported symbols that were never
+// referenced during resolution. Must be called after all resolution phases.
+func checkUnusedImports(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		used := ctx.usedImports[mod]
+		imports := ctx.moduleImports[mod]
+		for _, imp := range mod.Imports {
+			if isMacroSymbol(imp.Symbol) {
+				continue
+			}
+			// Skip imports that failed to resolve; already reported as
+			// import-not-found or import-module-not-found.
+			if imports == nil {
+				continue
+			}
+			if _, resolved := imports[imp.Symbol]; !resolved {
+				continue
+			}
+			if used != nil {
+				if _, ok := used[imp.Symbol]; ok {
+					continue
+				}
+			}
+			ctx.EmitDiagnostic(types.DiagImportUnused, mod, imp.Span,
+				fmt.Sprintf("unused import: %q from %q", imp.Symbol, imp.Module))
+		}
 	}
 }
 

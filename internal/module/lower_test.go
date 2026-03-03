@@ -356,3 +356,185 @@ END
 		})
 	}
 }
+
+func TestLower_ModuleIdentityNotFirst(t *testing.T) {
+	source := []byte(`NOT-FIRST-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+someObject OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    ::= { notFirstTest 1 }
+
+notFirstTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleIdentityNotFirst)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagModuleIdentityNotFirst)
+	testutil.Equal(t, types.SeverityWarning, d.Severity, "severity")
+	testutil.True(t, strings.Contains(d.Message, "NOT-FIRST-MIB"), "message should mention module name: %s", d.Message)
+}
+
+func TestLower_ModuleIdentityNotFirst_WhenFirst(t *testing.T) {
+	// MODULE-IDENTITY is the first definition; no diagnostic expected.
+	source := []byte(`FIRST-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+firstTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+someObject OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    ::= { firstTest 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleIdentityNotFirst)
+	testutil.Nil(t, d, "should not get %s when MODULE-IDENTITY is first", types.DiagModuleIdentityNotFirst)
+}
+
+func TestLower_ModuleIdentityMultiple(t *testing.T) {
+	source := []byte(`MULTI-MI-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, enterprises
+        FROM SNMPv2-SMI;
+
+first MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "First"
+    REVISION "200001010000Z"
+    DESCRIPTION "First"
+    ::= { enterprises 99998 }
+
+second MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Second"
+    REVISION "200001010000Z"
+    DESCRIPTION "Second"
+    ::= { enterprises 99999 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleIdentityMultiple)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagModuleIdentityMultiple)
+	testutil.Equal(t, types.SeverityError, d.Severity, "severity")
+}
+
+func TestLower_MacroNotImported(t *testing.T) {
+	// Uses OBJECT-TYPE but doesn't import it.
+	source := []byte(`MACRO-TEST-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+macroTest MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+someObj OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    ::= { macroTest 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagMacroNotImported)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagMacroNotImported)
+	testutil.Equal(t, types.SeverityMinor, d.Severity, "severity")
+	testutil.True(t, strings.Contains(d.Message, "OBJECT-TYPE"), "message should mention OBJECT-TYPE: %s", d.Message)
+}
+
+func TestLower_MacroNotImported_WhenImported(t *testing.T) {
+	// OBJECT-TYPE is properly imported; no diagnostic expected.
+	source := []byte(`MACRO-OK-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI;
+
+macroOk MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Test"
+    REVISION "200001010000Z"
+    DESCRIPTION "Test"
+    ::= { enterprises 99999 }
+
+someObj OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Test"
+    ::= { macroOk 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagMacroNotImported)
+	testutil.Nil(t, d, "should not get %s when macro is imported", types.DiagMacroNotImported)
+}
+
+func TestLower_MacroNotImported_SMIv1(t *testing.T) {
+	// SMIv1 modules should NOT get macro-not-imported diagnostics.
+	source := []byte(`SMIV1-MACRO-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    Counter
+        FROM RFC1155-SMI;
+
+someObj OBJECT-TYPE
+    SYNTAX      Counter
+    ACCESS      read-only
+    STATUS      mandatory
+    DESCRIPTION "Test"
+    ::= { 1 3 6 1 }
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagMacroNotImported)
+	testutil.Nil(t, d, "SMIv1 module should not get %s", types.DiagMacroNotImported)
+}

@@ -91,18 +91,47 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 		slog.Int("definitions", len(module.Definitions)))
 
 	if module.Language == types.LanguageSMIv2 && !IsBaseModule(module.Name) {
-		hasModuleIdentity := false
-		for _, def := range module.Definitions {
+		var moduleIdentities []*ModuleIdentity
+		var firstASTDef *ast.ModuleIdentityDef
+		firstIndex := -1
+		for i, def := range module.Definitions {
 			if mi, ok := def.(*ModuleIdentity); ok {
-				hasModuleIdentity = true
-				checkRevisionLastUpdated(ctx, mi)
+				if firstIndex == -1 {
+					firstIndex = i
+				}
+				moduleIdentities = append(moduleIdentities, mi)
+			}
+		}
+		// Find the first AST MODULE-IDENTITY for span-accurate date checks.
+		for _, def := range astModule.Body {
+			if astMI, ok := def.(*ast.ModuleIdentityDef); ok {
+				firstASTDef = astMI
 				break
 			}
 		}
-		if !hasModuleIdentity {
+
+		if len(moduleIdentities) == 0 {
 			ctx.emitDiagnostic(types.DiagMissingModuleIdentity, module.Span,
 				fmt.Sprintf("SMIv2 module %s lacks MODULE-IDENTITY", module.Name))
+		} else {
+			checkRevisionLastUpdated(ctx, moduleIdentities[0])
+
+			if firstASTDef != nil {
+				checkModuleIdentityDates(ctx, firstASTDef)
+			}
+
+			if firstIndex > 0 {
+				ctx.emitDiagnostic(types.DiagModuleIdentityNotFirst, moduleIdentities[0].Span,
+					"MODULE-IDENTITY should be the first definition in "+module.Name)
+			}
+
+			for _, mi := range moduleIdentities[1:] {
+				ctx.emitDiagnostic(types.DiagModuleIdentityMultiple, mi.Span,
+					"multiple MODULE-IDENTITY definitions in "+module.Name)
+			}
 		}
+
+		checkMacroImports(ctx, astModule, module)
 	}
 
 	for _, d := range astModule.Diagnostics {
@@ -277,6 +306,60 @@ func checkRevisionLastUpdated(ctx *LoweringContext, mi *ModuleIdentity) {
 	}
 	ctx.emitDiagnostic(types.DiagRevisionLastUpdated, mi.Span,
 		fmt.Sprintf("revision for LAST-UPDATED %s is missing", mi.LastUpdated))
+}
+
+// checkMacroImports warns when SMIv2 macro keywords are used without being imported.
+func checkMacroImports(ctx *LoweringContext, astMod *ast.Module, mod *Module) {
+	// Collect imported macro names.
+	importedMacros := make(map[string]struct{})
+	for _, clause := range astMod.Imports {
+		for _, sym := range clause.Symbols {
+			switch sym.Name {
+			case "MODULE-IDENTITY", "OBJECT-IDENTITY", "OBJECT-TYPE",
+				"NOTIFICATION-TYPE", "TEXTUAL-CONVENTION", "OBJECT-GROUP",
+				"NOTIFICATION-GROUP", "MODULE-COMPLIANCE", "AGENT-CAPABILITIES":
+				importedMacros[sym.Name] = struct{}{}
+			}
+		}
+	}
+
+	// Determine which macros are used by scanning definitions.
+	usedMacros := make(map[string]struct{})
+	for _, def := range mod.Definitions {
+		switch d := def.(type) {
+		case *ModuleIdentity:
+			usedMacros["MODULE-IDENTITY"] = struct{}{}
+		case *ObjectIdentity:
+			usedMacros["OBJECT-IDENTITY"] = struct{}{}
+		case *ObjectType:
+			usedMacros["OBJECT-TYPE"] = struct{}{}
+		case *Notification:
+			// Could be NOTIFICATION-TYPE or TRAP-TYPE; only NOTIFICATION-TYPE
+			// needs an import in SMIv2.
+			if d.TrapInfo == nil {
+				usedMacros["NOTIFICATION-TYPE"] = struct{}{}
+			}
+		case *TypeDef:
+			if d.IsTextualConvention {
+				usedMacros["TEXTUAL-CONVENTION"] = struct{}{}
+			}
+		case *ObjectGroup:
+			usedMacros["OBJECT-GROUP"] = struct{}{}
+		case *NotificationGroup:
+			usedMacros["NOTIFICATION-GROUP"] = struct{}{}
+		case *ModuleCompliance:
+			usedMacros["MODULE-COMPLIANCE"] = struct{}{}
+		case *AgentCapabilities:
+			usedMacros["AGENT-CAPABILITIES"] = struct{}{}
+		}
+	}
+
+	for macro := range usedMacros {
+		if _, ok := importedMacros[macro]; !ok {
+			ctx.emitDiagnostic(types.DiagMacroNotImported, mod.Span,
+				fmt.Sprintf("%s used but not imported in %s", macro, mod.Name))
+		}
+	}
 }
 
 func lowerObjectIdentity(def *ast.ObjectIdentityDef, ctx *LoweringContext) *ObjectIdentity {

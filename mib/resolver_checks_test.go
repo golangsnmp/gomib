@@ -2364,3 +2364,143 @@ func makeTypedObject(base BaseType, sizes *[]Range) *Object {
 	}
 	return obj
 }
+
+func TestCheckUnusedImports(t *testing.T) {
+	// DisplayString is imported but never referenced in any definition.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-TC", "DisplayString", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+
+	found := false
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagImportUnused {
+			found = true
+			testutil.True(t, d.Message != "", "expected non-empty message")
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for unused DisplayString import", types.DiagImportUnused)
+}
+
+func TestCheckUnusedImports_AllUsed(t *testing.T) {
+	// All imports are used; no unused import diagnostic expected.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagImportUnused {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagImportUnused, d.Message)
+		}
+	}
+}
+
+func TestCheckBasetypeNotImported(t *testing.T) {
+	// Integer32 used without import from SNMPv2-SMI.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+
+	found := false
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagBasetypeNotImported {
+			found = true
+			testutil.True(t, d.Message != "", "expected non-empty message")
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for Integer32", types.DiagBasetypeNotImported)
+}
+
+func TestCheckBasetypeNotImported_WhenImported(t *testing.T) {
+	// Integer32 is properly imported; no diagnostic expected.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagBasetypeNotImported {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagBasetypeNotImported, d.Message)
+		}
+	}
+}

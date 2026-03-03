@@ -28,22 +28,37 @@ const (
 
 // Lowering diagnostic codes.
 const (
-	DiagMissingModuleIdentity = "missing-module-identity"
-	DiagRevisionLastUpdated   = "revision-last-updated"
-	DiagUnknownDefinitionType = "unknown-definition-type"
-	DiagUnknownTypeSyntax     = "unknown-type-syntax"
-	DiagUnknownConstraintType = "unknown-constraint-type"
-	DiagUnknownRangeValue     = "unknown-range-value"
-	DiagUnknownOidComponent   = "unknown-oid-component-type"
-	DiagUnknownDefvalType     = "unknown-defval-type"
-	DiagBitsNumberNegative    = "bits-number-negative"
-	DiagBitsNumberTooLarge    = "bits-number-too-large"
-	DiagBitsNumberLarge       = "bits-number-large"
-	DiagEnumZero              = "enum-zero"
-	DiagEnumNameRedefinition  = "enum-name-redefinition"
-	DiagEnumValueRedefinition = "enum-value-redefinition"
-	DiagBitsNameRedefinition  = "bits-name-redefinition"
-	DiagBitsValueRedefinition = "bits-value-redefinition"
+	DiagMissingModuleIdentity  = "missing-module-identity"
+	DiagRevisionLastUpdated    = "revision-last-updated"
+	DiagRevisionNotDescending  = "revision-not-descending"
+	DiagRevisionAfterUpdate    = "revision-after-update"
+	DiagDateCharacter          = "date-character"
+	DiagDateLength             = "date-length"
+	DiagDateMonth              = "date-month"
+	DiagDateDay                = "date-day"
+	DiagDateHour               = "date-hour"
+	DiagDateMinutes            = "date-minutes"
+	DiagDateValue              = "date-value"
+	DiagDateYear2Digits        = "date-year-2digits"
+	DiagDateInFuture           = "date-in-future"
+	DiagDateInPast             = "date-in-past"
+	DiagUnknownDefinitionType  = "unknown-definition-type"
+	DiagUnknownTypeSyntax      = "unknown-type-syntax"
+	DiagUnknownConstraintType  = "unknown-constraint-type"
+	DiagUnknownRangeValue      = "unknown-range-value"
+	DiagUnknownOidComponent    = "unknown-oid-component-type"
+	DiagUnknownDefvalType      = "unknown-defval-type"
+	DiagBitsNumberNegative     = "bits-number-negative"
+	DiagBitsNumberTooLarge     = "bits-number-too-large"
+	DiagBitsNumberLarge        = "bits-number-large"
+	DiagEnumZero               = "enum-zero"
+	DiagEnumNameRedefinition   = "enum-name-redefinition"
+	DiagEnumValueRedefinition  = "enum-value-redefinition"
+	DiagBitsNameRedefinition   = "bits-name-redefinition"
+	DiagBitsValueRedefinition  = "bits-value-redefinition"
+	DiagModuleIdentityNotFirst = "module-identity-not-first"
+	DiagModuleIdentityMultiple = "module-identity-multiple"
+	DiagMacroNotImported       = "macro-not-imported"
 )
 
 // Resolver diagnostic codes.
@@ -135,6 +150,8 @@ const (
 	DiagComplianceMemberNotLocal  = "compliance-member-not-local"
 	DiagTimeticksRangeIllegal     = "timeticks-range-illegal"
 	DiagStatusInvalidCapabilities = "status-invalid-capabilities"
+	DiagImportUnused              = "import-unused"
+	DiagBasetypeNotImported       = "basetype-not-imported"
 )
 
 // codeEntry pairs a diagnostic code with its severity.
@@ -166,6 +183,18 @@ var parserDiagCodes = []codeEntry{
 var loweringDiagCodes = []codeEntry{
 	{DiagMissingModuleIdentity, SeverityWarning},
 	{DiagRevisionLastUpdated, SeverityMinor},
+	{DiagRevisionNotDescending, SeverityMinor},
+	{DiagRevisionAfterUpdate, SeverityMinor},
+	{DiagDateCharacter, SeverityError},
+	{DiagDateLength, SeverityError},
+	{DiagDateMonth, SeverityError},
+	{DiagDateDay, SeverityError},
+	{DiagDateHour, SeverityError},
+	{DiagDateMinutes, SeverityError},
+	{DiagDateValue, SeverityError},
+	{DiagDateYear2Digits, SeverityWarning},
+	{DiagDateInFuture, SeverityStyle},
+	{DiagDateInPast, SeverityStyle},
 	{DiagUnknownDefinitionType, SeverityWarning},
 	{DiagUnknownTypeSyntax, SeverityWarning},
 	{DiagUnknownConstraintType, SeverityWarning},
@@ -180,6 +209,9 @@ var loweringDiagCodes = []codeEntry{
 	{DiagEnumValueRedefinition, SeverityError},
 	{DiagBitsNameRedefinition, SeverityError},
 	{DiagBitsValueRedefinition, SeverityError},
+	{DiagModuleIdentityNotFirst, SeverityWarning},
+	{DiagModuleIdentityMultiple, SeverityError},
+	{DiagMacroNotImported, SeverityMinor},
 }
 
 var resolverDiagCodes = []codeEntry{
@@ -270,6 +302,8 @@ var resolverDiagCodes = []codeEntry{
 	{DiagComplianceMemberNotLocal, SeverityWarning},
 	{DiagTimeticksRangeIllegal, SeverityError},
 	{DiagStatusInvalidCapabilities, SeverityError},
+	{DiagImportUnused, SeverityStyle},
+	{DiagBasetypeNotImported, SeverityMinor},
 }
 
 // diagPhases maps phase names to their diagnostic code entries.
