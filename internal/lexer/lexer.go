@@ -476,14 +476,27 @@ loop:
 func (l *Lexer) scanNumber() Token {
 	start := l.pos
 	l.scanDigits()
-	return l.token(TokNumber, start)
+	tok := l.token(TokNumber, start)
+	// Check for leading zeros: more than one digit starting with '0'
+	if l.pos-start > 1 && l.source[start] == '0' {
+		l.emitDiagnostic(types.DiagNumberLeadingZero, l.spanFrom(start),
+			"leading zero(s) on a number")
+	}
+	return tok
 }
 
 func (l *Lexer) scanNegativeNumber() Token {
 	start := l.pos
 	l.advance() // consume -
+	digitStart := l.pos
 	l.scanDigits()
-	return l.token(TokNegativeNumber, start)
+	tok := l.token(TokNegativeNumber, start)
+	// Check for leading zeros in the digit portion
+	if l.pos-digitStart > 1 && l.source[digitStart] == '0' {
+		l.emitDiagnostic(types.DiagNumberLeadingZero, l.spanFrom(start),
+			"leading zero(s) on a number")
+	}
+	return tok
 }
 
 func (l *Lexer) scanDigits() {

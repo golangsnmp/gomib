@@ -24,6 +24,7 @@ const (
 	DiagInvalidI64           = "invalid-i64"
 	DiagKeywordReserved      = "keyword-reserved"
 	DiagInvalidHexRange      = "invalid-hex-range"
+	DiagNumberLeadingZero    = "number-leading-zero"
 )
 
 // Lowering diagnostic codes.
@@ -167,6 +168,11 @@ const (
 	DiagRowNameTableName          = "row-name-table-name"
 	DiagNamedNumbersAscending     = "named-numbers-ascending"
 	DiagHyphenInLabel             = "hyphen-in-label"
+	DiagOpaqueSMIv2               = "opaque-smiv2"
+	DiagInvalidFormat             = "invalid-format"
+	DiagTypeWithoutFormat         = "type-without-format"
+	DiagTypeUnreferenced          = "type-unref"
+	DiagGroupUnreferenced         = "group-unref"
 )
 
 // codeEntry pairs a diagnostic code with its severity.
@@ -193,6 +199,7 @@ var parserDiagCodes = []codeEntry{
 	{DiagInvalidI64, SeverityError},
 	{DiagKeywordReserved, SeveritySevere},
 	{DiagInvalidHexRange, SeverityError},
+	{DiagNumberLeadingZero, SeverityMinor},
 }
 
 var loweringDiagCodes = []codeEntry{
@@ -334,6 +341,11 @@ var resolverDiagCodes = []codeEntry{
 	{DiagRowNameTableName, SeverityStyle},
 	{DiagNamedNumbersAscending, SeverityStyle},
 	{DiagHyphenInLabel, SeverityStyle},
+	{DiagOpaqueSMIv2, SeverityWarning},
+	{DiagInvalidFormat, SeverityError},
+	{DiagTypeWithoutFormat, SeverityStyle},
+	{DiagTypeUnreferenced, SeverityStyle},
+	{DiagGroupUnreferenced, SeverityStyle},
 }
 
 // diagPhases maps phase names to their diagnostic code entries.

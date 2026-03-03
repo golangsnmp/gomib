@@ -1778,3 +1778,322 @@ func checkHyphenInLabel(ctx *resolverContext) {
 		}
 	})
 }
+
+// checkOpaqueSMIv2 flags OBJECT-TYPE definitions that use the Opaque base type
+// in SMIv2 modules. RFC 2578 section 7.1.3 says Opaque is provided solely for
+// backward-compatibility and should not be used for new definitions.
+func checkOpaqueSMIv2(ctx *resolverContext, objRefs []objectTypeRef) {
+	for _, ref := range objRefs {
+		if ref.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(ref.mod.Name) {
+			continue
+		}
+		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		if resolved == nil {
+			continue
+		}
+		t := resolved.Type()
+		if t == nil {
+			continue
+		}
+		if t.EffectiveBase() == BaseOpaque {
+			ctx.EmitDiagnostic(types.DiagOpaqueSMIv2,
+				ref.mod, ref.obj.Span,
+				fmt.Sprintf("%q: Opaque type should not be used in SMIv2", ref.obj.Name))
+		}
+	}
+}
+
+// validateDisplayHintInteger checks an integer-type DISPLAY-HINT per RFC 2579
+// section 3.1. Valid forms: "x", "o", "b", "d", or "d-N" where N is one or
+// more decimal digits specifying the implied decimal point position.
+func validateDisplayHintInteger(hint string) bool {
+	if hint == "" {
+		return false
+	}
+	switch hint[0] {
+	case 'x', 'o', 'b':
+		return len(hint) == 1
+	case 'd':
+		if len(hint) == 1 {
+			return true
+		}
+		if hint[1] != '-' || len(hint) < 3 {
+			return false
+		}
+		for i := 2; i < len(hint); i++ {
+			if hint[i] < '0' || hint[i] > '9' {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+// validateDisplayHintOctetString checks an octet-string-type DISPLAY-HINT per
+// RFC 2579 section 3.1. The hint consists of one or more octet-format specs,
+// each with five parts: optional repeat indicator (*), required octet count
+// (decimal digits), required format char (x/d/o/a/t), optional separator char,
+// and optional repeat terminator char.
+func validateDisplayHintOctetString(hint string) bool {
+	if hint == "" {
+		return false
+	}
+	p := 0
+	// Track whether the last spec consumes data. The last spec is implicitly
+	// repeated until all data is exhausted, so it must consume at least one
+	// byte to avoid infinite loops.
+	lastSpecConsumes := false
+	for p < len(hint) {
+		// Part 1: optional repeat indicator
+		repeat := false
+		if hint[p] == '*' {
+			repeat = true
+			p++
+		}
+
+		// Part 2: required octet count (one or more digits)
+		n := 0
+		take := 0
+		for p < len(hint) && hint[p] >= '0' && hint[p] <= '9' {
+			take = take*10 + int(hint[p]-'0')
+			p++
+			n++
+		}
+		if n == 0 {
+			return false
+		}
+
+		// Part 3: required format character
+		if p >= len(hint) {
+			return false
+		}
+		switch hint[p] {
+		case 'x', 'd', 'o', 'a', 't':
+			p++
+		default:
+			return false
+		}
+
+		// Part 4: optional separator character (not a digit, not *)
+		if p < len(hint) && hint[p] != '*' && (hint[p] < '0' || hint[p] > '9') {
+			p++
+
+			// Part 5: optional repeat terminator (only if repeat and separator present)
+			if repeat && p < len(hint) && hint[p] != '*' && (hint[p] < '0' || hint[p] > '9') {
+				p++
+			}
+		}
+
+		// A spec consumes data if take > 0, or if it has a repeat indicator
+		// (which consumes the count byte).
+		lastSpecConsumes = take > 0 || repeat
+	}
+	// The last spec is implicitly repeated. If it consumes zero bytes,
+	// applying the hint would loop forever.
+	return lastSpecConsumes
+}
+
+// checkFormatHints validates DISPLAY-HINT usage on textual conventions.
+// It combines two checks:
+//   - DiagInvalidFormat: format string is syntactically invalid for the base
+//     type, or DISPLAY-HINT is present on an inapplicable base type (RFC 2579
+//     section 3.1).
+//   - DiagTypeWithoutFormat: TC for OCTET STRING or integer-based type has no
+//     DISPLAY-HINT (RFC 2579 section 3.1 recommends one).
+func checkFormatHints(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			td, ok := def.(*module.TypeDef)
+			if !ok || !td.IsTextualConvention {
+				continue
+			}
+			resolved, ok := ctx.LookupTypeForModule(mod, td.Name)
+			if !ok {
+				continue
+			}
+			base := resolved.EffectiveBase()
+
+			if td.DisplayHint != "" {
+				var valid bool
+				switch base {
+				case BaseInteger32, BaseUnsigned32, BaseGauge32, BaseTimeTicks:
+					valid = validateDisplayHintInteger(td.DisplayHint)
+				case BaseOctetString, BaseOpaque:
+					valid = validateDisplayHintOctetString(td.DisplayHint)
+				default:
+					// DISPLAY-HINT is not applicable to this basetype.
+					valid = false
+				}
+				if !valid {
+					ctx.EmitDiagnostic(types.DiagInvalidFormat,
+						mod, td.Span,
+						fmt.Sprintf("%q: invalid DISPLAY-HINT %q for base type %s",
+							td.Name, td.DisplayHint, base))
+				}
+			} else if resolved.EffectiveDisplayHint() == "" {
+				switch base {
+				case BaseOctetString, BaseInteger32, BaseUnsigned32, BaseGauge32:
+					ctx.EmitDiagnostic(types.DiagTypeWithoutFormat,
+						mod, td.Span,
+						fmt.Sprintf("%q: textual convention without DISPLAY-HINT", td.Name))
+				}
+			}
+		}
+	}
+}
+
+// checkTypeUnreferenced flags type definitions that are never referenced by
+// any OBJECT-TYPE SYNTAX, other type definition, or compliance refinement.
+// Only checks within the loaded module set, not external consumers.
+func checkTypeUnreferenced(ctx *resolverContext) {
+	// Build set of referenced type names per module.
+	referenced := make(map[*module.Module]map[string]struct{})
+	markRef := func(mod *module.Module, name string) {
+		refs := referenced[mod]
+		if refs == nil {
+			refs = make(map[string]struct{})
+			referenced[mod] = refs
+		}
+		refs[name] = struct{}{}
+	}
+
+	// Collect type references from all definitions.
+	for _, mod := range ctx.modules {
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.ObjectType:
+				collectSyntaxTypeRefs(d.Syntax, mod, markRef)
+			case *module.TypeDef:
+				collectSyntaxTypeRefs(d.Syntax, mod, markRef)
+			case *module.ModuleCompliance:
+				for _, cm := range d.Modules {
+					for _, obj := range cm.Objects {
+						collectSyntaxTypeRefs(obj.Syntax, mod, markRef)
+						collectSyntaxTypeRefs(obj.WriteSyntax, mod, markRef)
+					}
+				}
+			case *module.AgentCapabilities:
+				for _, sup := range d.Supports {
+					for _, v := range sup.Variations {
+						collectSyntaxTypeRefs(v.Syntax, mod, markRef)
+						collectSyntaxTypeRefs(v.WriteSyntax, mod, markRef)
+					}
+				}
+			}
+		}
+	}
+
+	// Also mark types that are exported via imports from other modules.
+	for _, mod := range ctx.modules {
+		for _, imp := range mod.Imports {
+			// If another module imports a type name, mark it as used
+			// in the source module.
+			for _, srcMod := range ctx.moduleIndex[imp.Module] {
+				markRef(srcMod, imp.Symbol)
+			}
+		}
+	}
+
+	// Check each type definition.
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		refs := referenced[mod]
+		for _, def := range mod.Definitions {
+			td, ok := def.(*module.TypeDef)
+			if !ok {
+				continue
+			}
+			// Skip SEQUENCE types (used internally for row definitions).
+			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
+				continue
+			}
+			if refs != nil {
+				if _, used := refs[td.Name]; used {
+					continue
+				}
+			}
+			ctx.EmitDiagnostic(types.DiagTypeUnreferenced,
+				mod, td.Span,
+				fmt.Sprintf("%q: type defined but never referenced", td.Name))
+		}
+	}
+}
+
+// collectSyntaxTypeRefs extracts type name references from a TypeSyntax and
+// calls markRef for each one.
+func collectSyntaxTypeRefs(syntax module.TypeSyntax, mod *module.Module, markRef func(*module.Module, string)) {
+	if syntax == nil {
+		return
+	}
+	switch s := syntax.(type) {
+	case *module.TypeSyntaxTypeRef:
+		markRef(mod, s.Name)
+	case *module.TypeSyntaxIntegerEnum:
+		if s.Base != "" {
+			markRef(mod, s.Base)
+		}
+	case *module.TypeSyntaxConstrained:
+		collectSyntaxTypeRefs(s.Base, mod, markRef)
+	case *module.TypeSyntaxSequenceOf:
+		markRef(mod, s.EntryType)
+	}
+}
+
+// checkGroupUnreferenced flags OBJECT-GROUP and NOTIFICATION-GROUP definitions
+// that are never referenced in any MODULE-COMPLIANCE (as mandatory or optional
+// groups). Only checks within the loaded module set.
+func checkGroupUnreferenced(ctx *resolverContext) {
+	// Collect all group names referenced by compliance and capabilities modules.
+	referencedGroups := make(map[string]struct{})
+	for _, mod := range ctx.modules {
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.ModuleCompliance:
+				for _, cm := range d.Modules {
+					for _, name := range cm.MandatoryGroups {
+						referencedGroups[name] = struct{}{}
+					}
+					for _, grp := range cm.Groups {
+						referencedGroups[grp.Group] = struct{}{}
+					}
+				}
+			case *module.AgentCapabilities:
+				for _, sup := range d.Supports {
+					for _, name := range sup.Includes {
+						referencedGroups[name] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+
+	// Check each group definition.
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.ObjectGroup:
+				if _, ok := referencedGroups[d.Name]; !ok {
+					ctx.EmitDiagnostic(types.DiagGroupUnreferenced,
+						mod, d.Span,
+						fmt.Sprintf("%q: OBJECT-GROUP not referenced in any compliance module", d.Name))
+				}
+			case *module.NotificationGroup:
+				if _, ok := referencedGroups[d.Name]; !ok {
+					ctx.EmitDiagnostic(types.DiagGroupUnreferenced,
+						mod, d.Span,
+						fmt.Sprintf("%q: NOTIFICATION-GROUP not referenced in any compliance module", d.Name))
+				}
+			}
+		}
+	}
+}

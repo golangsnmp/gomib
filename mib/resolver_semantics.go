@@ -42,6 +42,10 @@ func resolveSemantics(ctx *resolverContext) {
 	checkTableRowNaming(ctx, objRefs)
 	checkNamedNumberOrdering(ctx)
 	checkHyphenInLabel(ctx)
+	checkOpaqueSMIv2(ctx, objRefs)
+	checkFormatHints(ctx)
+	checkTypeUnreferenced(ctx)
+	checkGroupUnreferenced(ctx)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
