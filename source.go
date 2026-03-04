@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"os"
+	posixpath "path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -143,7 +144,7 @@ func (s *fsSource) Find(name string) (FindResult, error) {
 	if !ok {
 		return FindResult{}, fs.ErrNotExist
 	}
-	fullPath := filepath.Join(s.name, path)
+	fullPath := posixpath.Join(s.name, path)
 	content, err := fs.ReadFile(s.fsys, path)
 	if err != nil {
 		return FindResult{Path: fullPath}, err
