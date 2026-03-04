@@ -512,6 +512,33 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			if idxObj == nil {
 				continue
 			}
+
+			// INDEX column access: SMIv2 requires not-accessible,
+			// SMIv1 requires accessible (RFC 2578 s7.7, RFC 1212 s4.1).
+			switch ref.mod.Language {
+			case types.LanguageSMIv2:
+				if idxObj.Access() != AccessNotAccessible {
+					ctx.EmitDiagnostic(types.DiagIndexAccessible,
+						ref.mod, obj.Span,
+						fmt.Sprintf("INDEX %q of %q should be not-accessible in SMIv2", item.Object, obj.Name))
+				}
+			case types.LanguageSMIv1:
+				if idxObj.Access() == AccessNotAccessible {
+					ctx.EmitDiagnostic(types.DiagIndexNotAccessible,
+						ref.mod, obj.Span,
+						fmt.Sprintf("INDEX %q of %q should be accessible in SMIv1", item.Object, obj.Name))
+				}
+			case types.LanguageUnknown:
+				// Cannot validate index access without known language.
+			}
+
+			// INDEX elements should not have DEFVAL (RFC 2578 s7.7).
+			if !idxObj.DefaultValue().IsZero() {
+				ctx.EmitDiagnostic(types.DiagIndexDefval,
+					ref.mod, obj.Span,
+					fmt.Sprintf("INDEX %q of %q has a DEFVAL", item.Object, obj.Name))
+			}
+
 			t := idxObj.Type()
 			if t == nil {
 				continue
@@ -1237,6 +1264,11 @@ func checkAccessPerVersion(ctx *resolverContext, mod *module.Module, obj *module
 			ctx.EmitDiagnostic(types.DiagAccessInvalidSMIv1,
 				mod, obj.Span,
 				fmt.Sprintf("%q: invalid access %s in SMIv1", obj.Name, obj.Access.String()))
+		}
+		if obj.Access == types.AccessWriteOnly {
+			ctx.EmitDiagnostic(types.DiagAccessWriteOnlySMIv1,
+				mod, obj.Span,
+				fmt.Sprintf("%q: write-only is valid but discouraged in SMIv1", obj.Name))
 		}
 	case types.LanguageSMIv2:
 		if obj.Access == types.AccessWriteOnly {
@@ -2409,6 +2441,29 @@ func checkTAddressTDomain(ctx *resolverContext, objRefs []objectTypeRef) {
 			ctx.EmitDiagnostic(types.DiagTAddressTDomain,
 				ref.mod, ref.obj.Span,
 				fmt.Sprintf("%q: TAddress column has no sibling with TDomain type", ref.obj.Name))
+		}
+	}
+}
+
+// checkIpAddressDeprecation warns when SMIv2 OBJECT-TYPEs use IpAddress,
+// which is deprecated in favor of InetAddress (RFC 4001).
+func checkIpAddressDeprecation(ctx *resolverContext, objRefs []objectTypeRef) {
+	for _, ref := range objRefs {
+		if ref.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(ref.mod.Name) {
+			continue
+		}
+		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		if resolved == nil {
+			continue
+		}
+		t := resolved.Type()
+		if t == nil {
+			continue
+		}
+		if t.EffectiveBase() == BaseIpAddress {
+			ctx.EmitDiagnostic(types.DiagIpAddressInSyntax,
+				ref.mod, ref.obj.Span,
+				fmt.Sprintf("%q: IpAddress is deprecated, use InetAddress (RFC 4001)", ref.obj.Name))
 		}
 	}
 }

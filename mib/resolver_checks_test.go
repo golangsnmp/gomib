@@ -3886,3 +3886,185 @@ func TestCheckTAddressTDomain_WithTDomainOK(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckIndexAccessAndDefval(t *testing.T) {
+	tests := []struct {
+		name     string
+		lang     types.Language
+		access   Access
+		defval   bool
+		strict   bool // use StrictConfig (needed for warning-level diags)
+		wantCode string
+	}{
+		{"SMIv2 read-only emits index-accessible", types.LanguageSMIv2, AccessReadOnly, false, false, types.DiagIndexAccessible},
+		{"SMIv2 not-accessible is ok", types.LanguageSMIv2, AccessNotAccessible, false, false, ""},
+		{"SMIv1 not-accessible emits index-not-accessible", types.LanguageSMIv1, AccessNotAccessible, false, false, types.DiagIndexNotAccessible},
+		{"SMIv1 read-only is ok", types.LanguageSMIv1, AccessReadOnly, false, false, ""},
+		{"INDEX with DEFVAL emits index-defval", types.LanguageSMIv2, AccessNotAccessible, true, true, types.DiagIndexDefval},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var ctx *resolverContext
+			if tt.strict {
+				ctx = newTestContextWithConfig(StrictConfig())
+			} else {
+				ctx = newTestContext()
+			}
+			mod := &module.Module{Name: "TEST-MIB", Language: tt.lang}
+			ctx.modules = append(ctx.modules, mod)
+			resolvedMod := newModule(mod.Name)
+			ctx.moduleToResolved[mod] = resolvedMod
+
+			idxObj := newObject("myIndex")
+			typ := newType("Integer32")
+			typ.setBase(BaseInteger32)
+			idxObj.setType(typ)
+			idxObj.setAccess(tt.access)
+			idxObj.setEffectiveRanges([]Range{{Min: 1, Max: 100}})
+			if tt.defval {
+				dv := newDefValInt(1, "1")
+				idxObj.setDefaultValue(&dv)
+			}
+			resolvedMod.addObject(idxObj)
+
+			root := ctx.mib.Root()
+			idxNode := buildOIDPath(root, 1, 1, 1, 1)
+			idxNode.setName("myIndex")
+			idxNode.setObject(idxObj)
+			ctx.registerModuleNodeSymbol(mod, "myIndex", idxNode)
+
+			objRefs := []objectTypeRef{
+				{mod: mod, obj: &module.ObjectType{
+					DefBase: module.DefBase{Name: "myEntry"},
+					Index:   []module.IndexItem{{Object: "myIndex"}},
+				}},
+			}
+
+			checkIndexConstraints(ctx, objRefs)
+
+			if tt.wantCode != "" {
+				var found bool
+				for _, d := range ctx.Diagnostics() {
+					if d.Code == tt.wantCode {
+						found = true
+					}
+				}
+				testutil.True(t, found, "expected %s", tt.wantCode)
+			} else {
+				// Verify neither index-accessible nor index-not-accessible emitted.
+				for _, d := range ctx.Diagnostics() {
+					if d.Code == types.DiagIndexAccessible || d.Code == types.DiagIndexNotAccessible {
+						t.Fatalf("unexpected diagnostic: %s: %s", d.Code, d.Message)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestCheckAccessWriteOnlySMIv1(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv1,
+		Imports: []module.Import{
+			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+			module.NewImport("RFC1155-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "woObject"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:        types.AccessWriteOnly,
+				AccessKeyword: types.AccessKeywordAccess,
+				Status:        types.StatusMandatory,
+				Oid:           testOid("testRoot", 1),
+			},
+		},
+	}
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagAccessWriteOnlySMIv1 {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for write-only in SMIv1", types.DiagAccessWriteOnlySMIv1)
+}
+
+func TestCheckIpAddressDeprecation(t *testing.T) {
+	t.Run("IpAddress in SMIv2 emits diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TEST-MIB",
+			Language: types.LanguageSMIv2,
+			Imports: []module.Import{
+				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "IpAddress", types.Span{}),
+			},
+			Definitions: []module.Definition{
+				&module.ValueAssignment{
+					DefBase: module.DefBase{Name: "testRoot"},
+					Oid:     testOid("enterprises", 99999),
+				},
+				&module.ObjectType{
+					DefBase:       module.DefBase{Name: "myAddr"},
+					Syntax:        &module.TypeSyntaxTypeRef{Name: "IpAddress"},
+					Access:        types.AccessReadOnly,
+					AccessKeyword: types.AccessKeywordMaxAccess,
+					Status:        types.StatusCurrent,
+					Oid:           testOid("testRoot", 1),
+				},
+			},
+		}
+		cfg := StrictConfig()
+		m := Resolve([]*module.Module{mod}, nil, &cfg)
+		var found bool
+		for _, d := range m.Diagnostics() {
+			if d.Code == types.DiagIpAddressInSyntax {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "expected %s for IpAddress in SMIv2", types.DiagIpAddressInSyntax)
+	})
+
+	t.Run("IpAddress in SMIv1 does not emit diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TEST-MIB",
+			Language: types.LanguageSMIv1,
+			Imports: []module.Import{
+				module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+				module.NewImport("RFC1155-SMI", "OBJECT-TYPE", types.Span{}),
+				module.NewImport("RFC1155-SMI", "IpAddress", types.Span{}),
+			},
+			Definitions: []module.Definition{
+				&module.ValueAssignment{
+					DefBase: module.DefBase{Name: "testRoot"},
+					Oid:     testOid("enterprises", 99999),
+				},
+				&module.ObjectType{
+					DefBase:       module.DefBase{Name: "myAddr"},
+					Syntax:        &module.TypeSyntaxTypeRef{Name: "IpAddress"},
+					Access:        types.AccessReadOnly,
+					AccessKeyword: types.AccessKeywordAccess,
+					Status:        types.StatusMandatory,
+					Oid:           testOid("testRoot", 1),
+				},
+			},
+		}
+		cfg := StrictConfig()
+		m := Resolve([]*module.Module{mod}, nil, &cfg)
+		for _, d := range m.Diagnostics() {
+			if d.Code == types.DiagIpAddressInSyntax {
+				t.Fatalf("unexpected %s in SMIv1: %s", types.DiagIpAddressInSyntax, d.Message)
+			}
+		}
+	})
+}
