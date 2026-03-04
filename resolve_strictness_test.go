@@ -4,8 +4,8 @@ package gomib
 // strictness levels, and tests import forwarding chains and partial resolution.
 // The strictness system gates fallback resolution strategies:
 //
-//   - Safe fallbacks (level >= 3, Normal): module aliases, import forwarding
-//   - Best-guess fallbacks (level >= 5, Permissive): global type lookup, SMI global OID roots
+//   - Safe fallbacks (level <= Normal): module aliases, import forwarding
+//   - Best-guess fallbacks (level <= Permissive): global type lookup, SMI global OID roots
 //
 // These tests load synthetic MIBs at different strictness levels and verify
 // that resolution outcomes differ. Expected values are grounded against
@@ -310,21 +310,21 @@ func TestOIDGlobalRootPermissiveOnly(t *testing.T) {
 }
 
 // TestStrictnessLevelBoundaries verifies the exact boundary conditions of
-// the two guard functions: AllowSafeFallbacks (level >= 3) and
-// AllowBestGuessFallbacks (level >= 5).
+// the two guard functions: AllowSafeFallbacks (level <= 3) and
+// AllowBestGuessFallbacks (level <= 1).
 func TestStrictnessLevelBoundaries(t *testing.T) {
 	tests := []struct {
 		level     mib.StrictnessLevel
 		wantSafe  bool
 		wantGuess bool
 	}{
-		{0, false, false}, // Strict
-		{1, false, false},
-		{2, false, false},
+		{0, true, true}, // Silent
+		{1, true, true}, // Permissive
+		{2, true, false},
 		{3, true, false}, // Normal
-		{4, true, false},
-		{5, true, true}, // Permissive
-		{6, true, true}, // Silent
+		{4, false, false},
+		{5, false, false},
+		{6, false, false}, // Strict
 	}
 
 	for _, tt := range tests {

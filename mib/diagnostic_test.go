@@ -107,12 +107,13 @@ func TestDiagnosticConfigIsStrict(t *testing.T) {
 		level StrictnessLevel
 		want  bool
 	}{
-		{"strict", StrictnessStrict, true},
-		{"level 1", 1, true},
-		{"level 2", 2, true},
-		{"normal", StrictnessNormal, false},
-		{"permissive", StrictnessPermissive, false},
 		{"silent", StrictnessSilent, false},
+		{"permissive", StrictnessPermissive, false},
+		{"level 2", 2, false},
+		{"normal", StrictnessNormal, false},
+		{"level 4", 4, true},
+		{"level 5", 5, true},
+		{"strict", StrictnessStrict, true},
 	}
 
 	for _, tt := range tests {
@@ -130,11 +131,12 @@ func TestDiagnosticConfigAllowSafeFallbacks(t *testing.T) {
 		level StrictnessLevel
 		want  bool
 	}{
-		{"strict", StrictnessStrict, false},
-		{"level 2", 2, false},
-		{"normal", StrictnessNormal, true},
-		{"permissive", StrictnessPermissive, true},
 		{"silent", StrictnessSilent, true},
+		{"permissive", StrictnessPermissive, true},
+		{"level 2", 2, true},
+		{"normal", StrictnessNormal, true},
+		{"level 4", 4, false},
+		{"strict", StrictnessStrict, false},
 	}
 
 	for _, tt := range tests {
@@ -152,11 +154,12 @@ func TestDiagnosticConfigAllowBestGuessFallbacks(t *testing.T) {
 		level StrictnessLevel
 		want  bool
 	}{
-		{"strict", StrictnessStrict, false},
+		{"silent", StrictnessSilent, true},
+		{"permissive", StrictnessPermissive, true},
+		{"level 2", 2, false},
 		{"normal", StrictnessNormal, false},
 		{"level 4", 4, false},
-		{"permissive", StrictnessPermissive, true},
-		{"silent", StrictnessSilent, true},
+		{"strict", StrictnessStrict, false},
 	}
 
 	for _, tt := range tests {

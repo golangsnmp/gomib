@@ -42,7 +42,7 @@ func (d Diagnostic) String() string {
 // DiagnosticConfig controls strictness and diagnostic filtering.
 type DiagnosticConfig struct {
 	// Level sets the base strictness level.
-	// Diagnostics with severity > Level are suppressed.
+	// Higher levels are stricter and report more diagnostics.
 	Level StrictnessLevel
 
 	// FailAt sets the severity threshold for failure.
@@ -129,11 +129,11 @@ func SilentConfig() DiagnosticConfig {
 // Ignore, then Level. Fatal diagnostics are always reported regardless of
 // Ignore list or Level (unless overridden to a non-fatal severity).
 //
-// The Level controls reporting threshold:
-//   - Level 0 (Strict): Report all diagnostics (Info and above)
-//   - Level 3 (Normal): Report Minor and above (0-3)
-//   - Level 5 (Permissive): Report Warning and above (0-5)
-//   - Level 6 (Silent): Report nothing
+// The Level controls reporting threshold (higher = stricter = more output):
+//   - Level 6 (Strict): Report all diagnostics (sev 0-6)
+//   - Level 3 (Normal): Report Minor and above (sev 0-3)
+//   - Level 1 (Permissive): Report Warning and above (sev 0-5)
+//   - Level 0 (Silent): Report nothing
 //
 // Lower severity numbers are more severe (Fatal=0, Info=6).
 func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
@@ -152,15 +152,23 @@ func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
 		return false
 	}
 
-	if c.Level >= StrictnessSilent {
-		return false
-	}
+	return int(sev) <= c.maxReportedSeverity()
+}
 
-	if c.Level == StrictnessStrict {
-		return true
+// maxReportedSeverity returns the maximum severity number (least severe)
+// that should be reported at the current strictness level.
+// Returns -1 for Silent (report nothing except fatal, handled above).
+func (c DiagnosticConfig) maxReportedSeverity() int {
+	switch {
+	case c.Level >= StrictnessStrict:
+		return int(SeverityInfo) // report everything
+	case c.Level >= StrictnessNormal:
+		return int(SeverityMinor) // report sev 0-3
+	case c.Level >= StrictnessPermissive:
+		return int(SeverityWarning) // report sev 0-5
+	default:
+		return -1 // silent: report nothing (fatal handled by caller)
 	}
-
-	return int(sev) <= int(c.Level)
 }
 
 // ShouldFail returns true if a diagnostic with the given severity should
@@ -172,21 +180,21 @@ func (c DiagnosticConfig) ShouldFail(sev Severity) bool {
 // IsStrict returns true if strict RFC compliance is required.
 // In strict mode, no fallback resolution strategies are used.
 func (c DiagnosticConfig) IsStrict() bool {
-	return c.Level < StrictnessNormal
+	return c.Level > StrictnessNormal
 }
 
 // AllowSafeFallbacks returns true if safe fallback strategies should be used.
 // Safe fallbacks have high confidence of matching MIB author intent.
-// Enabled at normal strictness (level 3) and above.
+// Enabled at normal strictness and below.
 func (c DiagnosticConfig) AllowSafeFallbacks() bool {
-	return c.Level >= StrictnessNormal
+	return c.Level <= StrictnessNormal
 }
 
 // AllowBestGuessFallbacks returns true if best-guess fallback strategies should be used.
 // Best-guess fallbacks may resolve incorrectly but help with broken vendor MIBs.
-// Enabled at permissive strictness (level 5) and above.
+// Enabled at permissive strictness and below.
 func (c DiagnosticConfig) AllowBestGuessFallbacks() bool {
-	return c.Level >= StrictnessPermissive
+	return c.Level <= StrictnessPermissive
 }
 
 // MatchGlob performs glob matching on diagnostic codes using path.Match

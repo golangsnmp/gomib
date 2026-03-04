@@ -74,12 +74,12 @@ MIBs that pass at permissive level but have warnings at strict level.
 
 ## gomib Strictness Mapping
 
-| gomib Level | smilint Level | Use Case |
-|-------------|---------------|----------|
-| Strict (0) | 0-1 | RFC compliance validation |
-| Normal (3) | 0-3 | Default, balanced |
-| Permissive (5) | 0-5 | Legacy/vendor MIBs |
-| Silent (6) | - | Maximum compatibility |
+| gomib --level | Internal | smilint Level | Use Case |
+|---------------|----------|---------------|----------|
+| 6 | Strict | 0-1 | RFC compliance validation |
+| 3 | Normal | 0-3 | Default, balanced |
+| 1 | Permissive | 0-5 | Legacy/vendor MIBs |
+| 0 | Silent | - | Maximum compatibility |
 
 ## Usage
 

@@ -6,6 +6,9 @@ import "github.com/golangsnmp/gomib/internal/types"
 // Lower values are more severe.
 type Severity = types.Severity
 
+// SeverityNames returns the severity level names in order (fatal..info).
+func SeverityNames() []string { return types.SeverityNames() }
+
 const (
 	SeverityFatal   = types.SeverityFatal
 	SeveritySevere  = types.SeveritySevere

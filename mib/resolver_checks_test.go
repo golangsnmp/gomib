@@ -3323,3 +3323,566 @@ func TestCheckInvalidFormat_UnsupportedBasetype(t *testing.T) {
 	}
 	testutil.True(t, found, "expected %s diagnostic for counter with hint", types.DiagInvalidFormat)
 }
+
+// --- node-implicit tests ---
+
+func TestCheckNodeImplicit_Fires(t *testing.T) {
+	// OID path { enterprises 99999 1 } creates an implicit node at
+	// enterprises.99999 (unnamed KindInternal).
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				Description: "test",
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "enterprises"},
+					&module.OidComponentNumber{Value: 99999},
+					&module.OidComponentNumber{Value: 1},
+				}, types.Span{}),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagNodeImplicit {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for implicit intermediate node", types.DiagNodeImplicit)
+}
+
+func TestCheckNodeImplicit_NoFireWhenNamed(t *testing.T) {
+	// Explicit enterprise root avoids implicit node.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				Description: "test",
+				Oid:         testOid("testEnterprise", 1),
+			},
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testEnterprise"},
+				Oid:     testOid("enterprises", 99999),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagNodeImplicit {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagNodeImplicit, d.Message)
+		}
+	}
+}
+
+// --- module-identity-registration tests ---
+
+func TestCheckModuleIdentityRegistration_UncontrolledMgmt(t *testing.T) {
+	// MODULE-IDENTITY under mgmt (1.3.6.1.2) but not under mib-2,
+	// transmission, or snmpModules.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				Description: "test",
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					// 1.3.6.1.2.99 - under mgmt but not under mib-2
+					&module.OidComponentNamedNumber{NameValue: "iso", NumberValue: 1},
+					&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+					&module.OidComponentNamedNumber{NameValue: "dod", NumberValue: 6},
+					&module.OidComponentNamedNumber{NameValue: "internet", NumberValue: 1},
+					&module.OidComponentNamedNumber{NameValue: "mgmt", NumberValue: 2},
+					&module.OidComponentNumber{Value: 99},
+				}, types.Span{}),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagModuleIdentityReg {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for uncontrolled mgmt registration", types.DiagModuleIdentityReg)
+}
+
+func TestCheckModuleIdentityRegistration_Mib2OK(t *testing.T) {
+	// MODULE-IDENTITY under mib-2 (1.3.6.1.2.1) should not fire.
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "mib-2", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				Description: "test",
+				Oid:         testOid("mib-2", 999),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagModuleIdentityReg {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagModuleIdentityReg, d.Message)
+		}
+	}
+}
+
+func TestCheckModuleIdentityRegistration_EnterprisesOK(t *testing.T) {
+	// MODULE-IDENTITY under enterprises should not fire (not under mgmt).
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				Description: "test",
+				Oid:         testOid("enterprises", 12345),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagModuleIdentityReg {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagModuleIdentityReg, d.Message)
+		}
+	}
+}
+
+// --- RowStatus/StorageType default tests ---
+
+func TestCheckRowStatusDefault_IllegalAction(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-TC", "RowStatus", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testIndex"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testRowStatus"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "RowStatus"},
+				Access:  types.AccessReadCreate,
+				Status:  types.StatusCurrent,
+				DefVal:  &module.DefValEnum{Name: "createAndGo"},
+				Oid:     testOid("testEntry", 2),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagRowStatusDefault {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for RowStatus DEFVAL createAndGo", types.DiagRowStatusDefault)
+}
+
+func TestCheckRowStatusDefault_ValidActive(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-TC", "RowStatus", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testIndex"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testRowStatus"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "RowStatus"},
+				Access:  types.AccessReadCreate,
+				Status:  types.StatusCurrent,
+				DefVal:  &module.DefValInteger{Value: 1},
+				Oid:     testOid("testEntry", 2),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagRowStatusDefault {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagRowStatusDefault, d.Message)
+		}
+	}
+}
+
+func TestCheckRowStatusAccess_NotReadCreate(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-TC", "RowStatus", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testIndex"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testRowStatus"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "RowStatus"},
+				Access:  types.AccessReadWrite,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 2),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagRowStatusAccess {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for RowStatus with read-write access", types.DiagRowStatusAccess)
+}
+
+func TestCheckStorageTypeDefault_Permanent(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-TC", "StorageType", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testIndex"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testStorage"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "StorageType"},
+				Access:  types.AccessReadCreate,
+				Status:  types.StatusCurrent,
+				DefVal:  &module.DefValEnum{Name: "permanent"},
+				Oid:     testOid("testEntry", 2),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagStorageTypeDefault {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for StorageType DEFVAL permanent", types.DiagStorageTypeDefault)
+}
+
+func TestCheckStorageTypeDefault_NonVolatileOK(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-TC", "StorageType", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testIndex"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testStorage"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "StorageType"},
+				Access:  types.AccessReadCreate,
+				Status:  types.StatusCurrent,
+				DefVal:  &module.DefValInteger{Value: 3},
+				Oid:     testOid("testEntry", 2),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagStorageTypeDefault {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagStorageTypeDefault, d.Message)
+		}
+	}
+}
+
+// --- TAddress/TDomain pairing test ---
+
+func TestCheckTAddressTDomain_MissingTDomain(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TAddress", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testIndex"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testAddr"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TAddress"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 2),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTAddressTDomain {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s diagnostic for TAddress without TDomain sibling", types.DiagTAddressTDomain)
+}
+
+func TestCheckTAddressTDomain_WithTDomainOK(t *testing.T) {
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports: []module.Import{
+			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TAddress", types.Span{}),
+			module.NewImport("SNMPv2-TC", "TDomain", types.Span{}),
+		},
+		Definitions: []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testRoot"},
+				Oid:     testOid("enterprises", 99999),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testTable"},
+				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+				Status:  types.StatusCurrent,
+				Index:   []module.IndexItem{{Object: "testIndex"}},
+				Oid:     testOid("testTable", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testIndex"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 1),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testDomain"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TDomain"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 2),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testAddr"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TAddress"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 3),
+			},
+		},
+	}
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTAddressTDomain {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagTAddressTDomain, d.Message)
+		}
+	}
+}

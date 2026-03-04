@@ -51,7 +51,7 @@ gomib load --permissive IF-MIB
 gomib load --stats IF-MIB
 ```
 
-Flags: `--strict` (RFC compliance), `--permissive` (vendor MIBs), `--level N` (strictness 0-6), `--stats` (detailed statistics).
+Flags: `--strict` (RFC compliance), `--permissive` (vendor MIBs), `--level N` (diagnostic level 0-6, higher is more verbose), `--stats` (detailed statistics).
 
 ### get
 
@@ -101,7 +101,7 @@ Check modules for issues.
 
 ```
 gomib lint IF-MIB
-gomib lint --level 4 IF-MIB
+gomib lint --level 6 IF-MIB
 gomib lint --format json IF-MIB
 gomib lint --format sarif IF-MIB
 gomib lint --ignore "identifier-*" IF-MIB
@@ -109,7 +109,7 @@ gomib lint --summary IF-MIB
 gomib lint --list-codes
 ```
 
-Flags: `--level N` (severity threshold, 0-6), `--fail-on N`, `--ignore CODE` (repeatable, supports globs), `--only CODE`, `--format` (text/json/sarif/compact), `--group-by` (module/code/severity), `--summary`, `--quiet`, `--list-codes` (show all diagnostic codes).
+Flags: `--level N` (report up to severity N, 0-6, higher is more verbose), `--fail-on N`, `--ignore CODE` (repeatable, supports globs), `--only CODE`, `--format` (text/json/sarif/compact), `--group-by` (module/code/severity), `--summary`, `--quiet`, `--list-codes` (show all diagnostic codes).
 
 ### find
 

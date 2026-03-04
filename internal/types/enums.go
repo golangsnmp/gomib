@@ -29,6 +29,9 @@ var severityNames = [...]string{"fatal", "severe", "error", "minor", "style", "w
 
 func (s Severity) String() string { return enumString(s, severityNames[:], "Severity") }
 
+// SeverityNames returns the severity level names in order (fatal..info).
+func SeverityNames() []string { return severityNames[:] }
+
 // AtLeast reports whether s is at least as severe as other.
 // Lower numeric values are more severe (Fatal=0, Info=6).
 func (s Severity) AtLeast(other Severity) bool {
@@ -36,13 +39,14 @@ func (s Severity) AtLeast(other Severity) bool {
 }
 
 // StrictnessLevel defines preset strictness configurations.
+// Higher values are stricter and report more diagnostics.
 type StrictnessLevel int
 
 const (
-	StrictnessStrict     StrictnessLevel = 0 // RFC-only, reject non-compliant
+	StrictnessSilent     StrictnessLevel = 0 // Accept everything, minimal output
+	StrictnessPermissive StrictnessLevel = 1 // Accept most real-world MIBs
 	StrictnessNormal     StrictnessLevel = 3 // Default, warn on issues
-	StrictnessPermissive StrictnessLevel = 5 // Accept most real-world MIBs
-	StrictnessSilent     StrictnessLevel = 6 // Accept everything, minimal output
+	StrictnessStrict     StrictnessLevel = 6 // RFC-only, reject non-compliant
 )
 
 // StrictnessLevel has non-consecutive values, so it keeps a switch.
