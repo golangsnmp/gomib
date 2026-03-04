@@ -441,14 +441,7 @@ func TestConvertDefValUnknown(t *testing.T) {
 	dv := convertDefVal(ctx, &module.DefValUnparsed{}, mod, nil, types.Span{})
 	testutil.Nil(t, dv, "expected nil for unparsed DefVal, got")
 
-	var found bool
-	for _, d := range ctx.Diagnostics() {
-		if d.Code == types.DiagDefvalUnresolved {
-			found = true
-			break
-		}
-	}
-	testutil.True(t, found, "expected DiagDefvalUnresolved diagnostic for unparsed DefVal")
+	hasDiag(t, ctx.Diagnostics(), types.DiagDefvalUnresolved)
 }
 
 func TestResolveTypeSyntax(t *testing.T) {
@@ -1545,14 +1538,7 @@ func TestLinkObjectIndexes(t *testing.T) {
 
 		testutil.Len(t, rowObj.Index(), 0, "index entries should be empty when index node has no object")
 
-		var found bool
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagIndexNotObject {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "expected DiagIndexNotObject diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagIndexNotObject)
 	})
 
 	t.Run("augments node without object emits diagnostic", func(t *testing.T) {
@@ -1590,14 +1576,7 @@ func TestLinkObjectIndexes(t *testing.T) {
 
 		testutil.Nil(t, augObj.Augments(), "augments should be nil when target has no object")
 
-		var found bool
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagAugmentsNotObject {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "expected DiagAugmentsNotObject diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagAugmentsNotObject)
 	})
 
 	t.Run("nested augments emits diagnostic", func(t *testing.T) {
@@ -1655,16 +1634,9 @@ func TestLinkObjectIndexes(t *testing.T) {
 
 		// midEntry augments baseEntry (base row) - no diagnostic.
 		// leafEntry augments midEntry (itself an augmentation) - should emit diagnostic.
-		var found bool
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagAugmentNested {
-				found = true
-				testutil.Contains(t, d.Message, "leafEntry", "diagnostic should mention augmenting row")
-				testutil.Contains(t, d.Message, "midEntry", "diagnostic should mention target row")
-				break
-			}
-		}
-		testutil.True(t, found, "expected DiagAugmentNested diagnostic for nested augments")
+		d := hasDiag(t, ctx.Diagnostics(), types.DiagAugmentNested)
+		testutil.Contains(t, d.Message, "leafEntry", "diagnostic should mention augmenting row")
+		testutil.Contains(t, d.Message, "midEntry", "diagnostic should mention target row")
 	})
 
 	t.Run("augments base row emits no nesting diagnostic", func(t *testing.T) {
@@ -1705,11 +1677,7 @@ func TestLinkObjectIndexes(t *testing.T) {
 		linkObjectIndexes(ctx, objRefs)
 		checkAugmentsNesting(ctx, objRefs)
 
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagAugmentNested {
-				t.Fatalf("unexpected DiagAugmentNested for augments targeting a base row")
-			}
-		}
+		noDiag(t, ctx.Diagnostics(), types.DiagAugmentNested)
 	})
 
 	t.Run("bare type index creates TypeName entry", func(t *testing.T) {
@@ -1839,27 +1807,17 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
 
 		// Group node.
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("testGroup")
-		ctx.registerModuleNodeSymbol(mod, "testGroup", grpNode)
+		grpNode := registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
 
 		// Member nodes.
-		m1 := buildOIDPath(root, 1, 2)
-		m1.setName("obj1")
-		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
+		m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 2)
 
-		m2 := buildOIDPath(root, 1, 3)
-		m2.setName("obj2")
-		ctx.registerModuleNodeSymbol(mod, "obj2", m2)
+		m2 := registerNodeWithSymbol(ctx, mod, root, "obj2", 1, 3)
 
 		createResolvedGroups(ctx)
 
@@ -1876,7 +1834,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		testutil.Equal(t, "testGroup", grpNode.Group().Name(), "group name on node")
 
 		// Verify registered on module.
-		testutil.Len(t, resolvedMod.Groups(), 1, "module groups")
+		testutil.Len(t, ctx.moduleToResolved[mod].Groups(), 1, "module groups")
 	})
 
 	t.Run("not-accessible member emits diagnostic", func(t *testing.T) {
@@ -1890,21 +1848,13 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("testGroup")
-		ctx.registerModuleNodeSymbol(mod, "testGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
 
-		memberNode := buildOIDPath(root, 1, 2)
-		memberNode.setName("notAccessObj")
-		ctx.registerModuleNodeSymbol(mod, "notAccessObj", memberNode)
+		memberNode := registerNodeWithSymbol(ctx, mod, root, "notAccessObj", 1, 2)
 
 		// Attach an Object with not-accessible access.
 		memberObj := newObject("notAccessObj")
@@ -1913,14 +1863,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 
 		createResolvedGroups(ctx)
 
-		var found bool
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagGroupNotAccessible {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "expected not-accessible diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupNotAccessible)
 	})
 
 	t.Run("unresolved group node skipped", func(t *testing.T) {
@@ -1934,11 +1877,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		createResolvedGroups(ctx)
 		testutil.Len(t, ctx.mib.Groups(), 0, "should create no groups when node is missing")
@@ -1955,21 +1894,13 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("testGroup")
-		ctx.registerModuleNodeSymbol(mod, "testGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
 
-		m1 := buildOIDPath(root, 1, 2)
-		m1.setName("obj1")
-		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
+		m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 2)
 		// "missing" is not registered.
 
 		createResolvedGroups(ctx)
@@ -1979,14 +1910,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		testutil.Len(t, groups[0].Members(), 1, "only resolved member should be present")
 		testutil.Equal(t, m1, groups[0].Members()[0], "resolved member")
 
-		var found bool
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagGroupMemberUnresolved {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "expected DiagGroupMemberUnresolved diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupMemberUnresolved)
 	})
 
 	t.Run("notification member emits group-objects-notification", func(t *testing.T) {
@@ -2000,33 +1924,18 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("testGroup")
-		ctx.registerModuleNodeSymbol(mod, "testGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
 
-		n1 := buildOIDPath(root, 1, 2)
-		n1.setName("notif1")
+		n1 := registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 2)
 		n1.setKind(types.KindNotification)
-		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
 
 		createResolvedGroups(ctx)
 
-		var found bool
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagGroupObjectsNotification {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "expected DiagGroupObjectsNotification diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectsNotification)
 	})
 
 	t.Run("mixed members emit group-member-mixed", func(t *testing.T) {
@@ -2040,41 +1949,22 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("mixedGroup")
-		ctx.registerModuleNodeSymbol(mod, "mixedGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "mixedGroup", 1, 1)
 
-		m1 := buildOIDPath(root, 1, 2)
-		m1.setName("obj1")
+		m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 2)
 		m1.setKind(types.KindScalar)
-		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
 
-		n1 := buildOIDPath(root, 1, 3)
-		n1.setName("notif1")
+		n1 := registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 3)
 		n1.setKind(types.KindNotification)
-		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
 
 		createResolvedGroups(ctx)
 
-		var foundMixed, foundObjNotif bool
-		for _, d := range ctx.Diagnostics() {
-			switch d.Code {
-			case types.DiagGroupMemberMixed:
-				foundMixed = true
-			case types.DiagGroupObjectsNotification:
-				foundObjNotif = true
-			}
-		}
-		testutil.True(t, foundMixed, "expected DiagGroupMemberMixed diagnostic")
-		testutil.True(t, foundObjNotif, "expected DiagGroupObjectsNotification diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupMemberMixed)
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectsNotification)
 	})
 
 	t.Run("obsolete member in current group emits group-object-status", func(t *testing.T) {
@@ -2089,22 +1979,14 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(StrictConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("currentGroup")
-		ctx.registerModuleNodeSymbol(mod, "currentGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "currentGroup", 1, 1)
 
-		m1 := buildOIDPath(root, 1, 2)
-		m1.setName("obsoleteObj")
+		m1 := registerNodeWithSymbol(ctx, mod, root, "obsoleteObj", 1, 2)
 		m1.setKind(types.KindScalar)
-		ctx.registerModuleNodeSymbol(mod, "obsoleteObj", m1)
 
 		obj := newObject("obsoleteObj")
 		obj.setStatus(types.StatusObsolete)
@@ -2112,14 +1994,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 
 		createResolvedGroups(ctx)
 
-		var found bool
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagGroupObjectStatus {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "expected DiagGroupObjectStatus diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectStatus)
 	})
 
 	t.Run("current member in current group no status diagnostic", func(t *testing.T) {
@@ -2134,22 +2009,14 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(StrictConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("currentGroup")
-		ctx.registerModuleNodeSymbol(mod, "currentGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "currentGroup", 1, 1)
 
-		m1 := buildOIDPath(root, 1, 2)
-		m1.setName("currentObj")
+		m1 := registerNodeWithSymbol(ctx, mod, root, "currentObj", 1, 2)
 		m1.setKind(types.KindScalar)
-		ctx.registerModuleNodeSymbol(mod, "currentObj", m1)
 
 		obj := newObject("currentObj")
 		obj.setStatus(types.StatusCurrent)
@@ -2157,11 +2024,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 
 		createResolvedGroups(ctx)
 
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagGroupObjectStatus {
-				t.Fatal("unexpected DiagGroupObjectStatus diagnostic")
-			}
-		}
+		noDiag(t, ctx.Diagnostics(), types.DiagGroupObjectStatus)
 	})
 
 	t.Run("smiv1 status member skips status check", func(t *testing.T) {
@@ -2176,22 +2039,14 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(StrictConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("currentGroup")
-		ctx.registerModuleNodeSymbol(mod, "currentGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "currentGroup", 1, 1)
 
-		m1 := buildOIDPath(root, 1, 2)
-		m1.setName("mandatoryObj")
+		m1 := registerNodeWithSymbol(ctx, mod, root, "mandatoryObj", 1, 2)
 		m1.setKind(types.KindScalar)
-		ctx.registerModuleNodeSymbol(mod, "mandatoryObj", m1)
 
 		obj := newObject("mandatoryObj")
 		obj.setStatus(types.StatusMandatory)
@@ -2199,11 +2054,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 
 		createResolvedGroups(ctx)
 
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagGroupObjectStatus {
-				t.Fatal("unexpected DiagGroupObjectStatus for SMIv1 status")
-			}
-		}
+		noDiag(t, ctx.Diagnostics(), types.DiagGroupObjectStatus)
 	})
 }
 
@@ -2221,25 +2072,15 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("testNotifGroup")
-		ctx.registerModuleNodeSymbol(mod, "testNotifGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "testNotifGroup", 1, 1)
 
-		n1 := buildOIDPath(root, 1, 2)
-		n1.setName("notif1")
-		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
+		registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 2)
 
-		n2 := buildOIDPath(root, 1, 3)
-		n2.setName("notif2")
-		ctx.registerModuleNodeSymbol(mod, "notif2", n2)
+		registerNodeWithSymbol(ctx, mod, root, "notif2", 1, 3)
 
 		createResolvedGroups(ctx)
 
@@ -2260,21 +2101,13 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("testNotifGroup")
-		ctx.registerModuleNodeSymbol(mod, "testNotifGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "testNotifGroup", 1, 1)
 
-		n1 := buildOIDPath(root, 1, 2)
-		n1.setName("notif1")
-		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
+		n1 := registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 2)
 		// "missing" is not registered.
 
 		createResolvedGroups(ctx)
@@ -2284,14 +2117,7 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 		testutil.Len(t, groups[0].Members(), 1, "only resolved member should be present")
 		testutil.Equal(t, n1, groups[0].Members()[0], "resolved member")
 
-		var found bool
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagGroupMemberUnresolved {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "expected DiagGroupMemberUnresolved diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupMemberUnresolved)
 	})
 
 	t.Run("object member emits group-notifications-object", func(t *testing.T) {
@@ -2305,33 +2131,18 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("testNotifGroup")
-		ctx.registerModuleNodeSymbol(mod, "testNotifGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "testNotifGroup", 1, 1)
 
-		m1 := buildOIDPath(root, 1, 2)
-		m1.setName("obj1")
+		m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 2)
 		m1.setKind(types.KindScalar)
-		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
 
 		createResolvedGroups(ctx)
 
-		var found bool
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagGroupNotificationsObject {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "expected DiagGroupNotificationsObject diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupNotificationsObject)
 	})
 
 	t.Run("mixed members emit group-member-mixed", func(t *testing.T) {
@@ -2345,41 +2156,22 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("mixedNotifGroup")
-		ctx.registerModuleNodeSymbol(mod, "mixedNotifGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "mixedNotifGroup", 1, 1)
 
-		n1 := buildOIDPath(root, 1, 2)
-		n1.setName("notif1")
+		n1 := registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 2)
 		n1.setKind(types.KindNotification)
-		ctx.registerModuleNodeSymbol(mod, "notif1", n1)
 
-		m1 := buildOIDPath(root, 1, 3)
-		m1.setName("obj1")
+		m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 3)
 		m1.setKind(types.KindColumn)
-		ctx.registerModuleNodeSymbol(mod, "obj1", m1)
 
 		createResolvedGroups(ctx)
 
-		var foundMixed, foundNotifObj bool
-		for _, d := range ctx.Diagnostics() {
-			switch d.Code {
-			case types.DiagGroupMemberMixed:
-				foundMixed = true
-			case types.DiagGroupNotificationsObject:
-				foundNotifObj = true
-			}
-		}
-		testutil.True(t, foundMixed, "expected DiagGroupMemberMixed diagnostic")
-		testutil.True(t, foundNotifObj, "expected DiagGroupNotificationsObject diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupMemberMixed)
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupNotificationsObject)
 	})
 
 	t.Run("deprecated member in current notification group emits status diagnostic", func(t *testing.T) {
@@ -2394,22 +2186,14 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(StrictConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		grpNode := buildOIDPath(root, 1, 1)
-		grpNode.setName("currentNotifGroup")
-		ctx.registerModuleNodeSymbol(mod, "currentNotifGroup", grpNode)
+		registerNodeWithSymbol(ctx, mod, root, "currentNotifGroup", 1, 1)
 
-		n1 := buildOIDPath(root, 1, 2)
-		n1.setName("depNotif")
+		n1 := registerNodeWithSymbol(ctx, mod, root, "depNotif", 1, 2)
 		n1.setKind(types.KindNotification)
-		ctx.registerModuleNodeSymbol(mod, "depNotif", n1)
 
 		notif := newNotification("depNotif")
 		notif.setStatus(types.StatusDeprecated)
@@ -2417,22 +2201,14 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 
 		createResolvedGroups(ctx)
 
-		var found bool
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == types.DiagGroupObjectStatus {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "expected DiagGroupObjectStatus diagnostic")
+		hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectStatus)
 	})
 }
 
 func TestRegisterNotification(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-	resolvedMod := newModule(mod.Name)
-	ctx.moduleToResolved[mod] = resolvedMod
+	ctx := newTestContextForModules(DefaultConfig(), mod)
+	resolvedMod := ctx.moduleToResolved[mod]
 
 	node := buildOIDPath(ctx.mib.Root(), 1, 1)
 	notif := newNotification("testNotif")
@@ -2447,9 +2223,7 @@ func TestRegisterNotification(t *testing.T) {
 
 func TestRegisterGroup(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-	resolvedMod := newModule(mod.Name)
-	ctx.moduleToResolved[mod] = resolvedMod
+	ctx := newTestContextForModules(DefaultConfig(), mod)
 
 	node := buildOIDPath(ctx.mib.Root(), 1, 1)
 	grp := newGroup("testGroup")
@@ -2459,14 +2233,13 @@ func TestRegisterGroup(t *testing.T) {
 	testutil.Len(t, ctx.mib.Groups(), 1, "mib groups")
 	testutil.NotNil(t, node.Group(), "node group")
 	testutil.Equal(t, grp, node.Group(), "node group")
-	testutil.Len(t, resolvedMod.Groups(), 1, "module groups")
+	testutil.Len(t, ctx.moduleToResolved[mod].Groups(), 1, "module groups")
 }
 
 func TestRegisterCompliance(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-	resolvedMod := newModule(mod.Name)
-	ctx.moduleToResolved[mod] = resolvedMod
+	ctx := newTestContextForModules(DefaultConfig(), mod)
+	resolvedMod := ctx.moduleToResolved[mod]
 
 	node := buildOIDPath(ctx.mib.Root(), 1, 1)
 	comp := newCompliance("testCompliance")
@@ -2481,9 +2254,8 @@ func TestRegisterCompliance(t *testing.T) {
 
 func TestRegisterCapability(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-	resolvedMod := newModule(mod.Name)
-	ctx.moduleToResolved[mod] = resolvedMod
+	ctx := newTestContextForModules(DefaultConfig(), mod)
+	resolvedMod := ctx.moduleToResolved[mod]
 
 	node := buildOIDPath(ctx.mib.Root(), 1, 1)
 	capability := newCapability("testCapability")
@@ -2509,27 +2281,17 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
 
-		notifNode := buildOIDPath(root, 1, 1)
-		notifNode.setName("myNotif")
-		ctx.registerModuleNodeSymbol(mod, "myNotif", notifNode)
+		registerNodeWithSymbol(ctx, mod, root, "myNotif", 1, 1)
 
-		obj1Node := buildOIDPath(root, 1, 2)
-		obj1Node.setName("obj1")
-		ctx.registerModuleNodeSymbol(mod, "obj1", obj1Node)
+		obj1Node := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 2)
 		obj1 := newObject("obj1")
 		obj1Node.setObject(obj1)
 
-		obj2Node := buildOIDPath(root, 1, 3)
-		obj2Node.setName("obj2")
-		ctx.registerModuleNodeSymbol(mod, "obj2", obj2Node)
+		obj2Node := registerNodeWithSymbol(ctx, mod, root, "obj2", 1, 3)
 		obj2 := newObject("obj2")
 		obj2Node.setObject(obj2)
 
@@ -2552,16 +2314,10 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
-		notifNode := buildOIDPath(root, 1, 1)
-		notifNode.setName("myNotif")
-		ctx.registerModuleNodeSymbol(mod, "myNotif", notifNode)
+		registerNodeWithSymbol(ctx, mod, root, "myNotif", 1, 1)
 
 		createResolvedNotifications(ctx)
 
@@ -2582,26 +2338,14 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 		}
 		modB := &module.Module{Name: "B-MIB"}
 
-		ctx := newResolverContext([]*module.Module{modA, modB}, nil, PermissiveConfig())
-		ctx.moduleIndex[modA.Name] = []*module.Module{modA}
-		ctx.moduleIndex[modB.Name] = []*module.Module{modB}
-		resolvedModA := newModule(modA.Name)
-		ctx.moduleToResolved[modA] = resolvedModA
-		ctx.resolvedToModule[resolvedModA] = modA
-		resolvedModB := newModule(modB.Name)
-		ctx.moduleToResolved[modB] = resolvedModB
-		ctx.resolvedToModule[resolvedModB] = modB
+		ctx := newTestContextForModules(PermissiveConfig(), modA, modB)
 
 		root := ctx.mib.Root()
 
-		notifNode := buildOIDPath(root, 1, 1)
-		notifNode.setName("myNotif")
-		ctx.registerModuleNodeSymbol(modA, "myNotif", notifNode)
+		registerNodeWithSymbol(ctx, modA, root, "myNotif", 1, 1)
 
 		// Object registered only in modB, not imported by modA.
-		foreignNode := buildOIDPath(root, 2, 1)
-		foreignNode.setName("foreignObj")
-		ctx.registerModuleNodeSymbol(modB, "foreignObj", foreignNode)
+		foreignNode := registerNodeWithSymbol(ctx, modB, root, "foreignObj", 2, 1)
 		foreignObj := newObject("foreignObj")
 		foreignNode.setObject(foreignObj)
 
@@ -2626,16 +2370,10 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-		ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-		resolvedMod := newModule(mod.Name)
-		ctx.moduleToResolved[mod] = resolvedMod
-		ctx.resolvedToModule[resolvedMod] = mod
+		ctx := newTestContextForModules(DefaultConfig(), mod)
 
 		root := ctx.mib.Root()
-		trapNode := buildOIDPath(root, 1, 1)
-		trapNode.setName("myTrap")
-		ctx.registerModuleNodeSymbol(mod, "myTrap", trapNode)
+		registerNodeWithSymbol(ctx, mod, root, "myTrap", 1, 1)
 
 		createResolvedNotifications(ctx)
 
@@ -2662,33 +2400,18 @@ func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 		},
 	}
 
-	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
-	ctx.moduleIndex[mod.Name] = []*module.Module{mod}
-	resolvedMod := newModule(mod.Name)
-	ctx.moduleToResolved[mod] = resolvedMod
-	ctx.resolvedToModule[resolvedMod] = mod
+	ctx := newTestContextForModules(DefaultConfig(), mod)
 
 	// Create a node for the notification itself
 	root := ctx.mib.Root()
-	notifNode := root.getOrCreateChild(1)
-	notifNode.setName("testNotif")
-	ctx.registerModuleNodeSymbol(mod, "testNotif", notifNode)
+	registerNodeWithSymbol(ctx, mod, root, "testNotif", 1)
 
 	// Create a node for the referenced object, but do NOT set an Object on it.
 	// This simulates an intermediate node or non-object definition.
-	objNode := root.getOrCreateChild(2)
-	objNode.setName("intermediateNode")
-	ctx.registerModuleNodeSymbol(mod, "intermediateNode", objNode)
+	registerNodeWithSymbol(ctx, mod, root, "intermediateNode", 2)
 
 	createResolvedNotifications(ctx)
 
 	// Should have emitted a diagnostic for the nil-object case.
-	var found bool
-	for _, d := range ctx.Diagnostics() {
-		if d.Code == types.DiagNotifObjectNotObject {
-			found = true
-			break
-		}
-	}
-	testutil.True(t, found, "expected diagnostic for notification object with nil Object, got none")
+	hasDiag(t, ctx.Diagnostics(), types.DiagNotifObjectNotObject)
 }
