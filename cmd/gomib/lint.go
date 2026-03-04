@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/golangsnmp/gomib"
@@ -19,7 +20,7 @@ Usage:
   gomib lint [options] MODULE...
 
 Options:
-  --level N       Report diagnostics at severity N or below (0-6, default: 3)
+  --level N       Report errors and warnings up to severity N (0-6, default: 3)
   --fail-on N     Exit non-zero if any diagnostic at severity N or below (default: 2)
   --ignore CODE   Ignore diagnostic codes (repeatable, supports globs like "identifier-*")
   --only CODE     Only report these codes (repeatable)
@@ -41,7 +42,8 @@ Severity Levels:
 
 Examples:
   gomib lint IF-MIB
-  gomib lint --level 4 IF-MIB                 # Include style warnings
+  gomib lint --level 6 IF-MIB                 # Show all diagnostics
+  gomib lint --level 1 IF-MIB                 # Only fatal and severe
   gomib lint --fail-on 3 IF-MIB              # Fail on minor or worse
   gomib lint --ignore "identifier-*" IF-MIB  # Skip identifier checks
   gomib lint --format json IF-MIB            # JSON output
@@ -51,8 +53,8 @@ Examples:
 `
 
 type lintConfig struct {
-	level   int
-	failOn  int
+	level   mib.Severity
+	failOn  mib.Severity
 	ignore  []string
 	only    []string
 	format  string
@@ -61,6 +63,20 @@ type lintConfig struct {
 	quiet   bool
 }
 
+// severityFlag implements flag.Value for mib.Severity.
+type severityFlag mib.Severity
+
+func (f *severityFlag) Set(s string) error {
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 0 || v > int(mib.SeverityInfo) {
+		return fmt.Errorf("severity must be 0-%d", mib.SeverityInfo)
+	}
+	*f = severityFlag(v)
+	return nil
+}
+
+func (f *severityFlag) String() string { return strconv.Itoa(int(*f)) }
+
 type lintResult struct {
 	Diagnostics []lintDiagnostic `json:"diagnostics,omitempty"`
 	Summary     lintSummary      `json:"summary"`
@@ -68,14 +84,14 @@ type lintResult struct {
 }
 
 type lintDiagnostic struct {
-	Severity    string `json:"severity"`
-	SeverityNum int    `json:"severity_num"`
-	Code        string `json:"code"`
-	Message     string `json:"message"`
-	Module      string `json:"module,omitempty"`
-	Line        int    `json:"line,omitempty"`
-	Column      int    `json:"column,omitempty"`
-	RuleID      string `json:"rule_id,omitempty"` // For SARIF
+	Severity    string       `json:"severity"`
+	SeverityNum mib.Severity `json:"severity_num"`
+	Code        string       `json:"code"`
+	Message     string       `json:"message"`
+	Module      string       `json:"module,omitempty"`
+	Line        int          `json:"line,omitempty"`
+	Column      int          `json:"column,omitempty"`
+	RuleID      string       `json:"rule_id,omitempty"` // For SARIF
 }
 
 type lintSummary struct {
@@ -90,13 +106,13 @@ func (c *cli) cmdLint(args []string) int {
 	fs.Usage = func() { fmt.Fprint(os.Stderr, lintUsage) }
 
 	cfg := lintConfig{
-		level:  3, // Default: report minor and above
-		failOn: 2, // Default: fail on error and above
+		level:  mib.SeverityMinor,
+		failOn: mib.SeverityError,
 		format: "text",
 	}
 
-	fs.IntVar(&cfg.level, "level", cfg.level, "report threshold")
-	fs.IntVar(&cfg.failOn, "fail-on", cfg.failOn, "failure threshold")
+	fs.Var((*severityFlag)(&cfg.level), "level", "report threshold")
+	fs.Var((*severityFlag)(&cfg.failOn), "fail-on", "failure threshold")
 	fs.Func("ignore", "ignore codes", func(s string) error {
 		cfg.ignore = append(cfg.ignore, s)
 		return nil
@@ -172,8 +188,10 @@ func (c *cli) cmdLint(args []string) int {
 }
 
 func (c *cli) runLint(modules []string, cfg *lintConfig) *lintResult {
+	// Use strict mode for collection so all diagnostics are gathered.
+	// The lint command filters by --level itself (smilint-style: higher = more verbose).
 	diagCfg := mib.DiagnosticConfig{
-		Level:  mib.StrictnessLevel(cfg.level),
+		Level:  mib.StrictnessStrict,
 		FailAt: mib.SeverityFatal, // We handle failure ourselves
 		Ignore: cfg.ignore,
 	}
@@ -189,8 +207,8 @@ func (c *cli) runLint(modules []string, cfg *lintConfig) *lintResult {
 
 	if err != nil {
 		result.Diagnostics = append(result.Diagnostics, lintDiagnostic{
-			Severity:    "fatal",
-			SeverityNum: 0,
+			Severity:    mib.SeverityFatal.String(),
+			SeverityNum: mib.SeverityFatal,
 			Code:        "parse-error",
 			Message:     err.Error(),
 		})
@@ -203,13 +221,16 @@ func (c *cli) runLint(modules []string, cfg *lintConfig) *lintResult {
 	result.Summary.Modules = len(m.Modules())
 
 	for _, d := range m.Diagnostics() {
+		if d.Severity > cfg.level {
+			continue
+		}
 		if len(cfg.only) > 0 && !matchesAny(d.Code, cfg.only) {
 			continue
 		}
 
 		ld := lintDiagnostic{
 			Severity:    d.Severity.String(),
-			SeverityNum: int(d.Severity),
+			SeverityNum: d.Severity,
 			Code:        d.Code,
 			Message:     d.Message,
 			Module:      d.Module,
@@ -222,7 +243,7 @@ func (c *cli) runLint(modules []string, cfg *lintConfig) *lintResult {
 		result.Summary.BySeverity[d.Severity.String()]++
 		result.Summary.ByCode[d.Code]++
 
-		if int(d.Severity) <= cfg.failOn {
+		if d.Severity <= cfg.failOn {
 			result.ExitCode = 1
 		}
 	}
@@ -329,12 +350,12 @@ func printLintByCode(result *lintResult) {
 }
 
 func printLintBySeverity(result *lintResult) {
-	bySev := make(map[int][]lintDiagnostic)
+	bySev := make(map[mib.Severity][]lintDiagnostic)
 	for _, d := range result.Diagnostics {
 		bySev[d.SeverityNum] = append(bySev[d.SeverityNum], d)
 	}
 
-	sevs := make([]int, 0, len(bySev))
+	sevs := make([]mib.Severity, 0, len(bySev))
 	for s := range bySev {
 		sevs = append(sevs, s)
 	}
@@ -387,7 +408,7 @@ func printLintDiagLineNoSeverity(d *lintDiagnostic) {
 func printLintSummary(result *lintResult) {
 	fmt.Printf("Checked %d modules, found %d issues:\n", result.Summary.Modules, result.Summary.Total)
 
-	sevOrder := []string{"fatal", "severe", "error", "minor", "style", "warning", "info"}
+	sevOrder := mib.SeverityNames()
 	for _, sev := range sevOrder {
 		if count := result.Summary.BySeverity[sev]; count > 0 {
 			fmt.Printf("  %-8s %d\n", sev+":", count)
@@ -565,13 +586,13 @@ func buildSARIFResults(result *lintResult) []sarifResult {
 	return results
 }
 
-func severityToSARIF(sev int) string {
+func severityToSARIF(sev mib.Severity) string {
 	switch {
-	case sev <= 2: // fatal, severe, error
+	case sev <= mib.SeverityError:
 		return "error"
-	case sev <= 4: // minor, style
+	case sev <= mib.SeverityStyle:
 		return "warning"
-	default: // warning, info
+	default:
 		return "note"
 	}
 }

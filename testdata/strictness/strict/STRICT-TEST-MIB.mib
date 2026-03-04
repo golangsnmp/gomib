@@ -18,8 +18,9 @@ strictTestMIB MODULE-IDENTITY
     REVISION    "202501270000Z"
     DESCRIPTION
         "Initial revision."
-    ::= { enterprises 99999 1 }
+    ::= { strictTestEnterprise 1 }
 
+strictTestEnterprise OBJECT IDENTIFIER ::= { enterprises 99999 }
 strictTestObjects OBJECT IDENTIFIER ::= { strictTestMIB 1 }
 strictTestConform OBJECT IDENTIFIER ::= { strictTestMIB 2 }
 

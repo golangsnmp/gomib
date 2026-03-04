@@ -9,7 +9,7 @@ import (
 )
 
 func tokenKinds(source string) []TokenKind {
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, _ := lexer.Tokenize()
 	kinds := make([]TokenKind, len(tokens))
 	for i, t := range tokens {
@@ -19,7 +19,7 @@ func tokenKinds(source string) []TokenKind {
 }
 
 func tokenTexts(source string) []string {
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, _ := lexer.Tokenize()
 	var texts []string
 	for _, t := range tokens {
@@ -234,7 +234,7 @@ func TestExportsSkip(t *testing.T) {
 
 func TestForbiddenKeywordFalse(t *testing.T) {
 	source := "DEFVAL {FALSE}"
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, diagnostics := lexer.Tokenize()
 
 	testutil.Equal(t, TokKwDefval, tokens[0].Kind, "first token")
@@ -246,7 +246,7 @@ func TestForbiddenKeywordFalse(t *testing.T) {
 
 func TestDoubleHyphenBreaksIdentifier(t *testing.T) {
 	source := "foo--bar"
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, _ := lexer.Tokenize()
 
 	// foo--bar should tokenize as identifier "foo" then comment "--bar"
@@ -260,7 +260,7 @@ func TestDoubleHyphenAfterIdentifierPreservesComment(t *testing.T) {
 	// Realistic MIB pattern: identifier immediately before -- comment,
 	// then more tokens on the next line
 	source := "ifIndex--index column\nOBJECT-TYPE"
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, _ := lexer.Tokenize()
 
 	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "identifier")
@@ -278,7 +278,7 @@ func TestManyJunkLinesNoStackOverflow(t *testing.T) {
 	}
 	sb.WriteString("OBJECT")
 	source := sb.String()
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, diags := lexer.Tokenize()
 
 	// Should find OBJECT after all the junk
@@ -300,7 +300,7 @@ func TestManyConsecutiveCommentsNoStackOverflow(t *testing.T) {
 	}
 	sb.WriteString("OBJECT")
 	source := sb.String()
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, _ := lexer.Tokenize()
 
 	testutil.Equal(t, TokKwObject, tokens[0].Kind, "should find OBJECT after many comments")
@@ -308,7 +308,7 @@ func TestManyConsecutiveCommentsNoStackOverflow(t *testing.T) {
 
 func TestUnterminatedQuotedString(t *testing.T) {
 	source := `"unterminated string`
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, diagnostics := lexer.Tokenize()
 
 	// Should produce a TokQuotedString token despite being unterminated
@@ -319,7 +319,7 @@ func TestUnterminatedQuotedString(t *testing.T) {
 
 func TestUnterminatedHexString(t *testing.T) {
 	source := "'0A1B"
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, diagnostics := lexer.Tokenize()
 
 	// Should produce a TokError for unterminated hex/bin string
@@ -329,7 +329,7 @@ func TestUnterminatedHexString(t *testing.T) {
 
 func TestHexStringMissingSuffix(t *testing.T) {
 	source := "'0A1B'X"
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, diagnostics := lexer.Tokenize()
 
 	// 'X' is not H or B, should produce error
@@ -351,7 +351,7 @@ func TestUnknownCharacter(t *testing.T) {
 	// The lexer skips to end-of-line on unknown characters, so TYPE
 	// on the next line should still be found.
 	source := "OBJECT @ stuff\nTYPE"
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, diagnostics := lexer.Tokenize()
 
 	var hasObject, hasType bool
@@ -383,7 +383,7 @@ func TestIdentifierWithUnderscore(t *testing.T) {
 func TestIdentifierEndingWithHyphen(t *testing.T) {
 	// An identifier ending with hyphen before non-identifier chars
 	source := "test- OBJECT"
-	lexer := New([]byte(source), nil, types.DiagnosticConfig{})
+	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, _ := lexer.Tokenize()
 
 	// "test-" is the identifier (hyphen is consumed as part of identifier),
@@ -517,7 +517,7 @@ func TestDiagnosticsHaveCode(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			lexer := New([]byte(tc.source), nil, types.DiagnosticConfig{})
+			lexer := New([]byte(tc.source), nil, types.DefaultConfig())
 			_, diagnostics := lexer.Tokenize()
 
 			testutil.Greater(t, len(diagnostics), 0, "expected at least one diagnostic")

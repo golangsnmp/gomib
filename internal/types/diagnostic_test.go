@@ -168,20 +168,16 @@ func TestShouldReport(t *testing.T) {
 	}
 }
 
-// TestStrictnessSeverityAlignment verifies that the numeric values of
-// StrictnessLevel and Severity enums remain aligned. ShouldReport relies
-// on comparing int(sev) <= int(level) for threshold filtering.
-func TestStrictnessSeverityAlignment(t *testing.T) {
-	if int(StrictnessNormal) != int(SeverityMinor) {
-		t.Errorf("StrictnessNormal(%d) != SeverityMinor(%d)", StrictnessNormal, SeverityMinor)
+// TestStrictnessLevelOrdering verifies that strictness levels are ordered
+// from least strict (Silent=0) to most strict (Strict=6).
+func TestStrictnessLevelOrdering(t *testing.T) {
+	if StrictnessSilent >= StrictnessPermissive {
+		t.Errorf("Silent(%d) should be < Permissive(%d)", StrictnessSilent, StrictnessPermissive)
 	}
-	if int(StrictnessPermissive) != int(SeverityWarning) {
-		t.Errorf("StrictnessPermissive(%d) != SeverityWarning(%d)", StrictnessPermissive, SeverityWarning)
+	if StrictnessPermissive >= StrictnessNormal {
+		t.Errorf("Permissive(%d) should be < Normal(%d)", StrictnessPermissive, StrictnessNormal)
 	}
-	if int(StrictnessSilent) != int(SeverityInfo) {
-		t.Errorf("StrictnessSilent(%d) != SeverityInfo(%d)", StrictnessSilent, SeverityInfo)
-	}
-	if int(StrictnessStrict) != int(SeverityFatal) {
-		t.Errorf("StrictnessStrict(%d) != SeverityFatal(%d)", StrictnessStrict, SeverityFatal)
+	if StrictnessNormal >= StrictnessStrict {
+		t.Errorf("Normal(%d) should be < Strict(%d)", StrictnessNormal, StrictnessStrict)
 	}
 }

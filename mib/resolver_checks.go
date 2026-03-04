@@ -2174,3 +2174,261 @@ func checkGroupUnreferenced(ctx *resolverContext) {
 		}
 	}
 }
+
+// checkNodeImplicit flags OID tree nodes that were created implicitly by
+// numeric arc resolution without any explicit definition. These are unnamed
+// intermediate nodes (KindInternal) that have children with actual
+// definitions.
+func checkNodeImplicit(ctx *resolverContext) {
+	root := ctx.mib.Root()
+	if root == nil {
+		return
+	}
+	for node := range root.Subtree() {
+		if node.IsRoot() || node.Kind() != KindInternal {
+			continue
+		}
+		if node.Name() != "" {
+			continue
+		}
+		// Only flag implicit nodes that have descendants with definitions,
+		// not leaf stubs.
+		if len(node.Children()) == 0 {
+			continue
+		}
+		// Find the module of the first named child to attribute the diagnostic.
+		var mod *module.Module
+		for _, child := range node.Children() {
+			if rm := child.Module(); rm != nil {
+				if m, ok := ctx.resolvedToModule[rm]; ok {
+					mod = m
+					break
+				}
+			}
+		}
+		ctx.EmitDiagnostic(types.DiagNodeImplicit,
+			mod, types.Span{},
+			fmt.Sprintf("implicit node at OID %s", node.OID()))
+	}
+}
+
+// checkModuleIdentityRegistration checks that MODULE-IDENTITY OIDs under the
+// IETF mgmt subtree (1.3.6.1.2) are registered under a controlled IANA
+// branch: mib-2 (1.3.6.1.2.1), transmission (1.3.6.1.2.1.10), or
+// snmpModules (1.3.6.1.6.3).
+func checkModuleIdentityRegistration(ctx *resolverContext) {
+	// mgmt prefix: 1.3.6.1.2
+	mgmtPrefix := OID{1, 3, 6, 1, 2}
+	// Controlled registration points.
+	mib2Prefix := OID{1, 3, 6, 1, 2, 1}
+	transmissionPrefix := OID{1, 3, 6, 1, 2, 1, 10}
+	snmpModulesPrefix := OID{1, 3, 6, 1, 6, 3}
+
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			mi, ok := def.(*module.ModuleIdentity)
+			if !ok {
+				continue
+			}
+			node, ok := ctx.LookupNodeForModule(mod, mi.Name)
+			if !ok {
+				continue
+			}
+			oid := node.OID()
+			if len(oid) < 2 {
+				ctx.EmitDiagnostic(types.DiagModuleIdentityReg,
+					mod, mi.Span,
+					fmt.Sprintf("%q: MODULE-IDENTITY OID too short for valid registration", mi.Name))
+				continue
+			}
+			if !oid.HasPrefix(mgmtPrefix) {
+				continue
+			}
+			if oid.HasPrefix(mib2Prefix) || oid.HasPrefix(transmissionPrefix) || oid.HasPrefix(snmpModulesPrefix) {
+				continue
+			}
+			ctx.EmitDiagnostic(types.DiagModuleIdentityReg,
+				mod, mi.Span,
+				fmt.Sprintf("%q: MODULE-IDENTITY registered under uncontrolled mgmt OID %s", mi.Name, oid))
+		}
+	}
+}
+
+// checkRowStatusDefaults checks RowStatus objects for valid DEFVAL values and
+// access levels. RowStatus DEFVAL must be 1-3 (active, notInService, notReady),
+// not 4-6 (createAndGo, createAndWait, destroy). RowStatus access must be
+// read-create (SMIv2) or read-write (SMIv1).
+func checkRowStatusDefaults(ctx *resolverContext, objRefs []objectTypeRef) {
+	rowStatusType := lookupWellKnownTC(ctx, "RowStatus")
+	if rowStatusType == nil {
+		return
+	}
+
+	rowStatusActionValues := map[int64]string{
+		4: "createAndGo", 5: "createAndWait", 6: "destroy",
+	}
+
+	for _, ref := range objRefs {
+		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		if resolved == nil {
+			continue
+		}
+		t := resolved.Type()
+		if t != rowStatusType {
+			continue
+		}
+
+		// Check access: must be read-create (or read-write in SMIv1).
+		access := ref.obj.Access
+		if ref.mod.Language == types.LanguageSMIv2 {
+			if access != types.AccessReadCreate {
+				ctx.EmitDiagnostic(types.DiagRowStatusAccess,
+					ref.mod, ref.obj.Span,
+					fmt.Sprintf("%q: RowStatus should have MAX-ACCESS read-create, has %s", ref.obj.Name, access))
+			}
+		} else if access != types.AccessReadWrite {
+			ctx.EmitDiagnostic(types.DiagRowStatusAccess,
+				ref.mod, ref.obj.Span,
+				fmt.Sprintf("%q: RowStatus should have ACCESS read-write, has %s", ref.obj.Name, access))
+		}
+
+		// Check DEFVAL.
+		dv := resolved.DefaultValue()
+		if dv.IsZero() {
+			continue
+		}
+		val, ok := defvalAsInt64(dv, rowStatusActionValues)
+		if !ok {
+			continue
+		}
+		if name, illegal := rowStatusActionValues[val]; illegal {
+			ctx.EmitDiagnostic(types.DiagRowStatusDefault,
+				ref.mod, ref.obj.Span,
+				fmt.Sprintf("%q: RowStatus DEFVAL %s(%d) is an action value, must be active(1), notInService(2), or notReady(3)", ref.obj.Name, name, val))
+		}
+	}
+}
+
+// checkStorageTypeDefaults checks StorageType objects for valid DEFVAL values.
+// StorageType DEFVAL must be 1-3 (other, volatile, nonVolatile), not 4-5
+// (permanent, readOnly).
+func checkStorageTypeDefaults(ctx *resolverContext, objRefs []objectTypeRef) {
+	storageType := lookupWellKnownTC(ctx, "StorageType")
+	if storageType == nil {
+		return
+	}
+
+	illegalValues := map[int64]string{
+		4: "permanent", 5: "readOnly",
+	}
+
+	for _, ref := range objRefs {
+		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		if resolved == nil {
+			continue
+		}
+		t := resolved.Type()
+		if t != storageType {
+			continue
+		}
+		dv := resolved.DefaultValue()
+		if dv.IsZero() {
+			continue
+		}
+		val, ok := defvalAsInt64(dv, illegalValues)
+		if !ok {
+			continue
+		}
+		if name, illegal := illegalValues[val]; illegal {
+			ctx.EmitDiagnostic(types.DiagStorageTypeDefault,
+				ref.mod, ref.obj.Span,
+				fmt.Sprintf("%q: StorageType DEFVAL %s(%d) is not a valid default, must be other(1), volatile(2), or nonVolatile(3)", ref.obj.Name, name, val))
+		}
+	}
+}
+
+// defvalAsInt64 extracts a numeric value from a DefVal, mapping enum labels
+// via the provided name map. Returns the value and true if extraction
+// succeeded, false otherwise.
+func defvalAsInt64(dv DefVal, labelToValue map[int64]string) (int64, bool) {
+	switch dv.Kind() {
+	case DefValKindInt:
+		v, _ := DefValAs[int64](dv)
+		return v, true
+	case DefValKindUint:
+		uv, _ := DefValAs[uint64](dv)
+		return int64(uv), true
+	case DefValKindEnum:
+		label, _ := DefValAs[string](dv)
+		for v, name := range labelToValue {
+			if name == label {
+				return v, true
+			}
+		}
+		return 0, false
+	default:
+		return 0, false
+	}
+}
+
+// checkTAddressTDomain verifies that column objects derived from TAddress have
+// a sibling column with TDomain type. Only checks column objects within table
+// rows.
+func checkTAddressTDomain(ctx *resolverContext, objRefs []objectTypeRef) {
+	tAddressType := lookupWellKnownTC(ctx, "TAddress")
+	tDomainType := lookupWellKnownTC(ctx, "TDomain")
+	if tAddressType == nil || tDomainType == nil {
+		return
+	}
+
+	for _, ref := range objRefs {
+		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		if resolved == nil || !resolved.IsColumn() {
+			continue
+		}
+		t := resolved.Type()
+		if t == nil || !isDerivedFromType(t, tAddressType) {
+			continue
+		}
+		row := resolved.Row()
+		if row == nil {
+			continue
+		}
+		found := false
+		for _, col := range row.Columns() {
+			ct := col.Type()
+			if ct != nil && isDerivedFromType(ct, tDomainType) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ctx.EmitDiagnostic(types.DiagTAddressTDomain,
+				ref.mod, ref.obj.Span,
+				fmt.Sprintf("%q: TAddress column has no sibling with TDomain type", ref.obj.Name))
+		}
+	}
+}
+
+// isDerivedFromType walks the parent chain of t and returns true if any
+// type in the chain is target.
+func isDerivedFromType(t, target *Type) bool {
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
+		if current == target {
+			return true
+		}
+	}
+	return false
+}
+
+// lookupWellKnownTC looks up a textual convention from SNMPv2-TC by name.
+func lookupWellKnownTC(ctx *resolverContext, name string) *Type {
+	if ctx.snmpv2TCModule == nil {
+		return nil
+	}
+	t, _ := ctx.lookupTypeInModule(ctx.snmpv2TCModule, name)
+	return t
+}

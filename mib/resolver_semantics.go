@@ -48,6 +48,11 @@ func resolveSemantics(ctx *resolverContext) {
 	checkGroupUnreferenced(ctx)
 	checkIdentifierCaseMatch(ctx)
 	checkTrapInSMIv2(ctx)
+	checkNodeImplicit(ctx)
+	checkModuleIdentityRegistration(ctx)
+	checkRowStatusDefaults(ctx, objRefs)
+	checkStorageTypeDefaults(ctx, objRefs)
+	checkTAddressTDomain(ctx, objRefs)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {

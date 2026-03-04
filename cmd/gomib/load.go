@@ -17,15 +17,15 @@ Usage:
 Options:
   --strict      Use strict RFC compliance mode
   --permissive  Use permissive mode for vendor MIBs
-  --level N     Set strictness level (0-6, lower is stricter)
+  --level N     Set diagnostic level (0-6, higher is more verbose)
   --stats       Show detailed statistics
   -h, --help    Show help
 
-Strictness Levels:
-  0 (strict)     - RFC compliance checking
+Diagnostic Levels:
+  0 (silent)     - Maximum compatibility
+  1 (permissive) - Accept most real-world MIBs
   3 (normal)     - Default, balanced
-  5 (permissive) - Accept most real-world MIBs
-  6 (silent)     - Maximum compatibility
+  6 (strict)     - RFC compliance checking
 
 Examples:
   gomib load IF-MIB
@@ -43,7 +43,7 @@ func (c *cli) cmdLoad(args []string) int {
 
 	strict := fs.Bool("strict", false, "use strict RFC compliance mode")
 	permissive := fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
-	level := fs.Int("level", -1, "set strictness level (0-6)")
+	level := fs.Int("level", -1, "set diagnostic level (0-6, higher is more verbose)")
 	stats := fs.Bool("stats", false, "show detailed statistics")
 	help := addHelpFlag(fs)
 

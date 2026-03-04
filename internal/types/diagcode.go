@@ -178,6 +178,12 @@ const (
 	DiagObsoleteImport            = "obsolete-import"
 	DiagIdentifierCaseMatch       = "identifier-case-match"
 	DiagTrapInSMIv2               = "trap-in-smiv2"
+	DiagNodeImplicit              = "node-implicit"
+	DiagModuleIdentityReg         = "module-identity-registration"
+	DiagRowStatusDefault          = "rowstatus-default"
+	DiagRowStatusAccess           = "rowstatus-access"
+	DiagStorageTypeDefault        = "storagetype-default"
+	DiagTAddressTDomain           = "taddress-tdomain"
 )
 
 // codeEntry pairs a diagnostic code with its severity.
@@ -356,6 +362,12 @@ var resolverDiagCodes = []codeEntry{
 	{DiagObsoleteImport, SeverityWarning},
 	{DiagIdentifierCaseMatch, SeverityStyle},
 	{DiagTrapInSMIv2, SeverityWarning},
+	{DiagNodeImplicit, SeverityStyle},
+	{DiagModuleIdentityReg, SeverityWarning},
+	{DiagRowStatusDefault, SeverityStyle},
+	{DiagRowStatusAccess, SeverityStyle},
+	{DiagStorageTypeDefault, SeverityStyle},
+	{DiagTAddressTDomain, SeverityWarning},
 }
 
 // diagPhases maps phase names to their diagnostic code entries.
