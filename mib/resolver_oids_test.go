@@ -255,15 +255,9 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 		ctx := newResolverContext(nil, nil, PermissiveConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
-		found := false
-		for _, d := range ctx.Diagnostics() {
-			if d.Code == "identifier-hyphen-smiv2" {
-				found = true
-				testutil.Equal(t, SeverityWarning, d.Severity, "severity")
-				testutil.Equal(t, "MY-MIB", d.Module, "module")
-			}
-		}
-		testutil.True(t, found, "expected identifier-hyphen-smiv2 diagnostic")
+		d := hasDiag(t, ctx.Diagnostics(), "identifier-hyphen-smiv2")
+		testutil.Equal(t, SeverityWarning, d.Severity, "severity")
+		testutil.Equal(t, "MY-MIB", d.Module, "module")
 	})
 
 	t.Run("SMIv2 without hyphen emits nothing", func(t *testing.T) {
@@ -1351,16 +1345,8 @@ func TestOidReuse_DifferentValueAssignments(t *testing.T) {
 		},
 	}
 
-	cfg := StrictConfig()
-	m := Resolve([]*module.Module{mod}, nil, &cfg)
-	var found bool
-	for _, d := range m.Diagnostics() {
-		if d.Code == types.DiagOidReuse {
-			found = true
-			break
-		}
-	}
-	testutil.True(t, found, "expected %s diagnostic for duplicate VALUE-ASSIGNMENTs", types.DiagOidReuse)
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagOidReuse)
 }
 
 func TestOidRegistered_DifferentObjectTypes(t *testing.T) {
@@ -1403,16 +1389,8 @@ func TestOidRegistered_DifferentObjectTypes(t *testing.T) {
 		},
 	}
 
-	cfg := StrictConfig()
-	m := Resolve([]*module.Module{mod}, nil, &cfg)
-	var found bool
-	for _, d := range m.Diagnostics() {
-		if d.Code == types.DiagOidRegistered {
-			found = true
-			break
-		}
-	}
-	testutil.True(t, found, "expected %s diagnostic for duplicate OBJECT-TYPEs", types.DiagOidRegistered)
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagOidRegistered)
 }
 
 func TestOidReuse_SameNameNoDiagnostic(t *testing.T) {
@@ -1451,13 +1429,8 @@ func TestOidReuse_SameNameNoDiagnostic(t *testing.T) {
 		},
 	}
 
-	cfg := StrictConfig()
-	m := Resolve([]*module.Module{mod1, mod2}, nil, &cfg)
-	for _, d := range m.Diagnostics() {
-		if d.Code == types.DiagOidReuse || d.Code == types.DiagOidRegistered {
-			t.Fatalf("unexpected diagnostic %s: %s", d.Code, d.Message)
-		}
-	}
+	m := resolveStrict(mod1, mod2)
+	noDiag(t, m.Diagnostics(), types.DiagOidReuse, types.DiagOidRegistered)
 }
 
 func TestResolveOidsRecursiveCycle(t *testing.T) {
@@ -1484,16 +1457,10 @@ func TestResolveOidsRecursiveCycle(t *testing.T) {
 		&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeB"}, Oid: oidB},
 	}
 
-	cfg := StrictConfig()
-	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	m := resolveStrict(mod)
 
-	var recursiveDiags []Diagnostic
-	for _, d := range m.Diagnostics() {
-		if d.Code == types.DiagOidRecursive {
-			recursiveDiags = append(recursiveDiags, d)
-		}
-	}
-	testutil.Len(t, recursiveDiags, 2, "expected 2 oid-recursive diagnostics")
+	recursiveDiags := diagsByCode(m.Diagnostics(), types.DiagOidRecursive)
+	requireDiagCount(t, m.Diagnostics(), types.DiagOidRecursive, 2)
 	for _, d := range recursiveDiags {
 		testutil.Contains(t, d.Message, "recursive OID", "diagnostic message")
 		testutil.Contains(t, d.Message, "cycle", "diagnostic message should mention cycle")
@@ -1516,16 +1483,10 @@ func TestResolveOidsSelfReference(t *testing.T) {
 		&module.ValueAssignment{DefBase: module.DefBase{Name: "selfNode"}, Oid: oid},
 	}
 
-	cfg := StrictConfig()
-	m := Resolve([]*module.Module{mod}, nil, &cfg)
+	m := resolveStrict(mod)
 
-	var recursiveDiags []Diagnostic
-	for _, d := range m.Diagnostics() {
-		if d.Code == types.DiagOidRecursive {
-			recursiveDiags = append(recursiveDiags, d)
-		}
-	}
-	testutil.Len(t, recursiveDiags, 1, "expected 1 oid-recursive diagnostic")
+	recursiveDiags := diagsByCode(m.Diagnostics(), types.DiagOidRecursive)
+	requireDiagCount(t, m.Diagnostics(), types.DiagOidRecursive, 1)
 	testutil.Contains(t, recursiveDiags[0].Message, "references itself", "self-reference message")
 }
 
@@ -1550,17 +1511,10 @@ func TestLastSubidZero(t *testing.T) {
 			&module.ObjectType{DefBase: module.DefBase{Name: "badObj"}, Oid: oid},
 		}
 
-		cfg := StrictConfig()
-		m := Resolve([]*module.Module{mod}, nil, &cfg)
+		m := resolveStrict(mod)
 
-		var found bool
-		for _, d := range m.Diagnostics() {
-			if d.Code == types.DiagLastSubidZero {
-				testutil.Contains(t, d.Message, "badObj", "diagnostic message")
-				found = true
-			}
-		}
-		testutil.True(t, found, "expected last-subid-zero diagnostic")
+		d := hasDiag(t, m.Diagnostics(), types.DiagLastSubidZero)
+		testutil.Contains(t, d.Message, "badObj", "diagnostic message")
 	})
 
 	t.Run("value-assignment with last subid zero is exempt", func(t *testing.T) {
@@ -1582,14 +1536,9 @@ func TestLastSubidZero(t *testing.T) {
 			&module.ValueAssignment{DefBase: module.DefBase{Name: "okNode"}, Oid: oid},
 		}
 
-		cfg := StrictConfig()
-		m := Resolve([]*module.Module{mod}, nil, &cfg)
+		m := resolveStrict(mod)
 
-		for _, d := range m.Diagnostics() {
-			if d.Code == types.DiagLastSubidZero {
-				t.Fatalf("unexpected last-subid-zero diagnostic for value assignment: %s", d.Message)
-			}
-		}
+		noDiag(t, m.Diagnostics(), types.DiagLastSubidZero)
 	})
 
 	t.Run("non-zero last subid emits no diagnostic", func(t *testing.T) {
@@ -1610,14 +1559,9 @@ func TestLastSubidZero(t *testing.T) {
 			&module.ObjectType{DefBase: module.DefBase{Name: "goodObj"}, Oid: oid},
 		}
 
-		cfg := StrictConfig()
-		m := Resolve([]*module.Module{mod}, nil, &cfg)
+		m := resolveStrict(mod)
 
-		for _, d := range m.Diagnostics() {
-			if d.Code == types.DiagLastSubidZero {
-				t.Fatalf("unexpected last-subid-zero diagnostic: %s", d.Message)
-			}
-		}
+		noDiag(t, m.Diagnostics(), types.DiagLastSubidZero)
 	})
 }
 

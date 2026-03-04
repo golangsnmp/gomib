@@ -9,25 +9,11 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-func newTestContext() *resolverContext {
-	return newResolverContext(nil, nil, DefaultConfig())
-}
-
 // Test-only helpers for wellKnownTypes classification.
 func isASN1Primitive(name string) bool   { return wellKnownTypes[name] == typeClassASN1Primitive }
 func isSmiGlobalType(name string) bool   { return wellKnownTypes[name] == typeClassSmiGlobal }
 func isSmiV1GlobalType(name string) bool { return wellKnownTypes[name] == typeClassSmiV1Global }
 func isSNMPv2TCType(name string) bool    { return wellKnownTypes[name] == typeClassSNMPv2TC }
-
-// buildOIDPath chains getOrCreateChild calls to build a node path from root.
-// For example, buildOIDPath(root, 1, 3, 6, 1) builds iso.org.dod.internet.
-func buildOIDPath(root *Node, arcs ...uint32) *Node {
-	n := root
-	for _, arc := range arcs {
-		n = n.getOrCreateChild(arc)
-	}
-	return n
-}
 
 // testNodeArc is an atomic counter for creating unique test nodes.
 // Atomic to avoid races if tests run in parallel.

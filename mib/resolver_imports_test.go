@@ -397,11 +397,6 @@ func TestTryImportForwarding(t *testing.T) {
 	})
 }
 
-// newTestContextWithConfig creates a resolverContext with a specific DiagnosticConfig.
-func newTestContextWithConfig(config DiagnosticConfig) *resolverContext {
-	return newResolverContext(nil, nil, config)
-}
-
 func TestResolveImportsFromModule(t *testing.T) {
 	syms := func(names ...string) []importSymbol {
 		out := make([]importSymbol, len(names))
