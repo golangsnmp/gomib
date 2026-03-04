@@ -86,6 +86,16 @@ type TypeSyntaxChoice struct {
 func (t *TypeSyntaxChoice) SyntaxSpan() types.Span { return t.Span }
 func (*TypeSyntaxChoice) typeSyntax()              {}
 
+// TypeSyntaxTagged is a tagged type: [APPLICATION n] IMPLICIT Type.
+// Only valid in SMI base modules.
+type TypeSyntaxTagged struct {
+	Underlying TypeSyntax
+	Span       types.Span
+}
+
+func (t *TypeSyntaxTagged) SyntaxSpan() types.Span { return t.Span }
+func (*TypeSyntaxTagged) typeSyntax()              {}
+
 // TypeSyntaxOctetString is the explicit OCTET STRING type.
 type TypeSyntaxOctetString struct {
 	Span types.Span

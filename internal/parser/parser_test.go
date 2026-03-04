@@ -155,6 +155,22 @@ func TestParseTypeAssignment(t *testing.T) {
 	testutil.Len(t, seq.Fields, 2, "sequence fields count")
 }
 
+func TestParseTaggedType(t *testing.T) {
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		MyCounter ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
+		END`)
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.TypeAssignmentDef)
+	testutil.True(t, ok, "expected TypeAssignmentDef, got %T", module.Body[0])
+	testutil.Equal(t, "MyCounter", def.Name.Name, "definition name")
+	tagged, ok := def.Syntax.(*ast.TypeSyntaxTagged)
+	testutil.True(t, ok, "expected TypeSyntaxTagged, got %T", def.Syntax)
+	// The underlying type should be a constrained INTEGER
+	_, ok = tagged.Underlying.(*ast.TypeSyntaxConstrained)
+	testutil.True(t, ok, "expected constrained underlying type, got %T", tagged.Underlying)
+}
+
 func TestParseDefVal(t *testing.T) {
 	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testDefault OBJECT-TYPE

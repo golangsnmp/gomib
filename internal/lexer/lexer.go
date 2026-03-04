@@ -532,10 +532,14 @@ func (l *Lexer) scanHexOrBinString() Token {
 	start := l.pos
 	l.advance() // consume opening quote
 
+	contentLen := 0
 	for {
 		b, ok := l.peek()
 		if !ok || b == '\'' {
 			break
+		}
+		if b != ' ' && b != '\t' && b != '\n' && b != '\r' {
+			contentLen++
 		}
 		l.advance()
 	}
@@ -559,10 +563,20 @@ func (l *Lexer) scanHexOrBinString() Token {
 	case 'H', 'h':
 		l.advance()
 		kind = TokHexString
+		if contentLen > 0 && contentLen%2 != 0 {
+			span := l.spanFrom(start)
+			l.emitDiagnostic(types.DiagHexStringMul2, span,
+				fmt.Sprintf("hex string length %d is not a multiple of 2", contentLen))
+		}
 
 	case 'B', 'b':
 		l.advance()
 		kind = TokBinString
+		if contentLen > 0 && contentLen%8 != 0 {
+			span := l.spanFrom(start)
+			l.emitDiagnostic(types.DiagBinStringMul8, span,
+				fmt.Sprintf("binary string length %d is not a multiple of 8", contentLen))
+		}
 
 	default:
 		span := l.spanFrom(start)
