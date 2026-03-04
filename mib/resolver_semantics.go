@@ -53,6 +53,7 @@ func resolveSemantics(ctx *resolverContext) {
 	checkRowStatusDefaults(ctx, objRefs)
 	checkStorageTypeDefaults(ctx, objRefs)
 	checkTAddressTDomain(ctx, objRefs)
+	checkIpAddressDeprecation(ctx, objRefs)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {

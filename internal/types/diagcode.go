@@ -184,6 +184,11 @@ const (
 	DiagRowStatusAccess           = "rowstatus-access"
 	DiagStorageTypeDefault        = "storagetype-default"
 	DiagTAddressTDomain           = "taddress-tdomain"
+	DiagIndexAccessible           = "index-accessible"
+	DiagIndexNotAccessible        = "index-not-accessible"
+	DiagIndexDefval               = "index-defval"
+	DiagAccessWriteOnlySMIv1      = "access-write-only-smiv1"
+	DiagIpAddressInSyntax         = "ipaddress-in-syntax"
 )
 
 // codeEntry pairs a diagnostic code with its severity.
@@ -368,6 +373,11 @@ var resolverDiagCodes = []codeEntry{
 	{DiagRowStatusAccess, SeverityStyle},
 	{DiagStorageTypeDefault, SeverityStyle},
 	{DiagTAddressTDomain, SeverityWarning},
+	{DiagIndexAccessible, SeverityMinor},
+	{DiagIndexNotAccessible, SeverityMinor},
+	{DiagIndexDefval, SeverityWarning},
+	{DiagAccessWriteOnlySMIv1, SeverityStyle},
+	{DiagIpAddressInSyntax, SeverityStyle},
 }
 
 // diagPhases maps phase names to their diagnostic code entries.

@@ -47,7 +47,7 @@ MIBs with specific RFC violations for testing diagnostic emission.
   - net-snmp: Loads (more permissive)
 
 - **MISSING-IDENTITY-MIB.mib** - SMIv2 module without MODULE-IDENTITY (RFC 2578 Section 3)
-  - Diagnostic: `missing-module-identity` (Error level)
+  - Diagnostic: `missing-module-identity` (Warning level)
   - smilint: `[2] missing MODULE-IDENTITY clause in SMIv2 MIB`
   - net-snmp: Loads (more permissive)
 
@@ -76,7 +76,7 @@ MIBs that pass at permissive level but have warnings at strict level.
 
 | gomib --level | Internal | smilint Level | Use Case |
 |---------------|----------|---------------|----------|
-| 6 | Strict | 0-1 | RFC compliance validation |
+| 6 | Strict | 0-6 | RFC compliance validation |
 | 3 | Normal | 0-3 | Default, balanced |
 | 1 | Permissive | 0-5 | Legacy/vendor MIBs |
 | 0 | Silent | - | Maximum compatibility |
