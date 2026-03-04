@@ -900,3 +900,29 @@ END
 	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleNameSuffix)
 	testutil.Nil(t, d, "base module should not get %s", types.DiagModuleNameSuffix)
 }
+
+func TestLower_TaggedTypeNotAllowed(t *testing.T) {
+	// Tagged types outside base modules should emit tagged-type-not-allowed.
+	source := []byte(`TAG-TEST-MIB DEFINITIONS ::= BEGIN
+
+MyCounter ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagTaggedTypeNotAllowed)
+	testutil.NotNil(t, d, "non-base module should get %s", types.DiagTaggedTypeNotAllowed)
+}
+
+func TestLower_TaggedTypeAllowedInBaseModule(t *testing.T) {
+	// Tagged types in base modules should not emit a diagnostic.
+	source := []byte(`SNMPv2-SMI DEFINITIONS ::= BEGIN
+
+Counter32 ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
+
+END
+`)
+
+	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagTaggedTypeNotAllowed)
+	testutil.Nil(t, d, "base module should not get %s", types.DiagTaggedTypeNotAllowed)
+}

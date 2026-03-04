@@ -347,6 +347,61 @@ func TestEmptyBinString(t *testing.T) {
 	testutil.Equal(t, TokBinString, kinds[0], "empty bin string should tokenize")
 }
 
+func TestHexStringMul2(t *testing.T) {
+	tests := []struct {
+		source   string
+		wantDiag bool
+	}{
+		{"'0A'H", false},       // 2 chars, OK
+		{"'0A1B'H", false},     // 4 chars, OK
+		{"'F'H", true},         // 1 char, odd
+		{"'FFF'H", true},       // 3 chars, odd
+		{"'ABCDEF0'H", true},   // 7 chars, odd
+		{"''H", false},         // empty, OK
+		{"'deadbeef'H", false}, // 8 chars, OK
+	}
+	cfg := types.StrictConfig()
+	for _, tt := range tests {
+		lexer := New([]byte(tt.source), nil, cfg)
+		tokens, diagnostics := lexer.Tokenize()
+		testutil.Equal(t, TokHexString, tokens[0].Kind, "token kind for %s", tt.source)
+		hasDiag := false
+		for _, d := range diagnostics {
+			if d.Code == types.DiagHexStringMul2 {
+				hasDiag = true
+			}
+		}
+		testutil.Equal(t, tt.wantDiag, hasDiag, "hex-string-mul2 diagnostic for %s", tt.source)
+	}
+}
+
+func TestBinStringMul8(t *testing.T) {
+	tests := []struct {
+		source   string
+		wantDiag bool
+	}{
+		{"'01010101'B", false},         // 8 bits, OK
+		{"'1111000011110000'B", false}, // 16 bits, OK
+		{"'10101'B", true},             // 5 bits, not multiple of 8
+		{"'101010101010'B", true},      // 12 bits, not multiple of 8
+		{"'1'B", true},                 // 1 bit, not multiple of 8
+		{"''B", false},                 // empty, OK
+	}
+	cfg := types.StrictConfig()
+	for _, tt := range tests {
+		lexer := New([]byte(tt.source), nil, cfg)
+		tokens, diagnostics := lexer.Tokenize()
+		testutil.Equal(t, TokBinString, tokens[0].Kind, "token kind for %s", tt.source)
+		hasDiag := false
+		for _, d := range diagnostics {
+			if d.Code == types.DiagBinStringMul8 {
+				hasDiag = true
+			}
+		}
+		testutil.Equal(t, tt.wantDiag, hasDiag, "bin-string-mul8 diagnostic for %s", tt.source)
+	}
+}
+
 func TestUnknownCharacter(t *testing.T) {
 	// The lexer skips to end-of-line on unknown characters, so TYPE
 	// on the next line should still be found.

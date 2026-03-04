@@ -959,6 +959,35 @@ func (p *Parser) parseTypeSyntax() (ast.TypeSyntax, *types.SpanDiagnostic) {
 			baseSyntax = &ast.TypeSyntaxTypeRef{Name: ident}
 		}
 
+	case lexer.TokLBracket:
+		// Tagged type: [APPLICATION n] IMPLICIT Type
+		// Only valid in base modules; lowering emits a diagnostic otherwise.
+		p.advance() // consume '['
+		// Skip optional tag class (APPLICATION, UNIVERSAL) and tag number
+		if p.check(lexer.TokKwApplication) || p.check(lexer.TokKwUniversal) {
+			p.advance()
+		}
+		if p.check(lexer.TokNumber) {
+			p.advance()
+		}
+		if _, err := p.expect(lexer.TokRBracket); err != nil {
+			return nil, err
+		}
+		// Skip optional IMPLICIT keyword
+		if p.check(lexer.TokKwImplicit) {
+			p.advance()
+		}
+		// Parse the underlying type
+		underlying, err := p.parseTypeSyntax()
+		if err != nil {
+			return nil, err
+		}
+		span := types.NewSpan(start, underlying.SyntaxSpan().End)
+		baseSyntax = &ast.TypeSyntaxTagged{
+			Underlying: underlying,
+			Span:       span,
+		}
+
 	default:
 		diag := p.makeError("expected type syntax")
 		return nil, &diag

@@ -2487,3 +2487,194 @@ func lookupWellKnownTC(ctx *resolverContext, name string) *Type {
 	t, _ := ctx.lookupTypeInModule(ctx.snmpv2TCModule, name)
 	return t
 }
+
+// lookupTypeInNamedModule looks up a type from a module identified by name.
+// Returns nil if the module is not loaded or the type is not found.
+func lookupTypeInNamedModule(ctx *resolverContext, moduleName, typeName string) *Type {
+	mods := ctx.moduleIndex[moduleName]
+	if len(mods) == 0 {
+		return nil
+	}
+	t, _ := ctx.lookupTypeInModule(mods[0], typeName)
+	return t
+}
+
+// addressPairingConfig defines the parameters for an address/address-type
+// pairing check (InetAddress or TransportAddress patterns).
+type addressPairingConfig struct {
+	moduleName      string   // source module, e.g. "INET-ADDRESS-MIB"
+	addressType     string   // address TC name, e.g. "InetAddress"
+	addressTypeType string   // address-type TC name, e.g. "InetAddressType"
+	specificTypes   []string // specific variant TC names, e.g. "InetAddressIPv4"
+	diagPairing     string   // diagnostic code for missing pairing
+	diagSubtyped    string   // diagnostic code for subtyped address-type
+	diagSpecific    string   // diagnostic code for specific variant usage
+}
+
+var inetAddressConfig = addressPairingConfig{
+	moduleName:      "INET-ADDRESS-MIB",
+	addressType:     "InetAddress",
+	addressTypeType: "InetAddressType",
+	specificTypes: []string{
+		"InetAddressIPv4",
+		"InetAddressIPv6",
+		"InetAddressIPv4z",
+		"InetAddressIPv6z",
+		"InetAddressDNS",
+	},
+	diagPairing:  types.DiagInetAddressPairing,
+	diagSubtyped: types.DiagInetAddressTypeSubtyped,
+	diagSpecific: types.DiagInetAddressSpecific,
+}
+
+var transportAddressConfig = addressPairingConfig{
+	moduleName:      "TRANSPORT-ADDRESS-MIB",
+	addressType:     "TransportAddress",
+	addressTypeType: "TransportAddressType",
+	specificTypes: []string{
+		"TransportAddressIPv4",
+		"TransportAddressIPv6",
+		"TransportAddressIPv4z",
+		"TransportAddressIPv6z",
+		"TransportAddressLocal",
+		"TransportAddressDns",
+	},
+	diagPairing:  types.DiagTransportAddressPairing,
+	diagSubtyped: types.DiagTransportAddressTypeSubtyped,
+	diagSpecific: types.DiagTransportAddressSpecific,
+}
+
+// checkInetAddressPairing validates InetAddress/InetAddressType pairing per RFC 4001.
+func checkInetAddressPairing(ctx *resolverContext, objRefs []objectTypeRef) {
+	checkAddressTypePairing(ctx, objRefs, &inetAddressConfig)
+}
+
+// checkTransportAddressPairing validates TransportAddress/TransportAddressType pairing per RFC 3419.
+func checkTransportAddressPairing(ctx *resolverContext, objRefs []objectTypeRef) {
+	checkAddressTypePairing(ctx, objRefs, &transportAddressConfig)
+}
+
+// checkAddressTypePairing implements three related checks for address/address-type
+// pairing patterns (used by both InetAddress and TransportAddress):
+//
+//   - Pairing: address column should have a sibling address-type column
+//   - Subtyped: address-type with enum refinement should have correspondingly
+//     constrained address sibling
+//   - Specific: specific address variants should not be used when the generic
+//     address type is appropriate
+func checkAddressTypePairing(ctx *resolverContext, objRefs []objectTypeRef, cfg *addressPairingConfig) {
+	addrType := lookupTypeInNamedModule(ctx, cfg.moduleName, cfg.addressType)
+	addrTypeType := lookupTypeInNamedModule(ctx, cfg.moduleName, cfg.addressTypeType)
+	if addrType == nil || addrTypeType == nil {
+		return
+	}
+
+	// Resolve specific variant types for the specific-variant check.
+	var specificTypes []*Type
+	for _, name := range cfg.specificTypes {
+		if t := lookupTypeInNamedModule(ctx, cfg.moduleName, name); t != nil {
+			specificTypes = append(specificTypes, t)
+		}
+	}
+
+	for _, ref := range objRefs {
+		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		if resolved == nil || !resolved.IsColumn() {
+			continue
+		}
+		t := resolved.Type()
+		if t == nil {
+			continue
+		}
+
+		// Check 1: address column without address-type sibling.
+		if isDerivedFromType(t, addrType) {
+			checkAddressPairingSibling(ctx, ref, resolved, addrTypeType, cfg.diagPairing, cfg.addressType, cfg.addressTypeType)
+			continue
+		}
+
+		// Check 2: address-type column with enum refinement but address sibling lacks SIZE.
+		if isDerivedFromType(t, addrTypeType) {
+			checkAddressTypeSubtyped(ctx, ref, resolved, addrType, objRefs, cfg.diagSubtyped, cfg.addressType, cfg.addressTypeType)
+			continue
+		}
+
+		// Check 3: specific variant used instead of generic address type.
+		for _, specific := range specificTypes {
+			if isDerivedFromType(t, specific) {
+				ctx.EmitDiagnostic(cfg.diagSpecific,
+					ref.mod, ref.obj.Span,
+					fmt.Sprintf("%q: %s is a specific variant, use %s with %s",
+						ref.obj.Name, specific.Name(), cfg.addressType, cfg.addressTypeType))
+				break
+			}
+		}
+	}
+}
+
+// checkAddressPairingSibling checks that an address column has a sibling
+// address-type column in the same row.
+func checkAddressPairingSibling(ctx *resolverContext, ref objectTypeRef, resolved *Object, addrTypeType *Type, diagCode, addrName, addrTypeName string) {
+	row := resolved.Row()
+	if row == nil {
+		return
+	}
+	for _, col := range row.Columns() {
+		ct := col.Type()
+		if ct != nil && isDerivedFromType(ct, addrTypeType) {
+			return
+		}
+	}
+	ctx.EmitDiagnostic(diagCode,
+		ref.mod, ref.obj.Span,
+		fmt.Sprintf("%q: %s column has no sibling with %s type", ref.obj.Name, addrName, addrTypeName))
+}
+
+// checkAddressTypeSubtyped checks that if an address-type column has enum
+// refinements, the paired address column also has explicit SIZE constraints
+// in its OBJECT-TYPE SYNTAX (not just inherited from the TC).
+func checkAddressTypeSubtyped(ctx *resolverContext, ref objectTypeRef, resolved *Object, addrType *Type, objRefs []objectTypeRef, diagCode, addrName, addrTypeName string) {
+	// Only check if the OBJECT-TYPE SYNTAX has explicit enum refinement.
+	if _, isEnum := ref.obj.Syntax.(*module.TypeSyntaxIntegerEnum); !isEnum {
+		return
+	}
+	row := resolved.Row()
+	if row == nil {
+		return
+	}
+	// Find sibling address column.
+	for _, col := range row.Columns() {
+		ct := col.Type()
+		if ct == nil || !isDerivedFromType(ct, addrType) {
+			continue
+		}
+		// Check whether the sibling's OBJECT-TYPE SYNTAX has an explicit
+		// SIZE constraint (not just the TC-inherited one). Look up the
+		// module IR entry for the sibling column.
+		if hasExplicitSizeConstraint(col.Name(), ref.mod, objRefs) {
+			return
+		}
+		ctx.EmitDiagnostic(diagCode,
+			ref.mod, ref.obj.Span,
+			fmt.Sprintf("%q: %s is subtyped but sibling %q (%s) has no SIZE constraint",
+				ref.obj.Name, addrTypeName, col.Name(), addrName))
+		return
+	}
+}
+
+// hasExplicitSizeConstraint checks whether the OBJECT-TYPE definition for the
+// named object has an explicit SIZE constraint in its SYNTAX clause.
+func hasExplicitSizeConstraint(name string, mod *module.Module, objRefs []objectTypeRef) bool {
+	for _, ref := range objRefs {
+		if ref.mod != mod || ref.obj.Name != name {
+			continue
+		}
+		c, ok := ref.obj.Syntax.(*module.TypeSyntaxConstrained)
+		if !ok {
+			return false
+		}
+		_, isSize := c.Constraint.(*module.ConstraintSize)
+		return isSize
+	}
+	return false
+}

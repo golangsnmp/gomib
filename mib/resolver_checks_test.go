@@ -3998,6 +3998,412 @@ func TestCheckAccessWriteOnlySMIv1(t *testing.T) {
 	testutil.True(t, found, "expected %s for write-only in SMIv1", types.DiagAccessWriteOnlySMIv1)
 }
 
+// testInetAddressMIB creates a minimal INET-ADDRESS-MIB module with the
+// type definitions needed for address pairing tests.
+// testTableModule builds a TEST-MIB with a standard table/entry/index skeleton.
+// extraImports are appended to the base SNMPv2-SMI imports.
+// columns are appended after the index definition (callers assign OIDs under testEntry).
+func testTableModule(extraImports []module.Import, columns ...module.Definition) *module.Module {
+	imports := []module.Import{
+		module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+	}
+	imports = append(imports, extraImports...)
+
+	defs := []module.Definition{
+		&module.ValueAssignment{
+			DefBase: module.DefBase{Name: "testRoot"},
+			Oid:     testOid("enterprises", 99999),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testTable"},
+			Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testRoot", 1),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testEntry"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+			Status:  types.StatusCurrent,
+			Index:   []module.IndexItem{{Object: "testIndex"}},
+			Oid:     testOid("testTable", 1),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testIndex"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Access:  types.AccessNotAccessible,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", 1),
+		},
+	}
+	defs = append(defs, columns...)
+
+	return &module.Module{
+		Name:        "TEST-MIB",
+		Language:    types.LanguageSMIv2,
+		Imports:     imports,
+		Definitions: defs,
+	}
+}
+
+func testInetAddressMIB() *module.Module {
+	mod := module.NewModule("INET-ADDRESS-MIB", types.Synthetic)
+	mod.Language = types.LanguageSMIv2
+	mod.Imports = []module.Import{
+		module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "mib-2", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "Unsigned32", types.Span{}),
+		module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+	}
+	mod.Definitions = []module.Definition{
+		&module.ModuleIdentity{
+			DefBase: module.DefBase{Name: "inetAddressMIB"},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "mib-2"},
+				&module.OidComponentNumber{Value: 76},
+			}, types.Span{}),
+		},
+		// InetAddressType ::= TEXTUAL-CONVENTION SYNTAX INTEGER { unknown(0), ipv4(1), ipv6(2), ... }
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "InetAddressType"},
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				NamedNumbers: []module.NamedNumber{
+					{Name: "unknown", Value: 0},
+					{Name: "ipv4", Value: 1},
+					{Name: "ipv6", Value: 2},
+					{Name: "ipv4z", Value: 3},
+					{Name: "ipv6z", Value: 4},
+					{Name: "dns", Value: 16},
+				},
+			},
+			Status:              types.StatusCurrent,
+			IsTextualConvention: true,
+		},
+		// InetAddress ::= TEXTUAL-CONVENTION SYNTAX OCTET STRING (SIZE (0..255))
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "InetAddress"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxOctetString{},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255)}},
+			},
+			Status:              types.StatusCurrent,
+			IsTextualConvention: true,
+		},
+		// InetAddressIPv4 ::= TEXTUAL-CONVENTION SYNTAX OCTET STRING (SIZE (4))
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "InetAddressIPv4"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxOctetString{},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{{Min: &module.RangeValueUnsigned{Value: 4}}}},
+			},
+			Status:              types.StatusCurrent,
+			IsTextualConvention: true,
+		},
+		// InetAddressIPv6 ::= TEXTUAL-CONVENTION SYNTAX OCTET STRING (SIZE (16))
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "InetAddressIPv6"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxOctetString{},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{{Min: &module.RangeValueUnsigned{Value: 16}}}},
+			},
+			Status:              types.StatusCurrent,
+			IsTextualConvention: true,
+		},
+	}
+	return mod
+}
+
+func TestCheckInetAddressPairing_MissingType(t *testing.T) {
+	inetMod := testInetAddressMIB()
+	mod := testTableModule(
+		[]module.Import{
+			module.NewImport("INET-ADDRESS-MIB", "InetAddress", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testAddr"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "InetAddress"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", 2),
+		},
+	)
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{inetMod, mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagInetAddressPairing {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for InetAddress without InetAddressType sibling", types.DiagInetAddressPairing)
+}
+
+func TestCheckInetAddressPairing_WithTypeOK(t *testing.T) {
+	inetMod := testInetAddressMIB()
+	mod := testTableModule(
+		[]module.Import{
+			module.NewImport("INET-ADDRESS-MIB", "InetAddress", types.Span{}),
+			module.NewImport("INET-ADDRESS-MIB", "InetAddressType", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testAddrType"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "InetAddressType"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", 2),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testAddr"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "InetAddress"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", 3),
+		},
+	)
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{inetMod, mod}, nil, &cfg)
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagInetAddressPairing {
+			t.Fatalf("unexpected %s diagnostic: %s", types.DiagInetAddressPairing, d.Message)
+		}
+	}
+}
+
+func TestCheckInetAddressSpecific(t *testing.T) {
+	inetMod := testInetAddressMIB()
+	mod := testTableModule(
+		[]module.Import{
+			module.NewImport("INET-ADDRESS-MIB", "InetAddressIPv4", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testAddr"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "InetAddressIPv4"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", 2),
+		},
+	)
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{inetMod, mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagInetAddressSpecific {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for InetAddressIPv4 usage", types.DiagInetAddressSpecific)
+}
+
+func TestCheckInetAddressTypeSubtyped(t *testing.T) {
+	inetMod := testInetAddressMIB()
+	mod := testTableModule(
+		[]module.Import{
+			module.NewImport("INET-ADDRESS-MIB", "InetAddress", types.Span{}),
+			module.NewImport("INET-ADDRESS-MIB", "InetAddressType", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testAddrType"},
+			// InetAddressType subtyped to only ipv4/ipv6
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				Base: "InetAddressType",
+				NamedNumbers: []module.NamedNumber{
+					{Name: "ipv4", Value: 1},
+					{Name: "ipv6", Value: 2},
+				},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			Oid:    testOid("testEntry", 2),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testAddr"},
+			// InetAddress without SIZE constraint
+			Syntax: &module.TypeSyntaxTypeRef{Name: "InetAddress"},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			Oid:    testOid("testEntry", 3),
+		},
+	)
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{inetMod, mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagInetAddressTypeSubtyped {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for subtyped InetAddressType without sized InetAddress", types.DiagInetAddressTypeSubtyped)
+}
+
+func testTransportAddressMIB() *module.Module {
+	mod := module.NewModule("TRANSPORT-ADDRESS-MIB", types.Synthetic)
+	mod.Language = types.LanguageSMIv2
+	mod.Imports = []module.Import{
+		module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "mib-2", types.Span{}),
+		module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+	}
+	mod.Definitions = []module.Definition{
+		&module.ModuleIdentity{
+			DefBase: module.DefBase{Name: "transportAddressMIB"},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "mib-2"},
+				&module.OidComponentNumber{Value: 100},
+			}, types.Span{}),
+		},
+		// TransportAddressType ::= TEXTUAL-CONVENTION SYNTAX INTEGER { udpIpv4(1), ... }
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "TransportAddressType"},
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				NamedNumbers: []module.NamedNumber{
+					{Name: "udpIpv4", Value: 1},
+					{Name: "udpIpv6", Value: 2},
+					{Name: "udpIpv4z", Value: 3},
+					{Name: "udpIpv6z", Value: 4},
+				},
+			},
+			Status:              types.StatusCurrent,
+			IsTextualConvention: true,
+		},
+		// TransportAddress ::= TEXTUAL-CONVENTION SYNTAX OCTET STRING (SIZE (0..255))
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "TransportAddress"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxOctetString{},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255)}},
+			},
+			Status:              types.StatusCurrent,
+			IsTextualConvention: true,
+		},
+		// TransportAddressIPv4 ::= TEXTUAL-CONVENTION SYNTAX OCTET STRING (SIZE (6))
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "TransportAddressIPv4"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxOctetString{},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{{Min: &module.RangeValueUnsigned{Value: 6}}}},
+			},
+			Status:              types.StatusCurrent,
+			IsTextualConvention: true,
+		},
+		// TransportAddressIPv6 ::= TEXTUAL-CONVENTION SYNTAX OCTET STRING (SIZE (18))
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "TransportAddressIPv6"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxOctetString{},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{{Min: &module.RangeValueUnsigned{Value: 18}}}},
+			},
+			Status:              types.StatusCurrent,
+			IsTextualConvention: true,
+		},
+	}
+	return mod
+}
+
+func TestCheckTransportAddressPairing_MissingType(t *testing.T) {
+	taMod := testTransportAddressMIB()
+	mod := testTableModule(
+		[]module.Import{
+			module.NewImport("TRANSPORT-ADDRESS-MIB", "TransportAddress", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testAddr"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "TransportAddress"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", 2),
+		},
+	)
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{taMod, mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTransportAddressPairing {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for TransportAddress without TransportAddressType sibling", types.DiagTransportAddressPairing)
+}
+
+func TestCheckTransportAddressSpecific(t *testing.T) {
+	taMod := testTransportAddressMIB()
+	mod := testTableModule(
+		[]module.Import{
+			module.NewImport("TRANSPORT-ADDRESS-MIB", "TransportAddressIPv4", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testAddr"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "TransportAddressIPv4"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", 2),
+		},
+	)
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{taMod, mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTransportAddressSpecific {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for TransportAddressIPv4 usage", types.DiagTransportAddressSpecific)
+}
+
+func TestCheckTransportAddressTypeSubtyped(t *testing.T) {
+	taMod := testTransportAddressMIB()
+	mod := testTableModule(
+		[]module.Import{
+			module.NewImport("TRANSPORT-ADDRESS-MIB", "TransportAddress", types.Span{}),
+			module.NewImport("TRANSPORT-ADDRESS-MIB", "TransportAddressType", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testAddrType"},
+			// TransportAddressType subtyped to only udpIpv4/udpIpv6
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				Base: "TransportAddressType",
+				NamedNumbers: []module.NamedNumber{
+					{Name: "udpIpv4", Value: 1},
+					{Name: "udpIpv6", Value: 2},
+				},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			Oid:    testOid("testEntry", 2),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testAddr"},
+			// TransportAddress without SIZE constraint
+			Syntax: &module.TypeSyntaxTypeRef{Name: "TransportAddress"},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			Oid:    testOid("testEntry", 3),
+		},
+	)
+
+	cfg := StrictConfig()
+	m := Resolve([]*module.Module{taMod, mod}, nil, &cfg)
+	var found bool
+	for _, d := range m.Diagnostics() {
+		if d.Code == types.DiagTransportAddressTypeSubtyped {
+			found = true
+			break
+		}
+	}
+	testutil.True(t, found, "expected %s for subtyped TransportAddressType without sized TransportAddress", types.DiagTransportAddressTypeSubtyped)
+}
+
 func TestCheckIpAddressDeprecation(t *testing.T) {
 	t.Run("IpAddress in SMIv2 emits diagnostic", func(t *testing.T) {
 		mod := &module.Module{

@@ -738,6 +738,14 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 		// Empty CHOICE fallback
 		return &TypeSyntaxOctetString{}
 
+	case *ast.TypeSyntaxTagged:
+		// Tagged types only appear in SMI base modules; normalize to the underlying type.
+		if !IsBaseModule(ctx.moduleName) {
+			ctx.emitDiagnostic(types.DiagTaggedTypeNotAllowed, syntax.SyntaxSpan(),
+				fmt.Sprintf("tagged type not allowed outside base module %q", ctx.moduleName))
+		}
+		return lowerTypeSyntax(s.Underlying, ctx)
+
 	case *ast.TypeSyntaxOctetString:
 		return &TypeSyntaxOctetString{}
 
