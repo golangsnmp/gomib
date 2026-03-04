@@ -67,6 +67,8 @@ const (
 	DiagEmptyUnits             = "empty-units"
 	DiagEmptyFormat            = "empty-format"
 	DiagModuleNameSuffix       = "module-name-suffix"
+	DiagMacroNotAllowed        = "macro-not-allowed"
+	DiagChoiceNotAllowed       = "choice-not-allowed"
 )
 
 // Resolver diagnostic codes.
@@ -173,6 +175,9 @@ const (
 	DiagTypeWithoutFormat         = "type-without-format"
 	DiagTypeUnreferenced          = "type-unref"
 	DiagGroupUnreferenced         = "group-unref"
+	DiagObsoleteImport            = "obsolete-import"
+	DiagIdentifierCaseMatch       = "identifier-case-match"
+	DiagTrapInSMIv2               = "trap-in-smiv2"
 )
 
 // codeEntry pairs a diagnostic code with its severity.
@@ -241,6 +246,8 @@ var loweringDiagCodes = []codeEntry{
 	{DiagEmptyUnits, SeverityStyle},
 	{DiagEmptyFormat, SeverityStyle},
 	{DiagModuleNameSuffix, SeverityStyle},
+	{DiagMacroNotAllowed, SeverityWarning},
+	{DiagChoiceNotAllowed, SeverityWarning},
 }
 
 var resolverDiagCodes = []codeEntry{
@@ -346,6 +353,9 @@ var resolverDiagCodes = []codeEntry{
 	{DiagTypeWithoutFormat, SeverityStyle},
 	{DiagTypeUnreferenced, SeverityStyle},
 	{DiagGroupUnreferenced, SeverityStyle},
+	{DiagObsoleteImport, SeverityWarning},
+	{DiagIdentifierCaseMatch, SeverityStyle},
+	{DiagTrapInSMIv2, SeverityWarning},
 }
 
 // diagPhases maps phase names to their diagnostic code entries.

@@ -2026,6 +2026,83 @@ func checkTypeUnreferenced(ctx *resolverContext) {
 	}
 }
 
+// isSequenceTypeDefDirect reports whether a definition is a SEQUENCE type
+// assignment. These conventionally share names with row OBJECT-TYPEs
+// differing only in initial case (e.g., FooEntry SEQUENCE vs fooEntry
+// OBJECT-TYPE), so they are excluded from case-collision checks.
+func isSequenceTypeDefDirect(def module.Definition) bool {
+	td, ok := def.(*module.TypeDef)
+	if !ok {
+		return false
+	}
+	_, isSeq := td.Syntax.(*module.TypeSyntaxSequence)
+	return isSeq
+}
+
+// checkIdentifierCaseMatch flags identifiers within a module that differ only
+// in case. ASN.1 identifiers are case-sensitive, but case-only differences are
+// a common source of confusion. SEQUENCE type definitions are excluded since
+// they conventionally mirror row entry names with different initial case.
+func checkIdentifierCaseMatch(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		// Group definitions by lowercased name, excluding SEQUENCE types.
+		byLower := make(map[string][]module.Definition)
+		for _, def := range mod.Definitions {
+			if isSequenceTypeDefDirect(def) {
+				continue
+			}
+			key := strings.ToLower(def.DefinitionName())
+			byLower[key] = append(byLower[key], def)
+		}
+		for _, defs := range byLower {
+			if len(defs) < 2 {
+				continue
+			}
+			// Check for actual case differences (skip exact duplicates).
+			seen := make(map[string]struct{})
+			var distinct []module.Definition
+			for _, def := range defs {
+				if _, ok := seen[def.DefinitionName()]; !ok {
+					seen[def.DefinitionName()] = struct{}{}
+					distinct = append(distinct, def)
+				}
+			}
+			if len(distinct) < 2 {
+				continue
+			}
+			// Report on all but the first definition.
+			firstName := distinct[0].DefinitionName()
+			for _, def := range distinct[1:] {
+				ctx.EmitDiagnostic(types.DiagIdentifierCaseMatch,
+					mod, def.DefinitionSpan(),
+					fmt.Sprintf("%q differs from %q only in case", def.DefinitionName(), firstName))
+			}
+		}
+	}
+}
+
+// checkTrapInSMIv2 flags TRAP-TYPE definitions in SMIv2 modules. TRAP-TYPE
+// is an SMIv1 construct; SMIv2 modules should use NOTIFICATION-TYPE instead.
+func checkTrapInSMIv2(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			notif, ok := def.(*module.Notification)
+			if !ok || !notif.IsTrap() {
+				continue
+			}
+			ctx.EmitDiagnostic(types.DiagTrapInSMIv2,
+				mod, notif.Span,
+				fmt.Sprintf("%q: TRAP-TYPE should not be used in SMIv2 module, use NOTIFICATION-TYPE", notif.Name))
+		}
+	}
+}
+
 // collectSyntaxTypeRefs extracts type name references from a TypeSyntax and
 // calls markRef for each one.
 func collectSyntaxTypeRefs(syntax module.TypeSyntax, mod *module.Module, markRef func(*module.Module, string)) {

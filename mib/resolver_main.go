@@ -72,6 +72,7 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "semantics"))
 
 	checkUnusedImports(ctx)
+	checkObsoleteImports(ctx)
 
 	ctx.DropModules()
 

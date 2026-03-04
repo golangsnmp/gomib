@@ -397,6 +397,69 @@ func checkUnusedImports(ctx *resolverContext) {
 	}
 }
 
+type moduleSymbol struct{ module, symbol string }
+
+// obsoleteImportTarget describes the preferred SMIv2 module and symbol name
+// for an import that should no longer come from an obsolete SMIv1 module.
+// Derived from libsmi's convertImportv2 table.
+type obsoleteImportTarget struct {
+	newModule, newSymbol string
+}
+
+// obsoleteImports maps (old module, old symbol) pairs to preferred targets.
+// RFC1155-SMI and RFC1065-SMI share the same symbol set.
+var obsoleteImports = func() map[moduleSymbol]obsoleteImportTarget {
+	// Symbols shared by RFC1155-SMI and RFC1065-SMI.
+	smiSymbols := []struct{ old, new string }{
+		{"internet", "internet"},
+		{"directory", "directory"},
+		{"mgmt", "mgmt"},
+		{"experimental", "experimental"},
+		{"private", "private"},
+		{"enterprises", "enterprises"},
+		{"IpAddress", "IpAddress"},
+		{"Counter", "Counter32"},
+		{"Gauge", "Gauge32"},
+		{"TimeTicks", "TimeTicks"},
+		{"Opaque", "Opaque"},
+	}
+	m := make(map[moduleSymbol]obsoleteImportTarget, len(smiSymbols)*2+2)
+	for _, mod := range []string{"RFC1155-SMI", "RFC1065-SMI"} {
+		for _, sym := range smiSymbols {
+			m[moduleSymbol{mod, sym.old}] = obsoleteImportTarget{moduleSNMPv2SMI, sym.new}
+		}
+	}
+	m[moduleSymbol{"RFC1213-MIB", "mib-2"}] = obsoleteImportTarget{moduleSNMPv2SMI, "mib-2"}
+	m[moduleSymbol{"RFC1213-MIB", "DisplayString"}] = obsoleteImportTarget{moduleSNMPv2TC, "DisplayString"}
+	return m
+}()
+
+// checkObsoleteImports flags SMIv2 modules importing symbols from obsolete
+// SMIv1 modules when newer SMIv2 equivalents exist.
+func checkObsoleteImports(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		if mod.Language != types.LanguageSMIv2 {
+			continue
+		}
+		for _, imp := range mod.Imports {
+			target, ok := obsoleteImports[moduleSymbol{imp.Module, imp.Symbol}]
+			if !ok {
+				continue
+			}
+			msg := fmt.Sprintf("%q should be imported from %s instead of %s",
+				imp.Symbol, target.newModule, imp.Module)
+			if imp.Symbol != target.newSymbol {
+				msg = fmt.Sprintf("%q should be imported as %q from %s instead of %s",
+					imp.Symbol, target.newSymbol, target.newModule, imp.Module)
+			}
+			ctx.EmitDiagnostic(types.DiagObsoleteImport, mod, imp.Span, msg)
+		}
+	}
+}
+
 func baseModuleImportAlias(name string) string {
 	switch name {
 	case "SNMPv2-SMI-v1":
