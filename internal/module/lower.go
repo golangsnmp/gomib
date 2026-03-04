@@ -274,8 +274,13 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 		return lowerModuleCompliance(d, ctx)
 	case *ast.AgentCapabilitiesDef:
 		return lowerAgentCapabilities(d, ctx)
-	case *ast.MacroDefinitionDef, *ast.ErrorDef:
-		// Non-semantic definitions
+	case *ast.MacroDefinitionDef:
+		if !IsBaseModule(ctx.moduleName) {
+			ctx.emitDiagnostic(types.DiagMacroNotAllowed, def.DefinitionSpan(),
+				fmt.Sprintf("MACRO definition %q not allowed outside base modules", def.DefinitionName()))
+		}
+		return nil
+	case *ast.ErrorDef:
 		return nil
 	default:
 		ctx.emitDiagnostic(types.DiagUnknownDefinitionType, def.DefinitionSpan(),
@@ -723,6 +728,10 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 
 	case *ast.TypeSyntaxChoice:
 		// CHOICE only appears in SMI base modules; normalize to the first alternative.
+		if !IsBaseModule(ctx.moduleName) {
+			ctx.emitDiagnostic(types.DiagChoiceNotAllowed, syntax.SyntaxSpan(),
+				fmt.Sprintf("CHOICE type not allowed outside base module %q", ctx.moduleName))
+		}
 		if len(s.Alternatives) > 0 {
 			return lowerTypeSyntax(s.Alternatives[0].Syntax, ctx)
 		}

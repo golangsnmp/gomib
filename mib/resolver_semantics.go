@@ -46,6 +46,8 @@ func resolveSemantics(ctx *resolverContext) {
 	checkFormatHints(ctx)
 	checkTypeUnreferenced(ctx)
 	checkGroupUnreferenced(ctx)
+	checkIdentifierCaseMatch(ctx)
+	checkTrapInSMIv2(ctx)
 }
 
 func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
