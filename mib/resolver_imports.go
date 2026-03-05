@@ -397,6 +397,16 @@ func checkUnusedImports(ctx *resolverContext) {
 	}
 }
 
+// copyUsedImportsToModules transfers the resolver's usedImports tracking data
+// to each resolved Module so it's available via Module.IsImportUsed().
+func copyUsedImportsToModules(ctx *resolverContext) {
+	for mod, used := range ctx.usedImports {
+		if resolved := ctx.moduleToResolved[mod]; resolved != nil && len(used) > 0 {
+			resolved.setUsedImportNames(used)
+		}
+	}
+}
+
 type moduleSymbol struct{ module, symbol string }
 
 // obsoleteImportTarget describes the preferred SMIv2 module and symbol name

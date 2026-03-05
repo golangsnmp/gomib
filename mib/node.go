@@ -17,6 +17,8 @@ import (
 type Node struct {
 	arc         uint32
 	name        string
+	desc        string
+	ref         string
 	span        Span
 	kind        Kind
 	module      *Module
@@ -41,6 +43,13 @@ func (n *Node) Arc() uint32 { return n.arc }
 
 // Name returns the node's symbolic name, or "" if unnamed.
 func (n *Node) Name() string { return n.name }
+
+// Description returns the description of this node's OID assignment, or "".
+// Populated for synthetic base module OID assignments and OBJECT-IDENTITY definitions.
+func (n *Node) Description() string { return n.desc }
+
+// Reference returns the reference string of this node's OID assignment, or "".
+func (n *Node) Reference() string { return n.ref }
 
 // Kind returns the structural classification of this node.
 func (n *Node) Kind() Kind { return n.kind }
@@ -205,6 +214,8 @@ func (n *Node) getOrCreateChild(arc uint32) *Node {
 
 func (n *Node) setSpan(s Span)                      { n.span = s }
 func (n *Node) setName(name string)                 { n.name = name }
+func (n *Node) setDescription(d string)             { n.desc = d }
+func (n *Node) setReference(r string)               { n.ref = r }
 func (n *Node) setKind(k Kind)                      { n.kind = k }
 func (n *Node) setModule(m *Module)                 { n.module = m }
 func (n *Node) setObject(obj *Object)               { n.obj = obj }

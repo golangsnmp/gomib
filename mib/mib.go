@@ -118,6 +118,62 @@ func (m *Mib) Capability(name string) *Capability {
 	return findEntity(m, name, func(nd *Node) *Capability { return nd.capability })
 }
 
+// Symbol returns the resolved definition for name. Lookup priority:
+// node entities (object > notification > group > compliance > capability > plain node),
+// then Type. Returns a zero Symbol if not found.
+func (m *Mib) Symbol(name string) Symbol {
+	// Check node-attached entities first.
+	for _, nd := range m.nameToNodes[name] {
+		if nd.obj != nil {
+			return symbolFromObject(nd.obj)
+		}
+	}
+	for _, nd := range m.nameToNodes[name] {
+		if nd.notif != nil {
+			return symbolFromNotification(nd.notif)
+		}
+	}
+	for _, nd := range m.nameToNodes[name] {
+		if nd.group != nil {
+			return symbolFromGroup(nd.group)
+		}
+	}
+	for _, nd := range m.nameToNodes[name] {
+		if nd.compliance != nil {
+			return symbolFromCompliance(nd.compliance)
+		}
+	}
+	for _, nd := range m.nameToNodes[name] {
+		if nd.capability != nil {
+			return symbolFromCapability(nd.capability)
+		}
+	}
+	// Plain node (no entity attachment).
+	if nodes := m.nameToNodes[name]; len(nodes) > 0 {
+		return symbolFromNode(nodes[0])
+	}
+	// Type lookup.
+	if t := m.typeByName[name]; t != nil {
+		return symbolFromType(t)
+	}
+	return Symbol{}
+}
+
+// ModulesDefining returns all modules that define a symbol with the given name.
+// Excludes synthetic base modules.
+func (m *Mib) ModulesDefining(name string) []*Module {
+	var result []*Module
+	for _, mod := range m.modules {
+		if mod.base {
+			continue
+		}
+		if mod.DefinesSymbol(name) {
+			result = append(result, mod)
+		}
+	}
+	return result
+}
+
 // NodeByOID returns the node at the exact OID, or nil if not found.
 func (m *Mib) NodeByOID(oid OID) *Node {
 	nd, ok := m.root.walkOID(oid)

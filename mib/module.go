@@ -1,6 +1,7 @@
 package mib
 
 import (
+	"iter"
 	"slices"
 
 	"github.com/golangsnmp/gomib/internal/types"
@@ -29,6 +30,10 @@ type Module struct {
 	nodes         []*Node
 
 	lineTable []int
+
+	// usedImportNames records which imported symbols were referenced during
+	// resolution. Populated by the resolver after all phases complete.
+	usedImportNames map[string]struct{}
 
 	// Name-indexed maps for O(1) lookups, populated by Add*() methods.
 	objectsByName       map[string]*Object
@@ -167,17 +172,100 @@ func (m *Module) Capability(name string) *Capability {
 	return m.capabilitiesByName[name]
 }
 
-func (m *Module) setLineTable(t []int)         { m.lineTable = t }
-func (m *Module) setSourcePath(path string)    { m.sourcePath = path }
-func (m *Module) setBase(b bool)               { m.base = b }
-func (m *Module) setLanguage(l Language)       { m.language = l }
-func (m *Module) setOID(oid OID)               { m.oid = oid }
-func (m *Module) setOrganization(org string)   { m.organization = org }
-func (m *Module) setContactInfo(info string)   { m.contactInfo = info }
-func (m *Module) setDescription(desc string)   { m.description = desc }
-func (m *Module) setLastUpdated(s string)      { m.lastUpdated = s }
-func (m *Module) setRevisions(revs []Revision) { m.revisions = revs }
-func (m *Module) setImports(imports []Import)  { m.imports = imports }
+// Definitions returns an iterator over all definitions in this module as Symbol
+// values. Yields Objects, Types, Notifications, Groups, Compliances,
+// Capabilities, then plain Nodes (nodes not covered by another entity type).
+func (m *Module) Definitions() iter.Seq[Symbol] {
+	return func(yield func(Symbol) bool) {
+		for _, o := range m.objects {
+			if !yield(symbolFromObject(o)) {
+				return
+			}
+		}
+		for _, t := range m.types {
+			if !yield(symbolFromType(t)) {
+				return
+			}
+		}
+		for _, n := range m.notifications {
+			if !yield(symbolFromNotification(n)) {
+				return
+			}
+		}
+		for _, g := range m.groups {
+			if !yield(symbolFromGroup(g)) {
+				return
+			}
+		}
+		for _, c := range m.compliances {
+			if !yield(symbolFromCompliance(c)) {
+				return
+			}
+		}
+		for _, c := range m.capabilities {
+			if !yield(symbolFromCapability(c)) {
+				return
+			}
+		}
+		for _, nd := range m.nodes {
+			if nd.obj != nil || nd.notif != nil || nd.group != nil || nd.compliance != nil || nd.capability != nil {
+				continue
+			}
+			if !yield(symbolFromNode(nd)) {
+				return
+			}
+		}
+	}
+}
+
+// DefinesSymbol reports whether this module defines a symbol with the given name.
+func (m *Module) DefinesSymbol(name string) bool {
+	if _, ok := m.objectsByName[name]; ok {
+		return true
+	}
+	if _, ok := m.typesByName[name]; ok {
+		return true
+	}
+	if _, ok := m.notificationsByName[name]; ok {
+		return true
+	}
+	if _, ok := m.groupsByName[name]; ok {
+		return true
+	}
+	if _, ok := m.compliancesByName[name]; ok {
+		return true
+	}
+	if _, ok := m.capabilitiesByName[name]; ok {
+		return true
+	}
+	if _, ok := m.nodesByName[name]; ok {
+		return true
+	}
+	return false
+}
+
+// IsImportUsed reports whether the named imported symbol was referenced
+// during resolution. Returns false for non-imported or unknown names.
+func (m *Module) IsImportUsed(name string) bool {
+	if m.usedImportNames == nil {
+		return false
+	}
+	_, ok := m.usedImportNames[name]
+	return ok
+}
+
+func (m *Module) setUsedImportNames(u map[string]struct{}) { m.usedImportNames = u }
+func (m *Module) setLineTable(t []int)                     { m.lineTable = t }
+func (m *Module) setSourcePath(path string)                { m.sourcePath = path }
+func (m *Module) setBase(b bool)                           { m.base = b }
+func (m *Module) setLanguage(l Language)                   { m.language = l }
+func (m *Module) setOID(oid OID)                           { m.oid = oid }
+func (m *Module) setOrganization(org string)               { m.organization = org }
+func (m *Module) setContactInfo(info string)               { m.contactInfo = info }
+func (m *Module) setDescription(desc string)               { m.description = desc }
+func (m *Module) setLastUpdated(s string)                  { m.lastUpdated = s }
+func (m *Module) setRevisions(revs []Revision)             { m.revisions = revs }
+func (m *Module) setImports(imports []Import)              { m.imports = imports }
 
 func (m *Module) addObject(obj *Object) {
 	m.objects = append(m.objects, obj)
