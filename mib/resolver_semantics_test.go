@@ -782,11 +782,11 @@ func TestConvertComplianceModules(t *testing.T) {
 						Object: "testObj",
 						Syntax: &module.TypeSyntaxConstrained{
 							Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
-							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(0, 100)}},
+							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(0, 100, types.Span{})}},
 						},
 						WriteSyntax: &module.TypeSyntaxConstrained{
 							Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
-							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(1, 50)}},
+							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(1, 50, types.Span{})}},
 						},
 					},
 				},
@@ -940,7 +940,7 @@ func TestConvertSupportsModules(t *testing.T) {
 						Name: "ifAdminStatus",
 						Syntax: &module.TypeSyntaxConstrained{
 							Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
-							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(1, 2)}},
+							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(1, 2, types.Span{})}},
 						},
 						WriteSyntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
 						CreationRequires: []string{"ifType", "ifSpeed"},

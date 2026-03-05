@@ -204,7 +204,7 @@ func constrainedOctetFixed(size uint64) TypeSyntax {
 
 func constrainedOctetRange(min, max uint64) TypeSyntax {
 	return constrainedOctetSize([]Range{
-		NewRangeUnsigned(min, max),
+		NewRangeUnsigned(min, max, types.Synthetic),
 	})
 }
 

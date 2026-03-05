@@ -2734,7 +2734,7 @@ func testInetAddressMIB() *module.Module {
 			DefBase: module.DefBase{Name: "InetAddress"},
 			Syntax: &module.TypeSyntaxConstrained{
 				Base:       &module.TypeSyntaxOctetString{},
-				Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255)}},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255, types.Span{})}},
 			},
 			Status:              types.StatusCurrent,
 			IsTextualConvention: true,
@@ -2898,7 +2898,7 @@ func testTransportAddressMIB() *module.Module {
 			DefBase: module.DefBase{Name: "TransportAddress"},
 			Syntax: &module.TypeSyntaxConstrained{
 				Base:       &module.TypeSyntaxOctetString{},
-				Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255)}},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255, types.Span{})}},
 			},
 			Status:              types.StatusCurrent,
 			IsTextualConvention: true,

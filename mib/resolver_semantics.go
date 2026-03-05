@@ -190,6 +190,15 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 
 		resolved := newObject(obj.Name)
 		resolved.setSpan(obj.Span)
+		resolved.setSyntaxSpan(obj.SyntaxSpan)
+		resolved.setAccessSpan(obj.AccessSpan)
+		resolved.setStatusSpan(obj.StatusSpan)
+		resolved.setDescriptionSpan(obj.DescriptionSpan)
+		resolved.setReferenceSpan(obj.ReferenceSpan)
+		resolved.setUnitsSpan(obj.UnitsSpan)
+		resolved.setAugmentsSpan(obj.AugmentsSpan)
+		resolved.setDefaultValueSpan(obj.DefValSpan)
+		resolved.setOidRefs(extractOidRefs(obj.DefinitionOid()))
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
@@ -252,6 +261,27 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 }
 
+// extractOidRefs extracts named symbolic references from an OID assignment.
+func extractOidRefs(oid *module.OidAssignment) []OidRef {
+	if oid == nil {
+		return nil
+	}
+	var refs []OidRef
+	for _, comp := range oid.Components {
+		switch c := comp.(type) {
+		case *module.OidComponentName:
+			refs = append(refs, OidRef{Name: c.NameValue, Span: c.Span})
+		case *module.OidComponentNamedNumber:
+			refs = append(refs, OidRef{Name: c.NameValue, Span: c.Span})
+		case *module.OidComponentQualifiedName:
+			refs = append(refs, OidRef{Name: c.NameValue, Span: c.Span})
+		case *module.OidComponentQualifiedNamedNumber:
+			refs = append(refs, OidRef{Name: c.NameValue, Span: c.Span})
+		}
+	}
+	return refs
+}
+
 // linkObjectIndexes resolves INDEX and AUGMENTS references now that all
 // objects exist. Uses the module's own Object instance, not the shared
 // node's, because multiple modules can define objects at the same OID.
@@ -280,6 +310,7 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 							Object:   idxObj,
 							Implied:  item.Implied,
 							Encoding: classifyIndexEncoding(idxObj, item.Implied),
+							Span:     item.Span,
 						})
 					} else if !isBareTypeIndex(item.Object) {
 						ctx.EmitDiagnostic(types.DiagIndexNotObject,
@@ -290,6 +321,7 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 					indexEntries = append(indexEntries, IndexEntry{
 						TypeName: item.Object,
 						Implied:  item.Implied,
+						Span:     item.Span,
 					})
 				}
 			}
@@ -374,6 +406,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 
 		resolved := newNotification(notif.Name)
 		resolved.setSpan(notif.Span)
+		resolved.setOidRefs(extractOidRefs(notif.DefinitionOid()))
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
@@ -441,6 +474,7 @@ type groupInfo struct {
 	description string
 	reference   string
 	members     []string
+	oidRefs     []OidRef
 	isNotifGrp  bool
 }
 
@@ -454,12 +488,14 @@ func createResolvedGroups(ctx *resolverContext) {
 					mod: mod, name: d.Name, span: d.DefinitionSpan(),
 					status: d.Status, description: d.Description,
 					reference: d.Reference, members: d.Objects,
+					oidRefs: extractOidRefs(d.DefinitionOid()),
 				})
 			case *module.NotificationGroup:
 				groups = append(groups, groupInfo{
 					mod: mod, name: d.Name, span: d.DefinitionSpan(),
 					status: d.Status, description: d.Description,
 					reference: d.Reference, members: d.Notifications,
+					oidRefs:    extractOidRefs(d.DefinitionOid()),
 					isNotifGrp: true,
 				})
 			}
@@ -467,7 +503,8 @@ func createResolvedGroups(ctx *resolverContext) {
 	}
 
 	created := 0
-	for _, gi := range groups {
+	for i := range groups {
+		gi := &groups[i]
 		node, ok := ctx.LookupNodeForModule(gi.mod, gi.name)
 		if !ok {
 			continue
@@ -475,6 +512,7 @@ func createResolvedGroups(ctx *resolverContext) {
 
 		resolved := newGroup(gi.name)
 		resolved.setSpan(gi.span)
+		resolved.setOidRefs(gi.oidRefs)
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[gi.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
@@ -596,6 +634,7 @@ func createResolvedCompliances(ctx *resolverContext) {
 
 		resolved := newCompliance(comp.Name)
 		resolved.setSpan(comp.Span)
+		resolved.setOidRefs(extractOidRefs(comp.DefinitionOid()))
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
@@ -620,6 +659,7 @@ func convertComplianceModules(ctx *resolverContext, mod *module.Module, modules 
 		result[i] = ComplianceModule{
 			ModuleName:      m.ModuleName,
 			MandatoryGroups: m.MandatoryGroups,
+			Span:            m.Span,
 		}
 		if len(m.Groups) > 0 {
 			groups := make([]ComplianceGroup, len(m.Groups))
@@ -627,6 +667,7 @@ func convertComplianceModules(ctx *resolverContext, mod *module.Module, modules 
 				groups[j] = ComplianceGroup{
 					Group:       g.Group,
 					Description: g.Description,
+					Span:        g.Span,
 				}
 			}
 			result[i].Groups = groups
@@ -637,6 +678,7 @@ func convertComplianceModules(ctx *resolverContext, mod *module.Module, modules 
 				objects[j] = ComplianceObject{
 					Object:      o.Object,
 					Description: o.Description,
+					Span:        o.Span,
 				}
 				objects[j].Syntax = resolveSyntaxConstraints(ctx, o.Syntax, mod, o.Object)
 				objects[j].WriteSyntax = resolveSyntaxConstraints(ctx, o.WriteSyntax, mod, o.Object)
@@ -666,6 +708,7 @@ func createResolvedCapabilities(ctx *resolverContext) {
 
 		resolved := newCapability(ac.Name)
 		resolved.setSpan(ac.Span)
+		resolved.setOidRefs(extractOidRefs(ac.DefinitionOid()))
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
@@ -691,12 +734,14 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 		result[i] = CapabilitiesModule{
 			ModuleName: m.ModuleName,
 			Includes:   m.Includes,
+			Span:       m.Span,
 		}
 		for _, v := range m.Variations {
 			if isNotificationVariation(ctx, mod, m.ModuleName, &v) {
 				nv := NotificationVariation{
 					Notification: v.Name,
 					Description:  v.Description,
+					Span:         v.Span,
 				}
 				if v.Access != nil {
 					nv.Access = v.Access
@@ -711,6 +756,7 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 				ov := ObjectVariation{
 					Object:      v.Name,
 					Description: v.Description,
+					Span:        v.Span,
 				}
 				ov.Syntax = resolveSyntaxConstraints(ctx, v.Syntax, mod, v.Name)
 				ov.WriteSyntax = resolveSyntaxConstraints(ctx, v.WriteSyntax, mod, v.Name)

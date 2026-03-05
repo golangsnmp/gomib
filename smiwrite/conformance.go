@@ -138,7 +138,8 @@ func (e *emitter) emitAgentCapabilities(cap *mib.Capability) error {
 			return err
 		}
 
-		for _, ov := range sm.ObjectVariations {
+		for i := range sm.ObjectVariations {
+			ov := &sm.ObjectVariations[i]
 			if _, err := fmt.Fprintf(e.w, "        VARIATION %s\n", ov.Object); err != nil {
 				return err
 			}

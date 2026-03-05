@@ -7,15 +7,22 @@ import (
 	"strings"
 )
 
+// ImportSymbol is a single imported symbol with its source location.
+type ImportSymbol struct {
+	Name string
+	Span Span
+}
+
 // Import describes a group of symbols imported from a single source module.
 type Import struct {
-	Module  string   // source module name
-	Symbols []string // imported symbol names
+	Module  string
+	Symbols []ImportSymbol
 }
 
 // Range represents a min..max constraint for sizes or values.
 type Range struct {
 	Min, Max int64
+	Span     Span
 }
 
 // String returns the range as "min..max" or just "value" if min equals max.
@@ -30,6 +37,7 @@ func (r Range) String() string {
 type NamedValue struct {
 	Label string
 	Value int64
+	Span  Span
 }
 
 func findNamedValue(values []NamedValue, label string) (NamedValue, bool) {
@@ -45,6 +53,7 @@ func findNamedValue(values []NamedValue, label string) (NamedValue, bool) {
 type Revision struct {
 	Date        string // "YYYY-MM-DD" or original format
 	Description string
+	Span        Span
 }
 
 // IndexEntry describes an index component for a table row.
@@ -55,6 +64,7 @@ type IndexEntry struct {
 	TypeName string        // non-empty for bare type indexes
 	Implied  bool          // IMPLIED keyword present
 	Encoding IndexEncoding // RFC 2578 s7.7 encoding classification, set during resolution
+	Span     Span
 }
 
 // classifyIndexEncoding determines the index encoding from the object's
@@ -266,12 +276,14 @@ type ComplianceModule struct {
 	MandatoryGroups []string           // MANDATORY-GROUPS references
 	Groups          []ComplianceGroup  // GROUP refinements
 	Objects         []ComplianceObject // OBJECT refinements
+	Span            Span
 }
 
 // ComplianceGroup is a GROUP clause within MODULE-COMPLIANCE.
 type ComplianceGroup struct {
 	Group       string // group reference name
 	Description string
+	Span        Span
 }
 
 // ComplianceObject is an OBJECT refinement within MODULE-COMPLIANCE.
@@ -281,6 +293,7 @@ type ComplianceObject struct {
 	WriteSyntax *SyntaxConstraints // WRITE-SYNTAX refinement (nil if not specified)
 	MinAccess   *Access            // MIN-ACCESS restriction (nil if not specified)
 	Description string
+	Span        Span
 }
 
 // clone returns a deep copy of the ComplianceModule.
@@ -302,6 +315,7 @@ type CapabilitiesModule struct {
 	Includes               []string                // INCLUDES group references
 	ObjectVariations       []ObjectVariation       // object VARIATION clauses
 	NotificationVariations []NotificationVariation // notification VARIATION clauses
+	Span                   Span
 }
 
 // clone returns a deep copy of the CapabilitiesModule.
@@ -328,6 +342,7 @@ type ObjectVariation struct {
 	CreationRequires []string           // CREATION-REQUIRES columns (nil if not specified)
 	DefVal           DefVal             // overridden default value (zero if not specified)
 	Description      string
+	Span             Span
 }
 
 // NotificationVariation is a notification VARIATION within AGENT-CAPABILITIES.
@@ -335,6 +350,7 @@ type NotificationVariation struct {
 	Notification string  // notification reference name
 	Access       *Access // ACCESS restriction (nil if not specified)
 	Description  string
+	Span         Span
 }
 
 // SyntaxConstraints holds a resolved type reference and any inline
