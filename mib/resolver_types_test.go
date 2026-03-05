@@ -47,15 +47,15 @@ func TestSyntaxToBaseType(t *testing.T) {
 		// Constrained wrapping - delegates to inner syntax
 		{"constrained Integer32", &module.TypeSyntaxConstrained{
 			Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(0, 100)}},
+			Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(0, 100, types.Span{})}},
 		}, BaseInteger32, true},
 		{"constrained OCTET STRING", &module.TypeSyntaxConstrained{
 			Base:       &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
-			Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255)}},
+			Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255, types.Span{})}},
 		}, BaseOctetString, true},
 		{"constrained OctetString primitive", &module.TypeSyntaxConstrained{
 			Base:       &module.TypeSyntaxOctetString{},
-			Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255)}},
+			Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeUnsigned(0, 255, types.Span{})}},
 		}, BaseOctetString, true},
 		{"constrained ObjectIdentifier primitive", &module.TypeSyntaxConstrained{
 			Base:       &module.TypeSyntaxObjectIdentifier{},
@@ -270,7 +270,7 @@ func TestExtractConstraints(t *testing.T) {
 			Base: &module.TypeSyntaxOctetString{},
 			Constraint: &module.ConstraintSize{
 				Ranges: []module.Range{
-					module.NewRangeUnsigned(0, 255),
+					module.NewRangeUnsigned(0, 255, types.Span{}),
 				},
 			},
 		}
@@ -286,7 +286,7 @@ func TestExtractConstraints(t *testing.T) {
 			Base: &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			Constraint: &module.ConstraintRange{
 				Ranges: []module.Range{
-					module.NewRangeSigned(-128, 127),
+					module.NewRangeSigned(-128, 127, types.Span{}),
 				},
 			},
 		}
@@ -302,8 +302,8 @@ func TestExtractConstraints(t *testing.T) {
 			Base: &module.TypeSyntaxOctetString{},
 			Constraint: &module.ConstraintSize{
 				Ranges: []module.Range{
-					module.NewRangeSingleUnsigned(0),
-					module.NewRangeUnsigned(4, 255),
+					module.NewRangeSingleUnsigned(0, types.Span{}),
+					module.NewRangeUnsigned(4, 255, types.Span{}),
 				},
 			},
 		}
@@ -333,7 +333,7 @@ func TestExtractConstraints(t *testing.T) {
 func TestRangesToConstraint(t *testing.T) {
 	t.Run("signed range", func(t *testing.T) {
 		ranges := []module.Range{
-			module.NewRangeSigned(-100, 100),
+			module.NewRangeSigned(-100, 100, types.Span{}),
 		}
 		got := rangesToConstraint(ranges)
 		testutil.Len(t, got, 1, "ranges")
@@ -343,7 +343,7 @@ func TestRangesToConstraint(t *testing.T) {
 
 	t.Run("single value range", func(t *testing.T) {
 		ranges := []module.Range{
-			module.NewRangeSingleSigned(42),
+			module.NewRangeSingleSigned(42, types.Span{}),
 		}
 		got := rangesToConstraint(ranges)
 		testutil.Len(t, got, 1, "ranges")
@@ -354,8 +354,8 @@ func TestRangesToConstraint(t *testing.T) {
 
 	t.Run("multiple ranges", func(t *testing.T) {
 		ranges := []module.Range{
-			module.NewRangeSigned(0, 10),
-			module.NewRangeSigned(100, 200),
+			module.NewRangeSigned(0, 10, types.Span{}),
+			module.NewRangeSigned(100, 200, types.Span{}),
 		}
 		got := rangesToConstraint(ranges)
 		testutil.Len(t, got, 2, "ranges")

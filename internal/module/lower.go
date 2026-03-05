@@ -194,6 +194,46 @@ func optionalStatus(s *ast.StatusClause, defaultStatus types.Status) types.Statu
 	return defaultStatus
 }
 
+// optionalQuotedStringSpan returns qs.Span if qs is non-nil, or zero otherwise.
+func optionalQuotedStringSpan(qs *ast.QuotedString) types.Span {
+	if qs != nil {
+		return qs.Span
+	}
+	return types.Span{}
+}
+
+// optionalStatusSpan returns s.Span if s is non-nil, or zero otherwise.
+func optionalStatusSpan(s *ast.StatusClause) types.Span {
+	if s != nil {
+		return s.Span
+	}
+	return types.Span{}
+}
+
+// optionalIndexClauseSpan returns the IndexClauseSpan if clause is non-nil.
+func optionalIndexClauseSpan(clause ast.IndexClause) types.Span {
+	if clause != nil {
+		return clause.IndexClauseSpan()
+	}
+	return types.Span{}
+}
+
+// optionalAugmentsSpan returns a.Span if a is non-nil, or zero otherwise.
+func optionalAugmentsSpan(a *ast.AugmentsClause) types.Span {
+	if a != nil {
+		return a.Span
+	}
+	return types.Span{}
+}
+
+// optionalDefValSpan returns d.Span if d is non-nil, or zero otherwise.
+func optionalDefValSpan(d *ast.DefValClause) types.Span {
+	if d != nil {
+		return d.Span
+	}
+	return types.Span{}
+}
+
 // checkEmptyOptionalString emits a diagnostic when an optional quoted string
 // clause is present but empty.
 func checkEmptyOptionalString(ctx *LoweringContext, qs *ast.QuotedString, span types.Span, defName, clause, code string) {
@@ -235,7 +275,7 @@ func lowerImports(importClauses []ast.ImportClause, ctx *LoweringContext) []Impo
 		}
 
 		for _, symbol := range clause.Symbols {
-			imports = append(imports, NewImport(fromModule, symbol.Name, clause.Span))
+			imports = append(imports, NewImport(fromModule, symbol.Name, symbol.Span))
 		}
 	}
 
@@ -301,19 +341,28 @@ func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 	checkEmptyOptionalString(ctx, def.Units, def.Span, name, "UNITS", types.DiagEmptyUnits)
 
 	return &ObjectType{
-		DefBase:        DefBase{Name: def.Name.Name, Span: def.Span},
-		Syntax:         lowerTypeSyntax(def.Syntax.Syntax, ctx),
-		Units:          optionalString(def.Units),
-		Access:         def.Access.Value,
-		AccessKeyword:  def.Access.Keyword,
-		Status:         optionalStatus(def.Status, types.StatusCurrent),
-		Description:    optionalString(def.Description),
-		HasDescription: def.Description != nil,
-		Reference:      optionalString(def.Reference),
-		Index:          lowerIndexClause(def.Index),
-		Augments:       augments,
-		DefVal:         lowerOptionalDefVal(def.DefVal, ctx),
-		Oid:            lowerOidAssignment(def.OidAssignment, ctx),
+		DefBase:         DefBase{Name: def.Name.Name, Span: def.Span},
+		Syntax:          lowerTypeSyntax(def.Syntax.Syntax, ctx),
+		Units:           optionalString(def.Units),
+		Access:          def.Access.Value,
+		AccessKeyword:   def.Access.Keyword,
+		Status:          optionalStatus(def.Status, types.StatusCurrent),
+		Description:     optionalString(def.Description),
+		HasDescription:  def.Description != nil,
+		Reference:       optionalString(def.Reference),
+		Index:           lowerIndexClause(def.Index),
+		Augments:        augments,
+		DefVal:          lowerOptionalDefVal(def.DefVal, ctx),
+		Oid:             lowerOidAssignment(def.OidAssignment, ctx),
+		SyntaxSpan:      def.Syntax.Span,
+		AccessSpan:      def.Access.Span,
+		StatusSpan:      optionalStatusSpan(def.Status),
+		DescriptionSpan: optionalQuotedStringSpan(def.Description),
+		UnitsSpan:       optionalQuotedStringSpan(def.Units),
+		ReferenceSpan:   optionalQuotedStringSpan(def.Reference),
+		IndexSpan:       optionalIndexClauseSpan(def.Index),
+		AugmentsSpan:    optionalAugmentsSpan(def.Augments),
+		DefValSpan:      optionalDefValSpan(def.DefVal),
 	}
 }
 
@@ -323,6 +372,7 @@ func lowerModuleIdentity(def *ast.ModuleIdentityDef, ctx *LoweringContext) *Modu
 		revisions[i] = Revision{
 			Date:        r.Date.Value,
 			Description: r.Description.Value,
+			Span:        r.Span,
 		}
 	}
 
@@ -475,14 +525,20 @@ func lowerTextualConvention(def *ast.TextualConventionDef, ctx *LoweringContext)
 		Description:         def.Description.Value,
 		Reference:           optionalString(def.Reference),
 		IsTextualConvention: true,
+		SyntaxSpan:          def.Syntax.Span,
+		StatusSpan:          def.Status.Span,
+		DescriptionSpan:     def.Description.Span,
+		ReferenceSpan:       optionalQuotedStringSpan(def.Reference),
+		DisplayHintSpan:     optionalQuotedStringSpan(def.DisplayHint),
 	}
 }
 
 func lowerTypeAssignment(def *ast.TypeAssignmentDef, ctx *LoweringContext) *TypeDef {
 	return &TypeDef{
-		DefBase: DefBase{Name: def.Name.Name, Span: def.Span},
-		Syntax:  lowerTypeSyntax(def.Syntax, ctx),
-		Status:  types.StatusCurrent,
+		DefBase:    DefBase{Name: def.Name.Name, Span: def.Span},
+		Syntax:     lowerTypeSyntax(def.Syntax, ctx),
+		Status:     types.StatusCurrent,
+		SyntaxSpan: def.Syntax.SyntaxSpan(),
 	}
 }
 
@@ -553,6 +609,7 @@ func lowerComplianceModule(m ast.ComplianceModule, ctx *LoweringContext) Complia
 			groups = append(groups, ComplianceGroup{
 				Group:       comp.Group.Name,
 				Description: comp.Description.Value,
+				Span:        comp.Span,
 			})
 		case *ast.ComplianceObject:
 			objects = append(objects, lowerComplianceObject(comp, ctx))
@@ -569,6 +626,7 @@ func lowerComplianceModule(m ast.ComplianceModule, ctx *LoweringContext) Complia
 		MandatoryGroups: identNames(m.MandatoryGroups),
 		Groups:          groups,
 		Objects:         objects,
+		Span:            m.Span,
 	}
 }
 
@@ -593,6 +651,7 @@ func lowerComplianceObject(o *ast.ComplianceObject, ctx *LoweringContext) Compli
 		WriteSyntax: lowerOptionalSyntax(o.WriteSyntax, ctx),
 		MinAccess:   optionalAccess(o.MinAccess),
 		Description: o.Description.Value,
+		Span:        o.Span,
 	}
 }
 
@@ -627,6 +686,7 @@ func lowerSupportsModule(s *ast.SupportsModule, ctx *LoweringContext) SupportsMo
 		ModuleName: s.ModuleName.Name,
 		Includes:   identNames(s.Includes),
 		Variations: variations,
+		Span:       s.Span,
 	}
 }
 
@@ -648,7 +708,7 @@ func lowerVariation(v *ast.Variation, ctx *LoweringContext) Variation {
 func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 	switch s := syntax.(type) {
 	case *ast.TypeSyntaxTypeRef:
-		return &TypeSyntaxTypeRef{Name: s.Name.Name}
+		return &TypeSyntaxTypeRef{Name: s.Name.Name, Span: s.Name.Span}
 
 	case *ast.TypeSyntaxIntegerEnum:
 		namedNumbers := make([]NamedNumber, len(s.NamedNumbers))
@@ -669,13 +729,13 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 				ctx.emitDiagnostic(types.DiagEnumZero, nn.Span,
 					fmt.Sprintf("enumeration contains zero value %q(0) in SMIv1 module", nn.Name.Name))
 			}
-			namedNumbers[i] = NewNamedNumber(nn.Name.Name, nn.Value)
+			namedNumbers[i] = NewNamedNumber(nn.Name.Name, nn.Value, nn.Span)
 		}
 		var base string
 		if s.Base != nil {
 			base = s.Base.Name
 		}
-		return &TypeSyntaxIntegerEnum{Base: base, NamedNumbers: namedNumbers}
+		return &TypeSyntaxIntegerEnum{Base: base, NamedNumbers: namedNumbers, Span: s.SyntaxSpan()}
 
 	case *ast.TypeSyntaxBits:
 		namedBits := make([]NamedBit, len(s.NamedBits))
@@ -706,25 +766,26 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 				ctx.emitDiagnostic(types.DiagBitsNumberLarge, nb.Span,
 					fmt.Sprintf("BITS position %d for %q may cause interoperability problems", pos, nb.Name.Name))
 			}
-			namedBits[i] = NewNamedBit(nb.Name.Name, uint32(pos))
+			namedBits[i] = NewNamedBit(nb.Name.Name, uint32(pos), nb.Span)
 		}
-		return &TypeSyntaxBits{NamedBits: namedBits}
+		return &TypeSyntaxBits{NamedBits: namedBits, Span: s.SyntaxSpan()}
 
 	case *ast.TypeSyntaxConstrained:
 		return &TypeSyntaxConstrained{
 			Base:       lowerTypeSyntax(s.Base, ctx),
 			Constraint: lowerConstraint(s.Constraint, ctx),
+			Span:       s.SyntaxSpan(),
 		}
 
 	case *ast.TypeSyntaxSequenceOf:
-		return &TypeSyntaxSequenceOf{EntryType: s.EntryType.Name}
+		return &TypeSyntaxSequenceOf{EntryType: s.EntryType.Name, Span: s.SyntaxSpan()}
 
 	case *ast.TypeSyntaxSequence:
 		fields := make([]SequenceField, len(s.Fields))
 		for i, f := range s.Fields {
-			fields[i] = NewSequenceField(f.Name.Name, lowerTypeSyntax(f.Syntax, ctx))
+			fields[i] = NewSequenceField(f.Name.Name, lowerTypeSyntax(f.Syntax, ctx), f.Span)
 		}
-		return &TypeSyntaxSequence{Fields: fields}
+		return &TypeSyntaxSequence{Fields: fields, Span: s.SyntaxSpan()}
 
 	case *ast.TypeSyntaxChoice:
 		// CHOICE only appears in SMI base modules; normalize to the first alternative.
@@ -762,10 +823,10 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 func lowerConstraint(constraint ast.Constraint, ctx *LoweringContext) Constraint {
 	switch c := constraint.(type) {
 	case *ast.ConstraintSize:
-		return &ConstraintSize{Ranges: lowerRanges(c.Ranges, ctx)}
+		return &ConstraintSize{Ranges: lowerRanges(c.Ranges, ctx), Span: c.ConstraintSpan()}
 
 	case *ast.ConstraintRange:
-		return &ConstraintRange{Ranges: lowerRanges(c.Ranges, ctx)}
+		return &ConstraintRange{Ranges: lowerRanges(c.Ranges, ctx), Span: c.ConstraintSpan()}
 
 	default:
 		ctx.emitDiagnostic(types.DiagUnknownConstraintType, constraint.ConstraintSpan(),
@@ -784,8 +845,9 @@ func lowerRanges(astRanges []ast.Range, ctx *LoweringContext) []Range {
 
 func lowerRange(r ast.Range, ctx *LoweringContext) Range {
 	return Range{
-		Min: lowerRangeValue(r.Min, ctx),
-		Max: lowerRangeValue(r.Max, ctx),
+		Min:  lowerRangeValue(r.Min, ctx),
+		Max:  lowerRangeValue(r.Max, ctx),
+		Span: r.Span,
 	}
 }
 
@@ -831,21 +893,23 @@ func lowerOidAssignment(oid ast.OidAssignment, ctx *LoweringContext) OidAssignme
 func lowerOidComponent(comp ast.OidComponent, ctx *LoweringContext) OidComponent {
 	switch c := comp.(type) {
 	case *ast.OidComponentName:
-		return &OidComponentName{NameValue: c.Name.Name}
+		return &OidComponentName{NameValue: c.Name.Name, Span: c.ComponentSpan()}
 
 	case *ast.OidComponentNumber:
-		return &OidComponentNumber{Value: c.Value}
+		return &OidComponentNumber{Value: c.Value, Span: c.ComponentSpan()}
 
 	case *ast.OidComponentNamedNumber:
 		return &OidComponentNamedNumber{
 			NameValue:   c.Name.Name,
 			NumberValue: c.Num,
+			Span:        c.ComponentSpan(),
 		}
 
 	case *ast.OidComponentQualifiedName:
 		return &OidComponentQualifiedName{
 			ModuleValue: c.ModuleName.Name,
 			NameValue:   c.Name.Name,
+			Span:        c.ComponentSpan(),
 		}
 
 	case *ast.OidComponentQualifiedNamedNumber:
@@ -853,12 +917,13 @@ func lowerOidComponent(comp ast.OidComponent, ctx *LoweringContext) OidComponent
 			ModuleValue: c.ModuleName.Name,
 			NameValue:   c.Name.Name,
 			NumberValue: c.Num,
+			Span:        c.ComponentSpan(),
 		}
 
 	default:
 		ctx.emitDiagnostic(types.DiagUnknownOidComponent, comp.ComponentSpan(),
 			fmt.Sprintf("unknown OID component type %T, defaulting to sub-id 0", comp))
-		return &OidComponentNumber{Value: 0}
+		return &OidComponentNumber{Value: 0, Span: types.Span{}}
 	}
 }
 
@@ -870,7 +935,7 @@ func lowerIndexClause(clause ast.IndexClause) []IndexItem {
 	indexes := clause.Indexes()
 	items := make([]IndexItem, len(indexes))
 	for i, idx := range indexes {
-		items[i] = IndexItem{Object: idx.Object.Name, Implied: idx.Implied}
+		items[i] = IndexItem{Object: idx.Object.Name, Implied: idx.Implied, Span: idx.Span}
 	}
 	return items
 }

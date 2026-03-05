@@ -9,11 +9,12 @@ import (
 type NamedNumber struct {
 	Name  string
 	Value int64
+	Span  types.Span
 }
 
 // NewNamedNumber returns a NamedNumber with the given name and value.
-func NewNamedNumber(name string, value int64) NamedNumber {
-	return NamedNumber{Name: name, Value: value}
+func NewNamedNumber(name string, value int64, span types.Span) NamedNumber {
+	return NamedNumber{Name: name, Value: value, Span: span}
 }
 
 // NamedBit is a named bit position in a BITS type definition,
@@ -21,22 +22,24 @@ func NewNamedNumber(name string, value int64) NamedNumber {
 type NamedBit struct {
 	Name     string
 	Position uint32
+	Span     types.Span
 }
 
 // NewNamedBit returns a NamedBit with the given name and position.
-func NewNamedBit(name string, position uint32) NamedBit {
-	return NamedBit{Name: name, Position: position}
+func NewNamedBit(name string, position uint32, span types.Span) NamedBit {
+	return NamedBit{Name: name, Position: position, Span: span}
 }
 
 // SequenceField is a field in a SEQUENCE type used for table row entries.
 type SequenceField struct {
 	Name   string
 	Syntax TypeSyntax
+	Span   types.Span
 }
 
 // NewSequenceField returns a SequenceField with the given name and syntax.
-func NewSequenceField(name string, syntax TypeSyntax) SequenceField {
-	return SequenceField{Name: name, Syntax: syntax}
+func NewSequenceField(name string, syntax TypeSyntax, span types.Span) SequenceField {
+	return SequenceField{Name: name, Syntax: syntax, Span: span}
 }
 
 // OidAssignment is an unresolved OID assignment. Components remain as
@@ -56,37 +59,54 @@ func NewOidAssignment(components []OidComponent, span types.Span) OidAssignment 
 // QualifiedNamedNumber).
 type OidComponent interface {
 	oidComponent()
+	ComponentSpan() types.Span
 }
 
 // OidComponentName is a symbolic name reference, e.g. internet.
 type OidComponentName struct {
 	NameValue string
+	Span      types.Span
 }
 
 func (*OidComponentName) oidComponent() {}
 
+// ComponentSpan returns the source span of this OID component.
+func (c *OidComponentName) ComponentSpan() types.Span { return c.Span }
+
 // OidComponentNumber is a numeric arc, e.g. 1 or 31.
 type OidComponentNumber struct {
 	Value uint32
+	Span  types.Span
 }
 
 func (*OidComponentNumber) oidComponent() {}
+
+// ComponentSpan returns the source span of this OID component.
+func (c *OidComponentNumber) ComponentSpan() types.Span { return c.Span }
 
 // OidComponentNamedNumber is a name with number, e.g. org(3).
 type OidComponentNamedNumber struct {
 	NameValue   string
 	NumberValue uint32
+	Span        types.Span
 }
 
 func (*OidComponentNamedNumber) oidComponent() {}
+
+// ComponentSpan returns the source span of this OID component.
+func (c *OidComponentNamedNumber) ComponentSpan() types.Span { return c.Span }
 
 // OidComponentQualifiedName is a module-qualified name, e.g. SNMPv2-SMI.enterprises.
 type OidComponentQualifiedName struct {
 	ModuleValue string
 	NameValue   string
+	Span        types.Span
 }
 
 func (*OidComponentQualifiedName) oidComponent() {}
+
+// ComponentSpan returns the source span of this OID component.
+func (c *OidComponentQualifiedName) ComponentSpan() types.Span { return c.Span }
 
 // OidComponentQualifiedNamedNumber is a module-qualified name with number,
 // e.g. SNMPv2-SMI.enterprises(1).
@@ -94,23 +114,32 @@ type OidComponentQualifiedNamedNumber struct {
 	ModuleValue string
 	NameValue   string
 	NumberValue uint32
+	Span        types.Span
 }
 
 func (*OidComponentQualifiedNamedNumber) oidComponent() {}
+
+// ComponentSpan returns the source span of this OID component.
+func (c *OidComponentQualifiedNamedNumber) ComponentSpan() types.Span { return c.Span }
 
 // TypeSyntax is an unresolved type representation. Use type switches to
 // dispatch on concrete types (TypeRef, IntegerEnum, Bits, Constrained,
 // SequenceOf, Sequence, OctetString, ObjectIdentifier).
 type TypeSyntax interface {
 	typeSyntax()
+	SyntaxSpan() types.Span
 }
 
 // TypeSyntaxTypeRef is a reference to a named type, e.g. Integer32.
 type TypeSyntaxTypeRef struct {
 	Name string
+	Span types.Span
 }
 
 func (*TypeSyntaxTypeRef) typeSyntax() {}
+
+// SyntaxSpan returns the source span of this type syntax.
+func (s *TypeSyntaxTypeRef) SyntaxSpan() types.Span { return s.Span }
 
 // TypeSyntaxIntegerEnum is an INTEGER with named values, e.g.
 // INTEGER { up(1), down(2) }. Base is non-empty when the enum restricts
@@ -118,98 +147,136 @@ func (*TypeSyntaxTypeRef) typeSyntax() {}
 type TypeSyntaxIntegerEnum struct {
 	Base         string
 	NamedNumbers []NamedNumber
+	Span         types.Span
 }
 
 func (*TypeSyntaxIntegerEnum) typeSyntax() {}
 
+// SyntaxSpan returns the source span of this type syntax.
+func (s *TypeSyntaxIntegerEnum) SyntaxSpan() types.Span { return s.Span }
+
 // TypeSyntaxBits is a BITS type with named bit positions.
 type TypeSyntaxBits struct {
 	NamedBits []NamedBit
+	Span      types.Span
 }
 
 func (*TypeSyntaxBits) typeSyntax() {}
+
+// SyntaxSpan returns the source span of this type syntax.
+func (s *TypeSyntaxBits) SyntaxSpan() types.Span { return s.Span }
 
 // TypeSyntaxConstrained is a type with a subtype constraint applied.
 type TypeSyntaxConstrained struct {
 	Base       TypeSyntax
 	Constraint Constraint
+	Span       types.Span
 }
 
 func (*TypeSyntaxConstrained) typeSyntax() {}
 
+// SyntaxSpan returns the source span of this type syntax.
+func (s *TypeSyntaxConstrained) SyntaxSpan() types.Span { return s.Span }
+
 // TypeSyntaxSequenceOf is SEQUENCE OF, used for table types.
 type TypeSyntaxSequenceOf struct {
 	EntryType string
+	Span      types.Span
 }
 
 func (*TypeSyntaxSequenceOf) typeSyntax() {}
 
+// SyntaxSpan returns the source span of this type syntax.
+func (s *TypeSyntaxSequenceOf) SyntaxSpan() types.Span { return s.Span }
+
 // TypeSyntaxSequence is a SEQUENCE with named fields, used for row types.
 type TypeSyntaxSequence struct {
 	Fields []SequenceField
+	Span   types.Span
 }
 
 func (*TypeSyntaxSequence) typeSyntax() {}
+
+// SyntaxSpan returns the source span of this type syntax.
+func (s *TypeSyntaxSequence) SyntaxSpan() types.Span { return s.Span }
 
 // TypeSyntaxOctetString is an explicit OCTET STRING reference.
 type TypeSyntaxOctetString struct{}
 
 func (*TypeSyntaxOctetString) typeSyntax() {}
 
+// SyntaxSpan returns a zero span (keyword types have no stored span).
+func (s *TypeSyntaxOctetString) SyntaxSpan() types.Span { return types.Span{} }
+
 // TypeSyntaxObjectIdentifier is an explicit OBJECT IDENTIFIER reference.
 type TypeSyntaxObjectIdentifier struct{}
 
 func (*TypeSyntaxObjectIdentifier) typeSyntax() {}
 
+// SyntaxSpan returns a zero span (keyword types have no stored span).
+func (s *TypeSyntaxObjectIdentifier) SyntaxSpan() types.Span { return types.Span{} }
+
 // Constraint is a subtype constraint (SIZE or value range).
 type Constraint interface {
 	constraint()
+	ConstraintSpan() types.Span
 }
 
 // ConstraintSize is a SIZE constraint, e.g. (SIZE (0..255)).
 type ConstraintSize struct {
 	Ranges []Range
+	Span   types.Span
 }
 
 func (*ConstraintSize) constraint() {}
 
+// ConstraintSpan returns the source span of this constraint.
+func (c *ConstraintSize) ConstraintSpan() types.Span { return c.Span }
+
 // ConstraintRange is a value range constraint, e.g. (0..65535).
 type ConstraintRange struct {
 	Ranges []Range
+	Span   types.Span
 }
 
 func (*ConstraintRange) constraint() {}
 
+// ConstraintSpan returns the source span of this constraint.
+func (c *ConstraintRange) ConstraintSpan() types.Span { return c.Span }
+
 // Range is a single range or value within a constraint. Max is nil for
 // single-value constraints.
 type Range struct {
-	Min RangeValue
-	Max RangeValue
+	Min  RangeValue
+	Max  RangeValue
+	Span types.Span
 }
 
 // NewRangeSingleSigned returns a single-value Range with a signed value.
-func NewRangeSingleSigned(value int64) Range {
-	return Range{Min: &RangeValueSigned{Value: value}, Max: nil}
+func NewRangeSingleSigned(value int64, span types.Span) Range {
+	return Range{Min: &RangeValueSigned{Value: value}, Max: nil, Span: span}
 }
 
 // NewRangeSingleUnsigned returns a single-value Range with an unsigned value.
-func NewRangeSingleUnsigned(value uint64) Range {
-	return Range{Min: &RangeValueUnsigned{Value: value}, Max: nil}
+func NewRangeSingleUnsigned(value uint64, span types.Span) Range {
+	return Range{Min: &RangeValueUnsigned{Value: value}, Max: nil, Span: span}
 }
 
 // NewRangeSigned returns a Range from min to max with signed values.
-func NewRangeSigned(min, max int64) Range {
+func NewRangeSigned(min, max int64, span types.Span) Range {
 	return Range{
-		Min: &RangeValueSigned{Value: min},
-		Max: &RangeValueSigned{Value: max},
+		Min:  &RangeValueSigned{Value: min},
+		Max:  &RangeValueSigned{Value: max},
+		Span: span,
 	}
 }
 
 // NewRangeUnsigned returns a Range from min to max with unsigned values.
-func NewRangeUnsigned(min, max uint64) Range {
+func NewRangeUnsigned(min, max uint64, span types.Span) Range {
 	return Range{
-		Min: &RangeValueUnsigned{Value: min},
-		Max: &RangeValueUnsigned{Value: max},
+		Min:  &RangeValueUnsigned{Value: min},
+		Max:  &RangeValueUnsigned{Value: max},
+		Span: span,
 	}
 }
 

@@ -7,13 +7,18 @@ import "slices"
 // Objects are attached to the OID tree via their [Node].
 type Object struct {
 	entity
-	typ         *Type
-	access      Access
-	units       string
-	defVal      *DefVal
-	augments    *Object
-	augmentedBy []*Object
-	index       []IndexEntry
+	typ          *Type
+	access       Access
+	units        string
+	defVal       *DefVal
+	augments     *Object
+	augmentedBy  []*Object
+	syntaxSpan   Span
+	accessSpan   Span
+	unitsSpan    Span
+	augmentsSpan Span
+	defValSpan   Span
+	index        []IndexEntry
 
 	hint             string
 	sizes            []Range
@@ -32,6 +37,21 @@ func (o *Object) Type() *Type { return o.typ }
 
 // Access returns the MAX-ACCESS or ACCESS clause value.
 func (o *Object) Access() Access { return o.access }
+
+// SyntaxSpan returns the source byte range of this object's SYNTAX clause.
+func (o *Object) SyntaxSpan() Span { return o.syntaxSpan }
+
+// AccessSpan returns the source byte range of this object's ACCESS clause.
+func (o *Object) AccessSpan() Span { return o.accessSpan }
+
+// UnitsSpan returns the source byte range of this object's UNITS clause.
+func (o *Object) UnitsSpan() Span { return o.unitsSpan }
+
+// AugmentsSpan returns the source byte range of this object's AUGMENTS clause.
+func (o *Object) AugmentsSpan() Span { return o.augmentsSpan }
+
+// DefaultValueSpan returns the source byte range of this object's DEFVAL clause.
+func (o *Object) DefaultValueSpan() Span { return o.defValSpan }
 
 // Units returns the UNITS clause text, or "".
 func (o *Object) Units() string { return o.units }
@@ -232,6 +252,11 @@ func (o *Object) setEffectiveRanges(r []Range)     { o.ranges = r }
 func (o *Object) setEffectiveEnums(e []NamedValue) { o.enums = e }
 func (o *Object) setEffectiveBits(b []NamedValue)  { o.bits = b }
 func (o *Object) setSequenceTypeName(s string)     { o.sequenceTypeName = s }
+func (o *Object) setSyntaxSpan(s Span)             { o.syntaxSpan = s }
+func (o *Object) setAccessSpan(s Span)             { o.accessSpan = s }
+func (o *Object) setUnitsSpan(s Span)              { o.unitsSpan = s }
+func (o *Object) setAugmentsSpan(s Span)           { o.augmentsSpan = s }
+func (o *Object) setDefaultValueSpan(s Span)       { o.defValSpan = s }
 
 func objectsByKind(objs []*Object, kind Kind) []*Object {
 	var result []*Object

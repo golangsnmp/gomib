@@ -37,6 +37,16 @@ type ObjectType struct {
 	Augments       string
 	DefVal         DefVal
 	Oid            OidAssignment
+
+	SyntaxSpan      types.Span
+	AccessSpan      types.Span
+	StatusSpan      types.Span
+	DescriptionSpan types.Span
+	UnitsSpan       types.Span
+	ReferenceSpan   types.Span
+	IndexSpan       types.Span
+	AugmentsSpan    types.Span
+	DefValSpan      types.Span
 }
 
 func (d *ObjectType) DefinitionOid() *OidAssignment { return &d.Oid }
@@ -45,6 +55,7 @@ func (d *ObjectType) DefinitionOid() *OidAssignment { return &d.Oid }
 type IndexItem struct {
 	Implied bool
 	Object  string
+	Span    types.Span
 }
 
 // ModuleIdentity is a MODULE-IDENTITY definition.
@@ -64,6 +75,7 @@ func (d *ModuleIdentity) DefinitionOid() *OidAssignment { return &d.Oid }
 type Revision struct {
 	Date        string
 	Description string
+	Span        types.Span
 }
 
 // ObjectIdentity is an OBJECT-IDENTITY definition.
@@ -116,6 +128,12 @@ type TypeDef struct {
 	Description         string
 	Reference           string
 	IsTextualConvention bool
+
+	SyntaxSpan      types.Span
+	StatusSpan      types.Span
+	DescriptionSpan types.Span
+	ReferenceSpan   types.Span
+	DisplayHintSpan types.Span
 }
 
 func (d *TypeDef) DefinitionOid() *OidAssignment { return nil }
@@ -171,12 +189,14 @@ type ComplianceModule struct {
 	MandatoryGroups []string
 	Groups          []ComplianceGroup
 	Objects         []ComplianceObject
+	Span            types.Span
 }
 
 // ComplianceGroup is a GROUP clause within MODULE-COMPLIANCE.
 type ComplianceGroup struct {
 	Group       string
 	Description string
+	Span        types.Span
 }
 
 // ComplianceObject is an OBJECT refinement within MODULE-COMPLIANCE.
@@ -186,6 +206,7 @@ type ComplianceObject struct {
 	WriteSyntax TypeSyntax
 	MinAccess   *types.Access
 	Description string
+	Span        types.Span
 }
 
 // AgentCapabilities is an AGENT-CAPABILITIES definition.
@@ -206,6 +227,7 @@ type SupportsModule struct {
 	ModuleName string
 	Includes   []string
 	Variations []Variation
+	Span       types.Span
 }
 
 // Variation is a VARIATION clause in AGENT-CAPABILITIES. At the IR level,

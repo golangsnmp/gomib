@@ -79,6 +79,7 @@ func createUserTypes(ctx *resolverContext) {
 
 			typ := newType(td.Name)
 			typ.setSpan(td.Span)
+			typ.setSyntaxSpan(td.SyntaxSpan)
 			typ.setModule(resolved)
 			typ.setBase(base)
 			typ.setIsTC(td.IsTextualConvention)
@@ -417,7 +418,7 @@ func rangesToConstraint(ranges []module.Range) []Range {
 		if r.Max != nil {
 			hi = rangeValueToI64(r.Max)
 		}
-		out = append(out, Range{Min: lo, Max: hi})
+		out = append(out, Range{Min: lo, Max: hi, Span: r.Span})
 	}
 	return out
 }
@@ -446,13 +447,13 @@ func extractNamedValues(syntax module.TypeSyntax) []NamedValue {
 	case *module.TypeSyntaxIntegerEnum:
 		values := make([]NamedValue, 0, len(s.NamedNumbers))
 		for _, nn := range s.NamedNumbers {
-			values = append(values, NamedValue{Label: nn.Name, Value: nn.Value})
+			values = append(values, NamedValue{Label: nn.Name, Value: nn.Value, Span: nn.Span})
 		}
 		return values
 	case *module.TypeSyntaxBits:
 		bits := make([]NamedValue, 0, len(s.NamedBits))
 		for _, nb := range s.NamedBits {
-			bits = append(bits, NamedValue{Label: nb.Name, Value: int64(nb.Position)})
+			bits = append(bits, NamedValue{Label: nb.Name, Value: int64(nb.Position), Span: nb.Span})
 		}
 		return bits
 	default:

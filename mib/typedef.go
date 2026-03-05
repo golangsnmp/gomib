@@ -12,20 +12,21 @@ const maxTypeChainDepth = 1000
 // at a base SMI type. Walking the chain with the Effective* methods resolves
 // inherited constraints, display hints, and enum/BITS definitions.
 type Type struct {
-	name   string
-	span   Span
-	module *Module
-	base   BaseType
-	parent *Type
-	status Status
-	hint   string
-	desc   string
-	ref    string
-	sizes  []Range
-	ranges []Range
-	enums  []NamedValue
-	bits   []NamedValue
-	isTC   bool
+	name       string
+	span       Span
+	syntaxSpan Span
+	module     *Module
+	base       BaseType
+	parent     *Type
+	status     Status
+	hint       string
+	desc       string
+	ref        string
+	sizes      []Range
+	ranges     []Range
+	enums      []NamedValue
+	bits       []NamedValue
+	isTC       bool
 }
 
 func newType(name string) *Type {
@@ -35,6 +36,9 @@ func newType(name string) *Type {
 // Span returns the source byte range of this type's definition.
 // Returns a zero-value Span for synthetic (base module) definitions.
 func (t *Type) Span() Span { return t.span }
+
+// SyntaxSpan returns the source byte range of this type's SYNTAX clause.
+func (t *Type) SyntaxSpan() Span { return t.syntaxSpan }
 
 // Name returns the type's name (e.g. "DisplayString"), or "" for anonymous types.
 func (t *Type) Name() string { return t.name }
@@ -195,3 +199,4 @@ func (t *Type) setRanges(r []Range)     { t.ranges = r }
 func (t *Type) setEnums(e []NamedValue) { t.enums = e }
 func (t *Type) setBits(b []NamedValue)  { t.bits = b }
 func (t *Type) setIsTC(isTC bool)       { t.isTC = isTC }
+func (t *Type) setSyntaxSpan(s Span)    { t.syntaxSpan = s }

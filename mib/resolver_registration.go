@@ -1,6 +1,7 @@
 package mib
 
 import (
+	"cmp"
 	"log/slog"
 	"slices"
 
@@ -104,17 +105,22 @@ func groupImports(raw []module.Import) []Import {
 		return nil
 	}
 	var order []string
-	grouped := make(map[string][]string)
+	grouped := make(map[string][]ImportSymbol)
 	for _, imp := range raw {
 		if _, ok := grouped[imp.Module]; !ok {
 			order = append(order, imp.Module)
 		}
-		grouped[imp.Module] = append(grouped[imp.Module], imp.Symbol)
+		grouped[imp.Module] = append(grouped[imp.Module], ImportSymbol{
+			Name: imp.Symbol,
+			Span: imp.Span,
+		})
 	}
 	result := make([]Import, 0, len(order))
 	for _, modName := range order {
 		syms := grouped[modName]
-		slices.Sort(syms)
+		slices.SortFunc(syms, func(a, b ImportSymbol) int {
+			return cmp.Compare(a.Name, b.Name)
+		})
 		result = append(result, Import{Module: modName, Symbols: syms})
 	}
 	return result
@@ -126,6 +132,7 @@ func convertRevisions(revs []module.Revision) []Revision {
 		result[i] = Revision{
 			Date:        r.Date,
 			Description: r.Description,
+			Span:        r.Span,
 		}
 	}
 	return result

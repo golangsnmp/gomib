@@ -1090,7 +1090,7 @@ func checkSequenceFields(ctx *resolverContext, objRefs []objectTypeRef) {
 		for _, field := range seqSyntax.Fields {
 			if _, found := columnByName[field.Name]; !found {
 				ctx.EmitDiagnostic(types.DiagSequenceNoColumn,
-					ref.mod, obj.Span,
+					ref.mod, field.Span,
 					fmt.Sprintf("SEQUENCE %q field %q is not a column of row %q", syntaxRef.Name, field.Name, obj.Name))
 			}
 		}
@@ -1153,7 +1153,7 @@ func checkSequenceFields(ctx *resolverContext, objRefs []objectTypeRef) {
 				continue
 			}
 			ctx.EmitDiagnostic(types.DiagSequenceTypeMismatch,
-				ref.mod, obj.Span,
+				ref.mod, field.Span,
 				fmt.Sprintf("SEQUENCE %q field %q type %q does not match column type %q", syntaxRef.Name, field.Name, fieldTypeName, colTypeName))
 		}
 	}

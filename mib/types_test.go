@@ -208,13 +208,16 @@ func TestBytesToHex(t *testing.T) {
 func TestModuleImportsDeepClone(t *testing.T) {
 	m := newModule("TEST-MIB")
 	m.setImports([]Import{
-		{Module: "SNMPv2-SMI", Symbols: []string{"MODULE-IDENTITY", "OBJECT-TYPE"}},
+		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{
+			{Name: "MODULE-IDENTITY"},
+			{Name: "OBJECT-TYPE"},
+		}},
 	})
 
 	got := m.Imports()
-	got[0].Symbols[0] = "MUTATED"
+	got[0].Symbols[0] = ImportSymbol{Name: "MUTATED"}
 
-	testutil.True(t, m.imports[0].Symbols[0] != "MUTATED", "mutating Imports() return value should not affect module internal state")
+	testutil.True(t, m.imports[0].Symbols[0].Name != "MUTATED", "mutating Imports() return value should not affect module internal state")
 }
 
 func TestComplianceModulesDeepClone(t *testing.T) {

@@ -232,7 +232,7 @@ func TestModuleAccessors(t *testing.T) {
 		{Date: "2000-06-14", Description: "Initial version"},
 	})
 	mod.setImports([]Import{
-		{Module: "SNMPv2-SMI", Symbols: []string{"MODULE-IDENTITY"}},
+		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{{Name: "MODULE-IDENTITY"}}},
 	})
 
 	testutil.Equal(t, "IF-MIB", mod.Name(), "Name()")
