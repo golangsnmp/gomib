@@ -450,6 +450,7 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 		node.setKind(KindCapability)
 	}
 	node.setName(label)
+	node.setSpan(def.def.DefinitionSpan())
 
 	// RFC 2578 section 7.10: the last sub-identifier of an administrative
 	// OID assignment must not be zero. Exempt NODE kinds (MODULE-IDENTITY,

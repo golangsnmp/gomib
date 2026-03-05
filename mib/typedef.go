@@ -13,6 +13,7 @@ const maxTypeChainDepth = 1000
 // inherited constraints, display hints, and enum/BITS definitions.
 type Type struct {
 	name   string
+	span   Span
 	module *Module
 	base   BaseType
 	parent *Type
@@ -30,6 +31,10 @@ type Type struct {
 func newType(name string) *Type {
 	return &Type{name: name}
 }
+
+// Span returns the source byte range of this type's definition.
+// Returns a zero-value Span for synthetic (base module) definitions.
+func (t *Type) Span() Span { return t.span }
 
 // Name returns the type's name (e.g. "DisplayString"), or "" for anonymous types.
 func (t *Type) Name() string { return t.name }
@@ -177,6 +182,7 @@ func (t *Type) String() string {
 	return t.name + " (" + t.EffectiveBase().String() + ")"
 }
 
+func (t *Type) setSpan(s Span)          { t.span = s }
 func (t *Type) setModule(m *Module)     { t.module = m }
 func (t *Type) setBase(b BaseType)      { t.base = b }
 func (t *Type) setParent(p *Type)       { t.parent = p }

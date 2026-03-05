@@ -1,6 +1,10 @@
 package mib
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/golangsnmp/gomib/internal/types"
+)
 
 // Module represents a loaded and resolved MIB module.
 type Module struct {
@@ -23,6 +27,8 @@ type Module struct {
 	compliances   []*Compliance
 	capabilities  []*Capability
 	nodes         []*Node
+
+	lineTable []int
 
 	// Name-indexed maps for O(1) lookups, populated by Add*() methods.
 	objectsByName       map[string]*Object
@@ -59,6 +65,12 @@ func (m *Module) SourcePath() string { return m.sourcePath }
 
 // IsBase reports whether this is a synthetic base module (e.g. SNMPv2-SMI).
 func (m *Module) IsBase() bool { return m.base }
+
+// LineCol converts a byte offset into 1-based line and column numbers using
+// this module's line table. Returns (0, 0) for synthetic modules or invalid offsets.
+func (m *Module) LineCol(offset ByteOffset) (line, col int) {
+	return types.LineColFromTable(m.lineTable, offset)
+}
 
 // OID returns the MODULE-IDENTITY OID, or nil if not declared.
 func (m *Module) OID() OID { return slices.Clone(m.oid) }
@@ -155,6 +167,7 @@ func (m *Module) Capability(name string) *Capability {
 	return m.capabilitiesByName[name]
 }
 
+func (m *Module) setLineTable(t []int)         { m.lineTable = t }
 func (m *Module) setSourcePath(path string)    { m.sourcePath = path }
 func (m *Module) setBase(b bool)               { m.base = b }
 func (m *Module) setLanguage(l Language)       { m.language = l }
