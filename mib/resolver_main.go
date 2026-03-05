@@ -73,6 +73,7 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 
 	checkUnusedImports(ctx)
 	checkObsoleteImports(ctx)
+	copyUsedImportsToModules(ctx)
 
 	ctx.DropModules()
 

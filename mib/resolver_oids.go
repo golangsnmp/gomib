@@ -449,6 +449,16 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 	case defAgentCapabilities:
 		node.setKind(KindCapability)
 	}
+
+	// Propagate descriptions from definition types that carry them.
+	switch d := def.def.(type) {
+	case *module.ValueAssignment:
+		node.setDescription(d.Description)
+		node.setReference(d.Reference)
+	case *module.ObjectIdentity:
+		node.setDescription(d.Description)
+		node.setReference(d.Reference)
+	}
 	node.setName(label)
 	node.setSpan(def.def.DefinitionSpan())
 
