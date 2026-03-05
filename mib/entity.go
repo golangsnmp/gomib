@@ -4,12 +4,17 @@ package mib
 // types: Object, Notification, Group, Compliance, and Capability.
 type entity struct {
 	name   string
+	span   Span
 	node   *Node
 	module *Module
 	status Status
 	desc   string
 	ref    string
 }
+
+// Span returns the source byte range of this entity's definition.
+// Returns a zero-value Span for synthetic (base module) definitions.
+func (e *entity) Span() Span { return e.span }
 
 // Name returns the entity's descriptor name.
 func (e *entity) Name() string { return e.name }
@@ -45,6 +50,7 @@ func (e *entity) String() string {
 	return e.name + " (" + e.OID().String() + ")"
 }
 
+func (e *entity) setSpan(s Span)          { e.span = s }
 func (e *entity) setNode(nd *Node)        { e.node = nd }
 func (e *entity) setModule(m *Module)     { e.module = m }
 func (e *entity) setStatus(s Status)      { e.status = s }

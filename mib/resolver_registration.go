@@ -27,6 +27,7 @@ func registerModules(ctx *resolverContext) {
 
 	for _, mod := range ctx.modules {
 		resolved := newModule(mod.Name)
+		resolved.setLineTable(mod.LineTable)
 		resolved.setSourcePath(mod.SourcePath)
 		resolved.setBase(module.IsBaseModule(mod.Name))
 		resolved.setLanguage(mod.Language)

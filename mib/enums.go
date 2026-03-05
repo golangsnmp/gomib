@@ -100,6 +100,12 @@ const (
 	BaseSequence         = types.BaseSequence
 )
 
+// ByteOffset is a byte position in source text.
+type ByteOffset = types.ByteOffset
+
+// Span is a half-open byte range [Start, End) in source text.
+type Span = types.Span
+
 // IndexEncoding classifies how an INDEX component maps to instance-identifier
 // sub-identifiers per RFC 2578 s7.7.
 type IndexEncoding = types.IndexEncoding

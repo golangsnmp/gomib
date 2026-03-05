@@ -189,6 +189,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 
 		resolved := newObject(obj.Name)
+		resolved.setSpan(obj.Span)
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
@@ -372,6 +373,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 		}
 
 		resolved := newNotification(notif.Name)
+		resolved.setSpan(notif.Span)
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
@@ -472,6 +474,7 @@ func createResolvedGroups(ctx *resolverContext) {
 		}
 
 		resolved := newGroup(gi.name)
+		resolved.setSpan(gi.span)
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[gi.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
@@ -592,6 +595,7 @@ func createResolvedCompliances(ctx *resolverContext) {
 		}
 
 		resolved := newCompliance(comp.Name)
+		resolved.setSpan(comp.Span)
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)
@@ -661,6 +665,7 @@ func createResolvedCapabilities(ctx *resolverContext) {
 		}
 
 		resolved := newCapability(ac.Name)
+		resolved.setSpan(ac.Span)
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolved.setModule(resolvedMod)

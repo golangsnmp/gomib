@@ -17,6 +17,7 @@ import (
 type Node struct {
 	arc         uint32
 	name        string
+	span        Span
 	kind        Kind
 	module      *Module
 	obj         *Object
@@ -30,6 +31,10 @@ type Node struct {
 	oidOnce     sync.Once               // ensures thread-safe lazy init of oidCache
 	sortedCache atomic.Pointer[[]*Node] // lazily computed sorted children; nil = invalidated
 }
+
+// Span returns the source byte range of this node's definition.
+// Returns a zero-value Span for synthetic (base module) or unnamed nodes.
+func (n *Node) Span() Span { return n.span }
 
 // Arc returns the numeric arc of this node relative to its parent.
 func (n *Node) Arc() uint32 { return n.arc }
@@ -198,6 +203,7 @@ func (n *Node) getOrCreateChild(arc uint32) *Node {
 	return child
 }
 
+func (n *Node) setSpan(s Span)                      { n.span = s }
 func (n *Node) setName(name string)                 { n.name = name }
 func (n *Node) setKind(k Kind)                      { n.kind = k }
 func (n *Node) setModule(m *Module)                 { n.module = m }

@@ -78,6 +78,7 @@ func createUserTypes(ctx *resolverContext) {
 			}
 
 			typ := newType(td.Name)
+			typ.setSpan(td.Span)
 			typ.setModule(resolved)
 			typ.setBase(base)
 			typ.setIsTC(td.IsTextualConvention)
