@@ -1,6 +1,9 @@
 package types
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 // enumString returns names[v] if in range, or "TypeName(v)" otherwise.
 func enumString[T ~int](v T, names []string, typeName string) string {
@@ -30,7 +33,7 @@ var severityNames = [...]string{"fatal", "severe", "error", "minor", "style", "w
 func (s Severity) String() string { return enumString(s, severityNames[:], "Severity") }
 
 // SeverityNames returns the severity level names in order (fatal..info).
-func SeverityNames() []string { return severityNames[:] }
+func SeverityNames() []string { return slices.Clone(severityNames[:]) }
 
 // AtLeast reports whether s is at least as severe as other.
 // Lower numeric values are more severe (Fatal=0, Info=6).
@@ -131,6 +134,9 @@ var accessNames = [...]string{
 
 func (a Access) String() string { return enumString(a, accessNames[:], "Access") }
 
+// AccessNames returns the access value names in order (not-accessible..not-implemented).
+func AccessNames() []string { return slices.Clone(accessNames[:]) }
+
 // Status represents the lifecycle state of a MIB definition.
 // Preserves SMIv1-specific values (mandatory, optional) without normalizing.
 type Status int
@@ -146,6 +152,9 @@ const (
 var statusNames = [...]string{"current", "deprecated", "obsolete", "mandatory", "optional"}
 
 func (s Status) String() string { return enumString(s, statusNames[:], "Status") }
+
+// StatusNames returns the status value names in order (current..optional).
+func StatusNames() []string { return slices.Clone(statusNames[:]) }
 
 // IsSMIv1 reports whether this is an SMIv1-specific status value.
 func (s Status) IsSMIv1() bool {
