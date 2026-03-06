@@ -33,11 +33,12 @@ var punctuation = map[byte]TokenKind{
 
 // Lexer tokenizes SMIv1/SMIv2 MIB source text.
 type Lexer struct {
-	source      []byte
-	pos         int
-	state       lexerState
-	diagnostics []types.SpanDiagnostic
-	diagConfig  types.DiagnosticConfig
+	source       []byte
+	pos          int
+	state        lexerState
+	commentStart int // saved position of '--' when entering comment state
+	diagnostics  []types.SpanDiagnostic
+	diagConfig   types.DiagnosticConfig
 	types.Logger
 }
 
@@ -91,8 +92,7 @@ func (l *Lexer) NextToken() Token {
 	for {
 		switch l.state {
 		case stateInComment:
-			l.consumeComment()
-			continue
+			return l.emitComment()
 		case stateInMacro:
 			return l.skipMacroBody()
 		case stateInExports:
@@ -218,6 +218,7 @@ func (l *Lexer) nextNormalToken() (Token, bool) {
 	}
 
 	if l.isCommentStart() {
+		l.commentStart = start
 		l.advance()
 		l.advance()
 		l.state = stateInComment
@@ -302,15 +303,19 @@ func (l *Lexer) tryConsumeTripleDashEOL() bool {
 	return false
 }
 
-// consumeComment skips over comment text and sets state back to normal.
-// Called from the NextToken loop when state is stateInComment.
-func (l *Lexer) consumeComment() {
+// emitComment consumes comment text and returns a TokComment token.
+// The span covers from '--' through the comment text, not including
+// any trailing newline. Called from the NextToken loop when state is
+// stateInComment.
+func (l *Lexer) emitComment() Token {
 	l.skipCommentBody(true)
-	// Consume trailing newline if present.
+	tok := l.token(TokComment, l.commentStart)
+	// Consume trailing newline if present (not part of comment span).
 	if b, ok := l.peek(); ok && (b == '\n' || b == '\r') {
 		l.skipLineEnding()
 	}
 	l.state = stateNormal
+	return tok
 }
 
 func (l *Lexer) skipMacroBody() Token {

@@ -159,6 +159,39 @@ func TestResolveOIDFormatRoundTrip(t *testing.T) {
 	testutil.True(t, oid.Equal(back), "round-trip: got %s, want %s", back, oid)
 }
 
+func TestAllSymbols(t *testing.T) {
+	m := newMib()
+
+	mod1 := newModule("MOD-A")
+	mod1.addObject(&Object{entity: entity{name: "objA"}})
+	mod1.addType(&Type{name: "TypeA"})
+	m.addModule(mod1)
+
+	mod2 := newModule("MOD-B")
+	mod2.addObject(&Object{entity: entity{name: "objB"}})
+	m.addModule(mod2)
+
+	var names []string
+	for sym := range m.AllSymbols() {
+		names = append(names, sym.Name())
+	}
+
+	testutil.Len(t, names, 3, "AllSymbols count")
+	testutil.Equal(t, "objA", names[0], "first symbol")
+	testutil.Equal(t, "TypeA", names[1], "second symbol")
+	testutil.Equal(t, "objB", names[2], "third symbol")
+}
+
+func TestAllSymbols_Empty(t *testing.T) {
+	m := newMib()
+
+	count := 0
+	for range m.AllSymbols() {
+		count++
+	}
+	testutil.Equal(t, 0, count, "AllSymbols on empty Mib")
+}
+
 func TestAddTypeFirstWriteWins(t *testing.T) {
 	m := newMib()
 

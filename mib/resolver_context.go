@@ -486,7 +486,7 @@ func (c *resolverContext) DropModules() {
 	c.moduleOidDefNames = nil
 }
 
-func addUnresolved(m *Mib, kind UnresolvedKind, symbol string, mod *module.Module) {
+func addUnresolved(m *Mib, kind UnresolvedKind, symbol, reason string, mod *module.Module) {
 	modName := ""
 	if mod != nil {
 		modName = mod.Name
@@ -495,25 +495,26 @@ func addUnresolved(m *Mib, kind UnresolvedKind, symbol string, mod *module.Modul
 		Kind:   kind,
 		Symbol: symbol,
 		Module: modName,
+		Reason: reason,
 	})
 }
 
 // FinalizeUnresolved copies collected unresolved references and diagnostics into the Mib builder.
 func (c *resolverContext) FinalizeUnresolved() {
 	for _, u := range c.unresolvedImports {
-		addUnresolved(c.mib, UnresolvedImport, u.symbol, u.importingModule)
+		addUnresolved(c.mib, UnresolvedImport, u.symbol, u.reason, u.importingModule)
 	}
 	for _, u := range c.unresolvedTypes {
-		addUnresolved(c.mib, UnresolvedType, u.referenced, u.module)
+		addUnresolved(c.mib, UnresolvedType, u.referenced, "unknown_type", u.module)
 	}
 	for _, u := range c.unresolvedOids {
-		addUnresolved(c.mib, UnresolvedOID, u.component, u.module)
+		addUnresolved(c.mib, UnresolvedOID, u.component, "unknown_parent", u.module)
 	}
 	for _, u := range c.unresolvedIndexes {
-		addUnresolved(c.mib, UnresolvedIndex, u.indexObject, u.module)
+		addUnresolved(c.mib, UnresolvedIndex, u.indexObject, "unknown_index_object", u.module)
 	}
 	for _, u := range c.unresolvedNotifObjects {
-		addUnresolved(c.mib, UnresolvedNotificationObject, u.object, u.module)
+		addUnresolved(c.mib, UnresolvedNotificationObject, u.object, "unknown_object", u.module)
 	}
 
 	for _, d := range c.diagnostics {

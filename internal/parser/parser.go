@@ -51,11 +51,21 @@ func New(source []byte, logger *slog.Logger, diagConfig types.DiagnosticConfig) 
 		eofToken:   eofToken,
 		Logger:     types.Logger{L: logger},
 	}
-	p.buf[0] = lex.NextToken()
-	p.buf[1] = lex.NextToken()
-	p.buf[2] = lex.NextToken()
+	p.buf[0] = p.nextNonComment()
+	p.buf[1] = p.nextNonComment()
+	p.buf[2] = p.nextNonComment()
 	p.Log(slog.LevelDebug, "parser initialized")
 	return p
+}
+
+// nextNonComment returns the next token from the lexer, skipping comment tokens.
+func (p *Parser) nextNonComment() lexer.Token {
+	for {
+		tok := p.lex.NextToken()
+		if tok.Kind != lexer.TokComment {
+			return tok
+		}
+	}
 }
 
 // emitDiagnostic records a diagnostic if the current config reports it.
@@ -228,7 +238,7 @@ func (p *Parser) advance() lexer.Token {
 	tok := p.buf[0]
 	p.buf[0] = p.buf[1]
 	p.buf[1] = p.buf[2]
-	p.buf[2] = p.lex.NextToken()
+	p.buf[2] = p.nextNonComment()
 	p.lastEnd = tok.Span.End
 	return tok
 }

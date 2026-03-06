@@ -290,6 +290,64 @@ func TestModulesDefiningNotFound(t *testing.T) {
 	testutil.Len(t, result, 0, "should find no modules")
 }
 
+func TestModuleImportsSymbol(t *testing.T) {
+	mod := newModule("TEST-MIB")
+	mod.setImports([]Import{
+		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{{Name: "enterprises"}, {Name: "Counter32"}}},
+		{Module: "SNMPv2-TC", Symbols: []ImportSymbol{{Name: "DisplayString"}}},
+	})
+
+	testutil.True(t, mod.ImportsSymbol("enterprises"), "enterprises")
+	testutil.True(t, mod.ImportsSymbol("Counter32"), "Counter32")
+	testutil.True(t, mod.ImportsSymbol("DisplayString"), "DisplayString")
+	testutil.False(t, mod.ImportsSymbol("nonexistent"), "nonexistent")
+
+	empty := newModule("EMPTY-MIB")
+	testutil.False(t, empty.ImportsSymbol("anything"), "no imports")
+}
+
+func TestModulesImporting(t *testing.T) {
+	m := newMib()
+
+	mod1 := newModule("MOD-A")
+	mod1.setImports([]Import{
+		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{{Name: "enterprises"}, {Name: "Counter32"}}},
+	})
+	m.addModule(mod1)
+
+	mod2 := newModule("MOD-B")
+	mod2.setImports([]Import{
+		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{{Name: "enterprises"}}},
+		{Module: "SNMPv2-TC", Symbols: []ImportSymbol{{Name: "DisplayString"}}},
+	})
+	m.addModule(mod2)
+
+	// Base module should be excluded.
+	baseMod := newModule("BASE-MOD")
+	baseMod.setBase(true)
+	baseMod.setImports([]Import{
+		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{{Name: "enterprises"}}},
+	})
+	m.addModule(baseMod)
+
+	result := m.ModulesImporting("enterprises")
+	testutil.Len(t, result, 2, "should find 2 non-base modules importing enterprises")
+	names := make(map[string]bool)
+	for _, mod := range result {
+		names[mod.Name()] = true
+	}
+	testutil.True(t, names["MOD-A"], "should include MOD-A")
+	testutil.True(t, names["MOD-B"], "should include MOD-B")
+	testutil.False(t, names["BASE-MOD"], "should exclude base module")
+
+	result = m.ModulesImporting("DisplayString")
+	testutil.Len(t, result, 1, "only MOD-B imports DisplayString")
+	testutil.Equal(t, result[0].Name(), "MOD-B", "module name")
+
+	result = m.ModulesImporting("nonexistent")
+	testutil.Len(t, result, 0, "should find no modules")
+}
+
 func TestModuleIsImportUsed(t *testing.T) {
 	mod := newModule("TEST-MIB")
 	mod.setUsedImportNames(map[string]struct{}{

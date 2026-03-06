@@ -68,6 +68,20 @@ func (m *Mib) Nodes() iter.Seq[*Node] {
 	}
 }
 
+// AllSymbols returns an iterator over all definitions across all loaded modules.
+// Yields each module's definitions (via [Module.Definitions]) in module-list order.
+func (m *Mib) AllSymbols() iter.Seq[Symbol] {
+	return func(yield func(Symbol) bool) {
+		for _, mod := range m.modules {
+			for sym := range mod.Definitions() {
+				if !yield(sym) {
+					return
+				}
+			}
+		}
+	}
+}
+
 // Node returns the node with the given name, or nil if not found.
 // Prefers nodes with object definitions, then notifications, then any.
 func (m *Mib) Node(name string) *Node {
@@ -168,6 +182,21 @@ func (m *Mib) ModulesDefining(name string) []*Module {
 			continue
 		}
 		if mod.DefinesSymbol(name) {
+			result = append(result, mod)
+		}
+	}
+	return result
+}
+
+// ModulesImporting returns all modules that import a symbol with the given name.
+// Excludes synthetic base modules.
+func (m *Mib) ModulesImporting(name string) []*Module {
+	var result []*Module
+	for _, mod := range m.modules {
+		if mod.base {
+			continue
+		}
+		if mod.ImportsSymbol(name) {
 			result = append(result, mod)
 		}
 	}

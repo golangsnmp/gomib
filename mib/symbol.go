@@ -141,3 +141,24 @@ func (s Symbol) Capability() *Capability { return s.capability }
 
 // Type returns the Type if this symbol is a type definition, or nil.
 func (s Symbol) Type() *Type { return s.typ }
+
+// Status returns the status of this symbol's definition (current,
+// deprecated, obsolete, etc.), or 0 for plain nodes and zero symbols.
+func (s Symbol) Status() Status {
+	switch {
+	case s.object != nil:
+		return s.object.Status()
+	case s.notification != nil:
+		return s.notification.Status()
+	case s.group != nil:
+		return s.group.Status()
+	case s.compliance != nil:
+		return s.compliance.Status()
+	case s.capability != nil:
+		return s.capability.Status()
+	case s.typ != nil:
+		return s.typ.Status()
+	default:
+		return 0
+	}
+}
