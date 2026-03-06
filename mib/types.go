@@ -419,4 +419,5 @@ type UnresolvedRef struct {
 	Kind   UnresolvedKind
 	Symbol string
 	Module string
+	Reason string
 }

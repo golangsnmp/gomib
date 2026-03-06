@@ -35,6 +35,10 @@ type Module struct {
 	// resolution. Populated by the resolver after all phases complete.
 	usedImportNames map[string]struct{}
 
+	// resolvedImports maps imported symbol names to the resolved Module
+	// that defines them. Populated by the resolver after import resolution.
+	resolvedImports map[string]*Module
+
 	// Name-indexed maps for O(1) lookups, populated by Add*() methods.
 	objectsByName       map[string]*Object
 	typesByName         map[string]*Type
@@ -220,26 +224,17 @@ func (m *Module) Definitions() iter.Seq[Symbol] {
 
 // DefinesSymbol reports whether this module defines a symbol with the given name.
 func (m *Module) DefinesSymbol(name string) bool {
-	if _, ok := m.objectsByName[name]; ok {
-		return true
-	}
-	if _, ok := m.typesByName[name]; ok {
-		return true
-	}
-	if _, ok := m.notificationsByName[name]; ok {
-		return true
-	}
-	if _, ok := m.groupsByName[name]; ok {
-		return true
-	}
-	if _, ok := m.compliancesByName[name]; ok {
-		return true
-	}
-	if _, ok := m.capabilitiesByName[name]; ok {
-		return true
-	}
-	if _, ok := m.nodesByName[name]; ok {
-		return true
+	return !m.Symbol(name).IsZero()
+}
+
+// ImportsSymbol reports whether this module's IMPORTS clause includes the given name.
+func (m *Module) ImportsSymbol(name string) bool {
+	for _, imp := range m.imports {
+		for _, sym := range imp.Symbols {
+			if sym.Name == name {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -254,7 +249,94 @@ func (m *Module) IsImportUsed(name string) bool {
 	return ok
 }
 
+// Symbol returns the resolved definition for the given name in this module.
+// Lookup priority matches Definitions(): objects, types, notifications, groups,
+// compliances, capabilities, then plain nodes. Returns a zero Symbol if not found.
+func (m *Module) Symbol(name string) Symbol {
+	if o := m.objectsByName[name]; o != nil {
+		return symbolFromObject(o)
+	}
+	if t := m.typesByName[name]; t != nil {
+		return symbolFromType(t)
+	}
+	if n := m.notificationsByName[name]; n != nil {
+		return symbolFromNotification(n)
+	}
+	if g := m.groupsByName[name]; g != nil {
+		return symbolFromGroup(g)
+	}
+	if c := m.compliancesByName[name]; c != nil {
+		return symbolFromCompliance(c)
+	}
+	if c := m.capabilitiesByName[name]; c != nil {
+		return symbolFromCapability(c)
+	}
+	if n := m.nodesByName[name]; n != nil {
+		return symbolFromNode(n)
+	}
+	return Symbol{}
+}
+
+// ImportSource returns the resolved source Module for an imported symbol,
+// or nil if the name is not an import.
+func (m *Module) ImportSource(name string) *Module {
+	if m.resolvedImports == nil {
+		return nil
+	}
+	return m.resolvedImports[name]
+}
+
+// AvailableSymbols returns an iterator over all symbols available in this
+// module's scope: own definitions first, then imported symbols looked up
+// from their source modules. Imported symbols follow IMPORTS declaration
+// order. Names that are also own definitions are yielded only once (as the
+// own definition).
+func (m *Module) AvailableSymbols() iter.Seq[Symbol] {
+	return func(yield func(Symbol) bool) {
+		// Own definitions first.
+		seen := make(map[string]struct{})
+		for sym := range m.Definitions() {
+			seen[sym.Name()] = struct{}{}
+			if !yield(sym) {
+				return
+			}
+		}
+		// Imported symbols in IMPORTS declaration order.
+		if m.resolvedImports == nil {
+			return
+		}
+		for _, imp := range m.imports {
+			for _, is := range imp.Symbols {
+				if _, already := seen[is.Name]; already {
+					continue
+				}
+				seen[is.Name] = struct{}{}
+				sourceMod := m.resolvedImports[is.Name]
+				if sourceMod == nil {
+					continue
+				}
+				sym := sourceMod.Symbol(is.Name)
+				if sym.IsZero() {
+					continue
+				}
+				if !yield(sym) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// ExportedSymbols returns an iterator over the symbols exported by this module.
+// In SMI all definitions are implicitly exported (no EXPORTS clause), so this
+// is semantically identical to Definitions() but provides a named API matching
+// the intent.
+func (m *Module) ExportedSymbols() iter.Seq[Symbol] {
+	return m.Definitions()
+}
+
 func (m *Module) setUsedImportNames(u map[string]struct{}) { m.usedImportNames = u }
+func (m *Module) setResolvedImports(ri map[string]*Module) { m.resolvedImports = ri }
 func (m *Module) setLineTable(t []int)                     { m.lineTable = t }
 func (m *Module) setSourcePath(path string)                { m.sourcePath = path }
 func (m *Module) setBase(b bool)                           { m.base = b }

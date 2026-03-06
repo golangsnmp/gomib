@@ -660,7 +660,7 @@ func TestFinalizeUnresolved(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	span := types.Span{}
 
-	ctx.RecordUnresolvedImport(mod, "OTHER", "sym1", "not found", span)
+	ctx.RecordUnresolvedImport(mod, "OTHER", "sym1", "module_not_found", span)
 	ctx.RecordUnresolvedType(mod, "ref1", "UnknownType", span)
 	ctx.RecordUnresolvedOid(mod, "obj1", "parent1", span)
 	ctx.RecordUnresolvedIndex(mod, "row1", "idx1", span)
@@ -674,10 +674,12 @@ func TestFinalizeUnresolved(t *testing.T) {
 	// We expect 5 unresolved refs.
 	testutil.Len(t, unresolved, 5, "expected 5 unresolved refs, got")
 
-	// Verify each kind is present.
+	// Verify each kind is present with correct reason.
 	kindCounts := map[UnresolvedKind]int{}
+	reasonByKind := map[UnresolvedKind]string{}
 	for _, u := range unresolved {
 		kindCounts[u.Kind]++
+		reasonByKind[u.Kind] = u.Reason
 		testutil.Equal(t, "TEST-MIB", u.Module, "unresolved ref kind")
 	}
 
@@ -685,6 +687,12 @@ func TestFinalizeUnresolved(t *testing.T) {
 	for _, k := range expectedKinds {
 		testutil.Equal(t, 1, kindCounts[k], "expected 1 unresolved ref of kind , got")
 	}
+
+	testutil.Equal(t, "module_not_found", reasonByKind[UnresolvedImport], "import reason")
+	testutil.Equal(t, "unknown_type", reasonByKind[UnresolvedType], "type reason")
+	testutil.Equal(t, "unknown_parent", reasonByKind[UnresolvedOID], "oid reason")
+	testutil.Equal(t, "unknown_index_object", reasonByKind[UnresolvedIndex], "index reason")
+	testutil.Equal(t, "unknown_object", reasonByKind[UnresolvedNotificationObject], "notif object reason")
 
 	// Diagnostics should also be copied.
 	diags := result.Diagnostics()
@@ -695,7 +703,7 @@ func TestFinalizeUnresolved_NilModule(t *testing.T) {
 	ctx := newTestContext()
 	span := types.Span{}
 
-	ctx.RecordUnresolvedImport(nil, "OTHER", "sym1", "not found", span)
+	ctx.RecordUnresolvedImport(nil, "OTHER", "sym1", "module_not_found", span)
 	ctx.RecordUnresolvedType(nil, "ref1", "UnknownType", span)
 	ctx.RecordUnresolvedOid(nil, "obj1", "parent1", span)
 	ctx.RecordUnresolvedIndex(nil, "row1", "idx1", span)
@@ -706,6 +714,8 @@ func TestFinalizeUnresolved_NilModule(t *testing.T) {
 	result := ctx.mib
 	for _, u := range result.Unresolved() {
 		testutil.Equal(t, "", u.Module, "unresolved ref kind")
+		// Reason should still be populated even with nil module.
+		testutil.True(t, u.Reason != "", "expected non-empty reason for kind %s", u.Kind)
 	}
 }
 

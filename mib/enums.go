@@ -100,6 +100,18 @@ const (
 	BaseSequence         = types.BaseSequence
 )
 
+// MacroInfo describes an SMI macro keyword.
+type MacroInfo = types.MacroInfo
+
+// MacroDescription returns info about an SMI macro keyword, if known.
+func MacroDescription(name string) (MacroInfo, bool) { return types.MacroDescription(name) }
+
+// ClauseInfo describes an SMI clause keyword used within a macro definition.
+type ClauseInfo = types.ClauseInfo
+
+// ClauseDescription returns info about an SMI clause keyword, if known.
+func ClauseDescription(name string) (ClauseInfo, bool) { return types.ClauseDescription(name) }
+
 // ByteOffset is a byte position in source text.
 type ByteOffset = types.ByteOffset
 

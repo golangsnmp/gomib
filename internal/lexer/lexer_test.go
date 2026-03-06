@@ -111,6 +111,7 @@ func TestCommentsDashDash(t *testing.T) {
 	kinds := tokenKinds("OBJECT -- comment\nTYPE")
 	expected := []TokenKind{
 		TokKwObject,
+		TokComment,
 		TokUppercaseIdent,
 		TokEOF,
 	}
@@ -121,6 +122,7 @@ func TestCommentsInline(t *testing.T) {
 	kinds := tokenKinds("OBJECT -- comment -- TYPE")
 	expected := []TokenKind{
 		TokKwObject,
+		TokComment,
 		TokUppercaseIdent,
 		TokEOF,
 	}
@@ -213,6 +215,7 @@ func TestMacroSkipENDBeforeComment(t *testing.T) {
 		TokKwObjectType,
 		TokKwMacro,
 		TokKwEnd,
+		TokComment,
 		TokLowercaseIdent,
 		TokKwObjectType,
 		TokEOF,
@@ -253,7 +256,8 @@ func TestDoubleHyphenBreaksIdentifier(t *testing.T) {
 	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "first token kind")
 	text := source[tokens[0].Span.Start:tokens[0].Span.End]
 	testutil.Equal(t, "foo", text, "first token text")
-	testutil.Equal(t, TokEOF, tokens[1].Kind, "second token (comment consumed)")
+	testutil.Equal(t, TokComment, tokens[1].Kind, "second token (comment)")
+	testutil.Equal(t, TokEOF, tokens[2].Kind, "third token (EOF)")
 }
 
 func TestDoubleHyphenAfterIdentifierPreservesComment(t *testing.T) {
@@ -266,7 +270,8 @@ func TestDoubleHyphenAfterIdentifierPreservesComment(t *testing.T) {
 	testutil.Equal(t, TokLowercaseIdent, tokens[0].Kind, "identifier")
 	text := source[tokens[0].Span.Start:tokens[0].Span.End]
 	testutil.Equal(t, "ifIndex", text, "identifier text should not include hyphen")
-	testutil.Equal(t, TokKwObjectType, tokens[1].Kind, "next token after comment")
+	testutil.Equal(t, TokComment, tokens[1].Kind, "comment token")
+	testutil.Equal(t, TokKwObjectType, tokens[2].Kind, "next token after comment")
 }
 
 func TestManyJunkLinesNoStackOverflow(t *testing.T) {
@@ -303,7 +308,9 @@ func TestManyConsecutiveCommentsNoStackOverflow(t *testing.T) {
 	lexer := New([]byte(source), nil, types.DefaultConfig())
 	tokens, _ := lexer.Tokenize()
 
-	testutil.Equal(t, TokKwObject, tokens[0].Kind, "should find OBJECT after many comments")
+	// 10000 comment tokens + OBJECT + EOF
+	testutil.Equal(t, TokComment, tokens[0].Kind, "first token should be comment")
+	testutil.Equal(t, TokKwObject, tokens[10000].Kind, "should find OBJECT after many comments")
 }
 
 func TestUnterminatedQuotedString(t *testing.T) {
@@ -457,7 +464,7 @@ func TestMultilineQuotedString(t *testing.T) {
 func TestCommentAtEOF(t *testing.T) {
 	source := "OBJECT -- comment at end"
 	kinds := tokenKinds(source)
-	expected := []TokenKind{TokKwObject, TokEOF}
+	expected := []TokenKind{TokKwObject, TokComment, TokEOF}
 	testutil.SliceEqual(t, expected, kinds, "comment at EOF")
 }
 
@@ -544,7 +551,7 @@ func TestIsKeywordCoversAllKeywords(t *testing.T) {
 
 	// Non-keywords must not pass.
 	nonKeywords := []TokenKind{
-		TokError, TokEOF, TokForbiddenKeyword,
+		TokError, TokEOF, TokForbiddenKeyword, TokComment,
 		TokUppercaseIdent, TokLowercaseIdent,
 		TokNumber, TokNegativeNumber, TokQuotedString, TokHexString, TokBinString,
 		TokLBracket, TokRBracket, TokLBrace, TokRBrace, TokLParen, TokRParen,
@@ -606,6 +613,37 @@ func TestKeywordLookup(t *testing.T) {
 		if found {
 			testutil.Equal(t, tc.expected, kind, "LookupKeyword(%q) kind", tc.text)
 		}
+	}
+}
+
+func TestCommentTokenSpan(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   string
+		wantText string
+	}{
+		{"line comment", "OBJECT -- a comment\nTYPE", "-- a comment"},
+		{"inline comment", "OBJECT -- inline -- TYPE", "-- inline --"},
+		{"comment at EOF", "-- eof comment", "-- eof comment"},
+		{"empty comment", "--\nTYPE", "--"},
+		{"comment with dashes", "-- foo-bar --", "-- foo-bar --"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			lexer := New([]byte(tc.source), nil, types.DefaultConfig())
+			tokens, _ := lexer.Tokenize()
+			var found bool
+			for _, tok := range tokens {
+				if tok.Kind == TokComment {
+					text := tc.source[tok.Span.Start:tok.Span.End]
+					testutil.Equal(t, tc.wantText, text, "comment span text")
+					found = true
+					break
+				}
+			}
+			testutil.True(t, found, "should find comment token")
+		})
 	}
 }
 

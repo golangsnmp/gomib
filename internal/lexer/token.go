@@ -20,6 +20,7 @@ const (
 	TokError TokenKind = iota
 	TokEOF
 	TokForbiddenKeyword
+	TokComment
 
 	// Identifiers
 
@@ -174,35 +175,39 @@ func (k TokenKind) IsIdentifier() bool {
 // IsTypeKeyword reports whether k is a built-in type keyword
 // (INTEGER, Counter32, OCTET STRING components, etc.).
 func (k TokenKind) IsTypeKeyword() bool {
-	switch k {
-	case TokKwInteger, TokKwUnsigned32, TokKwCounter32,
-		TokKwCounter64, TokKwGauge32, TokKwIpAddress, TokKwOpaque,
-		TokKwTimeTicks, TokKwBits, TokKwOctet, TokKwString,
-		TokKwCounter, TokKwGauge, TokKwNetworkAddress:
-		return true
-	default:
-		return false
-	}
+	return k >= TokKwInteger && k <= TokKwNetworkAddress
 }
 
 // IsMacroKeyword reports whether k is a macro invocation keyword
 // (OBJECT-TYPE, MODULE-IDENTITY, etc.).
 func (k TokenKind) IsMacroKeyword() bool {
-	switch k {
-	case TokKwModuleIdentity, TokKwModuleCompliance, TokKwObjectGroup,
-		TokKwNotificationGroup, TokKwAgentCapabilities, TokKwObjectType,
-		TokKwObjectIdentity, TokKwNotificationType, TokKwTextualConvention,
-		TokKwTrapType:
-		return true
-	default:
-		return false
-	}
+	return k >= TokKwModuleIdentity && k <= TokKwTrapType
+}
+
+// IsClauseKeyword reports whether k is a clause keyword
+// (SYNTAX, MAX-ACCESS, STATUS, DESCRIPTION, etc.).
+func (k TokenKind) IsClauseKeyword() bool {
+	return k >= TokKwSyntax && k <= TokKwVariables
+}
+
+// IsStatusAccessKeyword reports whether k is a status or access value keyword
+// (current, deprecated, read-only, etc.).
+func (k TokenKind) IsStatusAccessKeyword() bool {
+	return k >= TokKwCurrent && k <= TokKwNotImplemented
+}
+
+// IsStructuralKeyword reports whether k is a structural keyword
+// (DEFINITIONS, BEGIN, END, IMPORTS, EXPORTS, FROM, OBJECT, IDENTIFIER,
+// SEQUENCE, OF, CHOICE, MACRO).
+func (k TokenKind) IsStructuralKeyword() bool {
+	return k >= TokKwDefinitions && k <= TokKwMacro
 }
 
 var libsmiNames = [...]string{
 	TokError:                 "ERROR",
 	TokEOF:                   "EOF",
 	TokForbiddenKeyword:      "FORBIDDEN_KEYWORD",
+	TokComment:               "COMMENT",
 	TokUppercaseIdent:        "UPPERCASE_IDENTIFIER",
 	TokLowercaseIdent:        "LOWERCASE_IDENTIFIER",
 	TokNumber:                "NUMBER",

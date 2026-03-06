@@ -407,6 +407,27 @@ func copyUsedImportsToModules(ctx *resolverContext) {
 	}
 }
 
+// copyResolvedImportsToModules transfers the resolver's moduleImports data
+// to each resolved Module so it's available via Module.ImportSource() and
+// Module.AvailableSymbols().
+func copyResolvedImportsToModules(ctx *resolverContext) {
+	for mod, imports := range ctx.moduleImports {
+		resolved := ctx.moduleToResolved[mod]
+		if resolved == nil || len(imports) == 0 {
+			continue
+		}
+		resolvedMap := make(map[string]*Module, len(imports))
+		for symbol, sourceMod := range imports {
+			if sourceResolved := ctx.moduleToResolved[sourceMod]; sourceResolved != nil {
+				resolvedMap[symbol] = sourceResolved
+			}
+		}
+		if len(resolvedMap) > 0 {
+			resolved.setResolvedImports(resolvedMap)
+		}
+	}
+}
+
 type moduleSymbol struct{ module, symbol string }
 
 // obsoleteImportTarget describes the preferred SMIv2 module and symbol name
