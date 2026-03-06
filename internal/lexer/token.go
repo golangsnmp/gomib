@@ -190,6 +190,12 @@ func (k TokenKind) IsClauseKeyword() bool {
 	return k >= TokKwSyntax && k <= TokKwVariables
 }
 
+// IsTagKeyword reports whether k is an ASN.1 tag keyword
+// (APPLICATION, IMPLICIT, UNIVERSAL).
+func (k TokenKind) IsTagKeyword() bool {
+	return k >= TokKwApplication && k <= TokKwUniversal
+}
+
 // IsStatusAccessKeyword reports whether k is a status or access value keyword
 // (current, deprecated, read-only, etc.).
 func (k TokenKind) IsStatusAccessKeyword() bool {

@@ -109,6 +109,14 @@ func Load(ctx context.Context, opts ...LoadOption) (*mib.Mib, error) {
 	return loadAllModules(ctx, sources, &cfg)
 }
 
+// ScanModuleNames extracts module names from raw MIB file bytes by finding
+// identifiers that precede "DEFINITIONS ::=". This is a lightweight scan,
+// not a full parse. ASN.1 comments are skipped so that commented-out module
+// headers are not indexed. Returns nil if no module headers are found.
+func ScanModuleNames(content []byte) []string {
+	return scanModuleNames(content)
+}
+
 // checkLoadResult checks the resolved Mib for diagnostic threshold violations
 // and missing requested modules. Returns nil if no issues found.
 func checkLoadResult(m *mib.Mib, cfg *loadConfig, requestedModules []string) error {
