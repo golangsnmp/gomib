@@ -11,6 +11,7 @@
 /gomib-cli
 /gomib-netsnmp
 /gomib-libsmi
+/bin/
 
 # Test binary, built with `go test -c`
 *.test

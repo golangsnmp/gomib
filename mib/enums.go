@@ -9,6 +9,12 @@ type Severity = types.Severity
 // SeverityNames returns the severity level names in order (fatal..info).
 func SeverityNames() []string { return types.SeverityNames() }
 
+// StatusNames returns the status value names in order (current..optional).
+func StatusNames() []string { return types.StatusNames() }
+
+// AccessNames returns the access value names in order (not-accessible..not-implemented).
+func AccessNames() []string { return types.AccessNames() }
+
 const (
 	SeverityFatal   = types.SeverityFatal
 	SeveritySevere  = types.SeveritySevere
