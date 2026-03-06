@@ -74,6 +74,12 @@ src := gomib.Multi(systemSrc, vendorSrc)
 
 Files are matched by extension: no extension, `.mib`, `.smi`, `.txt`, `.my`. Override with `WithExtensions`. Non-MIB files are filtered during loading by checking for `DEFINITIONS` and `::=` in the content.
 
+`ScanModuleNames` extracts module names from raw bytes without a full parse, useful for indexing:
+
+```go
+names := gomib.ScanModuleNames(content) // e.g. ["IF-MIB"]
+```
+
 ### Options
 
 ```go
@@ -103,6 +109,16 @@ typ := m.Type("DisplayString")
 For qualified lookup, scope through the module (see [Module-scoped queries](#module-scoped-queries) below).
 
 Other lookup methods: `Node`, `Type`, `Notification`, `Group`, `Compliance`, `Capability`.
+
+`Symbol` provides a unified lookup across all definition types:
+
+```go
+sym := m.Symbol("ifIndex")       // returns a Symbol wrapping any definition kind
+sym.Name()                       // "ifIndex"
+sym.Object()                     // *Object (or nil if not an OBJECT-TYPE)
+sym.Node()                       // *Node
+sym.IsZero()                     // true if nothing was found
+```
 
 ### Resolve
 
@@ -148,6 +164,19 @@ obj := mod.Object("ifIndex")
 typ := mod.Type("InterfaceIndex")
 ```
 
+Module introspection methods:
+
+```go
+mod.DefinesSymbol("ifIndex")        // true if module defines this name
+mod.ImportsSymbol("DisplayString")  // true if module imports this name
+mod.IsImportUsed("DisplayString")   // true if import was referenced during resolution
+mod.ImportSource("DisplayString")   // *Module for the source of the import
+
+for sym := range mod.Definitions() {  // iterate all definitions as Symbol values
+    fmt.Println(sym.Name())
+}
+```
+
 ### Collections
 
 ```go
@@ -162,6 +191,7 @@ m.Groups()         // all groups
 m.Compliances()    // all compliances
 m.Capabilities()   // all capabilities
 m.Modules()        // all loaded modules
+m.AllSymbols()     // all definitions across all modules (iter.Seq[Symbol])
 ```
 
 ### OID tree iteration
@@ -176,6 +206,10 @@ node := m.Node("ifEntry")
 for child := range node.Subtree() {
     fmt.Println(child.Name())
 }
+
+// Node metadata (populated for base module OIDs and OBJECT-IDENTITY definitions)
+node.Description() // OID assignment description text
+node.Reference()   // reference string
 ```
 
 ## Objects
@@ -317,6 +351,37 @@ gomib.WithDiagnosticConfig(mib.DiagnosticConfig{
 })
 ```
 
+## Tokenization
+
+The `token` package provides direct access to the lexer for tooling, linting, or syntax highlighting:
+
+```go
+import "github.com/golangsnmp/gomib/token"
+
+source := []byte(`ifIndex OBJECT-TYPE SYNTAX InterfaceIndex`)
+tokens := token.Tokenize(source)
+
+for _, tok := range tokens {
+    if tok.Kind == token.EOF {
+        break
+    }
+    text := source[tok.Span.Start:tok.Span.End]
+    fmt.Printf("%-20s %s\n", tok.Kind.LibsmiName(), text)
+}
+```
+
+Token kind classification methods on `TokenKind`:
+
+```go
+tok.Kind.IsKeyword()             // any keyword
+tok.Kind.IsMacroKeyword()        // OBJECT-TYPE, MODULE-IDENTITY, etc.
+tok.Kind.IsTypeKeyword()         // INTEGER, Counter32, OCTET, etc.
+tok.Kind.IsClauseKeyword()       // SYNTAX, MAX-ACCESS, STATUS, etc.
+tok.Kind.IsIdentifier()          // uppercase or lowercase identifier
+tok.Kind.IsStructuralKeyword()   // DEFINITIONS, BEGIN, END, IMPORTS, etc.
+tok.Kind.IsStatusAccessKeyword() // current, deprecated, read-only, etc.
+```
+
 ## CLI
 
 The `cmd/gomib` tool provides a command-line interface for MIB operations:
@@ -328,6 +393,7 @@ gomib get -m IF-MIB 1.3.6.1.2.1.2   # query by OID
 gomib dump IF-MIB                    # JSON output
 gomib lint IF-MIB                    # check for issues
 gomib find --all 'if*'               # search by pattern
+gomib normalize IF-MIB               # emit canonical SMIv2 text
 gomib trace -m IF-MIB ifEntry        # trace resolution
 gomib paths                          # show search paths
 gomib list                           # list available modules
