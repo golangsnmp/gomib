@@ -545,6 +545,138 @@ func TestFinalizeOidDefinition(t *testing.T) {
 	}
 }
 
+func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
+	// When two modules define the same OID with different names,
+	// the node's name and module must stay in sync. The preferred
+	// module's name should win; a non-preferred module must not
+	// overwrite the name.
+
+	t.Run("non-preferred module does not overwrite name", func(t *testing.T) {
+		// SMIv2 module defines "preferredName" first
+		preferredSrc := &module.Module{Name: "PREFERRED-MIB", Language: types.LanguageSMIv2}
+		preferredMod := newModule("PREFERRED-MIB")
+		// SMIv1 module defines "loserName" second (lower rank, should not win)
+		loserSrc := &module.Module{Name: "LOSER-MIB", Language: types.LanguageSMIv1}
+		loserMod := newModule("LOSER-MIB")
+
+		ctx := newResolverContext([]*module.Module{preferredSrc, loserSrc}, nil, DefaultConfig())
+		ctx.moduleToResolved[preferredSrc] = preferredMod
+		ctx.resolvedToModule[preferredMod] = preferredSrc
+		ctx.moduleToResolved[loserSrc] = loserMod
+		ctx.resolvedToModule[loserMod] = loserSrc
+
+		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 42)
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNumber{Value: 1},
+		}, types.Synthetic)
+
+		// First: preferred module claims the node
+		def1 := oidDefinition{
+			mod:  preferredSrc,
+			def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "preferredName"}, Oid: oid},
+			kind: defValueAssignment,
+		}
+		finalizeOidDefinition(ctx, def1, node, "preferredName")
+
+		testutil.Equal(t, "preferredName", node.Name(), "name after preferred")
+		testutil.Equal(t, preferredMod, node.Module(), "module after preferred")
+
+		// Second: non-preferred module tries to claim the same node
+		def2 := oidDefinition{
+			mod:  loserSrc,
+			def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "loserName"}, Oid: oid},
+			kind: defValueAssignment,
+		}
+		finalizeOidDefinition(ctx, def2, node, "loserName")
+
+		// Name and module must both still reflect the preferred module
+		testutil.Equal(t, "preferredName", node.Name(), "name should not be overwritten by non-preferred module")
+		testutil.Equal(t, preferredMod, node.Module(), "module should not be overwritten by non-preferred module")
+	})
+
+	t.Run("non-preferred module does not overwrite kind", func(t *testing.T) {
+		// SMIv2 module defines as OBJECT-IDENTITY (KindNode) first
+		preferredSrc := &module.Module{Name: "PREFERRED-MIB", Language: types.LanguageSMIv2}
+		preferredMod := newModule("PREFERRED-MIB")
+		// SMIv1 module defines as OBJECT-TYPE (KindScalar) second
+		loserSrc := &module.Module{Name: "LOSER-MIB", Language: types.LanguageSMIv1}
+		loserMod := newModule("LOSER-MIB")
+
+		ctx := newResolverContext([]*module.Module{preferredSrc, loserSrc}, nil, DefaultConfig())
+		ctx.moduleToResolved[preferredSrc] = preferredMod
+		ctx.resolvedToModule[preferredMod] = preferredSrc
+		ctx.moduleToResolved[loserSrc] = loserMod
+		ctx.resolvedToModule[loserMod] = loserSrc
+
+		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 44)
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNumber{Value: 1},
+		}, types.Synthetic)
+
+		def1 := oidDefinition{
+			mod:  preferredSrc,
+			def:  &module.ObjectIdentity{DefBase: module.DefBase{Name: "preferredNode"}, Oid: oid},
+			kind: defObjectIdentity,
+		}
+		finalizeOidDefinition(ctx, def1, node, "preferredNode")
+		testutil.Equal(t, KindNode, node.Kind(), "kind after preferred")
+
+		def2 := oidDefinition{
+			mod:  loserSrc,
+			def:  &module.ObjectType{DefBase: module.DefBase{Name: "loserObj"}, Oid: oid},
+			kind: defObjectType,
+		}
+		finalizeOidDefinition(ctx, def2, node, "loserObj")
+
+		testutil.Equal(t, KindNode, node.Kind(), "kind should not be overwritten by non-preferred module")
+		testutil.Equal(t, "preferredNode", node.Name(), "name should not be overwritten")
+		testutil.Equal(t, preferredMod, node.Module(), "module should not be overwritten")
+	})
+
+	t.Run("preferred module does overwrite name", func(t *testing.T) {
+		// SMIv1 module defines "olderName" first
+		olderSrc := &module.Module{Name: "OLD-MIB", Language: types.LanguageSMIv1}
+		olderMod := newModule("OLD-MIB")
+		// SMIv2 module defines "newerName" second (higher rank, should win)
+		newerSrc := &module.Module{Name: "NEW-MIB", Language: types.LanguageSMIv2}
+		newerMod := newModule("NEW-MIB")
+
+		ctx := newResolverContext([]*module.Module{olderSrc, newerSrc}, nil, DefaultConfig())
+		ctx.moduleToResolved[olderSrc] = olderMod
+		ctx.resolvedToModule[olderMod] = olderSrc
+		ctx.moduleToResolved[newerSrc] = newerMod
+		ctx.resolvedToModule[newerMod] = newerSrc
+
+		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 43)
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNumber{Value: 1},
+		}, types.Synthetic)
+
+		// First: older module claims the node
+		def1 := oidDefinition{
+			mod:  olderSrc,
+			def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "olderName"}, Oid: oid},
+			kind: defValueAssignment,
+		}
+		finalizeOidDefinition(ctx, def1, node, "olderName")
+
+		// Second: preferred module overwrites
+		def2 := oidDefinition{
+			mod:  newerSrc,
+			def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "newerName"}, Oid: oid},
+			kind: defValueAssignment,
+		}
+		finalizeOidDefinition(ctx, def2, node, "newerName")
+
+		// Both name and module should reflect the preferred module
+		testutil.Equal(t, "newerName", node.Name(), "name should be overwritten by preferred module")
+		testutil.Equal(t, newerMod, node.Module(), "module should be overwritten by preferred module")
+	})
+}
+
 func TestOidDefinitionDefName(t *testing.T) {
 	oid := module.NewOidAssignment([]module.OidComponent{
 		&module.OidComponentNumber{Value: 1},
