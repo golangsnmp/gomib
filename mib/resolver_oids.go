@@ -435,33 +435,6 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 		}
 	}
 
-	switch def.kind {
-	case defObjectType:
-		node.setKind(KindScalar)
-	case defModuleIdentity, defObjectIdentity, defValueAssignment:
-		node.setKind(KindNode)
-	case defNotification:
-		node.setKind(KindNotification)
-	case defObjectGroup, defNotificationGroup:
-		node.setKind(KindGroup)
-	case defModuleCompliance:
-		node.setKind(KindCompliance)
-	case defAgentCapabilities:
-		node.setKind(KindCapability)
-	}
-
-	// Propagate descriptions from definition types that carry them.
-	switch d := def.def.(type) {
-	case *module.ValueAssignment:
-		node.setDescription(d.Description)
-		node.setReference(d.Reference)
-	case *module.ObjectIdentity:
-		node.setDescription(d.Description)
-		node.setReference(d.Reference)
-	}
-	node.setName(label)
-	node.setSpan(def.def.DefinitionSpan())
-
 	// RFC 2578 section 7.10: the last sub-identifier of an administrative
 	// OID assignment must not be zero. Exempt NODE kinds (MODULE-IDENTITY,
 	// OBJECT-IDENTITY, value assignments) and zeroDotZero (0.0).
@@ -485,24 +458,52 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 			slog.String("current", currentMod.Name()),
 			slog.String("new", def.mod.Name))
 	}
+	// The node's kind, name, span, description, and module back-reference
+	// all reflect the preferred module. Gate all of them behind the same
+	// preference check so they stay in sync.
+	if shouldPreferModule(ctx, currentMod, def.mod) {
+		switch def.kind {
+		case defObjectType:
+			node.setKind(KindScalar)
+		case defModuleIdentity, defObjectIdentity, defValueAssignment:
+			node.setKind(KindNode)
+		case defNotification:
+			node.setKind(KindNotification)
+		case defObjectGroup, defNotificationGroup:
+			node.setKind(KindGroup)
+		case defModuleCompliance:
+			node.setKind(KindCompliance)
+		case defAgentCapabilities:
+			node.setKind(KindCapability)
+		}
+		node.setName(label)
+		node.setSpan(def.def.DefinitionSpan())
+		switch d := def.def.(type) {
+		case *module.ValueAssignment:
+			node.setDescription(d.Description)
+			node.setReference(d.Reference)
+		case *module.ObjectIdentity:
+			node.setDescription(d.Description)
+			node.setReference(d.Reference)
+		}
+		node.setModule(newMod)
+		if def.kind == defModuleIdentity {
+			newMod.setOID(node.OID())
+		}
+	}
+
 	// Register non-semantic definitions in the defining module's node list
 	// regardless of preference. Both modules that define the same OID should
 	// list it in their Nodes(). Semantic definitions (object types, notifications,
-	// etc.) are registered in the semantics phase instead.
+	// etc.) are registered in the semantics phase instead. This must happen
+	// after the preference block so the node has its name set for addNode's
+	// name-keyed index.
 	switch def.kind {
 	case defValueAssignment, defObjectIdentity, defModuleIdentity:
 		newMod.addNode(node)
 	default:
 		// Semantic definitions (object types, notifications, groups, etc.)
 		// are registered in the semantics phase.
-	}
-
-	// The node's back-reference (node.Module()) points to the preferred module.
-	if shouldPreferModule(ctx, currentMod, def.mod) {
-		node.setModule(newMod)
-		if def.kind == defModuleIdentity {
-			newMod.setOID(node.OID())
-		}
 	}
 
 	ctx.registerModuleNodeSymbol(def.mod, label, node)
