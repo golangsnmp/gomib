@@ -43,7 +43,7 @@ func TestIsBareTypeIndex(t *testing.T) {
 
 func TestIsOIDType(t *testing.T) {
 	// Build a resolver context with base modules so type lookups work.
-	ctx := newResolverContext(nil, nil, DefaultConfig())
+	ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
 	registerModules(ctx)
 	resolveTypes(ctx)
 	// Use SNMPv2-TC module for lookups (where AutonomousType etc. are defined).
@@ -435,7 +435,7 @@ func TestConvertDefValOidRefUnresolved(t *testing.T) {
 }
 
 func TestConvertDefValUnknown(t *testing.T) {
-	ctx := newResolverContext(nil, nil, PermissiveConfig())
+	ctx := newResolverContext(nil, nil, ResolverNormal, VerboseConfig())
 	mod := &module.Module{Name: "TEST-MIB"}
 
 	dv := convertDefVal(ctx, &module.DefValUnparsed{}, mod, nil, types.Span{})
@@ -512,7 +512,7 @@ func TestResolveTypeSyntaxBaseTypes(t *testing.T) {
 	// global type lookup. Set up a context with an SNMPv2-SMI module
 	// that has the needed base types registered.
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	ctx := newResolverContext([]*module.Module{smiMod}, nil, DefaultConfig())
+	ctx := newResolverContext([]*module.Module{smiMod}, nil, ResolverNormal, DefaultConfig())
 	ctx.snmpv2SMIModule = smiMod
 
 	integerType := newType("INTEGER")
@@ -1762,7 +1762,7 @@ func TestLookupMemberNode(t *testing.T) {
 		modB := &module.Module{Name: "B"}
 		node := newTestNode("member1")
 
-		ctx := newResolverContext([]*module.Module{modA, modB}, nil, PermissiveConfig())
+		ctx := newResolverContext([]*module.Module{modA, modB}, nil, ResolverPermissive, DefaultConfig())
 		ctx.registerModuleNodeSymbol(modB, "member1", node)
 		// No import from A to B, but permissive mode should find it globally.
 
@@ -1776,7 +1776,7 @@ func TestLookupMemberNode(t *testing.T) {
 		modB := &module.Module{Name: "B"}
 		node := newTestNode("member1")
 
-		ctx := newResolverContext([]*module.Module{modA, modB}, nil, StrictConfig())
+		ctx := newResolverContext([]*module.Module{modA, modB}, nil, ResolverStrict, VerboseConfig())
 		ctx.registerModuleNodeSymbol(modB, "member1", node)
 		// No import from A to B.
 
@@ -1786,7 +1786,7 @@ func TestLookupMemberNode(t *testing.T) {
 
 	t.Run("not found in any mode", func(t *testing.T) {
 		modA := &module.Module{Name: "A"}
-		ctx := newResolverContext([]*module.Module{modA}, nil, PermissiveConfig())
+		ctx := newResolverContext([]*module.Module{modA}, nil, ResolverNormal, DefaultConfig())
 
 		_, ok := lookupMemberNode(ctx, modA, "nonexistent")
 		testutil.False(t, ok, "expected false for nonexistent member")
@@ -1979,7 +1979,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newTestContextForModules(StrictConfig(), mod)
+		ctx := newTestContextForModules(VerboseConfig(), mod)
 
 		root := ctx.mib.Root()
 
@@ -2009,7 +2009,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newTestContextForModules(StrictConfig(), mod)
+		ctx := newTestContextForModules(VerboseConfig(), mod)
 
 		root := ctx.mib.Root()
 
@@ -2039,7 +2039,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newTestContextForModules(StrictConfig(), mod)
+		ctx := newTestContextForModules(VerboseConfig(), mod)
 
 		root := ctx.mib.Root()
 
@@ -2186,7 +2186,7 @@ func TestCreateResolvedNotificationGroups(t *testing.T) {
 			},
 		}
 
-		ctx := newTestContextForModules(StrictConfig(), mod)
+		ctx := newTestContextForModules(VerboseConfig(), mod)
 
 		root := ctx.mib.Root()
 
@@ -2338,7 +2338,7 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 		}
 		modB := &module.Module{Name: "B-MIB"}
 
-		ctx := newTestContextForModules(PermissiveConfig(), modA, modB)
+		ctx := newTestContextForModulesWithPolicy(ResolverPermissive, DefaultConfig(), modA, modB)
 
 		root := ctx.mib.Root()
 

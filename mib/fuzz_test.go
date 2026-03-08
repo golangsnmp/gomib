@@ -105,12 +105,12 @@ func FuzzFormatOID(f *testing.F) {
 			DESCRIPTION ""
 			::= { testMIB 1 }
 		END`)
-	cfg := types.PermissiveConfig()
+	cfg := types.DefaultConfig()
 	p := parser.New(src, nil, cfg)
 	astMods := p.ParseModule()
 	mod := module.Lower(astMods[0], src, nil, cfg)
-	resolverCfg := PermissiveConfig()
-	mibTree := Resolve([]*module.Module{mod}, nil, &resolverCfg)
+	resolverCfg := DefaultConfig()
+	mibTree := Resolve([]*module.Module{mod}, nil, nil, &resolverCfg)
 
 	f.Fuzz(func(t *testing.T, s string) {
 		oid, err := ParseOID(s)

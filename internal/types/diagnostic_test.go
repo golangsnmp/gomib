@@ -81,7 +81,7 @@ func TestShouldReport(t *testing.T) {
 		},
 		{
 			name: "strict reports info",
-			cfg:  StrictConfig(),
+			cfg:  VerboseConfig(),
 			code: "some-info",
 			sev:  SeverityInfo,
 			want: true,
@@ -89,7 +89,7 @@ func TestShouldReport(t *testing.T) {
 		{
 			name: "silent still reports fatal",
 			cfg: DiagnosticConfig{
-				Level: StrictnessSilent,
+				Reporting: ReportingSilent,
 			},
 			code: "fatal-thing",
 			sev:  SeverityFatal,
@@ -98,7 +98,7 @@ func TestShouldReport(t *testing.T) {
 		{
 			name: "silent suppresses non-fatal",
 			cfg: DiagnosticConfig{
-				Level: StrictnessSilent,
+				Reporting: ReportingSilent,
 			},
 			code: "some-warning",
 			sev:  SeverityWarning,
@@ -107,8 +107,8 @@ func TestShouldReport(t *testing.T) {
 		{
 			name: "ignore suppresses matching code",
 			cfg: DiagnosticConfig{
-				Level:  StrictnessStrict,
-				Ignore: []string{"identifier-underscore"},
+				Reporting: ReportingVerbose,
+				Ignore:    []string{"identifier-underscore"},
 			},
 			code: "identifier-underscore",
 			sev:  SeverityWarning,
@@ -117,8 +117,8 @@ func TestShouldReport(t *testing.T) {
 		{
 			name: "ignore supports glob",
 			cfg: DiagnosticConfig{
-				Level:  StrictnessStrict,
-				Ignore: []string{"identifier-*"},
+				Reporting: ReportingVerbose,
+				Ignore:    []string{"identifier-*"},
 			},
 			code: "identifier-underscore",
 			sev:  SeverityWarning,
@@ -127,8 +127,8 @@ func TestShouldReport(t *testing.T) {
 		{
 			name: "override upgrades severity",
 			cfg: DiagnosticConfig{
-				Level:     StrictnessPermissive,
-				Overrides: map[string]Severity{"some-info": SeverityWarning},
+				Reporting: ReportingDefault,
+				Overrides: map[string]Severity{"some-info": SeverityMinor},
 			},
 			code: "some-info",
 			sev:  SeverityInfo,
@@ -137,7 +137,7 @@ func TestShouldReport(t *testing.T) {
 		{
 			name: "override to fatal always reports even with ignore",
 			cfg: DiagnosticConfig{
-				Level:     StrictnessStrict,
+				Reporting: ReportingVerbose,
 				Ignore:    []string{"some-code"},
 				Overrides: map[string]Severity{"some-code": SeverityFatal},
 			},
@@ -148,7 +148,7 @@ func TestShouldReport(t *testing.T) {
 		{
 			name: "ignore suppresses non-fatal with override",
 			cfg: DiagnosticConfig{
-				Level:     StrictnessStrict,
+				Reporting: ReportingVerbose,
 				Ignore:    []string{"some-code"},
 				Overrides: map[string]Severity{"some-code": SeverityWarning},
 			},
@@ -168,16 +168,17 @@ func TestShouldReport(t *testing.T) {
 	}
 }
 
-// TestStrictnessLevelOrdering verifies that strictness levels are ordered
-// from least strict (Silent=0) to most strict (Strict=6).
-func TestStrictnessLevelOrdering(t *testing.T) {
-	if StrictnessSilent >= StrictnessPermissive {
-		t.Errorf("Silent(%d) should be < Permissive(%d)", StrictnessSilent, StrictnessPermissive)
+// TestResolverStrictnessOrdering verifies resolver strictness enum ordering.
+func TestResolverStrictnessOrdering(t *testing.T) {
+	if !(ResolverStrict < ResolverNormal && ResolverNormal < ResolverPermissive) {
+		t.Fatalf("unexpected resolver ordering: strict=%d normal=%d permissive=%d",
+			ResolverStrict, ResolverNormal, ResolverPermissive)
 	}
-	if StrictnessPermissive >= StrictnessNormal {
-		t.Errorf("Permissive(%d) should be < Normal(%d)", StrictnessPermissive, StrictnessNormal)
-	}
-	if StrictnessNormal >= StrictnessStrict {
-		t.Errorf("Normal(%d) should be < Strict(%d)", StrictnessNormal, StrictnessStrict)
+}
+
+func TestReportingLevelOrdering(t *testing.T) {
+	if !(ReportingSilent < ReportingQuiet && ReportingQuiet < ReportingDefault && ReportingDefault < ReportingVerbose) {
+		t.Fatalf("unexpected reporting ordering: silent=%d quiet=%d default=%d verbose=%d",
+			ReportingSilent, ReportingQuiet, ReportingDefault, ReportingVerbose)
 	}
 }

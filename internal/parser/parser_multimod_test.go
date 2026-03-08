@@ -18,7 +18,7 @@ IMPORTS aRoot FROM A-MIB;
 bRoot OBJECT IDENTIFIER ::= { aRoot 1 }
 END
 `
-	p := New([]byte(source), nil, types.PermissiveConfig())
+	p := New([]byte(source), nil, types.DefaultConfig())
 	mods := p.ParseModule()
 
 	testutil.Equal(t, 2, len(mods), "should parse two modules")
@@ -36,7 +36,7 @@ X-MIB DEFINITIONS ::= BEGIN
 xRoot OBJECT IDENTIFIER ::= { 1 3 6 1 4 1 99991 }
 END
 `
-	p := New([]byte(source), nil, types.PermissiveConfig())
+	p := New([]byte(source), nil, types.DefaultConfig())
 	mods := p.ParseModule()
 
 	testutil.Equal(t, 1, len(mods), "single module file should return one module")
@@ -55,7 +55,7 @@ CLEAN-MIB DEFINITIONS ::= BEGIN
 cleanRoot OBJECT IDENTIFIER ::= { 1 3 6 1 4 1 99993 }
 END
 `
-	p := New([]byte(source), nil, types.StrictConfig())
+	p := New([]byte(source), nil, types.VerboseConfig())
 	mods := p.ParseModule()
 
 	testutil.Equal(t, 2, len(mods), "should parse two modules")

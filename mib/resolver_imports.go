@@ -64,8 +64,8 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 		return
 	}
 
-	// Module import aliases handle renamed modules (e.g., SNMPv2-SMI-v1 -> SNMPv2-SMI)
-	if ctx.DiagnosticConfig().AllowSafeFallbacks() {
+	// Module import aliases are constrained fallbacks (Normal/Permissive).
+	if ctx.ResolverStrictness().AllowConstrainedFallbacks() {
 		if aliased := baseModuleImportAlias(fromModuleName); aliased != "" {
 			aliasCandidates := ctx.moduleIndex[aliased]
 			if chosen, ok := findCandidateWithAllSymbols(ctx, aliasCandidates, userSymbols); ok {
@@ -84,7 +84,7 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 	}
 
 	// Import forwarding: symbols re-exported through intermediate modules
-	if ctx.DiagnosticConfig().AllowSafeFallbacks() && len(candidates) > 0 {
+	if len(candidates) > 0 {
 		if forwarded := tryImportForwarding(ctx, candidates, userSymbols); len(forwarded) > 0 {
 			if ctx.TraceEnabled() {
 				ctx.Trace("imports resolved via forwarding",
@@ -100,7 +100,7 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 
 	// Partial resolution: resolve symbols that are found and record
 	// unresolved for the rest. Handles MIBs that import from the wrong module.
-	if ctx.DiagnosticConfig().AllowSafeFallbacks() && len(candidates) > 0 {
+	if len(candidates) > 0 {
 		resolved, unresolved := tryPartialResolution(ctx, candidates, userSymbols)
 		for _, res := range resolved {
 			ctx.registerImport(importingModule, res.symbol, res.source)

@@ -10,7 +10,7 @@ import (
 )
 
 func TestBaseModuleTypeDescriptions(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 
 	typesWithDescs := []string{
 		// SMIv2 base types
@@ -39,7 +39,7 @@ func TestBaseModuleTypeDescriptions(t *testing.T) {
 }
 
 func TestBaseModuleNodeDescriptions(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 
 	nodesWithDescs := []string{
 		"internet", "enterprises", "mgmt", "mib-2",
@@ -61,7 +61,7 @@ func TestBaseModuleNodeDescriptions(t *testing.T) {
 }
 
 func TestBaseModuleNodeReferences(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 
 	// Nodes whose base module definitions carry an RFC reference.
 	nodesWithRefs := []string{
@@ -84,7 +84,7 @@ func TestBaseModuleNodeReferences(t *testing.T) {
 }
 
 func TestBaseModuleNodeDescriptionContent(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 
 	// Spot-check a few descriptions for expected content.
 	tests := []struct {

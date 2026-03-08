@@ -67,6 +67,7 @@ type resolverContext struct {
 	usedImports map[*module.Module]map[string]struct{}
 
 	// Diagnostic configuration and collection
+	strictness  ResolverStrictness
 	diagConfig  DiagnosticConfig
 	diagnostics []Diagnostic
 
@@ -109,7 +110,7 @@ type unresolvedNotifObject struct {
 	span         types.Span
 }
 
-func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig DiagnosticConfig) *resolverContext {
+func newResolverContext(mods []*module.Module, logger *slog.Logger, strictness ResolverStrictness, diagConfig DiagnosticConfig) *resolverContext {
 	n := len(mods)
 	ctx := &resolverContext{
 		mib:                newMib(),
@@ -123,6 +124,7 @@ func newResolverContext(mods []*module.Module, logger *slog.Logger, diagConfig D
 		moduleDefNames:     make(map[*module.Module]map[string]struct{}, n),
 		moduleOidDefNames:  make(map[*module.Module]map[string]struct{}, n),
 		usedImports:        make(map[*module.Module]map[string]struct{}, n),
+		strictness:         strictness,
 		diagConfig:         diagConfig,
 		Logger:             types.Logger{L: logger},
 	}
@@ -186,8 +188,8 @@ func (c *resolverContext) lookupTypeInModule(mod *module.Module, name string) (*
 
 // findWellKnownModuleForType returns the well-known base module expected to
 // define the given type name. ASN.1 primitives are always checked; other
-// well-known modules (SMI globals, SMIv1 types, SNMPv2-TC) require permissive
-// mode. Returns nil if no well-known module matches.
+// well-known modules (SMI globals, SMIv1 types, SNMPv2-TC) require constrained
+// fallbacks (Normal/Permissive). Returns nil if no well-known module matches.
 func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module {
 	cls := wellKnownTypes[name]
 
@@ -196,11 +198,11 @@ func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module
 		return c.snmpv2SMIModule
 	}
 
-	if !c.diagConfig.AllowBestGuessFallbacks() {
+	if !c.strictness.AllowConstrainedFallbacks() {
 		return nil
 	}
 
-	// Permissive only: well-known modules for SMI globals, SMIv1 types, SNMPv2-TC
+	// Normal/Permissive: well-known modules for SMI globals, SMIv1 types, SNMPv2-TC
 	switch cls {
 	case typeClassSmiGlobal:
 		return c.snmpv2SMIModule
@@ -223,13 +225,13 @@ func (c *resolverContext) tryWellKnownTypeFallbacks(name string) (*Type, bool) {
 }
 
 // LookupType searches for a type by name, trying well-known modules first.
-// Beyond ASN.1 primitives, global search is only enabled in permissive mode.
+// Beyond well-known sets, global search is only enabled in permissive mode.
 func (c *resolverContext) LookupType(name string) (*Type, bool) {
 	if t, ok := c.tryWellKnownTypeFallbacks(name); ok {
 		return t, true
 	}
 
-	if !c.diagConfig.AllowBestGuessFallbacks() {
+	if !c.strictness.AllowGlobalFallbacks() {
 		return nil, false
 	}
 
@@ -404,6 +406,11 @@ func (c *resolverContext) Diagnostics() []Diagnostic {
 // DiagnosticConfig returns the active strictness and filtering configuration.
 func (c *resolverContext) DiagnosticConfig() DiagnosticConfig {
 	return c.diagConfig
+}
+
+// ResolverStrictness returns the active resolver strictness policy.
+func (c *resolverContext) ResolverStrictness() ResolverStrictness {
+	return c.strictness
 }
 
 // TypeCount returns the total number of registered types across all modules.

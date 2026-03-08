@@ -96,7 +96,7 @@ func FuzzParseModule(f *testing.F) {
 			return
 		}
 
-		p := New(data, nil, types.PermissiveConfig())
+		p := New(data, nil, types.DefaultConfig())
 		mods := p.ParseModule()
 
 		if len(mods) == 0 {
@@ -215,7 +215,7 @@ func FuzzConstraintParsing(f *testing.F) {
 			src = append(src, " }\n\t::= { test 1 }\nEND"...)
 		}
 
-		p := New(src, nil, types.PermissiveConfig())
+		p := New(src, nil, types.DefaultConfig())
 		mods := p.ParseModule()
 		if len(mods) == 0 {
 			t.Fatal("ParseModule returned empty slice")

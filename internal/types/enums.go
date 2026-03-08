@@ -41,30 +41,60 @@ func (s Severity) AtLeast(other Severity) bool {
 	return s <= other
 }
 
-// StrictnessLevel defines preset strictness configurations.
-// Higher values are stricter and report more diagnostics.
-type StrictnessLevel int
+// ResolverStrictness controls resolver fallback behavior.
+type ResolverStrictness int
 
 const (
-	StrictnessSilent     StrictnessLevel = 0 // Accept everything, minimal output
-	StrictnessPermissive StrictnessLevel = 1 // Accept most real-world MIBs
-	StrictnessNormal     StrictnessLevel = 3 // Default, warn on issues
-	StrictnessStrict     StrictnessLevel = 6 // RFC-only, reject non-compliant
+	ResolverStrict ResolverStrictness = iota
+	ResolverNormal
+	ResolverPermissive
 )
 
-// StrictnessLevel has non-consecutive values, so it keeps a switch.
-func (l StrictnessLevel) String() string {
-	switch l {
-	case StrictnessStrict:
+func (s ResolverStrictness) String() string {
+	switch s {
+	case ResolverStrict:
 		return "strict"
-	case StrictnessNormal:
+	case ResolverNormal:
 		return "normal"
-	case StrictnessPermissive:
+	case ResolverPermissive:
 		return "permissive"
-	case StrictnessSilent:
+	default:
+		return fmt.Sprintf("ResolverStrictness(%d)", s)
+	}
+}
+
+// AllowConstrainedFallbacks reports whether tier-2 constrained fallbacks are enabled.
+func (s ResolverStrictness) AllowConstrainedFallbacks() bool {
+	return s != ResolverStrict
+}
+
+// AllowGlobalFallbacks reports whether tier-3 global fallbacks are enabled.
+func (s ResolverStrictness) AllowGlobalFallbacks() bool {
+	return s == ResolverPermissive
+}
+
+// ReportingLevel controls diagnostic reporting verbosity.
+type ReportingLevel int
+
+const (
+	ReportingSilent ReportingLevel = iota
+	ReportingQuiet
+	ReportingDefault
+	ReportingVerbose
+)
+
+func (l ReportingLevel) String() string {
+	switch l {
+	case ReportingVerbose:
+		return "verbose"
+	case ReportingDefault:
+		return "default"
+	case ReportingQuiet:
+		return "quiet"
+	case ReportingSilent:
 		return "silent"
 	default:
-		return fmt.Sprintf("StrictnessLevel(%d)", l)
+		return fmt.Sprintf("ReportingLevel(%d)", l)
 	}
 }
 

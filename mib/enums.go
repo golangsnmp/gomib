@@ -25,14 +25,23 @@ const (
 	SeverityInfo    = types.SeverityInfo
 )
 
-// StrictnessLevel defines preset strictness configurations.
-type StrictnessLevel = types.StrictnessLevel
+// ResolverStrictness controls resolver fallback behavior.
+type ResolverStrictness = types.ResolverStrictness
 
 const (
-	StrictnessStrict     = types.StrictnessStrict
-	StrictnessNormal     = types.StrictnessNormal
-	StrictnessPermissive = types.StrictnessPermissive
-	StrictnessSilent     = types.StrictnessSilent
+	ResolverStrict     = types.ResolverStrict
+	ResolverNormal     = types.ResolverNormal
+	ResolverPermissive = types.ResolverPermissive
+)
+
+// ReportingLevel controls diagnostic reporting verbosity.
+type ReportingLevel = types.ReportingLevel
+
+const (
+	ReportingSilent  = types.ReportingSilent
+	ReportingQuiet   = types.ReportingQuiet
+	ReportingDefault = types.ReportingDefault
+	ReportingVerbose = types.ReportingVerbose
 )
 
 // Kind identifies what an OID node represents.

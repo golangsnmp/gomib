@@ -52,7 +52,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 	}
 
 	if len(allModules) == 0 {
-		return mib.Resolve(nil, nil, nil), nil
+		return mib.Resolve(nil, nil, nil, nil), nil
 	}
 
 	log.Log(slog.LevelInfo, "parallel loading",
@@ -151,7 +151,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 	log.Log(slog.LevelInfo, "parallel loading complete",
 		slog.Int("modules", len(mods)))
 
-	m := mib.Resolve(mods, componentLogger(cfg.logger, "resolver"), &cfg.diagConfig)
+	m := mib.Resolve(mods, componentLogger(cfg.logger, "resolver"), &cfg.resolverStrictness, &cfg.diagConfig)
 	return m, checkLoadResult(m, cfg, nil)
 }
 
@@ -232,7 +232,7 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 
 	mods := collectModules(modules)
 
-	m := mib.Resolve(mods, componentLogger(cfg.logger, "resolver"), &cfg.diagConfig)
+	m := mib.Resolve(mods, componentLogger(cfg.logger, "resolver"), &cfg.resolverStrictness, &cfg.diagConfig)
 	return m, checkLoadResult(m, cfg, names)
 }
 

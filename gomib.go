@@ -36,12 +36,13 @@ const LevelTrace = types.LevelTrace
 type LoadOption func(*loadConfig)
 
 type loadConfig struct {
-	logger      *slog.Logger
-	systemPaths bool
-	diagConfig  mib.DiagnosticConfig
-	sources     []Source
-	modules     []string
-	hasModules  bool // true when WithModules was called (even with empty list)
+	logger             *slog.Logger
+	systemPaths        bool
+	resolverStrictness mib.ResolverStrictness
+	diagConfig         mib.DiagnosticConfig
+	sources            []Source
+	modules            []string
+	hasModules         bool // true when WithModules was called (even with empty list)
 }
 
 // WithLogger sets the logger for debug/trace output.
@@ -50,16 +51,14 @@ func WithLogger(logger *slog.Logger) LoadOption {
 	return func(c *loadConfig) { c.logger = logger }
 }
 
-// WithDiagnosticConfig sets the diagnostic configuration for strictness control.
-// If not set, defaults to Normal strictness (report Minor and above, fail on Severe).
+// WithDiagnosticConfig sets the diagnostic reporting/failure configuration.
 func WithDiagnosticConfig(cfg mib.DiagnosticConfig) LoadOption {
 	return func(c *loadConfig) { c.diagConfig = cfg }
 }
 
-// WithStrictness sets the strictness level using a preset configuration.
-// Convenience wrapper for WithDiagnosticConfig with preset configs.
-func WithStrictness(level mib.StrictnessLevel) LoadOption {
-	return func(c *loadConfig) { c.diagConfig = mib.ConfigForLevel(level) }
+// WithResolverStrictness sets resolver fallback behavior.
+func WithResolverStrictness(level mib.ResolverStrictness) LoadOption {
+	return func(c *loadConfig) { c.resolverStrictness = level }
 }
 
 // WithSource appends one or more MIB sources to the load configuration.
@@ -89,7 +88,8 @@ func WithModules(names ...string) LoadOption {
 //	m, err := gomib.Load(ctx, gomib.WithSystemPaths())
 func Load(ctx context.Context, opts ...LoadOption) (*mib.Mib, error) {
 	cfg := loadConfig{
-		diagConfig: mib.DefaultConfig(),
+		resolverStrictness: mib.ResolverNormal,
+		diagConfig:         mib.DefaultConfig(),
 	}
 	for _, opt := range opts {
 		opt(&cfg)

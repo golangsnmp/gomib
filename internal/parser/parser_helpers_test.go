@@ -7,7 +7,7 @@ import (
 
 // parseModule parses source with PermissiveConfig and returns the first AST module.
 func parseModule(source string) *ast.Module {
-	return parseModuleWith(source, types.PermissiveConfig())
+	return parseModuleWith(source, types.DefaultConfig())
 }
 
 // parseModuleWith parses source with the given diagnostic config and returns

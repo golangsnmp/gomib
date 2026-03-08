@@ -302,7 +302,7 @@ func TestLookupNodeGlobal(t *testing.T) {
 	nodeX := newTestNode("x")
 	nodeY := newTestNode("y")
 
-	ctx := newResolverContext([]*module.Module{modA, modB}, nil, DefaultConfig())
+	ctx := newResolverContext([]*module.Module{modA, modB}, nil, ResolverNormal, DefaultConfig())
 	ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
 	ctx.moduleSymbolToNode[modB] = map[string]*Node{"y": nodeY}
 
@@ -325,7 +325,7 @@ func TestLookupNodeGlobal_DeterministicOrder(t *testing.T) {
 	nodeA := newTestNode("x")
 	nodeB := newTestNode("x")
 
-	ctx := newResolverContext([]*module.Module{modA, modB}, nil, DefaultConfig())
+	ctx := newResolverContext([]*module.Module{modA, modB}, nil, ResolverNormal, DefaultConfig())
 	ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeA}
 	ctx.moduleSymbolToNode[modB] = map[string]*Node{"x": nodeB}
 
@@ -366,7 +366,7 @@ func TestLookupTypeForModule_ASN1Fallback(t *testing.T) {
 
 func TestLookupTypeForModule_PermissiveFallbacks(t *testing.T) {
 	// In permissive mode, SMI global types, SMIv1 types, and TC types resolve.
-	ctx := newResolverContext(nil, nil, PermissiveConfig())
+	ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
 	modA := &module.Module{Name: "A"}
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
@@ -401,7 +401,7 @@ func TestLookupTypeForModule_PermissiveFallbacks(t *testing.T) {
 
 func TestLookupTypeForModule_StrictNoFallback(t *testing.T) {
 	// In strict mode, SMI global types should not resolve without import.
-	ctx := newResolverContext(nil, nil, StrictConfig())
+	ctx := newResolverContext(nil, nil, ResolverStrict, VerboseConfig())
 	modA := &module.Module{Name: "A"}
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
@@ -425,7 +425,7 @@ func TestLookupTypeForModule_StrictNoFallback(t *testing.T) {
 
 func TestLookupType_Permissive(t *testing.T) {
 	// LookupType with no module context, permissive mode.
-	ctx := newResolverContext(nil, nil, PermissiveConfig())
+	ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
 	rfc1155Mod := &module.Module{Name: "RFC1155-SMI"}
@@ -464,7 +464,7 @@ func TestLookupType_Permissive(t *testing.T) {
 
 func TestLookupType_StrictOnlyPrimitives(t *testing.T) {
 	// Strict mode: only ASN.1 primitives, no global search.
-	ctx := newResolverContext(nil, nil, StrictConfig())
+	ctx := newResolverContext(nil, nil, ResolverStrict, VerboseConfig())
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
 	intType := newType("INTEGER")
@@ -489,7 +489,7 @@ func TestLookupType_GlobalModuleScan(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 	vendorType := newType("VendorSpecialType")
 
-	ctx := newResolverContext([]*module.Module{modA}, nil, PermissiveConfig())
+	ctx := newResolverContext([]*module.Module{modA}, nil, ResolverPermissive, DefaultConfig())
 	ctx.snmpv2SMIModule = &module.Module{Name: "SNMPv2-SMI"}
 	ctx.moduleSymbolToType[modA] = map[string]*Type{"VendorSpecialType": vendorType}
 
@@ -576,15 +576,15 @@ func TestEmitDiagnostic(t *testing.T) {
 			want:   0,
 		},
 		{
-			name:   "permissive reports warning",
-			config: PermissiveConfig(),
+			name:   "verbose reports warning",
+			config: VerboseConfig(),
 			code:   types.DiagIdentifierHyphenSMI, // SeverityWarning
 			want:   1,
 		},
 		{
 			name: "silent suppresses non-fatal",
 			config: DiagnosticConfig{
-				Level: StrictnessSilent,
+				Reporting: ReportingSilent,
 			},
 			code: types.DiagParseError, // SeverityError
 			want: 0,
@@ -593,7 +593,7 @@ func TestEmitDiagnostic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := newResolverContext(nil, nil, tt.config)
+			ctx := newResolverContext(nil, nil, ResolverNormal, tt.config)
 			mod := &module.Module{Name: "MOD"}
 			ctx.EmitDiagnostic(tt.code, mod, types.Span{}, "test message")
 			got := len(ctx.Diagnostics())
@@ -605,17 +605,17 @@ func TestEmitDiagnostic(t *testing.T) {
 func TestShouldReport_FatalAlwaysReported(t *testing.T) {
 	// No diagnostic codes map to SeverityFatal, but ShouldReport must still
 	// pass fatal-severity diagnostics even in silent mode.
-	config := DiagnosticConfig{Level: StrictnessSilent}
+	config := DiagnosticConfig{Reporting: ReportingSilent}
 	testutil.True(t, config.ShouldReport("any-code", SeverityFatal),
 		"fatal should be reported even in silent mode")
 }
 
 func TestEmitDiagnostic_IgnoredCode(t *testing.T) {
 	config := DiagnosticConfig{
-		Level:  StrictnessStrict,
-		Ignore: []string{"import-*"},
+		Reporting: ReportingVerbose,
+		Ignore:    []string{"import-*"},
 	}
-	ctx := newResolverContext(nil, nil, config)
+	ctx := newResolverContext(nil, nil, ResolverNormal, config)
 	mod := &module.Module{Name: "MOD"}
 	ctx.EmitDiagnostic(types.DiagImportNotFound, mod, types.Span{}, "ignored")
 	testutil.Len(t, ctx.Diagnostics(), 0, "expected ignored code to produce no diagnostics")
@@ -721,7 +721,7 @@ func TestFinalizeUnresolved_NilModule(t *testing.T) {
 
 func TestDropModules(t *testing.T) {
 	mod := &module.Module{Name: "A"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 	ctx.moduleIndex["A"] = []*module.Module{mod}
 	ctx.moduleDefNames[mod] = map[string]struct{}{"foo": {}}
 
@@ -740,8 +740,8 @@ func TestDropModules(t *testing.T) {
 }
 
 func TestDiagnosticConfig_Getter(t *testing.T) {
-	config := PermissiveConfig()
-	ctx := newResolverContext(nil, nil, config)
+	config := DefaultConfig()
+	ctx := newResolverContext(nil, nil, ResolverNormal, config)
 	got := ctx.DiagnosticConfig()
-	testutil.Equal(t, config.Level, got.Level, "DiagnosticConfig().Level")
+	testutil.Equal(t, config.Reporting, got.Reporting, "DiagnosticConfig().Reporting")
 }

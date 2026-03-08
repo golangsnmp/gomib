@@ -268,7 +268,7 @@ func TestResolvePreservesImportMap(t *testing.T) {
 		Status:  types.StatusCurrent,
 	})
 
-	m := Resolve([]*module.Module{sourceMod, testMod}, nil, nil)
+	m := Resolve([]*module.Module{sourceMod, testMod}, nil, nil, nil)
 
 	resolvedTest := m.Module("TEST-MIB")
 	testutil.NotNil(t, resolvedTest, "TEST-MIB not found")

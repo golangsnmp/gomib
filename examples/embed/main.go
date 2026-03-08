@@ -26,7 +26,7 @@ func main() {
 		gomib.WithSource(embedded),
 		gomib.WithModules("EXAMPLE-MIB"),
 		gomib.WithSystemPaths(),
-		gomib.WithStrictness(mib.StrictnessPermissive),
+		gomib.WithResolverStrictness(mib.ResolverPermissive),
 	)
 	if err != nil {
 		log.Fatal(err)

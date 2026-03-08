@@ -5,22 +5,23 @@ import "github.com/golangsnmp/gomib/internal/types"
 // Diagnostic represents an issue found during parsing or resolution.
 type Diagnostic = types.Diagnostic
 
-// DiagnosticConfig controls strictness and diagnostic filtering.
+// DiagnosticConfig controls diagnostic reporting and failure policy.
 type DiagnosticConfig = types.DiagnosticConfig
 
-// ConfigForLevel returns the diagnostic configuration preset for the given
-// strictness level. Unknown levels fall back to DefaultConfig.
-func ConfigForLevel(level StrictnessLevel) DiagnosticConfig { return types.ConfigForLevel(level) }
+// ConfigForReporting returns the diagnostic configuration preset for the given
+// reporting level. Unknown levels fall back to DefaultConfig.
+func ConfigForReporting(level ReportingLevel) DiagnosticConfig {
+	return types.ConfigForReporting(level)
+}
 
-// DefaultConfig returns the default diagnostic configuration (Normal strictness).
+// DefaultConfig returns the default diagnostic configuration.
 func DefaultConfig() DiagnosticConfig { return types.DefaultConfig() }
 
-// StrictConfig returns a strict configuration for RFC compliance checking.
-func StrictConfig() DiagnosticConfig { return types.StrictConfig() }
+// VerboseConfig returns a verbose reporting profile.
+func VerboseConfig() DiagnosticConfig { return types.VerboseConfig() }
 
-// PermissiveConfig returns a permissive configuration for legacy/vendor MIBs.
-// Suppresses common vendor MIB violations like underscores in identifiers.
-func PermissiveConfig() DiagnosticConfig { return types.PermissiveConfig() }
+// QuietConfig returns a low-noise reporting profile.
+func QuietConfig() DiagnosticConfig { return types.QuietConfig() }
 
 // SilentConfig returns a silent configuration that suppresses all diagnostics.
 func SilentConfig() DiagnosticConfig { return types.SilentConfig() }

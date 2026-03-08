@@ -462,7 +462,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 	})
 
 	t.Run("alias disabled in strict mode", func(t *testing.T) {
-		ctx := newTestContextWithConfig(StrictConfig())
+		ctx := newTestContextWithPolicy(ResolverStrict, VerboseConfig())
 		source := makeTestModule(ctx, "SNMPv2-SMI", []string{"enterprises"})
 		ctx.moduleIndex["SNMPv2-SMI"] = []*module.Module{source}
 
@@ -470,8 +470,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "SNMPv2-SMI-v1",
 			syms("enterprises"))
 
-		testutil.Equal(t, 0, len(ctx.moduleImports[importing]), "alias should not be used in strict mode")
-		testutil.Len(t, ctx.unresolvedImports, 1, "expected 1 unresolved, got")
+		testutil.Equal(t, 0, len(ctx.moduleImports[importing]), "alias should not resolve in strict mode")
+		testutil.Equal(t, 1, len(ctx.unresolvedImports), "strict should record unresolved aliased import")
 	})
 
 	t.Run("forwarding resolution", func(t *testing.T) {
@@ -551,8 +551,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 		testutil.True(t, found, "expected diagnostic code %q for module IMPORTER in %v", "import-module-not-found", diags)
 	})
 
-	t.Run("module not found in strict mode", func(t *testing.T) {
-		ctx := newTestContextWithConfig(StrictConfig())
+	t.Run("missing symbol in strict mode uses partial resolution", func(t *testing.T) {
+		ctx := newTestContextWithConfig(VerboseConfig())
 		// Candidate exists but doesn't have the symbol
 		source := makeTestModule(ctx, "SRC", []string{"other"})
 		ctx.moduleIndex["SRC"] = []*module.Module{source}
@@ -561,14 +561,15 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "SRC",
 			syms("missing"))
 
-		// Strict mode disallows fallbacks, so it falls through to module_not_found
-		testutil.Equal(t, 0, len(ctx.moduleImports[importing]), "expected no imports in strict mode with missing symbol")
+		// Partial resolution is active at all levels, so missing symbols
+		// are reported as symbol_not_exported, not module_not_found.
+		testutil.Equal(t, 0, len(ctx.moduleImports[importing]), "expected no imports for missing symbol")
 		testutil.Len(t, ctx.unresolvedImports, 1, "unresolved count")
-		testutil.Equal(t, reasonModuleNotFound, ctx.unresolvedImports[0].reason, "reason")
+		testutil.Equal(t, reasonSymbolNotExported, ctx.unresolvedImports[0].reason, "reason")
 	})
 
-	t.Run("forwarding disabled in strict mode", func(t *testing.T) {
-		ctx := newTestContextWithConfig(StrictConfig())
+	t.Run("forwarding works in strict mode", func(t *testing.T) {
+		ctx := newTestContextWithConfig(VerboseConfig())
 
 		realSource := &module.Module{Name: "REAL"}
 		ctx.moduleIndex["REAL"] = []*module.Module{realSource}
@@ -585,7 +586,9 @@ func TestResolveImportsFromModule(t *testing.T) {
 		importing := &module.Module{Name: "IMPORTER"}
 		resolveImportsFromModule(ctx, importing, "INTER", syms("sym"))
 
-		testutil.Equal(t, 0, len(ctx.moduleImports[importing]), "forwarding should not be used in strict mode")
+		imports := ctx.moduleImports[importing]
+		testutil.Equal(t, 1, len(imports), "forwarding should resolve in strict mode")
+		testutil.Equal(t, realSource, imports["sym"], "sym should be forwarded from REAL")
 	})
 }
 
@@ -701,7 +704,7 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{importing}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{importing}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleIndex["SOURCE-MIB"] = []*module.Module{source}
 		ctx.moduleDefNames[source] = map[string]struct{}{
 			"sysDescr": {},
@@ -727,7 +730,7 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{importing}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{importing}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleIndex["MOD-A"] = []*module.Module{sourceA}
 		ctx.moduleIndex["MOD-B"] = []*module.Module{sourceB}
 		ctx.moduleDefNames[sourceA] = map[string]struct{}{"alpha": {}}

@@ -146,8 +146,8 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 
 	if source := buildSource(mibPaths); source != nil {
 		cfg := mib.DiagnosticConfig{
-			Level:  mib.StrictnessLevel(level),
-			FailAt: mib.SeverityFatal,
+			Reporting: reportingFromLibsmiLevel(level),
+			FailAt:    mib.SeverityFatal,
 		}
 
 		ctx := context.Background()
@@ -198,6 +198,19 @@ func compareDiagnostics(module string, mibPaths []string, level int) *DiagCompar
 	}
 
 	return result
+}
+
+func reportingFromLibsmiLevel(level int) mib.ReportingLevel {
+	switch {
+	case level <= 0:
+		return mib.ReportingSilent
+	case level <= 2:
+		return mib.ReportingQuiet
+	case level <= 5:
+		return mib.ReportingDefault
+	default:
+		return mib.ReportingVerbose
+	}
 }
 
 func printDiagComparison(w io.Writer, result *DiagComparison) {

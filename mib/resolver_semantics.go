@@ -428,7 +428,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 			objNode, ok = ctx.LookupNodeForModule(ref.mod, objName)
 
 			// Permissive only: global lookup for objects not explicitly imported
-			if !ok && ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+			if !ok && ctx.ResolverStrictness().AllowGlobalFallbacks() {
 				objNode, ok = ctx.LookupNodeGlobal(objName)
 				if ok && ctx.TraceEnabled() {
 					ctx.Trace("permissive: resolved notification object via global lookup",
@@ -793,7 +793,7 @@ func isNotificationVariation(ctx *resolverContext, mod *module.Module, supportsM
 		return node.Kind() == KindNotification
 	}
 	// Permissive: try global lookup.
-	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+	if ctx.ResolverStrictness().AllowGlobalFallbacks() {
 		if node, ok := ctx.LookupNodeGlobal(v.Name); ok {
 			return node.Kind() == KindNotification
 		}
@@ -807,7 +807,7 @@ func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*N
 	if ok {
 		return node, true
 	}
-	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+	if ctx.ResolverStrictness().AllowGlobalFallbacks() {
 		node, ok = ctx.LookupNodeGlobal(name)
 		if ok && ctx.TraceEnabled() {
 			ctx.Trace("permissive: resolved group member via global lookup",

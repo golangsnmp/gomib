@@ -111,7 +111,7 @@ func FuzzLower(f *testing.F) {
 			return
 		}
 
-		cfg := types.PermissiveConfig()
+		cfg := types.DefaultConfig()
 
 		p := parser.New(data, nil, cfg)
 		astMods := p.ParseModule()
@@ -168,7 +168,7 @@ func FuzzPipeline(f *testing.F) {
 			return
 		}
 
-		cfg := types.PermissiveConfig()
+		cfg := types.DefaultConfig()
 
 		p := parser.New(data, nil, cfg)
 		astMods := p.ParseModule()
@@ -181,8 +181,8 @@ func FuzzPipeline(f *testing.F) {
 			return
 		}
 
-		resolverCfg := mib.PermissiveConfig()
-		m := mib.Resolve([]*module.Module{mod}, nil, &resolverCfg)
+		resolverCfg := mib.DefaultConfig()
+		m := mib.Resolve([]*module.Module{mod}, nil, nil, &resolverCfg)
 		if m == nil {
 			t.Fatal("Resolve returned nil")
 		}
@@ -584,7 +584,7 @@ func FuzzMultiModule(f *testing.F) {
 			return
 		}
 
-		cfg := types.PermissiveConfig()
+		cfg := types.DefaultConfig()
 
 		var mods []*module.Module
 		for _, data := range [][]byte{dataA, dataB} {
@@ -602,8 +602,8 @@ func FuzzMultiModule(f *testing.F) {
 			return
 		}
 
-		resolverCfg := mib.PermissiveConfig()
-		m := mib.Resolve(mods, nil, &resolverCfg)
+		resolverCfg := mib.DefaultConfig()
+		m := mib.Resolve(mods, nil, nil, &resolverCfg)
 		if m == nil {
 			t.Fatal("Resolve returned nil for multi-module input")
 		}

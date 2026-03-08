@@ -10,15 +10,30 @@ import (
 )
 
 func newTestContext() *resolverContext {
-	return newResolverContext(nil, nil, DefaultConfig())
+	return newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
 }
 
 func newTestContextWithConfig(config DiagnosticConfig) *resolverContext {
-	return newResolverContext(nil, nil, config)
+	return newResolverContext(nil, nil, ResolverNormal, config)
+}
+
+func newTestContextWithPolicy(strictness ResolverStrictness, config DiagnosticConfig) *resolverContext {
+	return newResolverContext(nil, nil, strictness, config)
 }
 
 func newTestContextForModules(config DiagnosticConfig, mods ...*module.Module) *resolverContext {
-	ctx := newResolverContext(mods, nil, config)
+	ctx := newResolverContext(mods, nil, ResolverNormal, config)
+	for _, mod := range mods {
+		ctx.moduleIndex[mod.Name] = append(ctx.moduleIndex[mod.Name], mod)
+		resolvedMod := newModule(mod.Name)
+		ctx.moduleToResolved[mod] = resolvedMod
+		ctx.resolvedToModule[resolvedMod] = mod
+	}
+	return ctx
+}
+
+func newTestContextForModulesWithPolicy(strictness ResolverStrictness, config DiagnosticConfig, mods ...*module.Module) *resolverContext {
+	ctx := newResolverContext(mods, nil, strictness, config)
 	for _, mod := range mods {
 		ctx.moduleIndex[mod.Name] = append(ctx.moduleIndex[mod.Name], mod)
 		resolvedMod := newModule(mod.Name)
@@ -39,12 +54,14 @@ func buildOIDPath(root *Node, arcs ...uint32) *Node {
 }
 
 func resolveWithConfig(cfg DiagnosticConfig, mods ...*module.Module) *Mib {
-	return Resolve(mods, nil, &cfg)
+	strictness := ResolverNormal
+	return Resolve(mods, nil, &strictness, &cfg)
 }
 
 func resolveStrict(mods ...*module.Module) *Mib {
-	cfg := StrictConfig()
-	return resolveWithConfig(cfg, mods...)
+	cfg := VerboseConfig()
+	strictness := ResolverStrict
+	return Resolve(mods, nil, &strictness, &cfg)
 }
 
 // testOid builds an OID assignment as { parentName subid }.
@@ -58,7 +75,7 @@ func testOid(parentName string, subid uint32) module.OidAssignment {
 // newComplianceTestContext creates a resolverContext with strict config,
 // registering each module in index and resolved maps.
 func newComplianceTestContext(mods ...*module.Module) *resolverContext {
-	return newTestContextForModules(StrictConfig(), mods...)
+	return newTestContextForModules(VerboseConfig(), mods...)
 }
 
 type testModuleConfig struct {

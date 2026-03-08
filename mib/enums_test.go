@@ -30,22 +30,41 @@ func TestSeverityString(t *testing.T) {
 	}
 }
 
-func TestStrictnessLevelString(t *testing.T) {
+func TestResolverStrictnessString(t *testing.T) {
 	tests := []struct {
-		level StrictnessLevel
+		level ResolverStrictness
 		want  string
 	}{
-		{StrictnessStrict, "strict"},
-		{StrictnessNormal, "normal"},
-		{StrictnessPermissive, "permissive"},
-		{StrictnessSilent, "silent"},
-		{StrictnessLevel(99), "StrictnessLevel(99)"},
+		{ResolverStrict, "strict"},
+		{ResolverNormal, "normal"},
+		{ResolverPermissive, "permissive"},
+		{ResolverStrictness(99), "ResolverStrictness(99)"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			got := tt.level.String()
-			testutil.Equal(t, tt.want, got, "StrictnessLevel().String()")
+			testutil.Equal(t, tt.want, got, "ResolverStrictness().String()")
+		})
+	}
+}
+
+func TestReportingLevelString(t *testing.T) {
+	tests := []struct {
+		level ReportingLevel
+		want  string
+	}{
+		{ReportingSilent, "silent"},
+		{ReportingQuiet, "quiet"},
+		{ReportingDefault, "default"},
+		{ReportingVerbose, "verbose"},
+		{ReportingLevel(99), "ReportingLevel(99)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			got := tt.level.String()
+			testutil.Equal(t, tt.want, got, "ReportingLevel().String()")
 		})
 	}
 }
