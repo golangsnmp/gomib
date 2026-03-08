@@ -53,11 +53,6 @@ func buildOIDPath(root *Node, arcs ...uint32) *Node {
 	return n
 }
 
-func resolveWithConfig(cfg DiagnosticConfig, mods ...*module.Module) *Mib {
-	strictness := ResolverNormal
-	return Resolve(mods, nil, &strictness, &cfg)
-}
-
 func resolveStrict(mods ...*module.Module) *Mib {
 	cfg := VerboseConfig()
 	strictness := ResolverStrict
