@@ -82,6 +82,28 @@ func TestParseIntegerEnum(t *testing.T) {
 	testutil.Equal(t, int64(1), enumSyntax.NamedNumbers[0].Value, "first named number value")
 }
 
+func TestParseIntegerEnumMissingComma(t *testing.T) {
+	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+		testStatus OBJECT-TYPE
+			SYNTAX INTEGER { up(1) down(2), testing(3) }
+			MAX-ACCESS read-only
+			STATUS current
+			DESCRIPTION "Test status"
+			::= { test 1 }
+		END`)
+
+	testutil.Len(t, module.Body, 1, "definitions count")
+	def, ok := module.Body[0].(*ast.ObjectTypeDef)
+	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
+	enumSyntax, ok := def.Syntax.Syntax.(*ast.TypeSyntaxIntegerEnum)
+	testutil.True(t, ok, "expected IntegerEnum syntax, got %T", def.Syntax.Syntax)
+	testutil.Len(t, enumSyntax.NamedNumbers, 3, "named numbers count")
+	testutil.Equal(t, "up", enumSyntax.NamedNumbers[0].Name.Name, "first named number name")
+	testutil.Equal(t, "down", enumSyntax.NamedNumbers[1].Name.Name, "second named number name")
+	testutil.Equal(t, "testing", enumSyntax.NamedNumbers[2].Name.Name, "third named number name")
+	testutil.Equal(t, 1, countDiagnostics(module.Diagnostics, types.DiagMissingComma), "missing comma diagnostic")
+}
+
 func TestParseModuleIdentity(t *testing.T) {
 	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testMIB MODULE-IDENTITY

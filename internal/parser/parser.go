@@ -1075,6 +1075,9 @@ func (p *Parser) parseNamedNumberList() ([]ast.NamedNumber, *types.SpanDiagnosti
 
 		if p.check(lexer.TokComma) {
 			p.advance()
+		} else if next := p.peek(); next.Kind.IsIdentifier() || next.Kind.IsKeyword() {
+			// Recovery: missing comma before another named number.
+			p.emitDiagnostic(types.DiagMissingComma, next.Span, "missing comma in named number list")
 		} else {
 			break
 		}
