@@ -497,6 +497,43 @@ func TestShouldPreferModule(t *testing.T) {
 
 		testutil.False(t, shouldPreferModule(ctx, oldMod, newSrc), "expected older LAST-UPDATED to lose")
 	})
+
+	t.Run("base module beats vendor module", func(t *testing.T) {
+		baseSrc := &module.Module{Name: "SNMPv2-SMI", Language: types.LanguageSMIv2}
+		vendorSrc := &module.Module{Name: "VENDOR-MIB", Language: types.LanguageSMIv2}
+		baseMod := newModule("SNMPv2-SMI")
+		vendorMod := newModule("VENDOR-MIB")
+
+		ctx := newTestContext()
+		ctx.moduleToResolved = map[*module.Module]*Module{baseSrc: baseMod, vendorSrc: vendorMod}
+		ctx.resolvedToModule = map[*Module]*module.Module{vendorMod: vendorSrc, baseMod: baseSrc}
+
+		// Base module should replace vendor module
+		testutil.True(t, shouldPreferModule(ctx, vendorMod, baseSrc), "expected base module to replace vendor")
+		// Vendor module should not replace base module
+		testutil.False(t, shouldPreferModule(ctx, baseMod, vendorSrc), "expected vendor NOT to replace base module")
+	})
+
+	t.Run("base module beats vendor even with newer LAST-UPDATED", func(t *testing.T) {
+		baseSrc := &module.Module{Name: "RFC1155-SMI", Language: types.LanguageSMIv1}
+		vendorSrc := &module.Module{
+			Name:     "VENDOR-MIB",
+			Language: types.LanguageSMIv2,
+			Definitions: []module.Definition{
+				&module.ModuleIdentity{DefBase: module.DefBase{Name: "vendorMIB"}, LastUpdated: "202501010000Z"},
+			},
+		}
+		baseMod := newModule("RFC1155-SMI")
+		vendorMod := newModule("VENDOR-MIB")
+
+		ctx := newTestContext()
+		ctx.moduleToResolved = map[*module.Module]*Module{baseSrc: baseMod, vendorSrc: vendorMod}
+		ctx.resolvedToModule = map[*Module]*module.Module{vendorMod: vendorSrc, baseMod: baseSrc}
+
+		// Base module wins even though vendor is SMIv2 with newer timestamp
+		testutil.True(t, shouldPreferModule(ctx, vendorMod, baseSrc), "expected base module to win over newer vendor")
+		testutil.False(t, shouldPreferModule(ctx, baseMod, vendorSrc), "expected vendor NOT to replace base module")
+	})
 }
 
 func TestFinalizeOidDefinition(t *testing.T) {

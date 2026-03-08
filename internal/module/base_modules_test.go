@@ -151,7 +151,6 @@ func TestSNMPv2SMI_OIDTree(t *testing.T) {
 		{"snmpDomains", "snmpV2", 1},
 		{"snmpProxys", "snmpV2", 2},
 		{"snmpModules", "snmpV2", 3},
-		{"snmp", "mib-2", 11},
 	}
 
 	for _, tt := range tests {
