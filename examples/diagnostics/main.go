@@ -26,11 +26,11 @@ func main() {
 
 	levels := []struct {
 		name  string
-		level mib.StrictnessLevel
+		level mib.ResolverStrictness
 	}{
-		{"Strict", mib.StrictnessStrict},
-		{"Normal", mib.StrictnessNormal},
-		{"Permissive", mib.StrictnessPermissive},
+		{"Strict", mib.ResolverStrict},
+		{"Normal", mib.ResolverNormal},
+		{"Permissive", mib.ResolverPermissive},
 	}
 
 	for _, l := range levels {
@@ -39,7 +39,7 @@ func main() {
 		if src != nil {
 			loadOpts = append(loadOpts, gomib.WithSource(src))
 		}
-		loadOpts = append(loadOpts, gomib.WithModules("IF-MIB"), gomib.WithSystemPaths(), gomib.WithStrictness(l.level))
+		loadOpts = append(loadOpts, gomib.WithModules("IF-MIB"), gomib.WithSystemPaths(), gomib.WithResolverStrictness(l.level))
 		m, err := gomib.Load(context.Background(), loadOpts...)
 		if err != nil {
 			fmt.Printf("  load error: %v\n\n", err)
@@ -85,9 +85,9 @@ func main() {
 	}
 	customOpts = append(customOpts, gomib.WithModules("IF-MIB"), gomib.WithSystemPaths(),
 		gomib.WithDiagnosticConfig(mib.DiagnosticConfig{
-			Level:  mib.StrictnessNormal,
-			FailAt: mib.SeverityFatal,
-			Ignore: []string{"identifier-*"},
+			Reporting: mib.ReportingDefault,
+			FailAt:    mib.SeverityFatal,
+			Ignore:    []string{"identifier-*"},
 		}))
 	m, err := gomib.Load(context.Background(), customOpts...)
 	if err != nil {

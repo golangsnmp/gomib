@@ -117,8 +117,8 @@ func testAcceptance(modules, mibPaths []string, level int, showAll, collectDiags
 
 		if gomibSource != nil {
 			cfg := mib.DiagnosticConfig{
-				Level:  mib.StrictnessLevel(level),
-				FailAt: mib.Severity(level),
+				Reporting: reportingFromLibsmiLevel(level),
+				FailAt:    mib.Severity(level),
 			}
 
 			ctx := context.Background()

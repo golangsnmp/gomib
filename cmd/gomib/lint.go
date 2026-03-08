@@ -191,9 +191,9 @@ func (c *cli) runLint(modules []string, cfg *lintConfig) *lintResult {
 	// Use strict mode for collection so all diagnostics are gathered.
 	// The lint command filters by --level itself (smilint-style: higher = more verbose).
 	diagCfg := mib.DiagnosticConfig{
-		Level:  mib.StrictnessStrict,
-		FailAt: mib.SeverityFatal, // We handle failure ourselves
-		Ignore: cfg.ignore,
+		Reporting: mib.ReportingVerbose,
+		FailAt:    mib.SeverityFatal, // We handle failure ourselves
+		Ignore:    cfg.ignore,
 	}
 
 	m, err := c.loadMibWithOpts(modules, gomib.WithDiagnosticConfig(diagCfg))

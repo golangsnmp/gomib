@@ -12,10 +12,10 @@ import (
 func lowerModule(t *testing.T, source string) *Module {
 	t.Helper()
 	b := []byte(source)
-	p := parser.New(b, nil, types.PermissiveConfig())
+	p := parser.New(b, nil, types.VerboseConfig())
 	mods := p.ParseModule()
 	testutil.Greater(t, len(mods), 0, "parse returned no modules")
-	mod := Lower(mods[0], b, nil, types.PermissiveConfig())
+	mod := Lower(mods[0], b, nil, types.VerboseConfig())
 	testutil.NotNil(t, mod, "lower returned nil")
 	return mod
 }

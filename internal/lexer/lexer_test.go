@@ -367,7 +367,7 @@ func TestHexStringMul2(t *testing.T) {
 		{"''H", false},         // empty, OK
 		{"'deadbeef'H", false}, // 8 chars, OK
 	}
-	cfg := types.StrictConfig()
+	cfg := types.VerboseConfig()
 	for _, tt := range tests {
 		lexer := New([]byte(tt.source), nil, cfg)
 		tokens, diagnostics := lexer.Tokenize()
@@ -394,7 +394,7 @@ func TestBinStringMul8(t *testing.T) {
 		{"'1'B", true},                 // 1 bit, not multiple of 8
 		{"''B", false},                 // empty, OK
 	}
-	cfg := types.StrictConfig()
+	cfg := types.VerboseConfig()
 	for _, tt := range tests {
 		lexer := New([]byte(tt.source), nil, cfg)
 		tokens, diagnostics := lexer.Tokenize()
@@ -765,7 +765,7 @@ func TestNumberLeadingZero(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := types.StrictConfig()
+			cfg := types.VerboseConfig()
 			lexer := New([]byte(tc.source), nil, cfg)
 			_, diags := lexer.Tokenize()
 			var found bool

@@ -15,25 +15,20 @@ Usage:
   gomib load [options] MODULE...
 
 Options:
-  --strict      Use strict RFC compliance mode
-  --permissive  Use permissive mode for vendor MIBs
-  --level N     Set diagnostic level (0-6, higher is more verbose)
-  --stats       Show detailed statistics
-  -h, --help    Show help
-
-Diagnostic Levels:
-  0 (silent)     - Maximum compatibility
-  1 (permissive) - Accept most real-world MIBs
-  3 (normal)     - Default, balanced
-  6 (strict)     - RFC compliance checking
+  --strict        Resolver strictness: strict (tier-1 only)
+  --permissive    Resolver strictness: permissive (tier-1/2/3)
+  --report LEVEL  Diagnostic reporting: silent|quiet|default|verbose
+  --stats         Show detailed statistics
+  -h, --help      Show help
 
 Examples:
   gomib load IF-MIB
   gomib load IF-MIB SNMPv2-MIB
   gomib load -v IF-MIB                 # Debug logging
   gomib load -vv IF-MIB                # Trace logging
-  gomib load --strict IF-MIB           # RFC compliance mode
-  gomib load --permissive IF-MIB       # Vendor MIB mode
+  gomib load --strict IF-MIB           # strict resolver behavior
+  gomib load --permissive IF-MIB       # permissive resolver behavior
+  gomib load --report verbose IF-MIB   # verbose diagnostics
   gomib load --stats IF-MIB            # Show detailed stats
 `
 
@@ -43,7 +38,7 @@ func (c *cli) cmdLoad(args []string) int {
 
 	strict := fs.Bool("strict", false, "use strict RFC compliance mode")
 	permissive := fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
-	level := fs.Int("level", -1, "set diagnostic level (0-6, higher is more verbose)")
+	report := fs.String("report", "default", "diagnostic reporting: silent|quiet|default|verbose")
 	stats := fs.Bool("stats", false, "show detailed statistics")
 	help := addHelpFlag(fs)
 
@@ -65,11 +60,22 @@ func (c *cli) cmdLoad(args []string) int {
 	var opts []gomib.LoadOption
 	switch {
 	case *strict:
-		opts = append(opts, gomib.WithStrictness(mib.StrictnessStrict))
+		opts = append(opts, gomib.WithResolverStrictness(mib.ResolverStrict))
 	case *permissive:
-		opts = append(opts, gomib.WithStrictness(mib.StrictnessPermissive))
-	case *level >= 0:
-		opts = append(opts, gomib.WithStrictness(mib.StrictnessLevel(*level)))
+		opts = append(opts, gomib.WithResolverStrictness(mib.ResolverPermissive))
+	}
+	switch *report {
+	case "silent":
+		opts = append(opts, gomib.WithDiagnosticConfig(mib.SilentConfig()))
+	case "quiet":
+		opts = append(opts, gomib.WithDiagnosticConfig(mib.QuietConfig()))
+	case "default":
+		opts = append(opts, gomib.WithDiagnosticConfig(mib.DefaultConfig()))
+	case "verbose":
+		opts = append(opts, gomib.WithDiagnosticConfig(mib.VerboseConfig()))
+	default:
+		printError("invalid --report value %q (use silent|quiet|default|verbose)", *report)
+		return exitError
 	}
 
 	m, loadErr := c.loadMibWithOpts(modules, opts...)

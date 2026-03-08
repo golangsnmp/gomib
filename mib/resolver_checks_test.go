@@ -333,7 +333,7 @@ func TestCheckIndexIllegalBasetype(t *testing.T) {
 
 func TestCheckIndexOIDLength(t *testing.T) {
 	t.Run("exceeds 128 sub-identifiers", func(t *testing.T) {
-		ctx := newTestContextWithConfig(StrictConfig())
+		ctx := newTestContextWithConfig(VerboseConfig())
 		mod := &module.Module{Name: "TEST-MIB"}
 		ctx.modules = append(ctx.modules, mod)
 		resolvedMod := newModule(mod.Name)
@@ -2584,7 +2584,7 @@ func TestCheckIndexAccessAndDefval(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var ctx *resolverContext
 			if tt.strict {
-				ctx = newTestContextWithConfig(StrictConfig())
+				ctx = newTestContextWithConfig(VerboseConfig())
 			} else {
 				ctx = newTestContext()
 			}

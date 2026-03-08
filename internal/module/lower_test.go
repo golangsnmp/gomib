@@ -69,7 +69,7 @@ test_object OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagIdentifierUnderscore)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagIdentifierUnderscore)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagIdentifierUnderscore)
 	// test_object is on line 16, column 1 of the source
 	testutil.Equal(t, 16, d.Line, "identifier-underscore diagnostic line")
@@ -96,7 +96,7 @@ someObject OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagMissingModuleIdentity)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagMissingModuleIdentity)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagMissingModuleIdentity)
 	testutil.True(t, d.Line != 0, "expected non-zero line for lowering diagnostic, got %d", d.Line)
 	testutil.True(t, d.Column != 0, "expected non-zero column for lowering diagnostic, got %d", d.Column)
@@ -123,7 +123,7 @@ sysDescr OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagMissingModuleIdentity)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagMissingModuleIdentity)
 	testutil.NotNil(t, d, "SNMPv2-MIB without MODULE-IDENTITY should get %s diagnostic", types.DiagMissingModuleIdentity)
 }
 
@@ -138,7 +138,7 @@ IMPORTS
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.DefaultConfig(), types.DiagMissingModuleIdentity)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagMissingModuleIdentity)
 	testutil.Nil(t, d, "base module SNMPv2-SMI should not get %s diagnostic", types.DiagMissingModuleIdentity)
 }
 
@@ -168,7 +168,7 @@ badBitsObject OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagBitsNumberNegative)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagBitsNumberNegative)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagBitsNumberNegative)
 	testutil.Equal(t, types.SeverityError, d.Severity, "severity")
 	testutil.True(t, strings.Contains(d.Message, "badBit"), "message should mention badBit: %s", d.Message)
@@ -200,7 +200,7 @@ hugeBitsObject OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagBitsNumberTooLarge)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagBitsNumberTooLarge)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagBitsNumberTooLarge)
 	testutil.Equal(t, types.SeverityError, d.Severity, "severity")
 	testutil.True(t, strings.Contains(d.Message, "hugeBit"), "message should mention hugeBit: %s", d.Message)
@@ -232,7 +232,7 @@ largeBitsObject OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagBitsNumberLarge)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagBitsNumberLarge)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagBitsNumberLarge)
 	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
 	testutil.True(t, strings.Contains(d.Message, "largeBit"), "message should mention largeBit: %s", d.Message)
@@ -265,7 +265,7 @@ okBitsObject OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagBitsNumberLarge)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagBitsNumberLarge)
 	testutil.Nil(t, d, "position 127 should not trigger %s", types.DiagBitsNumberLarge)
 }
 
@@ -287,7 +287,7 @@ testObject OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagEnumZero)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagEnumZero)
 	testutil.NotNil(t, d, "expected %s diagnostic for SMIv1 enum with zero", types.DiagEnumZero)
 	testutil.Equal(t, types.SeverityError, d.Severity, "severity")
 	testutil.True(t, strings.Contains(d.Message, "off"), "message should mention off: %s", d.Message)
@@ -320,7 +320,7 @@ testObject OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.PermissiveConfig(), types.DiagEnumZero)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagEnumZero)
 	testutil.Nil(t, d, "SMIv2 enum with zero should not trigger %s", types.DiagEnumZero)
 }
 
@@ -347,8 +347,8 @@ END
 		name   string
 		config types.DiagnosticConfig
 	}{
-		{"permissive_config", types.PermissiveConfig()},
-		{"strict_config", types.StrictConfig()},
+		{"permissive_config", types.VerboseConfig()},
+		{"strict_config", types.VerboseConfig()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d := lowerAndFindDiagnostic(t, source, tc.config, types.DiagMissingModuleIdentity)
@@ -384,7 +384,7 @@ notFirstTest MODULE-IDENTITY
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleIdentityNotFirst)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagModuleIdentityNotFirst)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagModuleIdentityNotFirst)
 	testutil.Equal(t, types.SeverityWarning, d.Severity, "severity")
 	testutil.True(t, strings.Contains(d.Message, "NOT-FIRST-MIB"), "message should mention module name: %s", d.Message)
@@ -417,7 +417,7 @@ someObject OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleIdentityNotFirst)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagModuleIdentityNotFirst)
 	testutil.Nil(t, d, "should not get %s when MODULE-IDENTITY is first", types.DiagModuleIdentityNotFirst)
 }
 
@@ -449,7 +449,7 @@ second MODULE-IDENTITY
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleIdentityMultiple)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagModuleIdentityMultiple)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagModuleIdentityMultiple)
 	testutil.Equal(t, types.SeverityError, d.Severity, "severity")
 }
@@ -481,7 +481,7 @@ someObj OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagMacroNotImported)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagMacroNotImported)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagMacroNotImported)
 	testutil.Equal(t, types.SeverityMinor, d.Severity, "severity")
 	testutil.True(t, strings.Contains(d.Message, "OBJECT-TYPE"), "message should mention OBJECT-TYPE: %s", d.Message)
@@ -514,7 +514,7 @@ someObj OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagMacroNotImported)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagMacroNotImported)
 	testutil.Nil(t, d, "should not get %s when macro is imported", types.DiagMacroNotImported)
 }
 
@@ -536,7 +536,7 @@ someObj OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagMacroNotImported)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagMacroNotImported)
 	testutil.Nil(t, d, "SMIv1 module should not get %s", types.DiagMacroNotImported)
 }
 
@@ -568,7 +568,7 @@ emptyDescObj OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyDescription)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagEmptyDescription)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyDescription)
 	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
 }
@@ -599,7 +599,7 @@ goodObj OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyDescription)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagEmptyDescription)
 	testutil.Nil(t, d, "should not get %s with non-empty DESCRIPTION", types.DiagEmptyDescription)
 }
 
@@ -622,7 +622,7 @@ miDescTest MODULE-IDENTITY
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyDescription)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagEmptyDescription)
 	testutil.NotNil(t, d, "expected %s diagnostic for MODULE-IDENTITY with empty DESCRIPTION", types.DiagEmptyDescription)
 }
 
@@ -645,7 +645,7 @@ emptyOrgTest MODULE-IDENTITY
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyOrganization)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagEmptyOrganization)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyOrganization)
 	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
 }
@@ -669,7 +669,7 @@ emptyContactTest MODULE-IDENTITY
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyContact)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagEmptyContact)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyContact)
 	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
 }
@@ -701,7 +701,7 @@ refObj OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyReference)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagEmptyReference)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyReference)
 	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
 }
@@ -733,7 +733,7 @@ unitsObj OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyUnits)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagEmptyUnits)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyUnits)
 	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
 }
@@ -765,7 +765,7 @@ EmptyHintTC ::= TEXTUAL-CONVENTION
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagEmptyFormat)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagEmptyFormat)
 	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagEmptyFormat)
 	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
 }
@@ -799,10 +799,10 @@ END
 `)
 
 	b := source
-	p := parser.New(b, nil, types.StrictConfig())
+	p := parser.New(b, nil, types.VerboseConfig())
 	mods := p.ParseModule()
 	testutil.Greater(t, len(mods), 0, "parse returned no modules")
-	mod := Lower(mods[0], b, nil, types.StrictConfig())
+	mod := Lower(mods[0], b, nil, types.VerboseConfig())
 	testutil.NotNil(t, mod, "lower returned nil")
 
 	for _, def := range mod.Definitions {
@@ -836,7 +836,7 @@ myModule MODULE-IDENTITY
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleNameSuffix)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagModuleNameSuffix)
 	testutil.NotNil(t, d, "expected %s diagnostic for module without -MIB suffix", types.DiagModuleNameSuffix)
 	testutil.Equal(t, types.SeverityStyle, d.Severity, "severity")
 	testutil.True(t, strings.Contains(d.Message, "MY-MODULE"), "message should mention module name: %s", d.Message)
@@ -861,7 +861,7 @@ myModule MODULE-IDENTITY
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleNameSuffix)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagModuleNameSuffix)
 	testutil.Nil(t, d, "should not get %s with -MIB suffix", types.DiagModuleNameSuffix)
 }
 
@@ -883,7 +883,7 @@ testObj OBJECT-TYPE
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleNameSuffix)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagModuleNameSuffix)
 	testutil.Nil(t, d, "SMIv1 module should not get %s", types.DiagModuleNameSuffix)
 }
 
@@ -897,7 +897,7 @@ IMPORTS
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagModuleNameSuffix)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagModuleNameSuffix)
 	testutil.Nil(t, d, "base module should not get %s", types.DiagModuleNameSuffix)
 }
 
@@ -910,7 +910,7 @@ MyCounter ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagTaggedTypeNotAllowed)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagTaggedTypeNotAllowed)
 	testutil.NotNil(t, d, "non-base module should get %s", types.DiagTaggedTypeNotAllowed)
 }
 
@@ -923,6 +923,6 @@ Counter32 ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
 END
 `)
 
-	d := lowerAndFindDiagnostic(t, source, types.StrictConfig(), types.DiagTaggedTypeNotAllowed)
+	d := lowerAndFindDiagnostic(t, source, types.VerboseConfig(), types.DiagTaggedTypeNotAllowed)
 	testutil.Nil(t, d, "base module should not get %s", types.DiagTaggedTypeNotAllowed)
 }

@@ -452,7 +452,7 @@ func TestMibHasErrors(t *testing.T) {
 	testutil.False(t, m.HasErrors(), "standard MIBs at default strictness should not have errors")
 
 	// PROBLEM-IMPORTS-MIB has missing imports that fail at strict level.
-	strict := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.StrictnessStrict)
+	strict := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.ResolverStrict)
 	testutil.True(t, strict.HasErrors(), "PROBLEM-IMPORTS-MIB at strict should have errors")
 }
 

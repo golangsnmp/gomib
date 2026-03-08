@@ -77,7 +77,7 @@ func TestCollectOidDefinitions(t *testing.T) {
 		&module.TypeDef{DefBase: module.DefBase{Name: "MyType"}}, // skipped
 	}
 
-	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 	defs := collectOidDefinitions(ctx)
 
 	// All OID-bearing definitions except TypeDef and the empty notification
@@ -94,7 +94,7 @@ func TestCollectOidDefinitions(t *testing.T) {
 }
 
 func TestCollectOidDefinitionsEmpty(t *testing.T) {
-	ctx := newResolverContext(nil, nil, DefaultConfig())
+	ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
 	defs := collectOidDefinitions(ctx)
 
 	testutil.Len(t, defs.oidDefs, 0, "expected no oid defs, got")
@@ -103,7 +103,7 @@ func TestCollectOidDefinitionsEmpty(t *testing.T) {
 
 func TestGetOidParentSymbol(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 
 	makeOidDef := func(components []module.OidComponent) oidDefinition {
 		oid := module.NewOidAssignment(components, types.Synthetic)
@@ -158,7 +158,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 				},
 			},
 		}
-		localCtx := newResolverContext([]*module.Module{localMod}, nil, DefaultConfig())
+		localCtx := newResolverContext([]*module.Module{localMod}, nil, ResolverNormal, DefaultConfig())
 		def := oidDefinition{
 			mod: localMod,
 			def: &module.ValueAssignment{
@@ -188,7 +188,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 				},
 			},
 		}
-		localCtx := newResolverContext([]*module.Module{localMod}, nil, DefaultConfig())
+		localCtx := newResolverContext([]*module.Module{localMod}, nil, ResolverNormal, DefaultConfig())
 		def := oidDefinition{
 			mod: localMod,
 			def: &module.ValueAssignment{
@@ -251,8 +251,8 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 			{mod: mod, def: &module.ValueAssignment{DefBase: module.DefBase{Name: "my-object"}, Oid: oid}, kind: defValueAssignment},
 		}
 
-		// Use permissive config so SeverityWarning diagnostics are reported.
-		ctx := newResolverContext(nil, nil, PermissiveConfig())
+		// Use verbose reporting so SeverityWarning diagnostics are reported.
+		ctx := newResolverContext(nil, nil, ResolverNormal, VerboseConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		d := hasDiag(t, ctx.Diagnostics(), "identifier-hyphen-smiv2")
@@ -269,7 +269,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 			{mod: mod, def: &module.ValueAssignment{DefBase: module.DefBase{Name: "myObject"}, Oid: oid}, kind: defValueAssignment},
 		}
 
-		ctx := newResolverContext(nil, nil, DefaultConfig())
+		ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		testutil.Len(t, ctx.Diagnostics(), 0, "expected no diagnostics, got")
@@ -284,7 +284,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 			{mod: mod, def: &module.ValueAssignment{DefBase: module.DefBase{Name: "my-object"}, Oid: oid}, kind: defValueAssignment},
 		}
 
-		ctx := newResolverContext(nil, nil, DefaultConfig())
+		ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		testutil.Len(t, ctx.Diagnostics(), 0, "expected no diagnostics for SMIv1, got")
@@ -299,7 +299,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 			{mod: mod, def: &module.ValueAssignment{DefBase: module.DefBase{Name: "mib-2"}, Oid: oid}, kind: defValueAssignment},
 		}
 
-		ctx := newResolverContext(nil, nil, DefaultConfig())
+		ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
 		checkSmiv2IdentifierHyphens(ctx, defs)
 
 		testutil.Len(t, ctx.Diagnostics(), 0, "expected no diagnostics for base module, got")
@@ -364,7 +364,7 @@ func TestLookupOrCreateWellKnownRoot(t *testing.T) {
 func TestLookupSmiGlobalOidRoot(t *testing.T) {
 	t.Run("returns node when registered in SNMPv2-SMI", func(t *testing.T) {
 		smiMod := &module.Module{Name: "SNMPv2-SMI"}
-		ctx := newResolverContext([]*module.Module{smiMod}, nil, PermissiveConfig())
+		ctx := newResolverContext([]*module.Module{smiMod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
 		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1)
@@ -377,7 +377,7 @@ func TestLookupSmiGlobalOidRoot(t *testing.T) {
 
 	t.Run("returns node when registered in RFC1155-SMI", func(t *testing.T) {
 		rfc1155Mod := &module.Module{Name: "RFC1155-SMI"}
-		ctx := newResolverContext([]*module.Module{rfc1155Mod}, nil, PermissiveConfig())
+		ctx := newResolverContext([]*module.Module{rfc1155Mod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleIndex["RFC1155-SMI"] = []*module.Module{rfc1155Mod}
 
 		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1)
@@ -521,7 +521,7 @@ func TestFinalizeOidDefinition(t *testing.T) {
 			srcMod := &module.Module{Name: "TEST-MIB", Language: types.LanguageSMIv2}
 			resolvedMod := newModule("TEST-MIB")
 
-			ctx := newResolverContext([]*module.Module{srcMod}, nil, DefaultConfig())
+			ctx := newResolverContext([]*module.Module{srcMod}, nil, ResolverNormal, DefaultConfig())
 			ctx.moduleToResolved[srcMod] = resolvedMod
 			ctx.resolvedToModule[resolvedMod] = srcMod
 
@@ -559,7 +559,7 @@ func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
 		loserSrc := &module.Module{Name: "LOSER-MIB", Language: types.LanguageSMIv1}
 		loserMod := newModule("LOSER-MIB")
 
-		ctx := newResolverContext([]*module.Module{preferredSrc, loserSrc}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{preferredSrc, loserSrc}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[preferredSrc] = preferredMod
 		ctx.resolvedToModule[preferredMod] = preferredSrc
 		ctx.moduleToResolved[loserSrc] = loserMod
@@ -603,7 +603,7 @@ func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
 		loserSrc := &module.Module{Name: "LOSER-MIB", Language: types.LanguageSMIv1}
 		loserMod := newModule("LOSER-MIB")
 
-		ctx := newResolverContext([]*module.Module{preferredSrc, loserSrc}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{preferredSrc, loserSrc}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[preferredSrc] = preferredMod
 		ctx.resolvedToModule[preferredMod] = preferredSrc
 		ctx.moduleToResolved[loserSrc] = loserMod
@@ -643,7 +643,7 @@ func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
 		newerSrc := &module.Module{Name: "NEW-MIB", Language: types.LanguageSMIv2}
 		newerMod := newModule("NEW-MIB")
 
-		ctx := newResolverContext([]*module.Module{olderSrc, newerSrc}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{olderSrc, newerSrc}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[olderSrc] = olderMod
 		ctx.resolvedToModule[olderMod] = olderSrc
 		ctx.moduleToResolved[newerSrc] = newerMod
@@ -739,7 +739,7 @@ func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
 	// In permissive mode, unresolved names that are SMI global OID roots
 	// should reference SNMPv2-SMI.
 	mod := &module.Module{Name: "VENDOR-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, PermissiveConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 
 	oid := module.NewOidAssignment([]module.OidComponent{
 		&module.OidComponentName{NameValue: "enterprises"},
@@ -761,7 +761,7 @@ func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
 func TestGetOidParentSymbolStrictNoSmiGlobal(t *testing.T) {
 	// In strict mode, unresolved SMI global names should not be resolved.
 	mod := &module.Module{Name: "VENDOR-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, StrictConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, ResolverStrict, VerboseConfig())
 
 	oid := module.NewOidAssignment([]module.OidComponent{
 		&module.OidComponentName{NameValue: "enterprises"},
@@ -798,7 +798,7 @@ func TestCollectOidDefinitionsKindMapping(t *testing.T) {
 		&module.AgentCapabilities{DefBase: module.DefBase{Name: "cap"}, Oid: oid},
 	}
 
-	ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+	ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 	defs := collectOidDefinitions(ctx)
 
 	expected := []struct {
@@ -859,7 +859,7 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 	v2Mod := newModule("NEW-MIB")
 	v1Mod := newModule("OLD-MIB")
 
-	ctx := newResolverContext([]*module.Module{v2Src, v1Src}, nil, DefaultConfig())
+	ctx := newResolverContext([]*module.Module{v2Src, v1Src}, nil, ResolverNormal, DefaultConfig())
 	ctx.moduleToResolved[v2Src] = v2Mod
 	ctx.moduleToResolved[v1Src] = v1Mod
 	ctx.resolvedToModule[v2Mod] = v2Src
@@ -909,7 +909,7 @@ func TestResolveTrapTypeDefinitions_GenericTraps(t *testing.T) {
 	srcMod := &module.Module{Name: "TEST-V1-MIB", Language: types.LanguageSMIv1}
 	resolvedMod := newModule("TEST-V1-MIB")
 
-	ctx := newResolverContext([]*module.Module{srcMod}, nil, DefaultConfig())
+	ctx := newResolverContext([]*module.Module{srcMod}, nil, ResolverNormal, DefaultConfig())
 	ctx.moduleToResolved[srcMod] = resolvedMod
 	ctx.resolvedToModule[resolvedMod] = srcMod
 
@@ -970,7 +970,7 @@ func TestResolveTrapTypeDefinitions_EnterpriseSpecific(t *testing.T) {
 	srcMod := &module.Module{Name: "VENDOR-MIB", Language: types.LanguageSMIv1}
 	resolvedMod := newModule("VENDOR-MIB")
 
-	ctx := newResolverContext([]*module.Module{srcMod}, nil, DefaultConfig())
+	ctx := newResolverContext([]*module.Module{srcMod}, nil, ResolverNormal, DefaultConfig())
 	ctx.moduleToResolved[srcMod] = resolvedMod
 	ctx.resolvedToModule[resolvedMod] = srcMod
 
@@ -1024,7 +1024,7 @@ func TestIsSnmpTrapsOID(t *testing.T) {
 func TestResolveNamedNumberComponent(t *testing.T) {
 	t.Run("returns existing node when name is registered", func(t *testing.T) {
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 
 		// Register a node under the name "org".
 		orgNode := buildOIDPath(ctx.mib.Root(), 1, 3)
@@ -1045,7 +1045,7 @@ func TestResolveNamedNumberComponent(t *testing.T) {
 	t.Run("creates named child when name not registered", func(t *testing.T) {
 		mod := &module.Module{Name: "TEST-MIB"}
 		resolvedMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[mod] = resolvedMod
 
 		parent := ctx.mib.Root().getOrCreateChild(1)
@@ -1068,7 +1068,7 @@ func TestResolveNamedNumberComponent(t *testing.T) {
 	t.Run("isLast does not set name on child", func(t *testing.T) {
 		mod := &module.Module{Name: "TEST-MIB"}
 		resolvedMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[mod] = resolvedMod
 
 		parent := ctx.mib.Root().getOrCreateChild(1)
@@ -1092,7 +1092,7 @@ func TestResolveQualifiedNameComponent(t *testing.T) {
 	t.Run("returns node from named module", func(t *testing.T) {
 		smiMod := &module.Module{Name: "SNMPv2-SMI"}
 		defMod := &module.Module{Name: "TEST-MIB"}
-		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
 		entNode := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1)
@@ -1114,7 +1114,7 @@ func TestResolveQualifiedNameComponent(t *testing.T) {
 
 	t.Run("records unresolved when not found", func(t *testing.T) {
 		defMod := &module.Module{Name: "TEST-MIB"}
-		ctx := newResolverContext([]*module.Module{defMod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{defMod}, nil, ResolverNormal, DefaultConfig())
 
 		oid := module.NewOidAssignment([]module.OidComponent{
 			&module.OidComponentQualifiedName{ModuleValue: "UNKNOWN-MIB", NameValue: "foo"},
@@ -1140,7 +1140,7 @@ func TestResolveQualifiedNamedNumberComponent(t *testing.T) {
 	t.Run("returns node from named module", func(t *testing.T) {
 		smiMod := &module.Module{Name: "SNMPv2-SMI"}
 		defMod := &module.Module{Name: "TEST-MIB"}
-		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
 		entNode := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1)
@@ -1169,7 +1169,7 @@ func TestResolveQualifiedNamedNumberComponent(t *testing.T) {
 	t.Run("falls back to createNamedChild when not found", func(t *testing.T) {
 		defMod := &module.Module{Name: "TEST-MIB"}
 		resolvedMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{defMod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{defMod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[defMod] = resolvedMod
 
 		parent := ctx.mib.Root().getOrCreateChild(1)
@@ -1193,7 +1193,7 @@ func TestCreateNamedChild(t *testing.T) {
 	t.Run("non-last sets name and module and kind", func(t *testing.T) {
 		mod := &module.Module{Name: "TEST-MIB"}
 		resolvedMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[mod] = resolvedMod
 
 		parent := ctx.mib.Root().getOrCreateChild(1)
@@ -1222,7 +1222,7 @@ func TestCreateNamedChild(t *testing.T) {
 	t.Run("last component does not set name or kind", func(t *testing.T) {
 		mod := &module.Module{Name: "TEST-MIB"}
 		resolvedMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[mod] = resolvedMod
 
 		parent := ctx.mib.Root().getOrCreateChild(1)
@@ -1245,7 +1245,7 @@ func TestCreateNamedChild(t *testing.T) {
 	t.Run("does not override non-Internal kind", func(t *testing.T) {
 		mod := &module.Module{Name: "TEST-MIB"}
 		resolvedMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[mod] = resolvedMod
 
 		parent := ctx.mib.Root().getOrCreateChild(1)
@@ -1270,7 +1270,7 @@ func TestCreateNamedChild(t *testing.T) {
 	t.Run("nil parent uses root", func(t *testing.T) {
 		mod := &module.Module{Name: "TEST-MIB"}
 		resolvedMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[mod] = resolvedMod
 
 		oid := module.NewOidAssignment([]module.OidComponent{
@@ -1294,7 +1294,7 @@ func TestResolveOidComponentDispatch(t *testing.T) {
 	t.Run("NamedNumber dispatches correctly", func(t *testing.T) {
 		mod := &module.Module{Name: "TEST-MIB"}
 		resolvedMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleToResolved[mod] = resolvedMod
 
 		parent := ctx.mib.Root().getOrCreateChild(1)
@@ -1316,7 +1316,7 @@ func TestResolveOidComponentDispatch(t *testing.T) {
 	t.Run("QualifiedName dispatches correctly", func(t *testing.T) {
 		smiMod := &module.Module{Name: "SNMPv2-SMI"}
 		defMod := &module.Module{Name: "TEST-MIB"}
-		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
 		entNode := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1)
@@ -1341,7 +1341,7 @@ func TestResolveOidComponentDispatch(t *testing.T) {
 		smiMod := &module.Module{Name: "SNMPv2-SMI"}
 		defMod := &module.Module{Name: "TEST-MIB"}
 		resolvedDefMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 		ctx.moduleToResolved[defMod] = resolvedDefMod
 
@@ -1368,7 +1368,7 @@ func TestResolveOidComponentDispatch(t *testing.T) {
 func TestResolveNameComponentBranches(t *testing.T) {
 	t.Run("well-known root iso", func(t *testing.T) {
 		mod := &module.Module{Name: "TEST-MIB"}
-		ctx := newResolverContext([]*module.Module{mod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
 
 		oid := module.NewOidAssignment([]module.OidComponent{
 			&module.OidComponentName{NameValue: "iso"},
@@ -1387,7 +1387,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 	t.Run("permissive SMI global fallback", func(t *testing.T) {
 		smiMod := &module.Module{Name: "SNMPv2-SMI"}
 		defMod := &module.Module{Name: "VENDOR-MIB"}
-		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, PermissiveConfig())
+		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, ResolverNormal, DefaultConfig())
 		ctx.moduleIndex["SNMPv2-SMI"] = []*module.Module{smiMod}
 
 		entNode := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1)
@@ -1409,7 +1409,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 
 	t.Run("strict mode rejects unimported SMI global", func(t *testing.T) {
 		defMod := &module.Module{Name: "VENDOR-MIB"}
-		ctx := newResolverContext([]*module.Module{defMod}, nil, StrictConfig())
+		ctx := newResolverContext([]*module.Module{defMod}, nil, ResolverStrict, VerboseConfig())
 
 		oid := module.NewOidAssignment([]module.OidComponent{
 			&module.OidComponentName{NameValue: "enterprises"},
@@ -1430,7 +1430,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 
 	t.Run("unknown name records unresolved", func(t *testing.T) {
 		defMod := &module.Module{Name: "TEST-MIB"}
-		ctx := newResolverContext([]*module.Module{defMod}, nil, DefaultConfig())
+		ctx := newResolverContext([]*module.Module{defMod}, nil, ResolverNormal, DefaultConfig())
 
 		oid := module.NewOidAssignment([]module.OidComponent{
 			&module.OidComponentName{NameValue: "totallyUnknown"},

@@ -643,8 +643,8 @@ func TestIdentifierUnderscoreDiagnostic(t *testing.T) {
 		config types.DiagnosticConfig
 		want   int
 	}{
-		{"strict", types.StrictConfig(), 2},
-		{"permissive", types.PermissiveConfig(), 0},
+		{"strict", types.VerboseConfig(), 2},
+		{"permissive", types.DefaultConfig(), 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -657,17 +657,17 @@ func TestIdentifierUnderscoreDiagnostic(t *testing.T) {
 
 func TestIdentifierLengthDiagnostic(t *testing.T) {
 	longName := "thisIsAReallyLongIdentifierNameThatExceedsSixtyFourCharactersTotal"
-	module := parseModuleWith(longName+` DEFINITIONS ::= BEGIN END`, types.StrictConfig())
+	module := parseModuleWith(longName+` DEFINITIONS ::= BEGIN END`, types.VerboseConfig())
 	testutil.Equal(t, 1, countDiagnostics(module.Diagnostics, "identifier-length-64"), "identifier-length-64 diagnostic count")
 }
 
 func TestIdentifierHyphenEndDiagnostic(t *testing.T) {
-	module := parseModuleWith(`TEST-MIB- DEFINITIONS ::= BEGIN END`, types.StrictConfig())
+	module := parseModuleWith(`TEST-MIB- DEFINITIONS ::= BEGIN END`, types.VerboseConfig())
 	testutil.Equal(t, 1, countDiagnostics(module.Diagnostics, "identifier-hyphen-end"), "identifier-hyphen-end diagnostic count")
 }
 
 func TestReservedKeywordDiagnostic(t *testing.T) {
-	module := parseModuleWith(`BOOLEAN DEFINITIONS ::= BEGIN END`, types.StrictConfig())
+	module := parseModuleWith(`BOOLEAN DEFINITIONS ::= BEGIN END`, types.VerboseConfig())
 	testutil.Equal(t, 1, countDiagnostics(module.Diagnostics, "keyword-reserved"), "keyword-reserved diagnostic count")
 }
 
@@ -677,7 +677,7 @@ func TestParseUnterminatedStringPreservesContent(t *testing.T) {
 	// (span covers from opening quote to EOF). The parser should
 	// strip only the opening quote, not the last content char.
 	source := []byte(`"hello world`)
-	p := New(source, nil, types.PermissiveConfig())
+	p := New(source, nil, types.DefaultConfig())
 
 	qs, err := p.parseQuotedString()
 	testutil.Nil(t, err, "parseQuotedString should not return error for TokQuotedString")

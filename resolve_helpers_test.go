@@ -114,7 +114,7 @@ func countDiagnostics(m *mib.Mib, code string) int {
 }
 
 // loadCorpusMIB loads a single module from the primary corpus with optional
-// Load options (e.g. WithStrictness). Used for tests that need real MIBs but
+// Load options (e.g. WithResolverStrictness). Used for tests that need real MIBs but
 // not the synthetic problem corpus.
 func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
 	t.Helper()
@@ -129,11 +129,17 @@ func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
 
 // loadAtStrictness loads a module from both the primary corpus and the
 // problems directory at a specific strictness level.
-func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
+func loadAtStrictness(t testing.TB, name string, level mib.ResolverStrictness) *mib.Mib {
 	t.Helper()
 	corpus := mustDir(t, testutil.PrimaryCorpusDir())
 	problems := mustDir(t, testutil.ProblemsCorpusDir())
-	m, err := Load(context.Background(), WithSource(corpus, problems), WithModules(name), WithStrictness(level))
+	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
+	m, err := Load(context.Background(),
+		WithSource(corpus, problems),
+		WithModules(name),
+		WithResolverStrictness(level),
+		WithDiagnosticConfig(diag),
+	)
 	if err != nil {
 		t.Fatalf("Load(%s, %s) failed: %v", name, level, err)
 	}
@@ -142,11 +148,17 @@ func loadAtStrictness(t testing.TB, name string, level mib.StrictnessLevel) *mib
 
 // loadViolationMIB loads a module from the primary corpus and the strictness
 // violations directory at a specific strictness level.
-func loadViolationMIB(t testing.TB, name string, level mib.StrictnessLevel) *mib.Mib {
+func loadViolationMIB(t testing.TB, name string, level mib.ResolverStrictness) *mib.Mib {
 	t.Helper()
 	corpus := mustDir(t, testutil.PrimaryCorpusDir())
 	violations := mustDir(t, testutil.TestdataDir("strictness", "violations"))
-	m, err := Load(context.Background(), WithSource(corpus, violations), WithModules(name), WithStrictness(level))
+	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
+	m, err := Load(context.Background(),
+		WithSource(corpus, violations),
+		WithModules(name),
+		WithResolverStrictness(level),
+		WithDiagnosticConfig(diag),
+	)
 	if err != nil {
 		t.Fatalf("Load(%s, %s) failed: %v", name, level, err)
 	}

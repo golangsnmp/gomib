@@ -9,29 +9,29 @@ import (
 )
 
 func TestResolveNilModulesNilLoggerNilConfig(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 	testutil.NotNil(t, m, "Resolve returned nil Mib")
 	// Should have base modules registered even with nil input.
 	testutil.NotEmpty(t, m.Modules(), "expected at least base modules, got 0")
 }
 
 func TestResolveEmptyModulesNilLoggerNilConfig(t *testing.T) {
-	m := Resolve([]*module.Module{}, nil, nil)
+	m := Resolve([]*module.Module{}, nil, nil, nil)
 	testutil.NotNil(t, m, "Resolve returned nil Mib")
 	// Empty user modules still gets base modules.
 	testutil.NotEmpty(t, m.Modules(), "expected at least base modules, got 0")
 }
 
 func TestResolveNilModulesWithCustomConfig(t *testing.T) {
-	cfg := StrictConfig()
-	m := Resolve(nil, nil, &cfg)
+	cfg := VerboseConfig()
+	m := Resolve(nil, nil, nil, &cfg)
 	testutil.NotNil(t, m, "Resolve returned nil Mib")
 	// With strict config, the pipeline should still complete.
 	testutil.NotEmpty(t, m.Modules(), "expected at least base modules, got 0")
 }
 
 func TestResolveBaseModulesRegistered(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 
 	expectedModules := []string{
 		"SNMPv2-SMI",
@@ -48,7 +48,7 @@ func TestResolveBaseModulesRegistered(t *testing.T) {
 }
 
 func TestResolveBaseModulePrimitiveTypes(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 
 	// The 4 ASN.1 primitives should be seeded in SNMPv2-SMI.
 	primitives := []struct {
@@ -72,7 +72,7 @@ func TestResolveBaseModulePrimitiveTypes(t *testing.T) {
 }
 
 func TestResolveBaseModuleNodes(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 
 	// Base modules define well-known OID roots.
 	expectedNodes := []string{
@@ -94,7 +94,7 @@ func TestResolveBaseModuleNodes(t *testing.T) {
 }
 
 func TestResolveBaseModuleNodeOIDValues(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 
 	tests := []struct {
 		name string
@@ -121,7 +121,7 @@ func TestResolveBaseModuleNodeOIDValues(t *testing.T) {
 }
 
 func TestResolveBaseModuleSMITypes(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 
 	// SMI types defined as TypeDefs in SNMPv2-SMI should be resolved.
 	smiTypes := []struct {
@@ -153,7 +153,7 @@ func TestResolveUnresolvedImportProducesDiagnostic(t *testing.T) {
 		module.NewImport("NONEXISTENT-MIB", "fakeObject", types.Span{}),
 	}
 
-	m := Resolve([]*module.Module{mod}, nil, nil)
+	m := Resolve([]*module.Module{mod}, nil, nil, nil)
 	testutil.NotNil(t, m, "Resolve returned nil Mib")
 
 	// The module should still be registered.
@@ -185,22 +185,22 @@ func TestResolveUnresolvedImportProducesDiagnostic(t *testing.T) {
 }
 
 func TestResolvePermissiveConfig(t *testing.T) {
-	cfg := PermissiveConfig()
-	m := Resolve(nil, nil, &cfg)
+	cfg := DefaultConfig()
+	m := Resolve(nil, nil, nil, &cfg)
 	testutil.NotNil(t, m, "Resolve returned nil Mib")
 	// Should still produce base modules.
 	testutil.NotEmpty(t, m.Modules(), "expected at least base modules")
 }
 
 func TestResolveNoUserModulesNodeCount(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 	// Base modules define OID nodes (iso, org, dod, internet, etc.).
 	// There should be a reasonable number of nodes from base modules alone.
 	testutil.Greater(t, m.NodeCount(), 0, "expected non-zero node count from base modules")
 }
 
 func TestResolveNoUserModulesTypeCount(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 	// At minimum: 4 ASN.1 primitives + SMI types + TCs
 	testutil.True(t, len(m.Types()) >= 4, "expected at least 4 types (ASN.1 primitives), got %d", len(m.Types()))
 }
@@ -208,12 +208,12 @@ func TestResolveNoUserModulesTypeCount(t *testing.T) {
 func TestResolveNoUserModulesHasNoUnresolved(t *testing.T) {
 	// With only base modules and no user modules, there should be no
 	// unresolved references.
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 	testutil.Len(t, m.Unresolved(), 0, "expected no unresolved references for base-only resolution, got")
 }
 
 func TestResolveBaseOnlyHasNoErrors(t *testing.T) {
-	m := Resolve(nil, nil, nil)
+	m := Resolve(nil, nil, nil, nil)
 	testutil.False(t, m.HasErrors(), "expected no errors for base-only resolution, diagnostics:")
 }
 
@@ -223,7 +223,7 @@ func TestResolveUserModuleDuplicatingBaseModuleIsDropped(t *testing.T) {
 	userMod := module.NewModule("SNMPv2-SMI", types.Span{})
 	userMod.Language = types.LanguageSMIv2
 
-	m := Resolve([]*module.Module{userMod}, nil, nil)
+	m := Resolve([]*module.Module{userMod}, nil, nil, nil)
 	testutil.NotNil(t, m, "Resolve returned nil Mib")
 
 	// The SNMPv2-SMI module should still have its types (from the real base).

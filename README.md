@@ -87,9 +87,9 @@ gomib.Load(ctx,
     gomib.WithSource(src),
     gomib.WithSystemPaths(),                             // discover net-snmp/libsmi paths
     gomib.WithLogger(slog.Default()),                    // enable debug/trace logging
-    gomib.WithStrictness(mib.StrictnessPermissive),    // strictness preset
+    gomib.WithResolverStrictness(mib.ResolverPermissive),    // strictness preset
     gomib.WithDiagnosticConfig(mib.DiagnosticConfig{   // fine-grained control
-        Level:  mib.StrictnessNormal,
+        Reporting: mib.ReportingDefault,
         FailAt: mib.SeverityError,
         Ignore: []string{"identifier-underscore"},
     }),
@@ -323,26 +323,25 @@ for _, ref := range m.Unresolved() {
 }
 ```
 
-### Strictness levels
+### Strictness and Reporting
 
-Four presets control how strictly MIBs are validated:
+Resolver strictness controls fallback behavior:
 
-| Level | Constant | Behavior |
-|-------|----------|----------|
-| Strict | `StrictnessStrict` | RFC-only, no fallbacks |
-| Normal | `StrictnessNormal` | Default, safe fallbacks for common issues |
-| Permissive | `StrictnessPermissive` | Tolerant of vendor MIB violations |
-| Silent | `StrictnessSilent` | Accept everything, suppress diagnostics |
+| Resolver strictness | Constant | Behavior |
+|---|---|---|
+| Strict | `ResolverStrict` | Tier 1 only (deterministic scope/import resolution) |
+| Normal | `ResolverNormal` | Tier 1 + Tier 2 (constrained assumptions) |
+| Permissive | `ResolverPermissive` | Tier 1 + Tier 2 + Tier 3 (global search fallbacks) |
 
 ```go
-m, _ := gomib.Load(ctx, gomib.WithSource(src), gomib.WithStrictness(mib.StrictnessPermissive))
+m, _ := gomib.Load(ctx, gomib.WithSource(src), gomib.WithResolverStrictness(mib.ResolverPermissive))
 ```
 
-For fine-grained control, use `WithDiagnosticConfig`:
+Diagnostic reporting is independent and configured with `WithDiagnosticConfig`:
 
 ```go
 gomib.WithDiagnosticConfig(mib.DiagnosticConfig{
-    Level:  mib.StrictnessNormal,
+    Reporting: mib.ReportingDefault,
     FailAt: mib.SeverityError,              // fail on Error or worse
     Ignore: []string{"identifier-underscore"}, // suppress specific codes
     Overrides: map[string]mib.Severity{

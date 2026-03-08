@@ -7,6 +7,7 @@ package gomib
 // SMIv1/v2 mixing, index edge cases, DEFVAL variants, module aliases, and naming.
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"testing"
@@ -19,7 +20,23 @@ import (
 // (for dependencies like SNMPv2-SMI, SNMPv2-TC) and the problems directory.
 func loadProblemMIB(t testing.TB, name string) *mib.Mib {
 	t.Helper()
-	return loadAtStrictness(t, name, mib.StrictnessPermissive)
+	corpus := mustDir(t, testutil.PrimaryCorpusDir())
+	problems := mustDir(t, testutil.ProblemsCorpusDir())
+	diag := mib.DiagnosticConfig{
+		Reporting: mib.ReportingVerbose,
+		FailAt:    mib.SeverityFatal,
+		Ignore:    []string{"identifier-underscore", "identifier-length-32", "bad-identifier-case"},
+	}
+	m, err := Load(context.Background(),
+		WithSource(corpus, problems),
+		WithModules(name),
+		WithResolverStrictness(mib.ResolverPermissive),
+		WithDiagnosticConfig(diag),
+	)
+	if err != nil {
+		t.Fatalf("Load(%s) failed: %v", name, err)
+	}
+	return m
 }
 
 // TestProblemHexStrings verifies hex and binary string DEFVAL parsing.
@@ -1188,7 +1205,7 @@ func TestProblemSubtypeEnumIllegal(t *testing.T) {
 // Ground truth: net-snmp fails on SNMPv2-SMI-v1 (unlike gomib which has alias table).
 // PROBLEMS.md: PROBLEM-IMPORTS-ALIAS-MIB / SNMPv2-SMI-v1 / SNMPv2-TC-v1
 func TestProblemImportsAliasNormal(t *testing.T) {
-	m := loadAtStrictness(t, "PROBLEM-IMPORTS-ALIAS-MIB", mib.StrictnessNormal)
+	m := loadAtStrictness(t, "PROBLEM-IMPORTS-ALIAS-MIB", mib.ResolverNormal)
 
 	str := m.Object("problemAliasString")
 	testutil.NotNil(t, str, "Object(problemAliasString)")
@@ -1205,15 +1222,14 @@ func TestProblemImportsAliasNormal(t *testing.T) {
 // strict mode.
 // PROBLEMS.md: PROBLEM-IMPORTS-ALIAS-MIB / SNMPv2-SMI-v1
 func TestProblemImportsAliasStrict(t *testing.T) {
-	m := loadAtStrictness(t, "PROBLEM-IMPORTS-ALIAS-MIB", mib.StrictnessStrict)
+	m := loadAtStrictness(t, "PROBLEM-IMPORTS-ALIAS-MIB", mib.ResolverStrict)
 
 	unresolved := unresolvedSymbols(m, "PROBLEM-IMPORTS-ALIAS-MIB", mib.UnresolvedImport)
-	if len(unresolved) == 0 {
-		t.Error("strict mode should have unresolved imports from aliased module names")
-	}
+	testutil.True(t, len(unresolved) > 0,
+		"aliases should not resolve at strict level")
 
 	str := m.Object("problemAliasString")
-	testutil.Nil(t, str, "objects should not resolve in strict mode with aliased imports")
+	testutil.Nil(t, str, "objects should not resolve via aliased imports at strict level")
 }
 
 // TestProblemNamingUppercase verifies that uppercase-starting identifiers
@@ -1325,7 +1341,7 @@ func TestHexLiteralDefval(t *testing.T) {
 
 func TestModuleIdentityPermissive(t *testing.T) {
 	t.Run("IPV6-TC", func(t *testing.T) {
-		m := loadCorpusMIB(t, "IPV6-TC", WithStrictness(mib.StrictnessPermissive))
+		m := loadCorpusMIB(t, "IPV6-TC", WithResolverStrictness(mib.ResolverPermissive))
 
 		for _, d := range m.Diagnostics() {
 			if d.Module == "IPV6-TC" && d.Severity <= mib.SeverityError {
@@ -1339,7 +1355,7 @@ func TestModuleIdentityPermissive(t *testing.T) {
 	})
 
 	t.Run("IPV6-MIB", func(t *testing.T) {
-		m := loadCorpusMIB(t, "IPV6-MIB", WithStrictness(mib.StrictnessPermissive))
+		m := loadCorpusMIB(t, "IPV6-MIB", WithResolverStrictness(mib.ResolverPermissive))
 
 		for _, d := range m.Diagnostics() {
 			if d.Module == "IPV6-MIB" && d.Severity <= mib.SeverityError {

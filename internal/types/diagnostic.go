@@ -39,11 +39,10 @@ func (d Diagnostic) String() string {
 	return b.String()
 }
 
-// DiagnosticConfig controls strictness and diagnostic filtering.
+// DiagnosticConfig controls diagnostic reporting and failure policy.
 type DiagnosticConfig struct {
-	// Level sets the base strictness level.
-	// Higher levels are stricter and report more diagnostics.
-	Level StrictnessLevel
+	// Reporting controls baseline diagnostic output verbosity.
+	Reporting ReportingLevel
 
 	// FailAt sets the severity threshold for failure.
 	// If any diagnostic has severity <= FailAt, loading fails.
@@ -59,57 +58,44 @@ type DiagnosticConfig struct {
 	Ignore []string
 }
 
-// ConfigForLevel returns the diagnostic configuration preset for the given
-// strictness level. Unknown levels fall back to DefaultConfig.
-func ConfigForLevel(level StrictnessLevel) DiagnosticConfig {
+// ConfigForReporting returns the diagnostic configuration preset for the given
+// reporting level. Unknown levels fall back to DefaultConfig.
+func ConfigForReporting(level ReportingLevel) DiagnosticConfig {
 	switch level {
-	case StrictnessStrict:
-		return StrictConfig()
-	case StrictnessNormal:
+	case ReportingVerbose:
+		return VerboseConfig()
+	case ReportingDefault:
 		return DefaultConfig()
-	case StrictnessPermissive:
-		return PermissiveConfig()
-	case StrictnessSilent:
+	case ReportingQuiet:
+		return QuietConfig()
+	case ReportingSilent:
 		return SilentConfig()
 	default:
 		return DefaultConfig()
 	}
 }
 
-// DefaultConfig returns the default diagnostic configuration (Normal strictness).
+// DefaultConfig returns the default diagnostic configuration.
 func DefaultConfig() DiagnosticConfig {
 	return DiagnosticConfig{
-		Level:  StrictnessNormal,
-		FailAt: SeveritySevere,
+		Reporting: ReportingDefault,
+		FailAt:    SeveritySevere,
 	}
 }
 
-// StrictConfig returns a strict configuration for RFC compliance checking.
-func StrictConfig() DiagnosticConfig {
+// VerboseConfig returns a verbose reporting profile.
+func VerboseConfig() DiagnosticConfig {
 	return DiagnosticConfig{
-		Level:  StrictnessStrict,
-		FailAt: SeveritySevere,
+		Reporting: ReportingVerbose,
+		FailAt:    SeveritySevere,
 	}
 }
 
-// PermissiveConfig returns a permissive configuration for legacy/vendor MIBs.
-// Suppresses common vendor MIB violations like underscores in identifiers.
-//
-// Ignored codes:
-//   - identifier-underscore: vendor MIBs routinely use underscores (RFC style violation)
-//   - identifier-length-32: emitted at SeverityWarning by the parser for identifiers
-//     exceeding the 32-char recommendation (not the 64-char hard limit). Many vendor MIBs
-//     use long descriptive names, so this is noise in permissive mode.
-//   - bad-identifier-case: vendor MIBs frequently violate case conventions
-func PermissiveConfig() DiagnosticConfig {
+// QuietConfig returns a low-noise reporting profile.
+func QuietConfig() DiagnosticConfig {
 	return DiagnosticConfig{
-		Level:  StrictnessPermissive,
-		FailAt: SeverityFatal,
-		Ignore: []string{
-			DiagIdentifierUnderscore,
-			DiagIdentifierLength32,
-			DiagBadIdentifierCase,
-		},
+		Reporting: ReportingQuiet,
+		FailAt:    SeveritySevere,
 	}
 }
 
@@ -117,8 +103,8 @@ func PermissiveConfig() DiagnosticConfig {
 // Only fatal errors that prevent parsing are reported.
 func SilentConfig() DiagnosticConfig {
 	return DiagnosticConfig{
-		Level:  StrictnessSilent,
-		FailAt: SeverityFatal,
+		Reporting: ReportingSilent,
+		FailAt:    SeverityFatal,
 	}
 }
 
@@ -126,14 +112,14 @@ func SilentConfig() DiagnosticConfig {
 // should be reported under this configuration.
 //
 // Evaluation order: Overrides are applied first, then fatal check, then
-// Ignore, then Level. Fatal diagnostics are always reported regardless of
-// Ignore list or Level (unless overridden to a non-fatal severity).
+// Ignore, then Reporting. Fatal diagnostics are always reported regardless of
+// Ignore list or Reporting (unless overridden to a non-fatal severity).
 //
-// The Level controls reporting threshold (higher = stricter = more output):
-//   - Level 6 (Strict): Report all diagnostics (sev 0-6)
-//   - Level 3 (Normal): Report Minor and above (sev 0-3)
-//   - Level 1 (Permissive): Report Warning and above (sev 0-5)
-//   - Level 0 (Silent): Report nothing
+// Reporting controls the reporting threshold:
+//   - Verbose: report all diagnostics (sev 0-6)
+//   - Default: report Minor and above (sev 0-3)
+//   - Quiet: report Error and above (sev 0-2)
+//   - Silent: report nothing (except fatal, handled above)
 //
 // Lower severity numbers are more severe (Fatal=0, Info=6).
 func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
@@ -156,16 +142,16 @@ func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
 }
 
 // maxReportedSeverity returns the maximum severity number (least severe)
-// that should be reported at the current strictness level.
+// that should be reported at the current reporting level.
 // Returns -1 for Silent (report nothing except fatal, handled above).
 func (c DiagnosticConfig) maxReportedSeverity() int {
-	switch {
-	case c.Level >= StrictnessStrict:
+	switch c.Reporting {
+	case ReportingVerbose:
 		return int(SeverityInfo) // report everything
-	case c.Level >= StrictnessNormal:
+	case ReportingDefault:
 		return int(SeverityMinor) // report sev 0-3
-	case c.Level >= StrictnessPermissive:
-		return int(SeverityWarning) // report sev 0-5
+	case ReportingQuiet:
+		return int(SeverityError) // report sev 0-2
 	default:
 		return -1 // silent: report nothing (fatal handled by caller)
 	}
@@ -175,26 +161,6 @@ func (c DiagnosticConfig) maxReportedSeverity() int {
 // cause loading to fail.
 func (c DiagnosticConfig) ShouldFail(sev Severity) bool {
 	return sev <= c.FailAt
-}
-
-// IsStrict returns true if strict RFC compliance is required.
-// In strict mode, no fallback resolution strategies are used.
-func (c DiagnosticConfig) IsStrict() bool {
-	return c.Level > StrictnessNormal
-}
-
-// AllowSafeFallbacks returns true if safe fallback strategies should be used.
-// Safe fallbacks have high confidence of matching MIB author intent.
-// Enabled at normal strictness and below.
-func (c DiagnosticConfig) AllowSafeFallbacks() bool {
-	return c.Level <= StrictnessNormal
-}
-
-// AllowBestGuessFallbacks returns true if best-guess fallback strategies should be used.
-// Best-guess fallbacks may resolve incorrectly but help with broken vendor MIBs.
-// Enabled at permissive strictness and below.
-func (c DiagnosticConfig) AllowBestGuessFallbacks() bool {
-	return c.Level <= StrictnessPermissive
 }
 
 // MatchGlob performs glob matching on diagnostic codes using path.Match

@@ -125,7 +125,7 @@ func getOidParentSymbol(ctx *resolverContext, def oidDefinition) (graph.Symbol, 
 }
 
 // lookupNamedParentSymbol resolves a named OID parent by checking well-known roots,
-// local/imported definitions, and (in permissive mode) SMI global roots.
+// local/imported definitions, and (with constrained fallbacks) SMI global roots.
 func lookupNamedParentSymbol(ctx *resolverContext, def oidDefinition, name string) (graph.Symbol, bool) {
 	if wellKnownRootArc(name) >= 0 {
 		return graph.Symbol{}, false
@@ -133,7 +133,7 @@ func lookupNamedParentSymbol(ctx *resolverContext, def oidDefinition, name strin
 	if parentMod := findOidDefiningModule(ctx, def.mod, name); parentMod != "" {
 		return graph.Symbol{Module: parentMod, Name: name}, true
 	}
-	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+	if ctx.ResolverStrictness().AllowConstrainedFallbacks() {
 		if _, ok := smiGlobalOidRoots[name]; ok {
 			if ctx.TraceEnabled() {
 				ctx.Trace("permissive: using SMI global root for graph edge",
@@ -362,8 +362,8 @@ func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) 
 	if node, ok := lookupOrCreateWellKnownRoot(ctx, name); ok {
 		return node, true
 	}
-	// Permissive only: SMI global OID roots without explicit import
-	if ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+	// Normal/Permissive: SMI global OID roots without explicit import
+	if ctx.ResolverStrictness().AllowConstrainedFallbacks() {
 		if node, ok := lookupSmiGlobalOidRoot(ctx, name); ok {
 			if ctx.TraceEnabled() {
 				ctx.Trace("permissive: resolved OID via SMI global root",
@@ -533,8 +533,8 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 		defName := def.defName()
 
 		enterpriseNode, found := ctx.LookupNodeForModule(def.mod, enterprise)
-		// Permissive only: SMI global OID roots as fallback
-		if !found && ctx.DiagnosticConfig().AllowBestGuessFallbacks() {
+		// Normal/Permissive: SMI global OID roots as fallback
+		if !found && ctx.ResolverStrictness().AllowConstrainedFallbacks() {
 			if node, ok := lookupSmiGlobalOidRoot(ctx, enterprise); ok {
 				enterpriseNode = node
 				found = true
