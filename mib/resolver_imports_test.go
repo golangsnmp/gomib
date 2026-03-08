@@ -742,4 +742,60 @@ func TestResolveImports(t *testing.T) {
 		testutil.Equal(t, sourceA, imports["alpha"], "alpha should resolve to MOD-A")
 		testutil.Equal(t, sourceB, imports["beta"], "beta should resolve to MOD-B")
 	})
+
+	t.Run("duplicate import from different modules emits diagnostic", func(t *testing.T) {
+		sourceA := &module.Module{Name: "MOD-A"}
+		sourceB := &module.Module{Name: "MOD-B"}
+		importing := &module.Module{
+			Name: "IMPORTER",
+			Imports: []module.Import{
+				{Module: "MOD-A", Symbol: "DisplayString"},
+				{Module: "MOD-B", Symbol: "DisplayString"},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{importing}, nil, ResolverNormal, DefaultConfig())
+		ctx.moduleIndex["MOD-A"] = []*module.Module{sourceA}
+		ctx.moduleIndex["MOD-B"] = []*module.Module{sourceB}
+		ctx.moduleDefNames[sourceA] = map[string]struct{}{"DisplayString": {}}
+		ctx.moduleDefNames[sourceB] = map[string]struct{}{"DisplayString": {}}
+
+		resolveImports(ctx)
+
+		// First import wins.
+		imports := ctx.moduleImports[importing]
+		testutil.Equal(t, sourceA, imports["DisplayString"], "first import should win")
+
+		// Diagnostic emitted for the duplicate.
+		diag := hasDiag(t, ctx.Diagnostics(), types.DiagImportDuplicate)
+		testutil.Contains(t, diag.Message, "MOD-A", "diagnostic should mention first module")
+		testutil.Contains(t, diag.Message, "MOD-B", "diagnostic should mention second module")
+	})
+
+	t.Run("duplicate import from same module no diagnostic", func(t *testing.T) {
+		sourceA := &module.Module{Name: "MOD-A"}
+		importing := &module.Module{
+			Name: "IMPORTER",
+			Imports: []module.Import{
+				{Module: "MOD-A", Symbol: "foo"},
+				{Module: "MOD-A", Symbol: "foo"},
+			},
+		}
+
+		ctx := newResolverContext([]*module.Module{importing}, nil, ResolverNormal, DefaultConfig())
+		ctx.moduleIndex["MOD-A"] = []*module.Module{sourceA}
+		ctx.moduleDefNames[sourceA] = map[string]struct{}{"foo": {}}
+
+		resolveImports(ctx)
+
+		imports := ctx.moduleImports[importing]
+		testutil.Equal(t, sourceA, imports["foo"], "import should resolve")
+
+		// No diagnostic for same-module duplicate.
+		for _, d := range ctx.Diagnostics() {
+			if d.Code == types.DiagImportDuplicate {
+				t.Fatalf("unexpected duplicate import diagnostic: %s", d.Message)
+			}
+		}
+	})
 }

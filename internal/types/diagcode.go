@@ -178,6 +178,7 @@ const (
 	DiagTypeWithoutFormat            = "type-without-format"
 	DiagTypeUnreferenced             = "type-unref"
 	DiagGroupUnreferenced            = "group-unref"
+	DiagImportDuplicate              = "import-duplicate"
 	DiagObsoleteImport               = "obsolete-import"
 	DiagIdentifierCaseMatch          = "identifier-case-match"
 	DiagTrapInSMIv2                  = "trap-in-smiv2"
@@ -361,6 +362,7 @@ var resolverDiagCodes = []codeEntry{
 	{DiagComplianceMemberNotLocal, SeverityWarning},
 	{DiagTimeticksRangeIllegal, SeverityError},
 	{DiagStatusInvalidCapabilities, SeverityError},
+	{DiagImportDuplicate, SeverityMinor},
 	{DiagImportUnused, SeverityStyle},
 	{DiagBasetypeNotImported, SeverityMinor},
 	{DiagDescriptionMissing, SeverityMinor},

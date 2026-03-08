@@ -8,9 +8,7 @@
 *.so
 *.dylib
 /gomib
-/gomib-cli
-/gomib-netsnmp
-/gomib-libsmi
+/gomib-*
 /bin/
 
 # Test binary, built with `go test -c`
@@ -28,6 +26,9 @@ profile.cov
 # Go workspace file
 go.work
 go.work.sum
+
+# Commands with local build artifacts
+cmd/gomib-fixturegen/
 
 # env file
 .env
