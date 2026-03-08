@@ -219,6 +219,32 @@ func TestCorpusKindInference(t *testing.T) {
 	}
 }
 
+// TestCorpusBaseModuleOwnership verifies that well-known OIDs (iso, org, dod,
+// internet, etc.) are owned by their base modules even when vendor MIBs
+// redeclare them as intermediate path components.
+func TestCorpusBaseModuleOwnership(t *testing.T) {
+	// Load vendor MIBs that redeclare well-known OIDs as path prefixes:
+	//   IEEE8023-LAG-MIB: { iso(1) member-body(2) us(840) ... }
+	//   RAPID-CITY: { iso org(3) dod(6) ... }
+	m := loadCorpusMIB(t, "IEEE8023-LAG-MIB", WithModules("RAPID-CITY"))
+
+	// These OIDs are defined by multiple base modules (SNMPv2-SMI and
+	// RFC1155-SMI both define org, dod, internet, etc.). Either base module
+	// is acceptable; the key invariant is that no vendor module owns them.
+	wellKnown := []string{"iso", "org", "dod", "internet", "mgmt", "enterprises"}
+
+	for _, name := range wellKnown {
+		t.Run(name, func(t *testing.T) {
+			node := m.Node(name)
+			testutil.NotNil(t, node, "Node(%s)", name)
+			mod := node.Module()
+			testutil.NotNil(t, mod, "Module() for %s", name)
+			testutil.True(t, mod.IsBase(),
+				"module for %s should be a base module, got %s", name, mod.Name())
+		})
+	}
+}
+
 // TestCorpusBareTypeIndexes verifies that bare type indexes (INDEX { INTEGER })
 // produce IndexEntry values with Object=nil and TypeName set.
 // Already tested via TestProblemIndexBareType but included here for

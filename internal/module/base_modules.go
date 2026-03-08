@@ -351,11 +351,6 @@ func createOidDefinitions() []Definition {
 			&OidComponentNumber{Value: 0},
 			&OidComponentNumber{Value: 0},
 		}, "A value used for null identifiers. Used as a default value when no valid OID is applicable.", rfc2578),
-		// snmp OBJECT IDENTIFIER ::= { mib-2 11 }
-		makeOidValue("snmp", []OidComponent{
-			&OidComponentName{NameValue: "mib-2"},
-			&OidComponentNumber{Value: 11},
-		}, "SNMP protocol statistics and administrative objects.", rfc2578),
 	)
 	return defs
 }

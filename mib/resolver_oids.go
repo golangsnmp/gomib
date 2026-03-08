@@ -631,7 +631,8 @@ func wellKnownRootArc(name string) int {
 }
 
 // shouldPreferModule determines if newMod should replace currentMod as the node's module.
-// Preference order: SMIv2 > SMIv1 > Unknown, with newer LAST-UPDATED as tiebreaker.
+// Preference order: base modules first, then SMIv2 > SMIv1 > Unknown, with newer
+// LAST-UPDATED as tiebreaker.
 func shouldPreferModule(ctx *resolverContext, currentMod *Module, srcMod *module.Module) bool {
 	if currentMod == nil {
 		return true
@@ -640,6 +641,14 @@ func shouldPreferModule(ctx *resolverContext, currentMod *Module, srcMod *module
 	currentSrcMod := ctx.resolvedToModule[currentMod]
 	if currentSrcMod == nil {
 		return true
+	}
+
+	// Base modules always win. They are the authoritative source for
+	// well-known OIDs (iso, org, dod, internet, etc.).
+	newIsBase := module.IsBaseModule(srcMod.Name)
+	currentIsBase := module.IsBaseModule(currentSrcMod.Name)
+	if newIsBase != currentIsBase {
+		return newIsBase
 	}
 
 	newRank := languageRank(srcMod.Language)
