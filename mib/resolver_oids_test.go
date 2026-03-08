@@ -534,6 +534,35 @@ func TestShouldPreferModule(t *testing.T) {
 		testutil.True(t, shouldPreferModule(ctx, vendorMod, baseSrc), "expected base module to win over newer vendor")
 		testutil.False(t, shouldPreferModule(ctx, baseMod, vendorSrc), "expected vendor NOT to replace base module")
 	})
+
+	t.Run("equal rank and timestamp uses lexicographic module name", func(t *testing.T) {
+		// Both modules have the same language and LAST-UPDATED.
+		// The lexicographically smaller module name should win.
+		aSrc := &module.Module{
+			Name:     "ALPHA-MIB",
+			Language: types.LanguageSMIv2,
+			Definitions: []module.Definition{
+				&module.ModuleIdentity{DefBase: module.DefBase{Name: "alphaMIB"}, LastUpdated: "200501010000Z"},
+			},
+		}
+		bSrc := &module.Module{
+			Name:     "BRAVO-MIB",
+			Language: types.LanguageSMIv2,
+			Definitions: []module.Definition{
+				&module.ModuleIdentity{DefBase: module.DefBase{Name: "bravoMIB"}, LastUpdated: "200501010000Z"},
+			},
+		}
+		aMod := newModule("ALPHA-MIB")
+		bMod := newModule("BRAVO-MIB")
+
+		ctx := newTestContext()
+		ctx.moduleToResolved = map[*module.Module]*Module{aSrc: aMod, bSrc: bMod}
+		ctx.resolvedToModule = map[*Module]*module.Module{aMod: aSrc, bMod: bSrc}
+
+		// ALPHA < BRAVO lexicographically, so ALPHA should win
+		testutil.True(t, shouldPreferModule(ctx, bMod, aSrc), "expected ALPHA-MIB to replace BRAVO-MIB")
+		testutil.False(t, shouldPreferModule(ctx, aMod, bSrc), "expected BRAVO-MIB NOT to replace ALPHA-MIB")
+	})
 }
 
 func TestFinalizeOidDefinition(t *testing.T) {
@@ -1037,6 +1066,53 @@ func TestResolveTrapTypeDefinitions_EnterpriseSpecific(t *testing.T) {
 	testutil.Equal(t, KindNotification, node.Kind(), "vendorTrap: kind")
 }
 
+func TestResolveTrapTypeDefinitions_PreferenceGating(t *testing.T) {
+	// Two modules define the same TRAP-TYPE OID with different names.
+	// The preferred module (SMIv2 > SMIv1) should own name, kind, and module.
+	v2Mod := &module.Module{Name: "V2-MIB", Language: types.LanguageSMIv2}
+	v1Mod := &module.Module{Name: "V1-MIB", Language: types.LanguageSMIv1}
+	v2Resolved := newModule("V2-MIB")
+	v1Resolved := newModule("V1-MIB")
+
+	ctx := newResolverContext([]*module.Module{v2Mod, v1Mod}, nil, ResolverNormal, DefaultConfig())
+	ctx.moduleToResolved[v2Mod] = v2Resolved
+	ctx.moduleToResolved[v1Mod] = v1Resolved
+	ctx.resolvedToModule[v2Resolved] = v2Mod
+	ctx.resolvedToModule[v1Resolved] = v1Mod
+
+	// Build enterprise node
+	enterpriseNode := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 100)
+	enterpriseNode.setName("testEnterprise")
+	ctx.registerModuleNodeSymbol(v2Mod, "testEnterprise", enterpriseNode)
+	ctx.registerModuleNodeSymbol(v1Mod, "testEnterprise", enterpriseNode)
+
+	// V2 module defines the trap first (preferred)
+	defs := []trapTypeRef{
+		{
+			mod: v2Mod,
+			notif: &module.Notification{
+				DefBase:  module.DefBase{Name: "preferredName"},
+				TrapInfo: &module.TrapInfo{Enterprise: "testEnterprise", TrapNumber: 1},
+			},
+		},
+		{
+			mod: v1Mod,
+			notif: &module.Notification{
+				DefBase:  module.DefBase{Name: "lessPreferredName"},
+				TrapInfo: &module.TrapInfo{Enterprise: "testEnterprise", TrapNumber: 1},
+			},
+		},
+	}
+
+	resolveTrapTypeDefinitions(ctx, defs)
+
+	// The trap node at enterprise.0.1 should have the V2 module's name
+	trapNode := enterpriseNode.getOrCreateChild(0).getOrCreateChild(1)
+	testutil.Equal(t, "preferredName", trapNode.Name(), "name should reflect preferred module")
+	testutil.Equal(t, KindNotification, trapNode.Kind(), "kind")
+	testutil.Equal(t, v2Resolved, trapNode.Module(), "module should reflect preferred module")
+}
+
 func TestIsSnmpTrapsOID(t *testing.T) {
 	tests := []struct {
 		name string
@@ -1324,6 +1400,43 @@ func TestCreateNamedChild(t *testing.T) {
 		testutil.Equal(t, uint32(1), child.Arc(), "arc")
 		// Should be the same node as root's child.
 		testutil.Equal(t, ctx.mib.Root().getOrCreateChild(1), child, "expected root child")
+	})
+
+	t.Run("non-last does not overwrite preferred owner", func(t *testing.T) {
+		// A base module owns a node. A vendor module traversing through it
+		// as an intermediate path component should not take ownership.
+		baseMod := &module.Module{Name: "SNMPv2-SMI", Language: types.LanguageSMIv2}
+		vendorMod := &module.Module{Name: "VENDOR-MIB", Language: types.LanguageSMIv2}
+		baseResolved := newModule("SNMPv2-SMI")
+		vendorResolved := newModule("VENDOR-MIB")
+
+		ctx := newResolverContext([]*module.Module{baseMod, vendorMod}, nil, ResolverNormal, DefaultConfig())
+		ctx.moduleToResolved[baseMod] = baseResolved
+		ctx.moduleToResolved[vendorMod] = vendorResolved
+		ctx.resolvedToModule[baseResolved] = baseMod
+		ctx.resolvedToModule[vendorResolved] = vendorMod
+
+		parent := ctx.mib.Root().getOrCreateChild(1)
+		// Base module owns "org" at arc 3
+		existing := parent.getOrCreateChild(3)
+		existing.setName("org")
+		existing.setModule(baseResolved)
+		existing.setKind(KindNode)
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  vendorMod,
+			def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "vendorRoot"}, Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		child, ok := createNamedChild(ctx, def, parent, "org", 3, false)
+		testutil.True(t, ok, "expected ok")
+		// Base module should retain ownership
+		testutil.Equal(t, "org", child.Name(), "name should not be overwritten")
+		testutil.Equal(t, baseResolved, child.Module(), "base module should retain ownership")
 	})
 }
 
