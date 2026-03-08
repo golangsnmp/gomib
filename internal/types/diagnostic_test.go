@@ -170,14 +170,14 @@ func TestShouldReport(t *testing.T) {
 
 // TestResolverStrictnessOrdering verifies resolver strictness enum ordering.
 func TestResolverStrictnessOrdering(t *testing.T) {
-	if !(ResolverStrict < ResolverNormal && ResolverNormal < ResolverPermissive) {
+	if ResolverStrict >= ResolverNormal || ResolverNormal >= ResolverPermissive {
 		t.Fatalf("unexpected resolver ordering: strict=%d normal=%d permissive=%d",
 			ResolverStrict, ResolverNormal, ResolverPermissive)
 	}
 }
 
 func TestReportingLevelOrdering(t *testing.T) {
-	if !(ReportingSilent < ReportingQuiet && ReportingQuiet < ReportingDefault && ReportingDefault < ReportingVerbose) {
+	if ReportingSilent >= ReportingQuiet || ReportingQuiet >= ReportingDefault || ReportingDefault >= ReportingVerbose {
 		t.Fatalf("unexpected reporting ordering: silent=%d quiet=%d default=%d verbose=%d",
 			ReportingSilent, ReportingQuiet, ReportingDefault, ReportingVerbose)
 	}
