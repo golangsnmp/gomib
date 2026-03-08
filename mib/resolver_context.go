@@ -341,11 +341,24 @@ func (c *resolverContext) markImportUsed(mod *module.Module, name string) {
 }
 
 // registerImport maps a symbol in importingModule to its source module.
+// If the symbol is already registered, the existing registration is kept
+// (first-writer-wins) to avoid nondeterminism from map iteration order
+// when a MIB imports the same symbol from multiple modules.
 func (c *resolverContext) registerImport(importingModule *module.Module, symbol string, sourceModule *module.Module) {
 	imports := c.moduleImports[importingModule]
 	if imports == nil {
 		imports = make(map[string]*module.Module)
 		c.moduleImports[importingModule] = imports
+	}
+	if _, exists := imports[symbol]; exists {
+		if c.TraceEnabled() {
+			c.Trace("import already registered, keeping first",
+				slog.String("module", importingModule.Name),
+				slog.String("symbol", symbol),
+				slog.String("existing", imports[symbol].Name),
+				slog.String("ignored", sourceModule.Name))
+		}
+		return
 	}
 	imports[symbol] = sourceModule
 }

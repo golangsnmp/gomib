@@ -19,9 +19,37 @@ type importSymbol struct {
 // resolveImports is the import resolution phase entry point.
 func resolveImports(ctx *resolverContext) {
 	for _, mod := range ctx.modules {
-		importsBySource := make(map[string][]importSymbol)
+		// Group imports by source module, preserving the order in which
+		// source modules first appear. Symbols that appear in multiple
+		// groups (e.g., DisplayString imported from both RFC1213-MIB and
+		// SNMPv2-TC) are kept only in the first group, so that iteration
+		// order is deterministic and matches the MIB's import ordering.
+		type importGroup struct {
+			module  string
+			symbols []importSymbol
+		}
+		var groups []importGroup
+		groupIndex := make(map[string]int)
+		seenSymbols := make(map[string]string) // symbol -> first source module
+
 		for _, imp := range mod.Imports {
-			importsBySource[imp.Module] = append(importsBySource[imp.Module], importSymbol{
+			if firstMod, dup := seenSymbols[imp.Symbol]; dup {
+				if imp.Module != firstMod {
+					ctx.EmitDiagnostic(types.DiagImportDuplicate, mod, imp.Span,
+						fmt.Sprintf("duplicate import: %q already imported from %q, ignoring import from %q",
+							imp.Symbol, firstMod, imp.Module))
+				}
+				continue
+			}
+			seenSymbols[imp.Symbol] = imp.Module
+
+			idx, exists := groupIndex[imp.Module]
+			if !exists {
+				idx = len(groups)
+				groupIndex[imp.Module] = idx
+				groups = append(groups, importGroup{module: imp.Module})
+			}
+			groups[idx].symbols = append(groups[idx].symbols, importSymbol{
 				name: imp.Symbol,
 				span: imp.Span,
 			})
@@ -30,11 +58,11 @@ func resolveImports(ctx *resolverContext) {
 		if ctx.TraceEnabled() {
 			ctx.Trace("resolving imports for module",
 				slog.String("module", mod.Name),
-				slog.Int("sources", len(importsBySource)))
+				slog.Int("sources", len(groups)))
 		}
 
-		for fromModuleName, symbols := range importsBySource {
-			resolveImportsFromModule(ctx, mod, fromModuleName, symbols)
+		for _, g := range groups {
+			resolveImportsFromModule(ctx, mod, g.module, g.symbols)
 		}
 	}
 }

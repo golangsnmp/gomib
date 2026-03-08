@@ -1510,6 +1510,53 @@ func TestProblemCasefoldLowercaseTable(t *testing.T) {
 	}
 }
 
+// TestProblemDuplicateImportDeterminism verifies that a MIB importing the same
+// symbol from two different modules produces deterministic results across
+// loads. The first import in the MIB file should win.
+func TestProblemDuplicateImportDeterminism(t *testing.T) {
+	const iterations = 10
+
+	type result struct {
+		isTC       bool
+		moduleName string
+	}
+
+	var results []result
+
+	for range iterations {
+		m := loadProblemMIB(t, "PROBLEM-DUPLICATE-IMPORT-MIB")
+
+		obj := m.Object("problemDupObject")
+		if obj == nil {
+			t.Fatal("problemDupObject not found")
+		}
+		typ := obj.Type()
+		if typ == nil {
+			t.Fatalf("object %s has no type", obj.Name())
+		}
+
+		r := result{isTC: typ.IsTextualConvention()}
+		if typ.Module() != nil {
+			r.moduleName = typ.Module().Name()
+		}
+		results = append(results, r)
+	}
+
+	// All iterations should produce the same result.
+	first := results[0]
+	for i, r := range results[1:] {
+		if r.isTC != first.isTC || r.moduleName != first.moduleName {
+			t.Fatalf("nondeterminism at iteration %d: got module=%s isTC=%v, want module=%s isTC=%v",
+				i+1, r.moduleName, r.isTC, first.moduleName, first.isTC)
+		}
+	}
+
+	// The MIB lists DisplayString FROM RFC1213-MIB first,
+	// so RFC1213-MIB's version should be used.
+	testutil.Equal(t, "RFC1213-MIB", first.moduleName, "expected first-listed import to win")
+	testutil.Equal(t, false, first.isTC, "RFC1213-MIB:DisplayString should not be a TC")
+}
+
 // TestProblemGroupMembership verifies that group-membership diagnostics are
 // emitted for accessible objects and notifications not in any conformance group.
 func TestProblemGroupMembership(t *testing.T) {
