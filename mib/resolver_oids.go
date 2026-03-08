@@ -409,12 +409,18 @@ func createNamedChild(ctx *resolverContext, def oidDefinition, currentNode *Node
 	}
 	ctx.registerModuleNodeSymbol(def.mod, name, child)
 	if !isLast {
-		child.setName(name)
-		child.setModule(ctx.moduleToResolved[def.mod])
-		ctx.mib.registerNode(name, child)
-		if child.Kind() == KindInternal {
-			child.setKind(KindNode)
+		// Intermediate (non-leaf) path components are not definitions,
+		// they are traversal steps. Only take ownership if preferred
+		// over the current owner, so vendor modules traversing
+		// { iso(1) org(3) ... } don't overwrite base module ownership.
+		if shouldPreferModule(ctx, child.Module(), def.mod) {
+			child.setName(name)
+			child.setModule(ctx.moduleToResolved[def.mod])
+			if child.Kind() == KindInternal {
+				child.setKind(KindNode)
+			}
 		}
+		ctx.mib.registerNode(name, child)
 	}
 	return child, true
 }
@@ -556,11 +562,12 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 			trapNode = zeroNode.getOrCreateChild(trapNumber)
 		}
 
-		trapNode.setName(defName)
-		trapNode.setKind(KindNotification)
-		newMod := ctx.moduleToResolved[def.mod]
+		// Gate name, kind, and module behind the same preference check
+		// so they stay in sync (same pattern as finalizeOidDefinition).
 		if shouldPreferModule(ctx, trapNode.Module(), def.mod) {
-			trapNode.setModule(newMod)
+			trapNode.setName(defName)
+			trapNode.setKind(KindNotification)
+			trapNode.setModule(ctx.moduleToResolved[def.mod])
 		}
 		ctx.registerModuleNodeSymbol(def.mod, defName, trapNode)
 		ctx.mib.registerNode(defName, trapNode)
@@ -676,7 +683,13 @@ func shouldPreferModule(ctx *resolverContext, currentMod *Module, srcMod *module
 	// Same language - use LAST-UPDATED as tiebreaker (newer wins)
 	newUpdated := extractLastUpdated(srcMod)
 	currentUpdated := extractLastUpdated(currentSrcMod)
-	return newUpdated > currentUpdated
+	if newUpdated != currentUpdated {
+		return newUpdated > currentUpdated
+	}
+
+	// Deterministic fallback: lexicographic module name for stable results
+	// across runs and implementations when rank and timestamp are equal.
+	return srcMod.Name < currentSrcMod.Name
 }
 
 // languageRank returns a numeric rank for language preference.
