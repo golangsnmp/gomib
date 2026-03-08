@@ -27,6 +27,7 @@ const (
 	DiagKeywordReserved      = "keyword-reserved"
 	DiagInvalidHexRange      = "invalid-hex-range"
 	DiagNumberLeadingZero    = "number-leading-zero"
+	DiagMissingComma         = "missing-comma"
 )
 
 // Lowering diagnostic codes.
@@ -228,6 +229,7 @@ var parserDiagCodes = []codeEntry{
 	{DiagKeywordReserved, SeveritySevere},
 	{DiagInvalidHexRange, SeverityError},
 	{DiagNumberLeadingZero, SeverityMinor},
+	{DiagMissingComma, SeverityMinor},
 }
 
 var loweringDiagCodes = []codeEntry{
