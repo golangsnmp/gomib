@@ -3,7 +3,7 @@ PROBLEM-SEMANTIC-GLOBAL-MIB DEFINITIONS ::= BEGIN
 IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, Integer32, enterprises
         FROM SNMPv2-SMI
-    MODULE-COMPLIANCE, OBJECT-GROUP
+    MODULE-COMPLIANCE, OBJECT-GROUP, AGENT-CAPABILITIES
         FROM SNMPv2-CONF
     problemSemanticGlobalSourceRoot
         FROM PROBLEM-SEMANTIC-GLOBAL-SOURCE-MIB;
@@ -44,5 +44,16 @@ problemGlobalCompliance MODULE-COMPLIANCE
     MODULE
         MANDATORY-GROUPS { foreignCurrentGroup }
     ::= { problemSemanticGlobalObjects 4 }
+
+problemGlobalCapability AGENT-CAPABILITIES
+    PRODUCT-RELEASE "strictness test"
+    STATUS          current
+    DESCRIPTION     "Capability relying on permissive global variation lookup"
+    SUPPORTS        PROBLEM-SEMANTIC-GLOBAL-MIB
+        INCLUDES    { problemGlobalObjectGroup }
+        VARIATION   foreignGroupObject
+            ACCESS  read-only
+            DESCRIPTION "Broken variation target that only permissive global lookup recovers"
+    ::= { problemSemanticGlobalObjects 5 }
 
 END

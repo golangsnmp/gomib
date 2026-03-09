@@ -166,6 +166,73 @@ func TestSemanticGlobalLookupStrictnessBoundaries(t *testing.T) {
 	}
 }
 
+func TestCapabilityVariationGlobalLookupStrictnessBoundaries(t *testing.T) {
+	levels := []struct {
+		name                     string
+		level                    mib.ResolverStrictness
+		wantObjectVariations     int
+		wantNotifVariations      int
+		wantNotifAccessDiagCount int
+	}{
+		{
+			name:                     "strict",
+			level:                    mib.ResolverStrict,
+			wantObjectVariations:     0,
+			wantNotifVariations:      1,
+			wantNotifAccessDiagCount: 1,
+		},
+		{
+			name:                     "normal",
+			level:                    mib.ResolverNormal,
+			wantObjectVariations:     0,
+			wantNotifVariations:      1,
+			wantNotifAccessDiagCount: 1,
+		},
+		{
+			name:                     "permissive",
+			level:                    mib.ResolverPermissive,
+			wantObjectVariations:     1,
+			wantNotifVariations:      0,
+			wantNotifAccessDiagCount: 0,
+		},
+	}
+
+	for _, lvl := range levels {
+		t.Run(lvl.name, func(t *testing.T) {
+			m := loadAtStrictness(t, "PROBLEM-SEMANTIC-GLOBAL-MIB", lvl.level)
+
+			cap := m.Capability("problemGlobalCapability")
+			testutil.NotNil(t, cap, "capability should resolve")
+			if cap == nil {
+				return
+			}
+
+			supports := cap.Supports()
+			testutil.Len(t, supports, 1, "capability SUPPORTS clauses")
+			if len(supports) != 1 {
+				return
+			}
+
+			testutil.Equal(t, lvl.wantObjectVariations, len(supports[0].ObjectVariations),
+				"object variation count at %s", lvl.name)
+			testutil.Equal(t, lvl.wantNotifVariations, len(supports[0].NotificationVariations),
+				"notification variation count at %s", lvl.name)
+			testutil.Equal(t, lvl.wantNotifAccessDiagCount,
+				countDiagnostics(m, types.DiagVariationAccessNotifOnly),
+				"notification ACCESS diagnostic count at %s", lvl.name)
+
+			if lvl.wantObjectVariations == 1 {
+				testutil.Equal(t, "foreignGroupObject", supports[0].ObjectVariations[0].Object,
+					"permissive mode should classify the variation as an object")
+			}
+			if lvl.wantNotifVariations == 1 {
+				testutil.Equal(t, "foreignGroupObject", supports[0].NotificationVariations[0].Notification,
+					"strict/normal should fall back to notification heuristic")
+			}
+		})
+	}
+}
+
 func TestStrictModeIndexResolution(t *testing.T) {
 	entries := []string{
 		"rlPortGvrpTimersEntry",
