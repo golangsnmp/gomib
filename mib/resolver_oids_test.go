@@ -801,8 +801,8 @@ func TestSmiGlobalOidRoots(t *testing.T) {
 	testutil.False(t, ok, "iso should not be in smiGlobalOidRoots (it is a well-known root)")
 }
 
-func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
-	// In permissive mode, unresolved names that are SMI global OID roots
+func TestGetOidParentSymbolConstrainedSmiGlobal(t *testing.T) {
+	// In Normal+, unresolved names that are SMI global OID roots
 	// should reference SNMPv2-SMI.
 	mod := &module.Module{Name: "VENDOR-MIB"}
 	ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
@@ -819,7 +819,7 @@ func TestGetOidParentSymbolPermissiveSmiGlobal(t *testing.T) {
 	}
 
 	sym, ok := getOidParentSymbol(ctx, def)
-	testutil.True(t, ok, "expected true in permissive mode for SMI global root")
+	testutil.True(t, ok, "expected true in Normal+ for SMI global root")
 	testutil.Equal(t, "SNMPv2-SMI", sym.Module, "module")
 	testutil.Equal(t, "enterprises", sym.Name, "name")
 }
@@ -1534,7 +1534,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 		testutil.Equal(t, uint32(1), got.Arc(), "iso should be arc 1")
 	})
 
-	t.Run("permissive SMI global fallback", func(t *testing.T) {
+	t.Run("constrained SMI global fallback", func(t *testing.T) {
 		smiMod := &module.Module{Name: "SNMPv2-SMI"}
 		defMod := &module.Module{Name: "VENDOR-MIB"}
 		ctx := newResolverContext([]*module.Module{smiMod, defMod}, nil, ResolverNormal, DefaultConfig())
@@ -1553,7 +1553,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 		}
 
 		got, ok := resolveNameComponent(ctx, def, "enterprises")
-		testutil.True(t, ok, "expected ok in permissive mode")
+		testutil.True(t, ok, "expected ok in Normal+")
 		testutil.Equal(t, entNode, got, "expected enterprises node")
 	})
 

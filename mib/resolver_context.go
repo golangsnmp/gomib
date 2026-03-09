@@ -189,7 +189,7 @@ func (c *resolverContext) lookupTypeInModule(mod *module.Module, name string) (*
 // findWellKnownModuleForType returns the well-known base module expected to
 // define the given type name. ASN.1 primitives are always checked; other
 // well-known modules (SMI globals, SMIv1 types, SNMPv2-TC) require constrained
-// fallbacks (Normal/Permissive). Returns nil if no well-known module matches.
+// fallbacks (Normal+). Returns nil if no well-known module matches.
 func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module {
 	cls := wellKnownTypes[name]
 
@@ -202,7 +202,7 @@ func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module
 		return nil
 	}
 
-	// Normal/Permissive: well-known modules for SMI globals, SMIv1 types, SNMPv2-TC
+	// Normal+: well-known modules for SMI globals, SMIv1 types, SNMPv2-TC
 	switch cls {
 	case typeClassSmiGlobal:
 		return c.snmpv2SMIModule
@@ -216,7 +216,7 @@ func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module
 }
 
 // tryWellKnownTypeFallbacks searches ASN.1 primitives (always) and well-known
-// base modules (Normal/Permissive) for a type by name.
+// base modules (Normal+) for a type by name.
 func (c *resolverContext) tryWellKnownTypeFallbacks(name string) (*Type, bool) {
 	if m := c.findWellKnownModuleForType(name); m != nil {
 		return c.lookupTypeInModule(m, name)

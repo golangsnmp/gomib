@@ -59,7 +59,7 @@ func registerModules(ctx *resolverContext) {
 		// Cache pointers to base modules used by the type resolution
 		// fallback chain (LookupTypeForModule, LookupType). Many vendor
 		// MIBs use types from these modules without importing them, so
-		// constrained and permissive fallback paths need direct access.
+		// Normal+ fallback paths need direct access.
 		switch mod.Name {
 		case moduleSNMPv2SMI:
 			ctx.snmpv2SMIModule = mod
