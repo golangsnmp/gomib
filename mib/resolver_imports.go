@@ -92,7 +92,7 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 		return
 	}
 
-	// Module import aliases are constrained fallbacks (Normal/Permissive).
+	// Module import aliases are constrained fallbacks (Normal+).
 	if ctx.ResolverStrictness().AllowConstrainedFallbacks() {
 		if aliased := baseModuleImportAlias(fromModuleName); aliased != "" {
 			aliasCandidates := ctx.moduleIndex[aliased]

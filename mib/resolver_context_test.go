@@ -364,8 +364,8 @@ func TestLookupTypeForModule_ASN1Fallback(t *testing.T) {
 	testutil.Equal(t, intType, got, "expected ASN.1 primitive fallback")
 }
 
-func TestLookupTypeForModule_PermissiveFallbacks(t *testing.T) {
-	// In permissive mode, SMI global types, SMIv1 types, and TC types resolve.
+func TestLookupTypeForModule_ConstrainedFallbacks(t *testing.T) {
+	// In Normal+, SMI global types, SMIv1 types, and TC types resolve.
 	ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
 	modA := &module.Module{Name: "A"}
 
@@ -394,8 +394,8 @@ func TestLookupTypeForModule_PermissiveFallbacks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		got, ok := ctx.LookupTypeForModule(modA, tt.name)
-		testutil.True(t, ok, "LookupTypeForModule(%q) permissive: expected ok", tt.name)
-		testutil.Equal(t, tt.want, got, "LookupTypeForModule(%q) permissive", tt.name)
+		testutil.True(t, ok, "LookupTypeForModule(%q) constrained fallback: expected ok", tt.name)
+		testutil.Equal(t, tt.want, got, "LookupTypeForModule(%q) constrained fallback", tt.name)
 	}
 }
 
@@ -423,8 +423,8 @@ func TestLookupTypeForModule_StrictNoFallback(t *testing.T) {
 	testutil.Equal(t, intType, got, "expected ASN.1 primitive to resolve even in strict mode")
 }
 
-func TestLookupType_Permissive(t *testing.T) {
-	// LookupType with no module context, permissive mode.
+func TestLookupType_ConstrainedWellKnownTypes(t *testing.T) {
+	// LookupType with no module context still resolves well-known types in Normal.
 	ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}

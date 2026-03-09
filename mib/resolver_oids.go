@@ -362,7 +362,7 @@ func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) 
 	if node, ok := lookupOrCreateWellKnownRoot(ctx, name); ok {
 		return node, true
 	}
-	// Normal/Permissive: SMI global OID roots without explicit import
+	// Normal+: SMI global OID roots without explicit import
 	if ctx.ResolverStrictness().AllowConstrainedFallbacks() {
 		if node, ok := lookupSmiGlobalOidRoot(ctx, name); ok {
 			if ctx.TraceEnabled() {
@@ -539,7 +539,7 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 		defName := def.defName()
 
 		enterpriseNode, found := ctx.LookupNodeForModule(def.mod, enterprise)
-		// Normal/Permissive: SMI global OID roots as fallback
+		// Normal+: SMI global OID roots as fallback
 		if !found && ctx.ResolverStrictness().AllowConstrainedFallbacks() {
 			if node, ok := lookupSmiGlobalOidRoot(ctx, enterprise); ok {
 				enterpriseNode = node
