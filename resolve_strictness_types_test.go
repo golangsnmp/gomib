@@ -101,6 +101,53 @@ func TestTCFallbackStrictness(t *testing.T) {
 	}
 }
 
+func TestRealCorpusTypeFallbackStrictness(t *testing.T) {
+	levels := []struct {
+		strictnessCase
+		wantResolved bool
+	}{
+		{strictnessCase: strictnessCase{name: "strict", level: mib.ResolverStrict}},
+		{strictnessCase: strictnessCase{name: "normal", level: mib.ResolverNormal}, wantResolved: true},
+		{strictnessCase: strictnessCase{name: "permissive", level: mib.ResolverPermissive}, wantResolved: true},
+	}
+
+	tests := []struct {
+		object   string
+		symbol   string
+		wantBase mib.BaseType
+	}{
+		{object: "hwpingCtlTargetPort", symbol: "Integer32", wantBase: mib.BaseInteger32},
+		{object: "hwpingResultsRttNumDisconnects", symbol: "Gauge32", wantBase: mib.BaseGauge32},
+	}
+
+	for _, lvl := range levels {
+		t.Run(lvl.name, func(t *testing.T) {
+			m := loadAtStrictness(t, "HUAWEI-DISMAN-PING-MIB", lvl.level)
+			unresolved := unresolvedSymbols(m, "HUAWEI-DISMAN-PING-MIB", mib.UnresolvedType)
+
+			for _, tt := range tests {
+				t.Run(tt.object, func(t *testing.T) {
+					obj := requireObject(t, m, tt.object)
+					if !lvl.wantResolved {
+						testutil.Nil(t, obj.Type(), "type should remain unresolved at %s", lvl.name)
+						testutil.True(t, unresolved[tt.symbol],
+							"type %s should be unresolved at %s", tt.symbol, lvl.name)
+						return
+					}
+
+					testutil.NotNil(t, obj.Type(), "type should resolve at %s", lvl.name)
+					if obj.Type() != nil {
+						testutil.Equal(t, tt.wantBase, obj.Type().EffectiveBase(),
+							"base type for %s at %s", tt.object, lvl.name)
+					}
+					testutil.False(t, unresolved[tt.symbol],
+						"type %s should not be unresolved at %s", tt.symbol, lvl.name)
+				})
+			}
+		})
+	}
+}
+
 func TestModuleAliasStrictness(t *testing.T) {
 	levels := []struct {
 		strictnessCase
