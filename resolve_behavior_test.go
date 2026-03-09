@@ -39,8 +39,7 @@ func TestTypeChainBaseTypeInheritance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obj := m.Object(tt.name)
-			testutil.NotNil(t, obj, "Object(%s)", tt.name)
+			obj := requireObject(t, m, tt.name)
 			typ := obj.Type()
 			testutil.NotNil(t, typ, "Type() for %s", tt.name)
 			testutil.Equal(t, tt.wantBase, typ.EffectiveBase(),
@@ -54,8 +53,7 @@ func TestTypeChainDisplayHintInheritance(t *testing.T) {
 
 	t.Run("direct hint", func(t *testing.T) {
 		// MyString has DISPLAY-HINT "255a"
-		obj := m.Object("problemTwoLevelChain")
-		testutil.NotNil(t, obj, "Object(problemTwoLevelChain)")
+		obj := requireObject(t, m, "problemTwoLevelChain")
 		hint := obj.EffectiveDisplayHint()
 		testutil.Equal(t, "255a", hint,
 			"two-level chain should inherit display hint from MyString")
@@ -63,16 +61,14 @@ func TestTypeChainDisplayHintInheritance(t *testing.T) {
 
 	t.Run("inherited through chain", func(t *testing.T) {
 		// MySpecialGauge -> MyFormattedGauge (has "d-2") -> Gauge32
-		obj := m.Object("problemInheritedHint")
-		testutil.NotNil(t, obj, "Object(problemInheritedHint)")
+		obj := requireObject(t, m, "problemInheritedHint")
 		hint := obj.EffectiveDisplayHint()
 		testutil.Equal(t, "d-2", hint,
 			"should inherit display hint from MyFormattedGauge")
 	})
 
 	t.Run("no hint on primitive", func(t *testing.T) {
-		obj := m.Object("problemDirectInteger")
-		testutil.NotNil(t, obj, "Object(problemDirectInteger)")
+		obj := requireObject(t, m, "problemDirectInteger")
 		testutil.Equal(t, "", obj.EffectiveDisplayHint(),
 			"direct Integer32 should have no display hint")
 	})
@@ -83,8 +79,7 @@ func TestTypeChainSizeInheritance(t *testing.T) {
 
 	t.Run("direct size", func(t *testing.T) {
 		// MyString has SIZE (0..64), object uses MyString
-		obj := m.Object("problemTwoLevelChain")
-		testutil.NotNil(t, obj, "Object(problemTwoLevelChain)")
+		obj := requireObject(t, m, "problemTwoLevelChain")
 		sizes := obj.EffectiveSizes()
 		testutil.NotEmpty(t, sizes, "EffectiveSizes()")
 		testutil.Equal(t, 1, len(sizes), "should have 1 size range")
@@ -94,8 +89,7 @@ func TestTypeChainSizeInheritance(t *testing.T) {
 
 	t.Run("inherited through chain", func(t *testing.T) {
 		// MySizedLabel -> MySizedString (SIZE 1..100) -> DisplayString
-		obj := m.Object("problemInheritedSize")
-		testutil.NotNil(t, obj, "Object(problemInheritedSize)")
+		obj := requireObject(t, m, "problemInheritedSize")
 		sizes := obj.EffectiveSizes()
 		testutil.NotEmpty(t, sizes, "EffectiveSizes()")
 		testutil.Equal(t, 1, len(sizes), "should have 1 size range")
@@ -109,8 +103,7 @@ func TestTypeChainEnumInheritance(t *testing.T) {
 
 	t.Run("TC enum chain", func(t *testing.T) {
 		// MyFilteredStatus -> MyStatus -> INTEGER { active(1), inactive(2), unknown(3) }
-		obj := m.Object("problemEnumChain")
-		testutil.NotNil(t, obj, "Object(problemEnumChain)")
+		obj := requireObject(t, m, "problemEnumChain")
 		enums := obj.EffectiveEnums()
 		testutil.NotEmpty(t, enums, "EffectiveEnums()")
 		enumMap := normalizeEnums(enums)
@@ -120,8 +113,7 @@ func TestTypeChainEnumInheritance(t *testing.T) {
 	})
 
 	t.Run("inline enum", func(t *testing.T) {
-		obj := m.Object("problemInlineEnum")
-		testutil.NotNil(t, obj, "Object(problemInlineEnum)")
+		obj := requireObject(t, m, "problemInlineEnum")
 		enums := obj.EffectiveEnums()
 		testutil.NotEmpty(t, enums, "EffectiveEnums()")
 		enumMap := normalizeEnums(enums)
@@ -135,8 +127,7 @@ func TestTypeChainApplicationTypePreservation(t *testing.T) {
 
 	t.Run("Counter32 via TC", func(t *testing.T) {
 		// MyCounter -> Counter32
-		obj := m.Object("problemAppTypeChain")
-		testutil.NotNil(t, obj, "Object(problemAppTypeChain)")
+		obj := requireObject(t, m, "problemAppTypeChain")
 		typ := obj.Type()
 		testutil.NotNil(t, typ, "Type()")
 		// Counter32 is an application type - base should be Counter32, not Integer32
@@ -146,8 +137,7 @@ func TestTypeChainApplicationTypePreservation(t *testing.T) {
 
 	t.Run("Gauge32 via TC chain", func(t *testing.T) {
 		// MySpecialGauge -> MyFormattedGauge -> Gauge32
-		obj := m.Object("problemInheritedHint")
-		testutil.NotNil(t, obj, "Object(problemInheritedHint)")
+		obj := requireObject(t, m, "problemInheritedHint")
 		typ := obj.Type()
 		testutil.NotNil(t, typ, "Type()")
 		testutil.Equal(t, mib.BaseGauge32, typ.EffectiveBase(),
@@ -159,16 +149,14 @@ func TestTypeChainTCFlagPropagation(t *testing.T) {
 	m := loadTypeChainsMIB(t)
 
 	t.Run("TC type has flag", func(t *testing.T) {
-		obj := m.Object("problemTwoLevelChain")
-		testutil.NotNil(t, obj, "Object(problemTwoLevelChain)")
+		obj := requireObject(t, m, "problemTwoLevelChain")
 		testutil.NotNil(t, obj.Type(), "Type()")
 		testutil.True(t, obj.Type().IsTextualConvention(),
 			"MyString should be a TC")
 	})
 
 	t.Run("inline enum does not have TC flag", func(t *testing.T) {
-		obj := m.Object("problemInlineEnum")
-		testutil.NotNil(t, obj, "Object(problemInlineEnum)")
+		obj := requireObject(t, m, "problemInlineEnum")
 		testutil.NotNil(t, obj.Type(), "Type()")
 		// Inline INTEGER { ... } resolves to the primitive INTEGER type,
 		// which is not a TC
@@ -200,8 +188,7 @@ func TestKindInferenceTableStructure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obj := m.Object(tt.name)
-			testutil.NotNil(t, obj, "Object(%s)", tt.name)
+			obj := requireObject(t, m, tt.name)
 			kind := normalizeKind(obj.Kind())
 			testutil.Equal(t, tt.wantKind, kind,
 				"kind for %s", tt.name)

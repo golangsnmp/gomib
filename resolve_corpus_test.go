@@ -32,8 +32,7 @@ func TestCorpusBitsResolution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obj := m.Object(tt.name)
-			testutil.NotNil(t, obj, "Object(%s)", tt.name)
+			obj := requireObject(t, m, tt.name)
 
 			typ := obj.Type()
 			testutil.NotNil(t, typ, "Type() for %s", tt.name)
@@ -72,8 +71,7 @@ func TestCorpusImpliedIndexes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.entry, func(t *testing.T) {
-			obj := m.Object(tt.entry)
-			testutil.NotNil(t, obj, "Object(%s)", tt.entry)
+			obj := requireObject(t, m, tt.entry)
 
 			indexes := normalizeIndexes(obj.Index())
 			testutil.Len(t, indexes, len(tt.indexes), "index count for %s", tt.entry)
@@ -116,8 +114,7 @@ func TestCorpusImpliedMixedIndexes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.entry, func(t *testing.T) {
-			obj := m.Object(tt.entry)
-			testutil.NotNil(t, obj, "Object(%s)", tt.entry)
+			obj := requireObject(t, m, tt.entry)
 
 			indexes := normalizeIndexes(obj.Index())
 			testutil.Len(t, indexes, len(tt.indexes), "index count for %s", tt.entry)
@@ -152,8 +149,7 @@ func TestCorpusTrapType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			notif := m.Notification(tt.name)
-			testutil.NotNil(t, notif, "Notification(%s)", tt.name)
+			notif := requireNotification(t, m, tt.name)
 
 			// Verify OID is assigned (TRAP-TYPE uses enterprise.0.trapNumber).
 			oid := notif.OID()
@@ -211,8 +207,7 @@ func TestCorpusKindInference(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obj := m.Object(tt.name)
-			testutil.NotNil(t, obj, "Object(%s)", tt.name)
+			obj := requireObject(t, m, tt.name)
 			testutil.Equal(t, tt.kind.String(), obj.Kind().String(),
 				"kind for %s", tt.name)
 		})
