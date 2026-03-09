@@ -216,7 +216,7 @@ func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module
 }
 
 // tryWellKnownTypeFallbacks searches ASN.1 primitives (always) and well-known
-// base modules (permissive only) for a type by name.
+// base modules (Normal/Permissive) for a type by name.
 func (c *resolverContext) tryWellKnownTypeFallbacks(name string) (*Type, bool) {
 	if m := c.findWellKnownModuleForType(name); m != nil {
 		return c.lookupTypeInModule(m, name)
@@ -225,7 +225,8 @@ func (c *resolverContext) tryWellKnownTypeFallbacks(name string) (*Type, bool) {
 }
 
 // LookupType searches for a type by name, trying well-known modules first.
-// Beyond well-known sets, global search is only enabled in permissive mode.
+// Beyond those deterministic/constrained sets, global search is only enabled
+// in permissive mode.
 func (c *resolverContext) LookupType(name string) (*Type, bool) {
 	if t, ok := c.tryWellKnownTypeFallbacks(name); ok {
 		return t, true
@@ -247,7 +248,7 @@ func (c *resolverContext) LookupType(name string) (*Type, bool) {
 }
 
 // LookupTypeForModule resolves a type by name, traversing imports from mod.
-// Falls back to well-known base modules when permissive mode is enabled.
+// Falls back to well-known base modules when constrained fallbacks are enabled.
 func (c *resolverContext) LookupTypeForModule(mod *module.Module, name string) (*Type, bool) {
 	if t, ok := c.lookupTypeInModuleScope(mod, name); ok {
 		return t, true

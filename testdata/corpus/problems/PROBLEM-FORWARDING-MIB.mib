@@ -6,10 +6,15 @@
 PROBLEM-FORWARDING-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
-    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, Integer32, enterprises
         FROM SNMPv2-SMI
+    MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+        FROM SNMPv2-CONF
     ForwardedType, forwardedSourceRoot,
-    forwardedBaseEntry, forwardedBaseIndex
+    forwardedBaseEntry, forwardedBaseIndex,
+    forwardedBaseStatus, forwardedSourceObject,
+    forwardedSourceNotification, forwardedSourceObjectGroup,
+    forwardedSourceNotificationGroup
         FROM PROBLEM-FORWARDING-RELAY-MIB;
 
 problemForwardingMIB MODULE-IDENTITY
@@ -91,5 +96,30 @@ problemForwardedIndexValue OBJECT-TYPE
     STATUS      current
     DESCRIPTION "Indexed value column"
     ::= { problemForwardedIndexEntry 1 }
+
+problemForwardedNotification NOTIFICATION-TYPE
+    OBJECTS     { forwardedSourceObject, forwardedBaseStatus }
+    STATUS      current
+    DESCRIPTION "Notification using objects reached through import forwarding"
+    ::= { problemForwardingObjects 4 }
+
+problemForwardedObjectGroup OBJECT-GROUP
+    OBJECTS      { forwardedSourceObject, forwardedBaseStatus }
+    STATUS       current
+    DESCRIPTION  "Object group using members reached through import forwarding"
+    ::= { problemForwardingObjects 5 }
+
+problemForwardedNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { forwardedSourceNotification }
+    STATUS        current
+    DESCRIPTION   "Notification group using members reached through import forwarding"
+    ::= { problemForwardingObjects 6 }
+
+problemForwardedCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION "Compliance using a group reached through import forwarding"
+    MODULE
+        MANDATORY-GROUPS { forwardedSourceObjectGroup }
+    ::= { problemForwardingObjects 7 }
 
 END
