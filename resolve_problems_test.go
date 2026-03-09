@@ -80,11 +80,7 @@ func TestProblemHexStrings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obj := m.Object(tt.name)
-			testutil.NotNil(t, obj, "object %s should be found", tt.name)
-			if obj == nil {
-				return
-			}
+			obj := requireObject(t, m, tt.name)
 
 			dv := obj.DefaultValue()
 			testutil.True(t, !dv.IsZero(), "object %s should have a DEFVAL", tt.name)
@@ -135,10 +131,7 @@ func TestProblemHexStringBytes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obj := m.Object(tt.name)
-			if obj == nil {
-				t.Fatalf("object %s not found", tt.name)
-			}
+			obj := requireObject(t, m, tt.name)
 
 			dv := obj.DefaultValue()
 			if dv.IsZero() {
@@ -190,11 +183,7 @@ func TestProblemKeywordDefvals(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obj := m.Object(tt.name)
-			testutil.NotNil(t, obj, "object %s should be found", tt.name)
-			if obj == nil {
-				return
-			}
+			obj := requireObject(t, m, tt.name)
 
 			dv := obj.DefaultValue()
 			testutil.True(t, !dv.IsZero(), "object %s should have a DEFVAL", tt.name)
@@ -215,11 +204,7 @@ func TestProblemNotifications(t *testing.T) {
 
 	t.Run("normal notification", func(t *testing.T) {
 		// net-snmp: OBJECTS { problemNotifStatus, problemNotifDescription }
-		notif := m.Notification("problemNotifNormal")
-		testutil.NotNil(t, notif, "problemNotifNormal should be found")
-		if notif == nil {
-			return
-		}
+		notif := requireNotification(t, m, "problemNotifNormal")
 
 		varbinds := normalizeVarbinds(notif.Objects())
 		testutil.Len(t, varbinds, 2, "normal notification should have 2 varbinds")
@@ -232,11 +217,7 @@ func TestProblemNotifications(t *testing.T) {
 		// net-snmp: OBJECTS { problemNotifIndex, problemNotifStatus }
 		// Both net-snmp and gomib should include the not-accessible index object.
 		// smilint [3]: "object problemNotifIndex of notification must not be not-accessible"
-		notif := m.Notification("problemNotifWithIndex")
-		testutil.NotNil(t, notif, "problemNotifWithIndex should be found")
-		if notif == nil {
-			return
-		}
+		notif := requireNotification(t, m, "problemNotifWithIndex")
 
 		varbinds := normalizeVarbinds(notif.Objects())
 		wantVarbinds := []string{"problemNotifIndex", "problemNotifStatus"}
@@ -248,11 +229,7 @@ func TestProblemNotifications(t *testing.T) {
 	t.Run("undefined varbind", func(t *testing.T) {
 		// net-snmp: OBJECTS { problemNotifStatus, problemUndefinedVarbind }
 		// net-snmp preserves unresolved names; gomib excludes them.
-		notif := m.Notification("problemNotifWithUndefined")
-		testutil.NotNil(t, notif, "problemNotifWithUndefined should be found")
-		if notif == nil {
-			return
-		}
+		notif := requireNotification(t, m, "problemNotifWithUndefined")
 
 		varbinds := normalizeVarbinds(notif.Objects())
 		// gomib excludes unresolved references, so we expect only problemNotifStatus

@@ -64,8 +64,7 @@ func TestModuleGroupLookup(t *testing.T) {
 func TestGroupByName(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.Group("snmpGroup")
-	testutil.NotNil(t, g, "Group(snmpGroup) should not be nil")
+	g := requireGroup(t, m, "snmpGroup")
 	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 }
 
@@ -84,8 +83,7 @@ func TestGroupQualifiedLookup(t *testing.T) {
 func TestGroupByOID(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.Group("snmpGroup")
-	testutil.NotNil(t, g, "Group(snmpGroup)")
+	g := requireGroup(t, m, "snmpGroup")
 
 	// OID-based lookup via NodeByOID().Group()
 	nd := m.NodeByOID(g.OID())
@@ -104,10 +102,7 @@ func TestGroupNotFound(t *testing.T) {
 func TestGroupMetadata(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.Group("snmpGroup")
-	if g == nil {
-		t.Fatal("snmpGroup not found")
-	}
+	g := requireGroup(t, m, "snmpGroup")
 
 	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
 
@@ -135,10 +130,7 @@ func TestGroupMetadata(t *testing.T) {
 func TestObjectGroupMembers(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.Group("snmpGroup")
-	if g == nil {
-		t.Fatal("snmpGroup not found")
-	}
+	g := requireGroup(t, m, "snmpGroup")
 
 	members := g.Members()
 	// snmpGroup OBJECTS { snmpInPkts, snmpInBadVersions, snmpInASNParseErrs,
@@ -158,10 +150,7 @@ func TestObjectGroupMembers(t *testing.T) {
 func TestNotificationGroupMembers(t *testing.T) {
 	m := loadTestMIB(t)
 
-	g := m.Group("snmpBasicNotificationsGroup")
-	if g == nil {
-		t.Fatal("snmpBasicNotificationsGroup not found")
-	}
+	g := requireGroup(t, m, "snmpBasicNotificationsGroup")
 
 	testutil.True(t, g.IsNotificationGroup(),
 		"snmpBasicNotificationsGroup should be a NOTIFICATION-GROUP")

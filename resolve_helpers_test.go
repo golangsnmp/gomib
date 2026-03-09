@@ -39,6 +39,17 @@ func fixturePath(module string) string {
 	return testutil.TestdataDir("fixtures", "netsnmp", module+".json")
 }
 
+type strictnessCase struct {
+	name  string
+	level mib.ResolverStrictness
+}
+
+var allStrictnessCases = []strictnessCase{
+	{name: "strict", level: mib.ResolverStrict},
+	{name: "normal", level: mib.ResolverNormal},
+	{name: "permissive", level: mib.ResolverPermissive},
+}
+
 func loadFixtureNodes(t testing.TB, module string) map[string]*testutil.FixtureNode {
 	t.Helper()
 	return testutil.LoadFixture(t, fixturePath(module))
@@ -92,6 +103,42 @@ func requireFixtureObject(t *testing.T, m *mib.Mib, fn *testutil.FixtureNode) *m
 	return obj
 }
 
+func requireObject(t testing.TB, m *mib.Mib, name string) *mib.Object {
+	t.Helper()
+	obj := m.Object(name)
+	if obj == nil {
+		t.Fatalf("Object(%s) = nil", name)
+	}
+	return obj
+}
+
+func requireNode(t testing.TB, m *mib.Mib, name string) *mib.Node {
+	t.Helper()
+	node := m.Node(name)
+	if node == nil {
+		t.Fatalf("Node(%s) = nil", name)
+	}
+	return node
+}
+
+func requireNotification(t testing.TB, m *mib.Mib, name string) *mib.Notification {
+	t.Helper()
+	notif := m.Notification(name)
+	if notif == nil {
+		t.Fatalf("Notification(%s) = nil", name)
+	}
+	return notif
+}
+
+func requireGroup(t testing.TB, m *mib.Mib, name string) *mib.Group {
+	t.Helper()
+	group := m.Group(name)
+	if group == nil {
+		t.Fatalf("Group(%s) = nil", name)
+	}
+	return group
+}
+
 // mustDir calls Dir and fails the test on error.
 func mustDir(t testing.TB, path string) Source {
 	t.Helper()
@@ -111,6 +158,28 @@ func countDiagnostics(m *mib.Mib, code string) int {
 		}
 	}
 	return n
+}
+
+func countModuleDiagnostics(m *mib.Mib, module, code string) int {
+	var n int
+	for _, d := range m.Diagnostics() {
+		if d.Module == module && d.Code == code {
+			n++
+		}
+	}
+	return n
+}
+
+// unresolvedSymbols returns unresolved symbols of a given kind for one module,
+// keyed by symbol name for compact presence checks in tests.
+func unresolvedSymbols(m *mib.Mib, module string, kind mib.UnresolvedKind) map[string]bool {
+	result := make(map[string]bool)
+	for _, u := range m.Unresolved() {
+		if u.Module == module && u.Kind == kind {
+			result[u.Symbol] = true
+		}
+	}
+	return result
 }
 
 // loadCorpusMIB loads a single module from the primary corpus with optional

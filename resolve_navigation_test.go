@@ -20,10 +20,7 @@ func TestNodeParent(t *testing.T) {
 	m := loadTestMIB(t)
 
 	// ifIndex = 1.3.6.1.2.1.2.2.1.1
-	node := m.Node("ifIndex")
-	if node == nil {
-		t.Fatal("ifIndex not found")
-	}
+	node := requireNode(t, m, "ifIndex")
 
 	parent := node.Parent()
 	testutil.NotNil(t, parent, "ifIndex should have a parent")
@@ -90,20 +87,14 @@ func TestNodeArc(t *testing.T) {
 	m := loadTestMIB(t)
 
 	// ifIndex OID = 1.3.6.1.2.1.2.2.1.1 (last arc is 1)
-	node := m.Node("ifIndex")
-	if node == nil {
-		t.Fatal("ifIndex not found")
-	}
+	node := requireNode(t, m, "ifIndex")
 	testutil.Equal(t, uint32(1), node.Arc(), "ifIndex arc should be 1")
 }
 
 func TestNodeObjectAndNotification(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.Node("ifIndex")
-	if node == nil {
-		t.Fatal("ifIndex not found")
-	}
+	node := requireNode(t, m, "ifIndex")
 	obj := node.Object()
 	testutil.NotNil(t, obj, "ifIndex node should have an associated Object")
 	testutil.Equal(t, "ifIndex", obj.Name(), "associated object name")
@@ -121,10 +112,7 @@ func TestObjectTableNavigation(t *testing.T) {
 	m := loadTestMIB(t)
 
 	t.Run("column to table", func(t *testing.T) {
-		col := m.Object("ifIndex")
-		if col == nil {
-			t.Fatal("ifIndex not found")
-		}
+		col := requireObject(t, m, "ifIndex")
 		testutil.True(t, col.IsColumn(), "ifIndex should be a column")
 		testutil.False(t, col.IsTable(), "ifIndex should not be a table")
 		testutil.False(t, col.IsRow(), "ifIndex should not be a row")
@@ -137,11 +125,7 @@ func TestObjectTableNavigation(t *testing.T) {
 	})
 
 	t.Run("column to row", func(t *testing.T) {
-		col := m.Object("ifIndex")
-		if col == nil {
-			t.Fatal("ifIndex not found")
-		}
-
+		col := requireObject(t, m, "ifIndex")
 		row := col.Row()
 		testutil.NotNil(t, row, "Row() for ifIndex")
 		testutil.Equal(t, "ifEntry", row.Name(), "ifIndex's row should be ifEntry")
@@ -149,8 +133,7 @@ func TestObjectTableNavigation(t *testing.T) {
 	})
 
 	t.Run("table to entry", func(t *testing.T) {
-		tbl := m.Object("ifTable")
-		testutil.NotNil(t, tbl, "Object(ifTable)")
+		tbl := requireObject(t, m, "ifTable")
 		testutil.True(t, tbl.IsTable(), "ifTable should be a table")
 
 		entry := tbl.Entry()
@@ -159,8 +142,7 @@ func TestObjectTableNavigation(t *testing.T) {
 	})
 
 	t.Run("row columns", func(t *testing.T) {
-		row := m.Object("ifEntry")
-		testutil.NotNil(t, row, "Object(ifEntry)")
+		row := requireObject(t, m, "ifEntry")
 
 		cols := row.Columns()
 		testutil.Greater(t, len(cols), 5, "ifEntry should have many columns")
@@ -176,8 +158,7 @@ func TestObjectTableNavigation(t *testing.T) {
 	})
 
 	t.Run("scalar predicates", func(t *testing.T) {
-		scalar := m.Object("sysDescr")
-		testutil.NotNil(t, scalar, "Object(sysDescr)")
+		scalar := requireObject(t, m, "sysDescr")
 		testutil.True(t, scalar.IsScalar(), "sysDescr should be a scalar")
 		testutil.False(t, scalar.IsTable(), "sysDescr should not be a table")
 		testutil.False(t, scalar.IsRow(), "sysDescr should not be a row")
@@ -188,8 +169,7 @@ func TestObjectTableNavigation(t *testing.T) {
 func TestObjectEffectiveIndexes(t *testing.T) {
 	m := loadTestMIB(t)
 
-	entry := m.Object("ifEntry")
-	testutil.NotNil(t, entry, "Object(ifEntry)")
+	entry := requireObject(t, m, "ifEntry")
 
 	indexes := entry.EffectiveIndexes()
 	testutil.NotEmpty(t, indexes, "EffectiveIndexes() for ifEntry")
@@ -201,8 +181,7 @@ func TestObjectEffectiveIndexes(t *testing.T) {
 func TestObjectEnumLookup(t *testing.T) {
 	m := loadTestMIB(t)
 
-	obj := m.Object("ifType")
-	testutil.NotNil(t, obj, "Object(ifType)")
+	obj := requireObject(t, m, "ifType")
 
 	enums := obj.EffectiveEnums()
 	testutil.NotEmpty(t, enums, "EffectiveEnums() for ifType")
@@ -219,8 +198,7 @@ func TestObjectBitLookup(t *testing.T) {
 	// Use PROBLEM-DEFVAL-MIB which has BITS objects (problemDefvalEmptyBits, problemDefvalMultiBits)
 	pm := loadProblemMIB(t, "PROBLEM-DEFVAL-MIB")
 
-	obj := pm.Object("problemDefvalMultiBits")
-	testutil.NotNil(t, obj, "Object(problemDefvalMultiBits)")
+	obj := requireObject(t, pm, "problemDefvalMultiBits")
 
 	bits := obj.EffectiveBits()
 	testutil.NotEmpty(t, bits, "EffectiveBits() for problemDefvalMultiBits")
