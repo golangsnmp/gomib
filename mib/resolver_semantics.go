@@ -780,9 +780,10 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 
 // isNotificationVariation determines whether a VARIATION clause references a
 // NOTIFICATION-TYPE. It looks up the referenced name in the SUPPORTS module,
-// the defining module's imports, and (permissively) globally. If the name
-// cannot be resolved, it falls back to a syntactic heuristic: variations with
-// SYNTAX, WRITE-SYNTAX, CREATION-REQUIRES, or DEFVAL are object variations.
+// the defining module's imports, and, in permissive mode only, via global
+// search. If the name cannot be resolved, it falls back to a syntactic
+// heuristic: variations with SYNTAX, WRITE-SYNTAX, CREATION-REQUIRES, or
+// DEFVAL are object variations.
 func isNotificationVariation(ctx *resolverContext, mod *module.Module, supportsModule string, v *module.Variation) bool {
 	// Try the SUPPORTS module first (most correct per RFC 2580).
 	if node, ok := ctx.LookupNodeInModule(supportsModule, v.Name); ok {
@@ -792,7 +793,7 @@ func isNotificationVariation(ctx *resolverContext, mod *module.Module, supportsM
 	if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
 		return node.Kind() == KindNotification
 	}
-	// Permissive: try global lookup.
+	// Permissive only: try global lookup.
 	if ctx.ResolverStrictness().AllowGlobalFallbacks() {
 		if node, ok := ctx.LookupNodeGlobal(v.Name); ok {
 			return node.Kind() == KindNotification
