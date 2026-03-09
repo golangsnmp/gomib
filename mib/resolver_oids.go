@@ -136,7 +136,7 @@ func lookupNamedParentSymbol(ctx *resolverContext, def oidDefinition, name strin
 	if ctx.ResolverStrictness().AllowConstrainedFallbacks() {
 		if _, ok := smiGlobalOidRoots[name]; ok {
 			if ctx.TraceEnabled() {
-				ctx.Trace("permissive: using SMI global root for graph edge",
+				ctx.Trace("constrained fallback: using SMI global root for graph edge",
 					slog.String("name", name),
 					slog.String("module", def.mod.Name))
 			}
@@ -366,7 +366,7 @@ func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) 
 	if ctx.ResolverStrictness().AllowConstrainedFallbacks() {
 		if node, ok := lookupSmiGlobalOidRoot(ctx, name); ok {
 			if ctx.TraceEnabled() {
-				ctx.Trace("permissive: resolved OID via SMI global root",
+				ctx.Trace("constrained fallback: resolved OID via SMI global root",
 					slog.String("name", name),
 					slog.String("module", def.mod.Name))
 			}

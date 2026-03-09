@@ -195,3 +195,51 @@ func TestStrictModeIndexResolution(t *testing.T) {
 		})
 	}
 }
+
+func TestRealCorpusStrictSemanticResolution(t *testing.T) {
+	t.Run("HUAWEI imported augments stays deterministic", func(t *testing.T) {
+		m := loadAtStrictness(t, "HUAWEI-DISMAN-PING-MIB", mib.ResolverStrict)
+
+		obj := requireObject(t, m, "hwPingCtlEntry")
+		augments := obj.Augments()
+		testutil.NotNil(t, augments, "AUGMENTS target should resolve in strict mode")
+		if augments != nil {
+			testutil.Equal(t, "pingCtlEntry", augments.Name(), "AUGMENTS target name")
+			testutil.Equal(t, "DISMAN-PING-MIB", augments.Module().Name(),
+				"AUGMENTS target should stay attributed to imported module")
+		}
+	})
+
+	t.Run("TIMETRA compliance members stay local in strict mode", func(t *testing.T) {
+		m := loadAtStrictness(t, "TIMETRA-MPLS-MIB", mib.ResolverStrict)
+
+		comp := m.Compliance("tmnxMplsV22v0Compliance")
+		testutil.NotNil(t, comp, "Compliance(tmnxMplsV22v0Compliance)")
+		if comp == nil {
+			return
+		}
+
+		modules := comp.Modules()
+		testutil.Len(t, modules, 1, "compliance modules")
+		if len(modules) != 1 {
+			return
+		}
+
+		testutil.Equal(t, 4, len(modules[0].MandatoryGroups),
+			"mandatory group count")
+		testutil.Equal(t, 0, countModuleDiagnostics(m, "TIMETRA-MPLS-MIB", types.DiagGroupMemberUnresolved),
+			"group members should resolve in strict mode")
+		testutil.Equal(t, 0, countModuleDiagnostics(m, "TIMETRA-MPLS-MIB", types.DiagComplianceGroupStatus),
+			"resolved local groups should not need permissive recovery")
+
+		group := requireGroup(t, m, "tmnxMplsLspRateCountersGroup")
+		members := group.Members()
+		testutil.Len(t, members, 4, "group should retain all strict-mode members")
+		if len(members) == 4 {
+			testutil.Equal(t, "vRtrMplsLspStatsAggregateOnly", members[0].Name(),
+				"first strict-mode group member")
+			testutil.Equal(t, "vRtrMplsLspStatsRateMbps", members[3].Name(),
+				"last strict-mode group member")
+		}
+	})
+}

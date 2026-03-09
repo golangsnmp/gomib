@@ -111,7 +111,7 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 		}
 	}
 
-	// Import forwarding: symbols re-exported through intermediate modules
+	// Deterministic: symbols re-exported through explicit intermediate imports.
 	if len(candidates) > 0 {
 		if forwarded := tryImportForwarding(ctx, candidates, userSymbols); len(forwarded) > 0 {
 			if ctx.TraceEnabled() {
@@ -126,8 +126,8 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 		}
 	}
 
-	// Partial resolution: resolve symbols that are found and record
-	// unresolved for the rest. Handles MIBs that import from the wrong module.
+	// Deterministic per symbol: resolve symbols that are reachable from the
+	// declared source module and leave the rest unresolved.
 	if len(candidates) > 0 {
 		resolved, unresolved := tryPartialResolution(ctx, candidates, userSymbols)
 		for _, res := range resolved {

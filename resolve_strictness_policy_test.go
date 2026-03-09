@@ -74,3 +74,34 @@ func TestImportForwardingOidResolution(t *testing.T) {
 	testutil.Equal(t, "1.3.6.1.4.1.99998.20.1.10", obj.OID().String(),
 		"OID should resolve through forwarded parent")
 }
+
+func TestRapidCityWellKnownRootsStayDeterministic(t *testing.T) {
+	for _, lvl := range allStrictnessCases {
+		t.Run(lvl.name, func(t *testing.T) {
+			m := loadAtStrictness(t, "RAPID-CITY", lvl.level)
+
+			rapidCity := requireNode(t, m, "rapidCity")
+			testutil.Equal(t, "1.3.6.1.4.1.2272", rapidCity.OID().String(),
+				"rapidCity OID at %s", lvl.name)
+
+			unresolved := unresolvedSymbols(m, "RAPID-CITY", mib.UnresolvedOID)
+			testutil.False(t, unresolved["enterprises"],
+				"enterprises should not be unresolved at %s", lvl.name)
+			testutil.False(t, unresolved["internet"],
+				"internet should not be unresolved at %s", lvl.name)
+
+			for _, name := range []string{"internet", "snmpV2", "snmpModules"} {
+				t.Run(name, func(t *testing.T) {
+					node := requireNode(t, m, name)
+					mod := node.Module()
+					testutil.NotNil(t, mod, "Module() for %s", name)
+					if mod != nil {
+						testutil.True(t, mod.IsBase(),
+							"module for %s should stay in a base module at %s, got %s",
+							name, lvl.name, mod.Name())
+					}
+				})
+			}
+		})
+	}
+}
