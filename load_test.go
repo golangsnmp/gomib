@@ -127,87 +127,59 @@ func TestLoadNoSources(t *testing.T) {
 	testutil.Error(t, err, "loading with no sources should fail")
 }
 
-func TestNodeByName(t *testing.T) {
+func TestLookups(t *testing.T) {
 	m := loadTestMIB(t)
 
-	node := m.Node("ifIndex")
-	testutil.NotNil(t, node, "should find ifIndex by name")
-}
+	t.Run("Node", func(t *testing.T) {
+		testutil.NotNil(t, m.Node("ifIndex"), "should find ifIndex by name")
+		testutil.Nil(t, m.Node("totallyNonExistentSymbol"), "nonexistent symbol should return nil")
+	})
 
-func TestNodeNotFound(t *testing.T) {
-	m := loadTestMIB(t)
+	t.Run("Object", func(t *testing.T) {
+		obj := m.Object("sysDescr")
+		testutil.NotNil(t, obj, "should find sysDescr by name")
+		testutil.Equal(t, "sysDescr", obj.Name(), "object name")
+	})
 
-	node := m.Node("totallyNonExistentSymbol")
-	testutil.Nil(t, node, "nonexistent symbol should return nil")
-}
+	t.Run("Type", func(t *testing.T) {
+		typ := m.Type("DisplayString")
+		testutil.NotNil(t, typ, "Type(DisplayString)")
+		testutil.Equal(t, "DisplayString", typ.Name(), "type name")
+		testutil.True(t, typ.IsTextualConvention(), "DisplayString should be a TC")
+	})
 
-func TestObjectByName(t *testing.T) {
-	m := loadTestMIB(t)
+	t.Run("Notification", func(t *testing.T) {
+		notif := m.Notification("linkDown")
+		testutil.NotNil(t, notif, "Notification(linkDown)")
+		testutil.Equal(t, "linkDown", notif.Name(), "notification name")
+	})
 
-	obj := m.Object("sysDescr")
-	testutil.NotNil(t, obj, "should find sysDescr by name")
-	testutil.Equal(t, "sysDescr", obj.Name(), "object name")
-}
+	t.Run("Collections", func(t *testing.T) {
+		mods := m.Modules()
+		testutil.Greater(t, len(mods), 0, "should have modules")
 
-func TestType(t *testing.T) {
-	m := loadTestMIB(t)
-
-	typ := m.Type("DisplayString")
-	testutil.NotNil(t, typ, "Type(DisplayString)")
-	testutil.Equal(t, "DisplayString", typ.Name(), "type name")
-	testutil.True(t, typ.IsTextualConvention(), "DisplayString should be a TC")
-}
-
-func TestNotification(t *testing.T) {
-	m := loadTestMIB(t)
-
-	notif := m.Notification("linkDown")
-	testutil.NotNil(t, notif, "Notification(linkDown)")
-	testutil.Equal(t, "linkDown", notif.Name(), "notification name")
-}
-
-func TestModulesCollection(t *testing.T) {
-	m := loadTestMIB(t)
-
-	mods := m.Modules()
-	testutil.Greater(t, len(mods), 0, "should have modules")
-
-	found := false
-	for _, mod := range mods {
-		if mod.Name() == "IF-MIB" {
-			found = true
-			break
+		found := false
+		for _, mod := range mods {
+			if mod.Name() == "IF-MIB" {
+				found = true
+				break
+			}
 		}
-	}
-	testutil.True(t, found, "should find IF-MIB in modules list")
-}
+		testutil.True(t, found, "should find IF-MIB in modules list")
 
-func TestNodesIteration(t *testing.T) {
-	m := loadTestMIB(t)
+		testutil.Equal(t, len(m.Objects()), len(m.Objects()), "Objects() should be consistent")
+		testutil.Greater(t, len(m.Tables()), 0, "should have tables")
+		testutil.Greater(t, len(m.Scalars()), 0, "should have scalars")
+	})
 
-	count := 0
-	for range m.Nodes() {
-		count++
-	}
-	testutil.Greater(t, count, 0, "should have nodes")
-	testutil.Equal(t, m.NodeCount(), count, "NodeCount should match iteration count")
-}
-
-func TestObjectsCollection(t *testing.T) {
-	m := loadTestMIB(t)
-
-	objs := m.Objects()
-	testutil.Equal(t, len(m.Objects()), len(objs), "Objects() should be consistent")
-}
-
-func TestTablesAndScalars(t *testing.T) {
-	m := loadTestMIB(t)
-
-	tables := m.Tables()
-	scalars := m.Scalars()
-
-	testutil.Greater(t, len(tables), 0, "should have tables (IF-MIB has ifTable)")
-	testutil.Greater(t, len(scalars), 0, "should have scalars (SNMPv2-MIB has sysDescr)")
+	t.Run("NodesIteration", func(t *testing.T) {
+		count := 0
+		for range m.Nodes() {
+			count++
+		}
+		testutil.Greater(t, count, 0, "should have nodes")
+		testutil.Equal(t, m.NodeCount(), count, "NodeCount should match iteration count")
+	})
 }
 
 func TestStrictMIBsPassAtStrictLevel(t *testing.T) {

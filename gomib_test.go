@@ -3,6 +3,7 @@ package gomib_test
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -126,13 +127,12 @@ func TestLoadAndQueryMib(t *testing.T) {
 }
 
 func TestWithSystemPaths(t *testing.T) {
+	if os.Getenv("GOMIB_INTEGRATION") == "" {
+		t.Skip("skipping host-dependent test; set GOMIB_INTEGRATION=1 to run")
+	}
+
 	ctx := context.Background()
 
-	// WithSystemPaths alone may or may not find system MIB dirs depending
-	// on the host. If no system dirs exist, Load returns ErrNoSources.
-	// If system dirs exist but contain files producing diagnostics above
-	// the threshold, Load returns ErrDiagnosticThreshold.
-	// Either outcome is acceptable - we just verify it doesn't panic.
 	m, err := gomib.Load(ctx, gomib.WithSystemPaths())
 	if err != nil {
 		if !errors.Is(err, gomib.ErrNoSources) && !errors.Is(err, gomib.ErrDiagnosticThreshold) {

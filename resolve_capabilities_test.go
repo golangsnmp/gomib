@@ -38,34 +38,28 @@ func TestModuleCapabilities(t *testing.T) {
 		"capability name")
 }
 
-func TestModuleCapabilityLookup(t *testing.T) {
+func TestCapabilityConformanceNode(t *testing.T) {
 	m := loadCapabilityMIB(t)
 
-	mod := m.Module("JNX-SNMPv2-CAPABILITY")
-	if mod == nil {
-		t.Fatal("JNX-SNMPv2-CAPABILITY not found")
-	}
-
-	c := mod.Capability("jnxSnmpV2CapJunos")
-	testutil.NotNil(t, c, "Module.Capability(jnxSnmpV2CapJunos) should not be nil")
-	testutil.Equal(t, "jnxSnmpV2CapJunos", c.Name(), "capability name")
-
-	testutil.Nil(t, mod.Capability("noSuchCapability"),
-		"non-existent capability should return nil")
+	checkConformanceNode(t, m, conformanceNodeSpec{
+		name:   "jnxSnmpV2CapJunos",
+		module: "JNX-SNMPv2-CAPABILITY",
+		kind:   mib.KindCapability,
+		status: mib.StatusCurrent,
+	},
+		func(m *mib.Mib, name string) *mib.Capability { return m.Capability(name) },
+		func(mod *mib.Module, name string) *mib.Capability { return mod.Capability(name) },
+		(*mib.Capability).Node,
+		(*mib.Capability).Module,
+		(*mib.Capability).OID,
+		(*mib.Capability).Status,
+		(*mib.Capability).Description,
+		(*mib.Node).Capability,
+		isNilCapability,
+	)
 }
 
-func TestCapabilityMibLookup(t *testing.T) {
-	m := loadCapabilityMIB(t)
-
-	c := m.Capability("jnxSnmpV2CapJunos")
-	testutil.NotNil(t, c, "Mib.Capability(jnxSnmpV2CapJunos) should not be nil")
-	testutil.Equal(t, "jnxSnmpV2CapJunos", c.Name(), "capability name")
-
-	testutil.Nil(t, m.Capability("noSuchCapability"),
-		"non-existent capability should return nil")
-}
-
-func TestCapabilityMetadata(t *testing.T) {
+func TestCapabilityExtraMetadata(t *testing.T) {
 	m := loadCapabilityMIB(t)
 
 	c := m.Capability("jnxSnmpV2CapJunos")
@@ -73,38 +67,14 @@ func TestCapabilityMetadata(t *testing.T) {
 		t.Fatal("jnxSnmpV2CapJunos not found")
 	}
 
-	testutil.Equal(t, "jnxSnmpV2CapJunos", c.Name(), "capability name")
-	testutil.Equal(t, mib.StatusCurrent, c.Status(), "status should be current")
-
 	testutil.Contains(t, c.Description(), "JUNOS SNMPv2 MIB capabilities",
 		"description should mention JUNOS")
 	testutil.Equal(t, "All JUNOS Version", c.ProductRelease(),
 		"PRODUCT-RELEASE value")
-
-	node := c.Node()
-	testutil.NotNil(t, node, "Capability.Node() should not be nil")
-	testutil.Equal(t, "jnxSnmpV2CapJunos", node.Name(), "node name matches capability")
-	testutil.Equal(t, mib.KindCapability, node.Kind(), "node kind should be KindCapability")
-
-	mod := c.Module()
-	testutil.NotNil(t, mod, "Capability.Module() should not be nil")
-	testutil.Equal(t, "JNX-SNMPv2-CAPABILITY", mod.Name(), "capability module")
-
-	oid := c.OID()
-	testutil.Greater(t, len(oid), 0, "capability OID should not be empty")
 }
 
-func TestNodeCapability(t *testing.T) {
+func TestNodeCapabilityNonCapability(t *testing.T) {
 	m := loadCapabilityMIB(t)
-
-	node := m.Node("jnxSnmpV2CapJunos")
-	if node == nil {
-		t.Fatal("jnxSnmpV2CapJunos node not found")
-	}
-
-	c := node.Capability()
-	testutil.NotNil(t, c, "capability node should have Capability()")
-	testutil.Equal(t, "jnxSnmpV2CapJunos", c.Name(), "node Capability() name")
 
 	// MODULE-IDENTITY node should not have a capability
 	identity := m.Node("jnxSnmpV2Capability")
@@ -112,21 +82,6 @@ func TestNodeCapability(t *testing.T) {
 		testutil.Nil(t, identity.Capability(),
 			"MODULE-IDENTITY node should not have Capability()")
 	}
-}
-
-func TestCapabilityByOID(t *testing.T) {
-	m := loadCapabilityMIB(t)
-
-	c := m.Capability("jnxSnmpV2CapJunos")
-	if c == nil {
-		t.Fatal("jnxSnmpV2CapJunos not found")
-	}
-
-	nd := m.NodeByOID(c.OID())
-	testutil.NotNil(t, nd, "NodeByOID should find capability node")
-	testutil.NotNil(t, nd.Capability(), "node should have Capability()")
-	testutil.Equal(t, "jnxSnmpV2CapJunos", nd.Capability().Name(),
-		"capability found by OID")
 }
 
 func TestCapabilitySupports(t *testing.T) {

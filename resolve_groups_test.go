@@ -45,84 +45,32 @@ func TestModuleGroups(t *testing.T) {
 		"SNMPv2-MIB should contain snmpBasicNotificationsGroup")
 }
 
-func TestModuleGroupLookup(t *testing.T) {
+func TestGroupConformanceNode(t *testing.T) {
 	m := loadTestMIB(t)
 
-	snmpMIB := m.Module("SNMPv2-MIB")
-	if snmpMIB == nil {
-		t.Fatal("SNMPv2-MIB not found")
-	}
-
-	g := snmpMIB.Group("snmpGroup")
-	testutil.NotNil(t, g, "Module.Group(snmpGroup) should not be nil")
-	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
-
-	testutil.Nil(t, snmpMIB.Group("noSuchGroup"),
-		"non-existent group should return nil")
+	checkConformanceNode(t, m, conformanceNodeSpec{
+		name:       "snmpGroup",
+		module:     "SNMPv2-MIB",
+		kind:       mib.KindGroup,
+		status:     mib.StatusCurrent,
+		wrongOwner: "IF-MIB",
+	},
+		func(m *mib.Mib, name string) *mib.Group { return m.Group(name) },
+		func(mod *mib.Module, name string) *mib.Group { return mod.Group(name) },
+		(*mib.Group).Node,
+		(*mib.Group).Module,
+		(*mib.Group).OID,
+		(*mib.Group).Status,
+		(*mib.Group).Description,
+		(*mib.Node).Group,
+		isNilGroup,
+	)
 }
 
-func TestGroupByName(t *testing.T) {
+func TestGroupIsNotNotificationGroup(t *testing.T) {
 	m := loadTestMIB(t)
 
 	g := requireGroup(t, m, "snmpGroup")
-	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
-}
-
-func TestGroupQualifiedLookup(t *testing.T) {
-	m := loadTestMIB(t)
-
-	// Qualified lookup via Module().Group()
-	g := m.Module("SNMPv2-MIB").Group("snmpGroup")
-	testutil.NotNil(t, g, "Module(SNMPv2-MIB).Group(snmpGroup) should not be nil")
-	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
-
-	testutil.Nil(t, m.Module("IF-MIB").Group("snmpGroup"),
-		"snmpGroup should not be in IF-MIB")
-}
-
-func TestGroupByOID(t *testing.T) {
-	m := loadTestMIB(t)
-
-	g := requireGroup(t, m, "snmpGroup")
-
-	// OID-based lookup via NodeByOID().Group()
-	nd := m.NodeByOID(g.OID())
-	testutil.NotNil(t, nd, "NodeByOID should find group node")
-	testutil.NotNil(t, nd.Group(), "node should have Group()")
-	testutil.Equal(t, "snmpGroup", nd.Group().Name(), "group found by OID")
-}
-
-func TestGroupNotFound(t *testing.T) {
-	m := loadTestMIB(t)
-
-	testutil.Nil(t, m.Group("noSuchGroup"),
-		"non-existent group name should return nil")
-}
-
-func TestGroupMetadata(t *testing.T) {
-	m := loadTestMIB(t)
-
-	g := requireGroup(t, m, "snmpGroup")
-
-	testutil.Equal(t, "snmpGroup", g.Name(), "group name")
-
-	node := g.Node()
-	testutil.NotNil(t, node, "Group.Node() should not be nil")
-	testutil.Equal(t, "snmpGroup", node.Name(), "node name matches group")
-	testutil.Equal(t, mib.KindGroup, node.Kind(), "node kind should be KindGroup")
-
-	mod := g.Module()
-	testutil.NotNil(t, mod, "Group.Module() should not be nil")
-	testutil.Equal(t, "SNMPv2-MIB", mod.Name(), "group module")
-
-	oid := g.OID()
-	testutil.Greater(t, len(oid), 0, "group OID should not be empty")
-
-	testutil.Equal(t, mib.StatusCurrent, g.Status(), "snmpGroup should be current")
-
-	desc := g.Description()
-	testutil.Greater(t, len(desc), 0, "snmpGroup should have a description")
-
 	testutil.False(t, g.IsNotificationGroup(),
 		"snmpGroup is an OBJECT-GROUP, not NOTIFICATION-GROUP")
 }
@@ -169,37 +117,14 @@ func TestNotificationGroupMembers(t *testing.T) {
 		"authenticationFailure should be a member")
 }
 
-func TestNodeGroup(t *testing.T) {
+func TestNodeGroupNonGroup(t *testing.T) {
 	m := loadTestMIB(t)
-
-	node := m.Node("snmpGroup")
-	if node == nil {
-		t.Fatal("snmpGroup node not found")
-	}
-
-	g := node.Group()
-	testutil.NotNil(t, g, "group node should have Group()")
-	testutil.Equal(t, "snmpGroup", g.Name(), "node Group() name")
 
 	ifIndex := m.Node("ifIndex")
 	if ifIndex == nil {
 		t.Fatal("ifIndex not found")
 	}
 	testutil.Nil(t, ifIndex.Group(), "ifIndex should not have a Group()")
-}
-
-func TestGroupNodeModule(t *testing.T) {
-	m := loadTestMIB(t)
-
-	node := m.Node("snmpGroup")
-	if node == nil {
-		t.Fatal("snmpGroup node not found")
-	}
-
-	mod := node.Module()
-	testutil.NotNil(t, mod, "group node should have a Module()")
-	testutil.Equal(t, "SNMPv2-MIB", mod.Name(),
-		"snmpGroup node module should be SNMPv2-MIB")
 }
 
 func TestSmallObjectGroup(t *testing.T) {

@@ -40,88 +40,36 @@ func TestModuleCompliances(t *testing.T) {
 		"SNMPv2-MIB should contain snmpBasicComplianceRev2")
 }
 
-func TestModuleComplianceLookup(t *testing.T) {
+func TestComplianceConformanceNode(t *testing.T) {
 	m := loadTestMIB(t)
 
-	snmpMIB := m.Module("SNMPv2-MIB")
-	if snmpMIB == nil {
-		t.Fatal("SNMPv2-MIB not found")
+	checkConformanceNode(t, m, conformanceNodeSpec{
+		name:       "snmpBasicComplianceRev2",
+		module:     "SNMPv2-MIB",
+		kind:       mib.KindCompliance,
+		status:     mib.StatusCurrent,
+		wrongOwner: "IF-MIB",
+	},
+		func(m *mib.Mib, name string) *mib.Compliance { return m.Compliance(name) },
+		func(mod *mib.Module, name string) *mib.Compliance { return mod.Compliance(name) },
+		(*mib.Compliance).Node,
+		(*mib.Compliance).Module,
+		(*mib.Compliance).OID,
+		(*mib.Compliance).Status,
+		(*mib.Compliance).Description,
+		(*mib.Node).Compliance,
+		isNilCompliance,
+	)
+}
+
+func TestComplianceNodeNonCompliance(t *testing.T) {
+	m := loadTestMIB(t)
+
+	ifIndex := m.Node("ifIndex")
+	if ifIndex == nil {
+		t.Fatal("ifIndex not found")
 	}
-
-	c := snmpMIB.Compliance("snmpBasicComplianceRev2")
-	testutil.NotNil(t, c, "Module.Compliance(snmpBasicComplianceRev2) should not be nil")
-	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
-
-	testutil.Nil(t, snmpMIB.Compliance("noSuchCompliance"),
-		"non-existent compliance should return nil")
-}
-
-func TestCompliance(t *testing.T) {
-	m := loadTestMIB(t)
-
-	c := m.Compliance("snmpBasicComplianceRev2")
-	testutil.NotNil(t, c, "Compliance(snmpBasicComplianceRev2) should not be nil")
-	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
-}
-
-func TestComplianceQualifiedLookup(t *testing.T) {
-	m := loadTestMIB(t)
-
-	// Qualified lookup via Module().Compliance()
-	c := m.Module("SNMPv2-MIB").Compliance("snmpBasicComplianceRev2")
-	testutil.NotNil(t, c, "Module(SNMPv2-MIB).Compliance(snmpBasicComplianceRev2) should not be nil")
-	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
-
-	testutil.Nil(t, m.Module("IF-MIB").Compliance("snmpBasicComplianceRev2"),
-		"snmpBasicComplianceRev2 should not be in IF-MIB")
-}
-
-func TestComplianceByOID(t *testing.T) {
-	m := loadTestMIB(t)
-
-	c := m.Compliance("snmpBasicComplianceRev2")
-	testutil.NotNil(t, c, "Compliance(snmpBasicComplianceRev2)")
-
-	// OID-based lookup via NodeByOID().Compliance()
-	nd := m.NodeByOID(c.OID())
-	testutil.NotNil(t, nd, "NodeByOID should find compliance node")
-	testutil.NotNil(t, nd.Compliance(), "node should have Compliance()")
-	testutil.Equal(t, "snmpBasicComplianceRev2", nd.Compliance().Name(), "compliance found by OID")
-}
-
-func TestComplianceNotFound(t *testing.T) {
-	m := loadTestMIB(t)
-
-	testutil.Nil(t, m.Compliance("noSuchCompliance"),
-		"non-existent compliance name should return nil")
-}
-
-func TestComplianceMetadata(t *testing.T) {
-	m := loadTestMIB(t)
-
-	c := m.Compliance("snmpBasicComplianceRev2")
-	if c == nil {
-		t.Fatal("snmpBasicComplianceRev2 not found")
-	}
-
-	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "compliance name")
-
-	node := c.Node()
-	testutil.NotNil(t, node, "Compliance.Node() should not be nil")
-	testutil.Equal(t, "snmpBasicComplianceRev2", node.Name(), "node name matches compliance")
-	testutil.Equal(t, mib.KindCompliance, node.Kind(), "node kind should be KindCompliance")
-
-	mod := c.Module()
-	testutil.NotNil(t, mod, "Compliance.Module() should not be nil")
-	testutil.Equal(t, "SNMPv2-MIB", mod.Name(), "compliance module")
-
-	oid := c.OID()
-	testutil.Greater(t, len(oid), 0, "compliance OID should not be empty")
-
-	testutil.Equal(t, mib.StatusCurrent, c.Status(), "snmpBasicComplianceRev2 should be current")
-
-	desc := c.Description()
-	testutil.Greater(t, len(desc), 0, "snmpBasicComplianceRev2 should have a description")
+	testutil.Nil(t, ifIndex.Compliance(), "ifIndex should not have a Compliance()")
 }
 
 func TestDeprecatedCompliance(t *testing.T) {
@@ -166,37 +114,4 @@ func TestComplianceModules(t *testing.T) {
 	// GROUP clauses: snmpCommunityGroup, snmpWarmStartNotificationGroup
 	testutil.Equal(t, 2, len(mod.Groups),
 		"should have 2 GROUP refinements")
-}
-
-func TestNodeCompliance(t *testing.T) {
-	m := loadTestMIB(t)
-
-	node := m.Node("snmpBasicComplianceRev2")
-	if node == nil {
-		t.Fatal("snmpBasicComplianceRev2 node not found")
-	}
-
-	c := node.Compliance()
-	testutil.NotNil(t, c, "compliance node should have Compliance()")
-	testutil.Equal(t, "snmpBasicComplianceRev2", c.Name(), "node Compliance() name")
-
-	ifIndex := m.Node("ifIndex")
-	if ifIndex == nil {
-		t.Fatal("ifIndex not found")
-	}
-	testutil.Nil(t, ifIndex.Compliance(), "ifIndex should not have a Compliance()")
-}
-
-func TestComplianceNodeModule(t *testing.T) {
-	m := loadTestMIB(t)
-
-	node := m.Node("snmpBasicComplianceRev2")
-	if node == nil {
-		t.Fatal("snmpBasicComplianceRev2 node not found")
-	}
-
-	mod := node.Module()
-	testutil.NotNil(t, mod, "compliance node should have a Module()")
-	testutil.Equal(t, "SNMPv2-MIB", mod.Name(),
-		"snmpBasicComplianceRev2 node module should be SNMPv2-MIB")
 }
