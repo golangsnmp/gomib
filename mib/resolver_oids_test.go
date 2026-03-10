@@ -239,6 +239,44 @@ func TestGetOidParentSymbol(t *testing.T) {
 		testutil.Equal(t, "RFC1155-SMI", sym.Module, "module")
 		testutil.Equal(t, "private", sym.Name, "name")
 	})
+
+	t.Run("Normal mode resolves SMI global root", func(t *testing.T) {
+		vendorMod := &module.Module{Name: "VENDOR-MIB"}
+		normalCtx := newResolverContext([]*module.Module{vendorMod}, nil, ResolverNormal, DefaultConfig())
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "enterprises"},
+			&module.OidComponentNumber{Value: 42},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  vendorMod,
+			def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "vendorRoot"}, Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		sym, ok := getOidParentSymbol(normalCtx, def)
+		testutil.True(t, ok, "expected true in Normal mode for SMI global root")
+		testutil.Equal(t, "SNMPv2-SMI", sym.Module, "module")
+		testutil.Equal(t, "enterprises", sym.Name, "name")
+	})
+
+	t.Run("Strict mode rejects unimported SMI global", func(t *testing.T) {
+		vendorMod := &module.Module{Name: "VENDOR-MIB"}
+		strictCtx := newResolverContext([]*module.Module{vendorMod}, nil, ResolverStrict, VerboseConfig())
+
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "enterprises"},
+			&module.OidComponentNumber{Value: 42},
+		}, types.Synthetic)
+		def := oidDefinition{
+			mod:  vendorMod,
+			def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "vendorRoot"}, Oid: oid},
+			kind: defValueAssignment,
+		}
+
+		_, ok := getOidParentSymbol(strictCtx, def)
+		testutil.False(t, ok, "expected false in strict mode for unimported SMI global")
+	})
 }
 
 func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
@@ -801,49 +839,6 @@ func TestSmiGlobalOidRoots(t *testing.T) {
 	testutil.False(t, ok, "iso should not be in smiGlobalOidRoots (it is a well-known root)")
 }
 
-func TestGetOidParentSymbolConstrainedSmiGlobal(t *testing.T) {
-	// In Normal+, unresolved names that are SMI global OID roots
-	// should reference SNMPv2-SMI.
-	mod := &module.Module{Name: "VENDOR-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
-
-	oid := module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentName{NameValue: "enterprises"},
-		&module.OidComponentNumber{Value: 42},
-	}, types.Synthetic)
-
-	def := oidDefinition{
-		mod:  mod,
-		def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "vendorRoot"}, Oid: oid},
-		kind: defValueAssignment,
-	}
-
-	sym, ok := getOidParentSymbol(ctx, def)
-	testutil.True(t, ok, "expected true in Normal+ for SMI global root")
-	testutil.Equal(t, "SNMPv2-SMI", sym.Module, "module")
-	testutil.Equal(t, "enterprises", sym.Name, "name")
-}
-
-func TestGetOidParentSymbolStrictNoSmiGlobal(t *testing.T) {
-	// In strict mode, unresolved SMI global names should not be resolved.
-	mod := &module.Module{Name: "VENDOR-MIB"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, ResolverStrict, VerboseConfig())
-
-	oid := module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentName{NameValue: "enterprises"},
-		&module.OidComponentNumber{Value: 42},
-	}, types.Synthetic)
-
-	def := oidDefinition{
-		mod:  mod,
-		def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "vendorRoot"}, Oid: oid},
-		kind: defValueAssignment,
-	}
-
-	_, ok := getOidParentSymbol(ctx, def)
-	testutil.False(t, ok, "expected false in strict mode for unimported SMI global")
-}
-
 func TestCollectOidDefinitionsKindMapping(t *testing.T) {
 	// Verify that each definition type maps to the correct definitionKind.
 	mod := &module.Module{Name: "TEST-MIB"}
@@ -1155,50 +1150,9 @@ func TestResolveNamedNumberComponent(t *testing.T) {
 		testutil.Equal(t, orgNode, got, "expected existing node")
 	})
 
-	t.Run("creates named child when name not registered", func(t *testing.T) {
-		mod := &module.Module{Name: "TEST-MIB"}
-		resolvedMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
-		ctx.moduleToResolved[mod] = resolvedMod
-
-		parent := ctx.mib.Root().getOrCreateChild(1)
-		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
-		}, types.Synthetic)
-		def := oidDefinition{
-			mod:  mod,
-			def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "test"}, Oid: oid},
-			kind: defValueAssignment,
-		}
-
-		got, ok := resolveNamedNumberComponent(ctx, def, parent, "org", 3, false)
-		testutil.True(t, ok, "expected ok")
-		testutil.Equal(t, uint32(3), got.Arc(), "arc")
-		testutil.Equal(t, "org", got.Name(), "name should be set for non-last component")
-		testutil.Equal(t, KindNode, got.Kind(), "kind should be set for non-last component")
-	})
-
-	t.Run("isLast does not set name on child", func(t *testing.T) {
-		mod := &module.Module{Name: "TEST-MIB"}
-		resolvedMod := newModule("TEST-MIB")
-		ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
-		ctx.moduleToResolved[mod] = resolvedMod
-
-		parent := ctx.mib.Root().getOrCreateChild(1)
-		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNamedNumber{NameValue: "leaf", NumberValue: 5},
-		}, types.Synthetic)
-		def := oidDefinition{
-			mod:  mod,
-			def:  &module.ValueAssignment{DefBase: module.DefBase{Name: "test"}, Oid: oid},
-			kind: defValueAssignment,
-		}
-
-		got, ok := resolveNamedNumberComponent(ctx, def, parent, "leaf", 5, true)
-		testutil.True(t, ok, "expected ok")
-		testutil.Equal(t, uint32(5), got.Arc(), "arc")
-		testutil.Equal(t, "", got.Name(), "name should not be set for last component")
-	})
+	// Named child creation (non-last/isLast behavior) is covered by
+	// TestCreateNamedChild which tests createNamedChild directly with
+	// more thorough assertions (module, kind, symbol registration).
 }
 
 func TestResolveQualifiedNameComponent(t *testing.T) {
@@ -1715,61 +1669,61 @@ func TestOidReuse_SameNameNoDiagnostic(t *testing.T) {
 	noDiag(t, m.Diagnostics(), types.DiagOidReuse, types.DiagOidRegistered)
 }
 
-func TestResolveOidsRecursiveCycle(t *testing.T) {
-	// Two definitions that reference each other: A's OID starts with B, B's OID starts with A.
-	mod := &module.Module{
-		Name:     "CYCLE-MIB",
-		Language: types.LanguageSMIv2,
-		Imports: []module.Import{
-			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
-		},
-	}
+func TestResolveOidsCycleDetection(t *testing.T) {
+	t.Run("mutual cycle", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "CYCLE-MIB",
+			Language: types.LanguageSMIv2,
+			Imports: []module.Import{
+				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			},
+		}
 
-	oidA := module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentName{NameValue: "nodeB"},
-		&module.OidComponentNumber{Value: 1},
-	}, types.Span{})
-	oidB := module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentName{NameValue: "nodeA"},
-		&module.OidComponentNumber{Value: 2},
-	}, types.Span{})
+		oidA := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "nodeB"},
+			&module.OidComponentNumber{Value: 1},
+		}, types.Span{})
+		oidB := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "nodeA"},
+			&module.OidComponentNumber{Value: 2},
+		}, types.Span{})
 
-	mod.Definitions = []module.Definition{
-		&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeA"}, Oid: oidA},
-		&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeB"}, Oid: oidB},
-	}
+		mod.Definitions = []module.Definition{
+			&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeA"}, Oid: oidA},
+			&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeB"}, Oid: oidB},
+		}
 
-	m := resolveStrict(mod)
+		m := resolveStrict(mod)
 
-	recursiveDiags := diagsByCode(m.Diagnostics(), types.DiagOidRecursive)
-	requireDiagCount(t, m.Diagnostics(), types.DiagOidRecursive, 2)
-	for _, d := range recursiveDiags {
-		testutil.Contains(t, d.Message, "recursive OID", "diagnostic message")
-		testutil.Contains(t, d.Message, "cycle", "diagnostic message should mention cycle")
-	}
-}
+		recursiveDiags := diagsByCode(m.Diagnostics(), types.DiagOidRecursive)
+		requireDiagCount(t, m.Diagnostics(), types.DiagOidRecursive, 2)
+		for _, d := range recursiveDiags {
+			testutil.Contains(t, d.Message, "recursive OID", "diagnostic message")
+			testutil.Contains(t, d.Message, "cycle", "diagnostic message should mention cycle")
+		}
+	})
 
-func TestResolveOidsSelfReference(t *testing.T) {
-	// A definition whose OID references itself.
-	mod := &module.Module{
-		Name:     "SELF-REF-MIB",
-		Language: types.LanguageSMIv2,
-	}
+	t.Run("self reference", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "SELF-REF-MIB",
+			Language: types.LanguageSMIv2,
+		}
 
-	oid := module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentName{NameValue: "selfNode"},
-		&module.OidComponentNumber{Value: 1},
-	}, types.Span{})
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentName{NameValue: "selfNode"},
+			&module.OidComponentNumber{Value: 1},
+		}, types.Span{})
 
-	mod.Definitions = []module.Definition{
-		&module.ValueAssignment{DefBase: module.DefBase{Name: "selfNode"}, Oid: oid},
-	}
+		mod.Definitions = []module.Definition{
+			&module.ValueAssignment{DefBase: module.DefBase{Name: "selfNode"}, Oid: oid},
+		}
 
-	m := resolveStrict(mod)
+		m := resolveStrict(mod)
 
-	recursiveDiags := diagsByCode(m.Diagnostics(), types.DiagOidRecursive)
-	requireDiagCount(t, m.Diagnostics(), types.DiagOidRecursive, 1)
-	testutil.Contains(t, recursiveDiags[0].Message, "references itself", "self-reference message")
+		recursiveDiags := diagsByCode(m.Diagnostics(), types.DiagOidRecursive)
+		requireDiagCount(t, m.Diagnostics(), types.DiagOidRecursive, 1)
+		testutil.Contains(t, recursiveDiags[0].Message, "references itself", "self-reference message")
+	})
 }
 
 func TestLastSubidZero(t *testing.T) {

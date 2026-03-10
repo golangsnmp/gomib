@@ -46,60 +46,98 @@ func TestConvertRevisions(t *testing.T) {
 }
 
 func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
-	userMod := &module.Module{
-		Name:     "MY-MIB",
-		Language: types.LanguageSMIv2,
-		Definitions: []module.Definition{
-			&module.ObjectType{DefBase: module.DefBase{Name: "myObject", Span: types.Synthetic}},
-		},
-	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
-
-	registerModules(ctx)
-
-	// Base modules should come first, user module last
 	baseNames := module.BaseModuleNames()
-	testutil.Equal(t, len(baseNames)+1, len(ctx.modules), "module count (base=%d + user=1)", len(baseNames))
-	for i, name := range baseNames {
-		testutil.Equal(t, name, ctx.modules[i].Name, "Modules[].Name")
-	}
-	last := ctx.modules[len(ctx.modules)-1]
-	testutil.Equal(t, "MY-MIB", last.Name, "last module")
+
+	t.Run("with user modules", func(t *testing.T) {
+		userMod := &module.Module{
+			Name:     "MY-MIB",
+			Language: types.LanguageSMIv2,
+			Definitions: []module.Definition{
+				&module.ObjectType{DefBase: module.DefBase{Name: "myObject", Span: types.Synthetic}},
+			},
+		}
+		ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
+
+		registerModules(ctx)
+
+		testutil.Equal(t, len(baseNames)+1, len(ctx.modules), "module count (base=%d + user=1)", len(baseNames))
+		for i, name := range baseNames {
+			testutil.Equal(t, name, ctx.modules[i].Name, "Modules[].Name")
+		}
+		last := ctx.modules[len(ctx.modules)-1]
+		testutil.Equal(t, "MY-MIB", last.Name, "last module")
+	})
+
+	t.Run("no user modules", func(t *testing.T) {
+		ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
+
+		registerModules(ctx)
+
+		testutil.Len(t, ctx.modules, len(baseNames), "modules")
+		for i, name := range baseNames {
+			testutil.Equal(t, name, ctx.modules[i].Name, "Modules[].Name")
+		}
+	})
 }
 
-func TestRegisterModules_UserModulesWithBaseNamesFiltered(t *testing.T) {
-	// If a user provides a module with a base module name, it should be dropped.
-	userSNMP := &module.Module{
-		Name:     "SNMPv2-SMI",
-		Language: types.LanguageSMIv2,
-	}
-	userMod := &module.Module{
-		Name:     "MY-MIB",
-		Language: types.LanguageSMIv2,
-	}
-	ctx := newResolverContext([]*module.Module{userSNMP, userMod}, nil, ResolverNormal, DefaultConfig())
-
-	registerModules(ctx)
-
-	// The user's SNMPv2-SMI should be replaced by the base version.
-	// Count how many SNMPv2-SMI modules exist.
-	count := 0
-	for _, mod := range ctx.modules {
-		if mod.Name == "SNMPv2-SMI" {
-			count++
+func TestRegisterModules_UserBaseNamesFiltered(t *testing.T) {
+	t.Run("single base name shadowed", func(t *testing.T) {
+		userSNMP := &module.Module{
+			Name:     "SNMPv2-SMI",
+			Language: types.LanguageSMIv2,
 		}
-	}
-	testutil.Equal(t, 1, count, "found")
-
-	// MY-MIB should still be present
-	found := false
-	for _, mod := range ctx.modules {
-		if mod.Name == "MY-MIB" {
-			found = true
-			break
+		userMod := &module.Module{
+			Name:     "MY-MIB",
+			Language: types.LanguageSMIv2,
 		}
-	}
-	testutil.True(t, found, "MY-MIB not found in ctx.modules")
+		ctx := newResolverContext([]*module.Module{userSNMP, userMod}, nil, ResolverNormal, DefaultConfig())
+
+		registerModules(ctx)
+
+		count := 0
+		for _, mod := range ctx.modules {
+			if mod.Name == "SNMPv2-SMI" {
+				count++
+			}
+		}
+		testutil.Equal(t, 1, count, "found")
+
+		found := false
+		for _, mod := range ctx.modules {
+			if mod.Name == "MY-MIB" {
+				found = true
+				break
+			}
+		}
+		testutil.True(t, found, "MY-MIB not found in ctx.modules")
+	})
+
+	t.Run("all base names shadowed", func(t *testing.T) {
+		baseNames := module.BaseModuleNames()
+		var userMods []*module.Module
+		for _, name := range baseNames {
+			userMods = append(userMods, &module.Module{
+				Name:     name,
+				Language: types.LanguageSMIv2,
+			})
+		}
+		userMods = append(userMods, &module.Module{
+			Name:     "REAL-MIB",
+			Language: types.LanguageSMIv2,
+		})
+
+		ctx := newResolverContext(userMods, nil, ResolverNormal, DefaultConfig())
+		registerModules(ctx)
+
+		nameCounts := make(map[string]int)
+		for _, mod := range ctx.modules {
+			nameCounts[mod.Name]++
+		}
+		for _, name := range baseNames {
+			testutil.Equal(t, 1, nameCounts[name], "module")
+		}
+		testutil.Equal(t, 1, nameCounts["REAL-MIB"], "REAL-MIB appears")
+	})
 }
 
 func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
@@ -135,36 +173,59 @@ func TestRegisterModules_BaseModulePointersCached(t *testing.T) {
 }
 
 func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
-	userMod := &module.Module{
-		Name:     "MY-MIB",
-		Language: types.LanguageSMIv2,
-		Definitions: []module.Definition{
-			&module.ObjectType{DefBase: module.DefBase{Name: "fooObject", Span: types.Synthetic}},
-			&module.TypeDef{DefBase: module.DefBase{Name: "BarType", Span: types.Synthetic}},
-		},
-	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
-
-	registerModules(ctx)
-
-	// Find the user module pointer (the original may have been replaced)
-	var found *module.Module
-	for _, mod := range ctx.modules {
-		if mod.Name == "MY-MIB" {
-			found = mod
-			break
+	t.Run("user module", func(t *testing.T) {
+		userMod := &module.Module{
+			Name:     "MY-MIB",
+			Language: types.LanguageSMIv2,
+			Definitions: []module.Definition{
+				&module.ObjectType{DefBase: module.DefBase{Name: "fooObject", Span: types.Synthetic}},
+				&module.TypeDef{DefBase: module.DefBase{Name: "BarType", Span: types.Synthetic}},
+			},
 		}
-	}
-	testutil.NotNil(t, found, "MY-MIB not found in ctx.modules")
+		ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
 
-	defNames := ctx.moduleDefNames[found]
-	testutil.NotNil(t, defNames, "ModuleDefNames[MY-MIB] is nil")
-	_, hasFoo := defNames["fooObject"]
-	testutil.True(t, hasFoo, "fooObject not in ModuleDefNames")
-	_, hasBar := defNames["BarType"]
-	testutil.True(t, hasBar, "BarType not in ModuleDefNames")
-	_, hasNonExistent := defNames["nonExistent"]
-	testutil.False(t, hasNonExistent, "nonExistent should not be in ModuleDefNames")
+		registerModules(ctx)
+
+		var found *module.Module
+		for _, mod := range ctx.modules {
+			if mod.Name == "MY-MIB" {
+				found = mod
+				break
+			}
+		}
+		testutil.NotNil(t, found, "MY-MIB not found in ctx.modules")
+
+		defNames := ctx.moduleDefNames[found]
+		testutil.NotNil(t, defNames, "ModuleDefNames[MY-MIB] is nil")
+		_, hasFoo := defNames["fooObject"]
+		testutil.True(t, hasFoo, "fooObject not in ModuleDefNames")
+		_, hasBar := defNames["BarType"]
+		testutil.True(t, hasBar, "BarType not in ModuleDefNames")
+		_, hasNonExistent := defNames["nonExistent"]
+		testutil.False(t, hasNonExistent, "nonExistent should not be in ModuleDefNames")
+	})
+
+	t.Run("base module", func(t *testing.T) {
+		ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
+
+		registerModules(ctx)
+
+		var snmpv2smi *module.Module
+		for _, mod := range ctx.modules {
+			if mod.Name == "SNMPv2-SMI" {
+				snmpv2smi = mod
+				break
+			}
+		}
+		testutil.NotNil(t, snmpv2smi, "SNMPv2-SMI not found")
+
+		defNames := ctx.moduleDefNames[snmpv2smi]
+		testutil.NotNil(t, defNames, "ModuleDefNames[SNMPv2-SMI] is nil")
+		for _, name := range []string{"internet", "Integer32", "Counter32", "enterprises"} {
+			_, ok := defNames[name]
+			testutil.True(t, ok, "%q not in SNMPv2-SMI definition names", name)
+		}
+	})
 }
 
 func TestRegisterModules_ModuleToResolvedMapping(t *testing.T) {
@@ -331,71 +392,4 @@ func TestRegisterModules_DiagnosticsForwarded(t *testing.T) {
 		}
 	}
 	testutil.True(t, found, "module diagnostic not forwarded to builder")
-}
-
-func TestRegisterModules_AllBaseModulesFiltered(t *testing.T) {
-	// Provide user modules that shadow every base module name.
-	baseNames := module.BaseModuleNames()
-	var userMods []*module.Module
-	for _, name := range baseNames {
-		userMods = append(userMods, &module.Module{
-			Name:     name,
-			Language: types.LanguageSMIv2,
-		})
-	}
-	userMods = append(userMods, &module.Module{
-		Name:     "REAL-MIB",
-		Language: types.LanguageSMIv2,
-	})
-
-	ctx := newResolverContext(userMods, nil, ResolverNormal, DefaultConfig())
-	registerModules(ctx)
-
-	// Each base name should appear exactly once (from base, not user)
-	nameCounts := make(map[string]int)
-	for _, mod := range ctx.modules {
-		nameCounts[mod.Name]++
-	}
-	for _, name := range baseNames {
-		testutil.Equal(t, 1, nameCounts[name], "module")
-	}
-	testutil.Equal(t, 1, nameCounts["REAL-MIB"], "REAL-MIB appears")
-}
-
-func TestRegisterModules_EmptyModuleList(t *testing.T) {
-	// No user modules - should still register all base modules.
-	ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
-
-	registerModules(ctx)
-
-	baseNames := module.BaseModuleNames()
-	testutil.Len(t, ctx.modules, len(baseNames), "modules")
-	for i, name := range baseNames {
-		testutil.Equal(t, name, ctx.modules[i].Name, "Modules[].Name")
-	}
-}
-
-func TestRegisterModules_BaseModuleDefinitionNamesCached(t *testing.T) {
-	// Verify that base modules have their definition names cached too.
-	ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
-
-	registerModules(ctx)
-
-	// SNMPv2-SMI should have well-known definitions like "internet", "Integer32"
-	var snmpv2smi *module.Module
-	for _, mod := range ctx.modules {
-		if mod.Name == "SNMPv2-SMI" {
-			snmpv2smi = mod
-			break
-		}
-	}
-	testutil.NotNil(t, snmpv2smi, "SNMPv2-SMI not found")
-
-	defNames := ctx.moduleDefNames[snmpv2smi]
-	testutil.NotNil(t, defNames, "ModuleDefNames[SNMPv2-SMI] is nil")
-	// Spot-check a few well-known names
-	for _, name := range []string{"internet", "Integer32", "Counter32", "enterprises"} {
-		_, ok := defNames[name]
-		testutil.True(t, ok, "%q not in SNMPv2-SMI definition names", name)
-	}
 }

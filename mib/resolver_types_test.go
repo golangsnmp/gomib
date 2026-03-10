@@ -229,19 +229,15 @@ func TestExtractNamedValues(t *testing.T) {
 		testutil.Len(t, got, 0, "named values")
 	})
 
-	t.Run("TypeRef returns nil", func(t *testing.T) {
-		got := extractNamedValues(&module.TypeSyntaxTypeRef{Name: "Integer32"})
-		testutil.Nil(t, got, "expected nil")
-	})
-
-	t.Run("OctetString returns nil", func(t *testing.T) {
-		got := extractNamedValues(&module.TypeSyntaxOctetString{})
-		testutil.Nil(t, got, "expected nil")
-	})
-
-	t.Run("nil returns nil", func(t *testing.T) {
-		got := extractNamedValues(nil)
-		testutil.Nil(t, got, "expected nil")
+	t.Run("non-enum types return nil", func(t *testing.T) {
+		for _, syntax := range []module.TypeSyntax{
+			&module.TypeSyntaxTypeRef{Name: "Integer32"},
+			&module.TypeSyntaxOctetString{},
+			nil,
+		} {
+			got := extractNamedValues(syntax)
+			testutil.Nil(t, got, "expected nil")
+		}
 	})
 
 	t.Run("negative enum values", func(t *testing.T) {
@@ -428,24 +424,6 @@ func TestResolveBaseFromChain(t *testing.T) {
 		got, ok := resolveBaseFromChain(leaf)
 		testutil.True(t, ok, "expected ok=true")
 		testutil.Equal(t, BaseInteger32, got, "got")
-	})
-
-	t.Run("stops at application base type", func(t *testing.T) {
-		root := newType("INTEGER")
-		root.setBase(BaseInteger32)
-
-		counter := newType("Counter32")
-		counter.setBase(BaseCounter32)
-		counter.setParent(root)
-
-		myCounter := newType("MyCounter")
-		myCounter.setBase(BaseCounter32)
-		myCounter.setParent(counter)
-
-		got, ok := resolveBaseFromChain(myCounter)
-		testutil.True(t, ok, "expected ok=true")
-		// Should stop at Counter32 (application base type), not walk to INTEGER
-		testutil.Equal(t, BaseCounter32, got, "got")
 	})
 
 	t.Run("stops at each application type", func(t *testing.T) {
