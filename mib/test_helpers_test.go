@@ -147,6 +147,53 @@ func testSMIv1Module(extraImports []module.Import, defs ...module.Definition) *m
 	}, defs...)
 }
 
+// testTableModule builds a TEST-MIB with a standard table/entry/index skeleton.
+// extraImports are appended to the base SNMPv2-SMI imports.
+// columns are appended after the index definition (callers assign OIDs under testEntry).
+func testTableModule(extraImports []module.Import, columns ...module.Definition) *module.Module {
+	imports := []module.Import{
+		module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+	}
+	imports = append(imports, extraImports...)
+
+	defs := []module.Definition{
+		&module.ValueAssignment{
+			DefBase: module.DefBase{Name: "testRoot"},
+			Oid:     testOid("enterprises", 99999),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testTable"},
+			Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testRoot", 1),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testEntry"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+			Status:  types.StatusCurrent,
+			Index:   []module.IndexItem{{Object: "testIndex"}},
+			Oid:     testOid("testTable", 1),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testIndex"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Access:  types.AccessNotAccessible,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", 1),
+		},
+	}
+	defs = append(defs, columns...)
+
+	return &module.Module{
+		Name:        "TEST-MIB",
+		Language:    types.LanguageSMIv2,
+		Imports:     imports,
+		Definitions: defs,
+	}
+}
+
 func registerNodeWithSymbol(ctx *resolverContext, mod *module.Module, root *Node, symbol string, arcs ...uint32) *Node {
 	node := buildOIDPath(root, arcs...)
 	node.setName(symbol)
@@ -211,4 +258,43 @@ func formatDiagnostics(diags []Diagnostic) string {
 		parts = append(parts, fmt.Sprintf("[%s] %s: %s", d.Module, d.Code, d.Message))
 	}
 	return strings.Join(parts, "; ")
+}
+
+func requireTypeDescriptionAndReference(t testing.TB, m *Mib, name string) *Type {
+	t.Helper()
+	typ := m.Type(name)
+	if typ == nil {
+		t.Fatalf("type %q not found", name)
+	}
+	if typ.Description() == "" {
+		t.Fatalf("type %q has empty description", name)
+	}
+	if typ.Reference() == "" {
+		t.Fatalf("type %q has empty reference", name)
+	}
+	return typ
+}
+
+func requireNodeDescription(t testing.TB, m *Mib, name string) *Node {
+	t.Helper()
+	node := m.Node(name)
+	if node == nil {
+		t.Fatalf("node %q not found", name)
+	}
+	if node.Description() == "" {
+		t.Fatalf("node %q has empty description", name)
+	}
+	return node
+}
+
+func requireNodeReference(t testing.TB, m *Mib, name string) *Node {
+	t.Helper()
+	node := m.Node(name)
+	if node == nil {
+		t.Fatalf("node %q not found", name)
+	}
+	if node.Reference() == "" {
+		t.Fatalf("node %q has empty reference", name)
+	}
+	return node
 }

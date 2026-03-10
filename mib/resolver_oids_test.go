@@ -623,11 +623,8 @@ func TestFinalizeOidDefinition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srcMod := &module.Module{Name: "TEST-MIB", Language: types.LanguageSMIv2}
-			resolvedMod := newModule("TEST-MIB")
-
-			ctx := newResolverContext([]*module.Module{srcMod}, nil, ResolverNormal, DefaultConfig())
-			ctx.moduleToResolved[srcMod] = resolvedMod
-			ctx.resolvedToModule[resolvedMod] = srcMod
+			ctx := newTestContextForModules(DefaultConfig(), srcMod)
+			resolvedMod := ctx.moduleToResolved[srcMod]
 
 			node := buildOIDPath(ctx.mib.Root(), 1, 3, 6)
 
@@ -658,16 +655,10 @@ func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
 	t.Run("non-preferred module does not overwrite name", func(t *testing.T) {
 		// SMIv2 module defines "preferredName" first
 		preferredSrc := &module.Module{Name: "PREFERRED-MIB", Language: types.LanguageSMIv2}
-		preferredMod := newModule("PREFERRED-MIB")
 		// SMIv1 module defines "loserName" second (lower rank, should not win)
 		loserSrc := &module.Module{Name: "LOSER-MIB", Language: types.LanguageSMIv1}
-		loserMod := newModule("LOSER-MIB")
-
-		ctx := newResolverContext([]*module.Module{preferredSrc, loserSrc}, nil, ResolverNormal, DefaultConfig())
-		ctx.moduleToResolved[preferredSrc] = preferredMod
-		ctx.resolvedToModule[preferredMod] = preferredSrc
-		ctx.moduleToResolved[loserSrc] = loserMod
-		ctx.resolvedToModule[loserMod] = loserSrc
+		ctx := newTestContextForModules(DefaultConfig(), preferredSrc, loserSrc)
+		preferredMod := ctx.moduleToResolved[preferredSrc]
 
 		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 42)
 
@@ -702,16 +693,10 @@ func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
 	t.Run("non-preferred module does not overwrite kind", func(t *testing.T) {
 		// SMIv2 module defines as OBJECT-IDENTITY (KindNode) first
 		preferredSrc := &module.Module{Name: "PREFERRED-MIB", Language: types.LanguageSMIv2}
-		preferredMod := newModule("PREFERRED-MIB")
 		// SMIv1 module defines as OBJECT-TYPE (KindScalar) second
 		loserSrc := &module.Module{Name: "LOSER-MIB", Language: types.LanguageSMIv1}
-		loserMod := newModule("LOSER-MIB")
-
-		ctx := newResolverContext([]*module.Module{preferredSrc, loserSrc}, nil, ResolverNormal, DefaultConfig())
-		ctx.moduleToResolved[preferredSrc] = preferredMod
-		ctx.resolvedToModule[preferredMod] = preferredSrc
-		ctx.moduleToResolved[loserSrc] = loserMod
-		ctx.resolvedToModule[loserMod] = loserSrc
+		ctx := newTestContextForModules(DefaultConfig(), preferredSrc, loserSrc)
+		preferredMod := ctx.moduleToResolved[preferredSrc]
 
 		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 44)
 
@@ -742,16 +727,10 @@ func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
 	t.Run("preferred module does overwrite name", func(t *testing.T) {
 		// SMIv1 module defines "olderName" first
 		olderSrc := &module.Module{Name: "OLD-MIB", Language: types.LanguageSMIv1}
-		olderMod := newModule("OLD-MIB")
 		// SMIv2 module defines "newerName" second (higher rank, should win)
 		newerSrc := &module.Module{Name: "NEW-MIB", Language: types.LanguageSMIv2}
-		newerMod := newModule("NEW-MIB")
-
-		ctx := newResolverContext([]*module.Module{olderSrc, newerSrc}, nil, ResolverNormal, DefaultConfig())
-		ctx.moduleToResolved[olderSrc] = olderMod
-		ctx.resolvedToModule[olderMod] = olderSrc
-		ctx.moduleToResolved[newerSrc] = newerMod
-		ctx.resolvedToModule[newerMod] = newerSrc
+		ctx := newTestContextForModules(DefaultConfig(), olderSrc, newerSrc)
+		newerMod := ctx.moduleToResolved[newerSrc]
 
 		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 43)
 
@@ -886,6 +865,128 @@ func TestCollectOidDefinitionsKindMapping(t *testing.T) {
 	}
 }
 
+func TestResolveOids(t *testing.T) {
+	t.Run("resolves qualified dependencies across modules", func(t *testing.T) {
+		parentMod := &module.Module{
+			Name:     "PARENT-MIB",
+			Language: types.LanguageSMIv2,
+			Definitions: []module.Definition{
+				&module.ValueAssignment{
+					DefBase: module.DefBase{Name: "parentRoot"},
+					Oid: module.NewOidAssignment([]module.OidComponent{
+						&module.OidComponentName{NameValue: "iso"},
+						&module.OidComponentNumber{Value: 3},
+						&module.OidComponentNumber{Value: 6},
+						&module.OidComponentNumber{Value: 1},
+						&module.OidComponentNumber{Value: 4},
+						&module.OidComponentNumber{Value: 1},
+						&module.OidComponentNumber{Value: 55555},
+					}, types.Span{}),
+				},
+			},
+		}
+
+		childMod := &module.Module{
+			Name:     "CHILD-MIB",
+			Language: types.LanguageSMIv2,
+			Definitions: []module.Definition{
+				&module.ValueAssignment{
+					DefBase: module.DefBase{Name: "childNode"},
+					Oid: module.NewOidAssignment([]module.OidComponent{
+						&module.OidComponentQualifiedName{ModuleValue: "PARENT-MIB", NameValue: "parentRoot"},
+						&module.OidComponentNumber{Value: 7},
+					}, types.Span{}),
+				},
+			},
+		}
+
+		ctx := newTestContextForModules(VerboseConfig(), parentMod, childMod)
+
+		resolveOids(ctx)
+
+		parentNode, ok := ctx.LookupNodeForModule(parentMod, "parentRoot")
+		testutil.True(t, ok, "parentRoot should resolve")
+		testutil.True(t, parentNode.OID().Equal(OID{1, 3, 6, 1, 4, 1, 55555}), "parentRoot OID")
+
+		childNode, ok := ctx.LookupNodeForModule(childMod, "childNode")
+		testutil.True(t, ok, "childNode should resolve")
+		testutil.True(t, childNode.OID().Equal(OID{1, 3, 6, 1, 4, 1, 55555, 7}), "childNode OID")
+		noDiag(t, ctx.Diagnostics(), types.DiagOidOrphan, types.DiagOidRecursive)
+	})
+
+	t.Run("resolves trap types after OID definitions", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TRAP-MIB",
+			Language: types.LanguageSMIv1,
+			Definitions: []module.Definition{
+				&module.ValueAssignment{
+					DefBase: module.DefBase{Name: "vendorEnterprise"},
+					Oid: module.NewOidAssignment([]module.OidComponent{
+						&module.OidComponentName{NameValue: "iso"},
+						&module.OidComponentNumber{Value: 3},
+						&module.OidComponentNumber{Value: 6},
+						&module.OidComponentNumber{Value: 1},
+						&module.OidComponentNumber{Value: 4},
+						&module.OidComponentNumber{Value: 1},
+						&module.OidComponentNumber{Value: 424242},
+					}, types.Span{}),
+				},
+				&module.Notification{
+					DefBase:  module.DefBase{Name: "vendorTrap"},
+					TrapInfo: &module.TrapInfo{Enterprise: "vendorEnterprise", TrapNumber: 11},
+				},
+			},
+		}
+
+		ctx := newTestContextForModules(VerboseConfig(), mod)
+
+		resolveOids(ctx)
+
+		enterpriseNode, ok := ctx.LookupNodeForModule(mod, "vendorEnterprise")
+		testutil.True(t, ok, "vendorEnterprise should resolve")
+		testutil.True(t, enterpriseNode.OID().Equal(OID{1, 3, 6, 1, 4, 1, 424242}), "vendorEnterprise OID")
+
+		trapNode, ok := ctx.LookupNodeForModule(mod, "vendorTrap")
+		testutil.True(t, ok, "vendorTrap should resolve")
+		testutil.True(t, trapNode.OID().Equal(OID{1, 3, 6, 1, 4, 1, 424242, 0, 11}), "vendorTrap OID")
+		testutil.Equal(t, KindNotification, trapNode.Kind(), "vendorTrap kind")
+		noDiag(t, ctx.Diagnostics(), types.DiagOidOrphan, types.DiagOidRecursive)
+	})
+
+	t.Run("records recursive diagnostics for graph cycles", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "CYCLE-MIB",
+			Language: types.LanguageSMIv2,
+			Definitions: []module.Definition{
+				&module.ValueAssignment{
+					DefBase: module.DefBase{Name: "nodeA"},
+					Oid: module.NewOidAssignment([]module.OidComponent{
+						&module.OidComponentName{NameValue: "nodeB"},
+						&module.OidComponentNumber{Value: 1},
+					}, types.Span{}),
+				},
+				&module.ValueAssignment{
+					DefBase: module.DefBase{Name: "nodeB"},
+					Oid: module.NewOidAssignment([]module.OidComponent{
+						&module.OidComponentName{NameValue: "nodeA"},
+						&module.OidComponentNumber{Value: 2},
+					}, types.Span{}),
+				},
+			},
+		}
+
+		ctx := newTestContextForModules(VerboseConfig(), mod)
+
+		resolveOids(ctx)
+
+		requireDiagCount(t, ctx.Diagnostics(), types.DiagOidRecursive, 2)
+		_, ok := ctx.LookupNodeForModule(mod, "nodeA")
+		testutil.False(t, ok, "nodeA should remain unresolved")
+		_, ok = ctx.LookupNodeForModule(mod, "nodeB")
+		testutil.False(t, ok, "nodeB should remain unresolved")
+	})
+}
+
 func TestTrapTypeRef(t *testing.T) {
 	notif := &module.Notification{
 		DefBase:  module.DefBase{Name: "myTrap", Span: types.Span{Start: 10, End: 20}},
@@ -917,14 +1018,9 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 
 	v2Src := &module.Module{Name: "NEW-MIB", Language: types.LanguageSMIv2}
 	v1Src := &module.Module{Name: "OLD-MIB", Language: types.LanguageSMIv1}
-	v2Mod := newModule("NEW-MIB")
-	v1Mod := newModule("OLD-MIB")
-
-	ctx := newResolverContext([]*module.Module{v2Src, v1Src}, nil, ResolverNormal, DefaultConfig())
-	ctx.moduleToResolved[v2Src] = v2Mod
-	ctx.moduleToResolved[v1Src] = v1Mod
-	ctx.resolvedToModule[v2Mod] = v2Src
-	ctx.resolvedToModule[v1Mod] = v1Src
+	ctx := newTestContextForModules(DefaultConfig(), v2Src, v1Src)
+	v2Mod := ctx.moduleToResolved[v2Src]
+	v1Mod := ctx.moduleToResolved[v1Src]
 
 	node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 2)
 
@@ -968,11 +1064,7 @@ func TestResolveTrapTypeDefinitions_GenericTraps(t *testing.T) {
 	//       ::= 0
 
 	srcMod := &module.Module{Name: "TEST-V1-MIB", Language: types.LanguageSMIv1}
-	resolvedMod := newModule("TEST-V1-MIB")
-
-	ctx := newResolverContext([]*module.Module{srcMod}, nil, ResolverNormal, DefaultConfig())
-	ctx.moduleToResolved[srcMod] = resolvedMod
-	ctx.resolvedToModule[resolvedMod] = srcMod
+	ctx := newTestContextForModules(DefaultConfig(), srcMod)
 
 	// Build snmpTraps node at 1.3.6.1.6.3.1.1.5
 	snmpTrapsNode := ctx.mib.Root().
@@ -1029,11 +1121,7 @@ func TestResolveTrapTypeDefinitions_EnterpriseSpecific(t *testing.T) {
 	// per RFC 3584 section 3.
 
 	srcMod := &module.Module{Name: "VENDOR-MIB", Language: types.LanguageSMIv1}
-	resolvedMod := newModule("VENDOR-MIB")
-
-	ctx := newResolverContext([]*module.Module{srcMod}, nil, ResolverNormal, DefaultConfig())
-	ctx.moduleToResolved[srcMod] = resolvedMod
-	ctx.resolvedToModule[resolvedMod] = srcMod
+	ctx := newTestContextForModules(DefaultConfig(), srcMod)
 
 	// Build vendor enterprise node at 1.3.6.1.4.1.9 (e.g. Cisco)
 	enterpriseNode := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 9)
@@ -1066,14 +1154,8 @@ func TestResolveTrapTypeDefinitions_PreferenceGating(t *testing.T) {
 	// The preferred module (SMIv2 > SMIv1) should own name, kind, and module.
 	v2Mod := &module.Module{Name: "V2-MIB", Language: types.LanguageSMIv2}
 	v1Mod := &module.Module{Name: "V1-MIB", Language: types.LanguageSMIv1}
-	v2Resolved := newModule("V2-MIB")
-	v1Resolved := newModule("V1-MIB")
-
-	ctx := newResolverContext([]*module.Module{v2Mod, v1Mod}, nil, ResolverNormal, DefaultConfig())
-	ctx.moduleToResolved[v2Mod] = v2Resolved
-	ctx.moduleToResolved[v1Mod] = v1Resolved
-	ctx.resolvedToModule[v2Resolved] = v2Mod
-	ctx.resolvedToModule[v1Resolved] = v1Mod
+	ctx := newTestContextForModules(DefaultConfig(), v2Mod, v1Mod)
+	v2Resolved := ctx.moduleToResolved[v2Mod]
 
 	// Build enterprise node
 	enterpriseNode := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 100)

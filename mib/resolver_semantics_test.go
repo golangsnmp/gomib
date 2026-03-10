@@ -982,6 +982,318 @@ func TestConvertSupportsModules(t *testing.T) {
 	})
 }
 
+func TestExtractOidRefs(t *testing.T) {
+	t.Run("nil oid", func(t *testing.T) {
+		testutil.Nil(t, extractOidRefs(nil), "expected nil refs for nil oid")
+	})
+
+	t.Run("extracts named symbolic references only", func(t *testing.T) {
+		oid := module.NewOidAssignment([]module.OidComponent{
+			&module.OidComponentNumber{Value: 1},
+			&module.OidComponentName{NameValue: "internet", Span: types.Span{Start: 1, End: 9}},
+			&module.OidComponentNamedNumber{NameValue: "private", NumberValue: 4, Span: types.Span{Start: 10, End: 20}},
+			&module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises", Span: types.Span{Start: 21, End: 36}},
+			&module.OidComponentQualifiedNamedNumber{ModuleValue: "RFC1155-SMI", NameValue: "private", NumberValue: 4, Span: types.Span{Start: 37, End: 52}},
+		}, types.Span{})
+
+		refs := extractOidRefs(&oid)
+		testutil.Len(t, refs, 4, "oid refs len")
+		testutil.Equal(t, "internet", refs[0].Name, "refs[0].Name")
+		testutil.Equal(t, ByteOffset(1), refs[0].Span.Start, "refs[0].Span.Start")
+		testutil.Equal(t, "private", refs[1].Name, "refs[1].Name")
+		testutil.Equal(t, "enterprises", refs[2].Name, "refs[2].Name")
+		testutil.Equal(t, "private", refs[3].Name, "refs[3].Name")
+	})
+}
+
+func TestIsSequenceTypeDef(t *testing.T) {
+	imported := &module.Module{
+		Name: "IMPORTED-MIB",
+		Definitions: []module.Definition{
+			&module.TypeDef{
+				DefBase: module.DefBase{Name: "ImportedEntry"},
+				Syntax:  &module.TypeSyntaxSequence{},
+			},
+			&module.TypeDef{
+				DefBase: module.DefBase{Name: "ImportedText"},
+				Syntax:  &module.TypeSyntaxOctetString{},
+			},
+		},
+	}
+	local := &module.Module{
+		Name: "LOCAL-MIB",
+		Definitions: []module.Definition{
+			&module.TypeDef{
+				DefBase: module.DefBase{Name: "LocalEntry"},
+				Syntax:  &module.TypeSyntaxSequence{},
+			},
+		},
+	}
+
+	ctx := newTestContextForModules(DefaultConfig(), local, imported)
+	ctx.moduleImports[local] = map[string]*module.Module{
+		"ImportedEntry": imported,
+		"ImportedText":  imported,
+	}
+
+	tests := []struct {
+		name string
+		mod  *module.Module
+		typ  string
+		want bool
+	}{
+		{name: "local sequence typedef", mod: local, typ: "LocalEntry", want: true},
+		{name: "imported sequence typedef", mod: local, typ: "ImportedEntry", want: true},
+		{name: "imported non-sequence typedef", mod: local, typ: "ImportedText", want: false},
+		{name: "missing typedef", mod: local, typ: "MissingEntry", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testutil.Equal(t, tt.want, isSequenceTypeDef(ctx, tt.mod, tt.typ), "isSequenceTypeDef()")
+		})
+	}
+}
+
+func TestResolveSyntaxConstraints(t *testing.T) {
+	mod := &module.Module{Name: "TEST-MIB"}
+	ctx := newTestContextForModules(DefaultConfig(), mod)
+
+	intType := newType("Integer32")
+	intType.setBase(BaseInteger32)
+	ctx.registerModuleTypeSymbol(mod, "Integer32", intType)
+
+	t.Run("nil syntax", func(t *testing.T) {
+		testutil.Nil(t, resolveSyntaxConstraints(ctx, nil, mod, "testObj"), "expected nil constraints for nil syntax")
+	})
+
+	t.Run("type and range constraints", func(t *testing.T) {
+		sc := resolveSyntaxConstraints(ctx, &module.TypeSyntaxConstrained{
+			Base: &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Constraint: &module.ConstraintRange{
+				Ranges: []module.Range{module.NewRangeSigned(1, 10, types.Span{})},
+			},
+		}, mod, "testObj")
+
+		testutil.NotNil(t, sc, "syntax constraints")
+		testutil.Equal(t, intType, sc.Type, "constraint type")
+		testutil.Len(t, sc.Ranges, 1, "ranges len")
+		testutil.Equal(t, int64(1), sc.Ranges[0].Min, "range min")
+		testutil.Equal(t, int64(10), sc.Ranges[0].Max, "range max")
+	})
+
+	t.Run("bits syntax keeps bit labels", func(t *testing.T) {
+		sc := resolveSyntaxConstraints(ctx, &module.TypeSyntaxBits{
+			NamedBits: []module.NamedBit{
+				{Name: "featureA", Position: 0},
+				{Name: "featureB", Position: 1},
+			},
+		}, mod, "bitsObj")
+
+		testutil.NotNil(t, sc, "syntax constraints")
+		testutil.Len(t, sc.Bits, 2, "bits len")
+		testutil.Equal(t, "featureA", sc.Bits[0].Label, "bits[0].Label")
+		testutil.Len(t, sc.Enums, 0, "enums len")
+	})
+}
+
+func TestCreateResolvedObjects(t *testing.T) {
+	mod := &module.Module{
+		Name: "TEST-MIB",
+		Definitions: []module.Definition{
+			&module.TypeDef{
+				DefBase: module.DefBase{Name: "IfEntry"},
+				Syntax:  &module.TypeSyntaxSequence{},
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "sysName"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "DisplayString"},
+				Access:      types.AccessReadOnly,
+				Status:      types.StatusCurrent,
+				Description: "system name",
+				Reference:   "RFC1213",
+				Units:       "chars",
+				DefVal:      &module.DefValString{Value: "public"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "testRoot"},
+					&module.OidComponentNumber{Value: 1},
+				}, types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "ifIndex"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "ifEntry"},
+					&module.OidComponentNumber{Value: 1},
+				}, types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "ifEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "IfEntry"},
+				Access:  types.AccessNotAccessible,
+				Status:  types.StatusCurrent,
+				Index: []module.IndexItem{
+					{Object: "ifIndex"},
+				},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "testRoot"},
+					&module.OidComponentNumber{Value: 2},
+				}, types.Span{}),
+			},
+		},
+	}
+
+	ctx := newTestContextForModules(DefaultConfig(), mod)
+
+	displayType := newType("DisplayString")
+	displayType.setBase(BaseOctetString)
+	displayType.setDisplayHint("255a")
+	displayType.setSizes([]Range{{Min: 0, Max: 255}})
+	ctx.registerModuleTypeSymbol(mod, "DisplayString", displayType)
+
+	intType := newType("Integer32")
+	intType.setBase(BaseInteger32)
+	ctx.registerModuleTypeSymbol(mod, "Integer32", intType)
+
+	root := ctx.mib.Root()
+	sysNameNode := registerNodeWithSymbol(ctx, mod, root, "sysName", 1, 3, 6, 1, 4, 1)
+	sysNameNode.setKind(KindScalar)
+	ifEntryNode := registerNodeWithSymbol(ctx, mod, root, "ifEntry", 1, 3, 6, 1, 4, 2)
+	ifEntryNode.setKind(KindRow)
+	ifIndexNode := registerNodeWithSymbol(ctx, mod, ifEntryNode, "ifIndex", 1)
+	ifIndexNode.setKind(KindColumn)
+
+	createResolvedObjects(ctx, collectObjectTypeRefs(ctx))
+
+	resolvedMod := ctx.moduleToResolved[mod]
+	testutil.NotNil(t, resolvedMod, "resolved module")
+
+	sysName := resolvedMod.Object("sysName")
+	testutil.NotNil(t, sysName, "sysName object")
+	testutil.Equal(t, resolvedMod, sysName.Module(), "sysName module")
+	testutil.Equal(t, sysNameNode, sysName.Node(), "sysName node")
+	testutil.Equal(t, displayType, sysName.Type(), "sysName type")
+	testutil.Equal(t, AccessReadOnly, sysName.Access(), "sysName access")
+	testutil.Equal(t, StatusCurrent, sysName.Status(), "sysName status")
+	testutil.Equal(t, "system name", sysName.Description(), "sysName description")
+	testutil.Equal(t, "RFC1213", sysName.Reference(), "sysName reference")
+	testutil.Equal(t, "chars", sysName.Units(), "sysName units")
+	testutil.Equal(t, "255a", sysName.EffectiveDisplayHint(), "sysName display hint")
+	testutil.Len(t, sysName.EffectiveSizes(), 1, "sysName sizes")
+	testutil.Len(t, sysName.OidRefs(), 1, "sysName oid refs")
+	testutil.Equal(t, "testRoot", sysName.OidRefs()[0].Name, "sysName oid ref")
+	testutil.Equal(t, DefValKindString, sysName.DefaultValue().Kind(), "sysName defval kind")
+	defval, ok := DefValAs[string](sysName.DefaultValue())
+	testutil.True(t, ok, "sysName defval type")
+	testutil.Equal(t, "public", defval, "sysName defval")
+	testutil.Equal(t, sysName, sysNameNode.Object(), "sysName node object")
+
+	ifEntry := resolvedMod.Object("ifEntry")
+	testutil.NotNil(t, ifEntry, "ifEntry object")
+	testutil.Nil(t, ifEntry.Type(), "sequence row should not resolve to a Type")
+	testutil.Equal(t, "IfEntry", ifEntry.SequenceTypeName(), "row sequence type name")
+	testutil.Len(t, ifEntry.Index(), 1, "ifEntry index len")
+	testutil.NotNil(t, ifEntry.Index()[0].Object, "ifEntry index object")
+	testutil.Equal(t, "ifIndex", ifEntry.Index()[0].Object.Name(), "ifEntry index object name")
+	testutil.Equal(t, IndexEncodingInteger, ifEntry.Index()[0].Encoding, "ifEntry index encoding")
+}
+
+func TestCreateResolvedCapabilities(t *testing.T) {
+	defMod := &module.Module{
+		Name: "CAP-MIB",
+		Definitions: []module.Definition{
+			&module.AgentCapabilities{
+				DefBase:        module.DefBase{Name: "testAgent"},
+				ProductRelease: "1.0",
+				Status:         types.StatusCurrent,
+				Description:    "capability description",
+				Reference:      "RFC2580",
+				Supports: []module.SupportsModule{
+					{
+						ModuleName: "IF-MIB",
+						Includes:   []string{"ifGeneralGroup"},
+						Variations: []module.Variation{
+							{
+								Name:             "ifAdminStatus",
+								Syntax:           &module.TypeSyntaxTypeRef{Name: "DisplayString"},
+								Access:           func() *types.Access { v := types.AccessReadOnly; return &v }(),
+								CreationRequires: []string{"ifIndex"},
+								DefVal:           &module.DefValString{Value: "up"},
+								Description:      "object variation",
+							},
+							{
+								Name:        "linkDown",
+								Access:      func() *types.Access { v := types.AccessReadOnly; return &v }(),
+								Description: "notification variation",
+							},
+						},
+					},
+				},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "testRoot"},
+					&module.OidComponentNumber{Value: 100},
+				}, types.Span{}),
+			},
+		},
+	}
+	supportsMod := &module.Module{Name: "IF-MIB"}
+
+	ctx := newTestContextForModules(VerboseConfig(), defMod, supportsMod)
+
+	displayType := newType("DisplayString")
+	displayType.setBase(BaseOctetString)
+	ctx.registerModuleTypeSymbol(defMod, "DisplayString", displayType)
+
+	root := ctx.mib.Root()
+	capNode := registerNodeWithSymbol(ctx, defMod, root, "testAgent", 1, 3, 6, 1, 4, 100)
+	capNode.setKind(KindCapability)
+
+	objNode := registerNodeWithSymbol(ctx, supportsMod, root, "ifAdminStatus", 1, 3, 6, 1, 2, 1)
+	objNode.setKind(KindColumn)
+	notifNode := registerNodeWithSymbol(ctx, supportsMod, root, "linkDown", 1, 3, 6, 1, 6, 3)
+	notifNode.setKind(KindNotification)
+
+	createResolvedCapabilities(ctx)
+
+	resolvedMod := ctx.moduleToResolved[defMod]
+	cap := resolvedMod.Capability("testAgent")
+	testutil.NotNil(t, cap, "capability")
+	testutil.Equal(t, resolvedMod, cap.Module(), "capability module")
+	testutil.Equal(t, capNode, cap.Node(), "capability node")
+	testutil.Equal(t, "1.0", cap.ProductRelease(), "product release")
+	testutil.Equal(t, "capability description", cap.Description(), "description")
+	testutil.Equal(t, "RFC2580", cap.Reference(), "reference")
+	testutil.Len(t, cap.OidRefs(), 1, "oid refs len")
+	testutil.Equal(t, "testRoot", cap.OidRefs()[0].Name, "oid ref")
+	testutil.Equal(t, cap, capNode.Capability(), "node capability")
+
+	supports := cap.Supports()
+	testutil.Len(t, supports, 1, "supports len")
+	testutil.Equal(t, "IF-MIB", supports[0].ModuleName, "supports module")
+	testutil.Len(t, supports[0].Includes, 1, "supports includes len")
+	testutil.Len(t, supports[0].ObjectVariations, 1, "object variations len")
+	testutil.Len(t, supports[0].NotificationVariations, 1, "notification variations len")
+
+	objVar := supports[0].ObjectVariations[0]
+	testutil.Equal(t, "ifAdminStatus", objVar.Object, "object variation name")
+	testutil.NotNil(t, objVar.Syntax, "object variation syntax")
+	testutil.Equal(t, displayType, objVar.Syntax.Type, "object variation syntax type")
+	testutil.NotNil(t, objVar.Access, "object variation access")
+	testutil.Equal(t, AccessReadOnly, *objVar.Access, "object variation access")
+	testutil.Len(t, objVar.CreationRequires, 1, "object variation creation-requires")
+	testutil.Equal(t, "ifIndex", objVar.CreationRequires[0], "object variation creation-requires")
+	testutil.Equal(t, DefValKindString, objVar.DefVal.Kind(), "object variation defval kind")
+
+	notifVar := supports[0].NotificationVariations[0]
+	testutil.Equal(t, "linkDown", notifVar.Notification, "notification variation name")
+	testutil.NotNil(t, notifVar.Access, "notification variation access")
+	testutil.Equal(t, AccessReadOnly, *notifVar.Access, "notification variation access")
+
+	hasDiag(t, ctx.Diagnostics(), types.DiagVariationAccessNotifOnly)
+}
+
 func TestConvertDefValOidValue(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}

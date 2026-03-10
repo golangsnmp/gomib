@@ -2265,6 +2265,45 @@ func TestCheckInvalidFormat(t *testing.T) {
 	})
 }
 
+func TestCheckTypeWithoutFormat(t *testing.T) {
+	t.Run("octet string textual convention without DISPLAY-HINT emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "DisplayStringLike"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				Status:              types.StatusCurrent,
+				Description:         "textual convention without display hint",
+				IsTextualConvention: true,
+			},
+		)
+
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagTypeWithoutFormat)
+	})
+
+	t.Run("counter textual convention without DISPLAY-HINT is allowed", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
+				module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "CounterLike"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Counter32"},
+				Status:              types.StatusCurrent,
+				Description:         "counter textual convention without display hint",
+				IsTextualConvention: true,
+			},
+		)
+
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagTypeWithoutFormat)
+	})
+}
+
 func TestCheckNodeImplicit(t *testing.T) {
 	t.Run("implicit node emits diagnostic", func(t *testing.T) {
 		mod := &module.Module{
@@ -2606,53 +2645,6 @@ func TestCheckAccessWriteOnlySMIv1(t *testing.T) {
 
 // testInetAddressMIB creates a minimal INET-ADDRESS-MIB module with the
 // type definitions needed for address pairing tests.
-// testTableModule builds a TEST-MIB with a standard table/entry/index skeleton.
-// extraImports are appended to the base SNMPv2-SMI imports.
-// columns are appended after the index definition (callers assign OIDs under testEntry).
-func testTableModule(extraImports []module.Import, columns ...module.Definition) *module.Module {
-	imports := []module.Import{
-		module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
-		module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
-		module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-	}
-	imports = append(imports, extraImports...)
-
-	defs := []module.Definition{
-		&module.ValueAssignment{
-			DefBase: module.DefBase{Name: "testRoot"},
-			Oid:     testOid("enterprises", 99999),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testTable"},
-			Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testRoot", 1),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testEntry"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
-			Status:  types.StatusCurrent,
-			Index:   []module.IndexItem{{Object: "testIndex"}},
-			Oid:     testOid("testTable", 1),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testIndex"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Access:  types.AccessNotAccessible,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testEntry", 1),
-		},
-	}
-	defs = append(defs, columns...)
-
-	return &module.Module{
-		Name:        "TEST-MIB",
-		Language:    types.LanguageSMIv2,
-		Imports:     imports,
-		Definitions: defs,
-	}
-}
-
 func testInetAddressMIB() *module.Module {
 	mod := module.NewModule("INET-ADDRESS-MIB", types.Synthetic)
 	mod.Language = types.LanguageSMIv2
@@ -3744,6 +3736,114 @@ func TestCheckIntegerMisuse_Integer32NoDiag(t *testing.T) {
 	noDiag(t, m.Diagnostics(), types.DiagIntegerInSMIv2)
 }
 
+func TestCheckTypeUnreferenced(t *testing.T) {
+	t.Run("emits for unused local type", func(t *testing.T) {
+		mod := module.NewModule("TEST-MIB", types.Span{})
+		mod.Definitions = []module.Definition{
+			&module.TypeDef{
+				DefBase: module.DefBase{Name: "UnusedType"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			},
+		}
+
+		ctx := newTestContextForModules(VerboseConfig(), mod)
+		checkTypeUnreferenced(ctx)
+
+		hasDiag(t, ctx.Diagnostics(), types.DiagTypeUnreferenced)
+	})
+
+	t.Run("skips locally referenced types", func(t *testing.T) {
+		mod := module.NewModule("TEST-MIB", types.Span{})
+		mod.Definitions = []module.Definition{
+			&module.TypeDef{
+				DefBase: module.DefBase{Name: "ParentType"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			},
+			&module.TypeDef{
+				DefBase: module.DefBase{Name: "ChildType"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "ParentType"},
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObject"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "ChildType"},
+			},
+		}
+
+		ctx := newTestContextForModules(VerboseConfig(), mod)
+		checkTypeUnreferenced(ctx)
+
+		noDiag(t, ctx.Diagnostics(), types.DiagTypeUnreferenced)
+	})
+
+	t.Run("treats imported type as referenced in source module", func(t *testing.T) {
+		source := module.NewModule("SOURCE-MIB", types.Span{})
+		source.Definitions = []module.Definition{
+			&module.TypeDef{
+				DefBase: module.DefBase{Name: "ExportedType"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			},
+		}
+
+		user := module.NewModule("USER-MIB", types.Span{})
+		user.Imports = []module.Import{
+			module.NewImport("SOURCE-MIB", "ExportedType", types.Span{}),
+		}
+		user.Definitions = []module.Definition{
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObject"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			},
+		}
+
+		ctx := newTestContextForModules(VerboseConfig(), source, user)
+		checkTypeUnreferenced(ctx)
+
+		noDiag(t, ctx.Diagnostics(), types.DiagTypeUnreferenced)
+	})
+}
+
+func TestCheckIdentifierCaseMatch(t *testing.T) {
+	t.Run("case-only collision emits diagnostic", func(t *testing.T) {
+		mod := module.NewModule("TEST-MIB", types.Span{})
+		mod.Definitions = []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testNode"},
+			},
+			&module.ObjectIdentity{
+				DefBase: module.DefBase{Name: "TestNode"},
+			},
+		}
+
+		ctx := newTestContextForModules(VerboseConfig(), mod)
+		checkIdentifierCaseMatch(ctx)
+
+		d := hasDiag(t, ctx.Diagnostics(), types.DiagIdentifierCaseMatch)
+		testutil.Contains(t, d.Message, "TestNode", "diagnostic message")
+		testutil.Contains(t, d.Message, "testNode", "diagnostic message")
+	})
+
+	t.Run("sequence row naming convention is skipped", func(t *testing.T) {
+		mod := module.NewModule("TEST-MIB", types.Span{})
+		mod.Definitions = []module.Definition{
+			&module.TypeDef{
+				DefBase: module.DefBase{Name: "TestEntry"},
+				Syntax: &module.TypeSyntaxSequence{
+					Fields: []module.SequenceField{{Name: "index", Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"}}},
+				},
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+			},
+		}
+
+		ctx := newTestContextForModules(VerboseConfig(), mod)
+		checkIdentifierCaseMatch(ctx)
+
+		noDiag(t, ctx.Diagnostics(), types.DiagIdentifierCaseMatch)
+	})
+}
+
 func TestCheckIntegerMisuse_IntegerEnumNoDiag(t *testing.T) {
 	// INTEGER with named values (enum) should not trigger.
 	mod := testSMIv2Module(
@@ -3819,6 +3919,59 @@ func TestCheckTrapInSMIv2_SMIv1TrapSkipped(t *testing.T) {
 
 	m := resolveStrict(mod)
 	noDiag(t, m.Diagnostics(), types.DiagTrapInSMIv2)
+}
+
+func TestCheckGroupUnreferenced(t *testing.T) {
+	t.Run("unreferenced groups emit diagnostics", func(t *testing.T) {
+		mod := module.NewModule("TEST-MIB", types.Span{})
+		mod.Definitions = []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "unusedObjectGroup"},
+			},
+			&module.NotificationGroup{
+				DefBase: module.DefBase{Name: "unusedNotificationGroup"},
+			},
+		}
+
+		ctx := newTestContextForModules(VerboseConfig(), mod)
+		checkGroupUnreferenced(ctx)
+
+		requireDiagCount(t, ctx.Diagnostics(), types.DiagGroupUnreferenced, 2)
+	})
+
+	t.Run("compliance and capabilities references suppress diagnostics", func(t *testing.T) {
+		mod := module.NewModule("TEST-MIB", types.Span{})
+		mod.Definitions = []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "usedObjectGroup"},
+			},
+			&module.NotificationGroup{
+				DefBase: module.DefBase{Name: "usedNotificationGroup"},
+			},
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Modules: []module.ComplianceModule{
+					{
+						MandatoryGroups: []string{"usedObjectGroup"},
+					},
+				},
+			},
+			&module.AgentCapabilities{
+				DefBase: module.DefBase{Name: "testCaps"},
+				Supports: []module.SupportsModule{
+					{
+						ModuleName: "TEST-MIB",
+						Includes:   []string{"usedNotificationGroup"},
+					},
+				},
+			},
+		}
+
+		ctx := newTestContextForModules(VerboseConfig(), mod)
+		checkGroupUnreferenced(ctx)
+
+		noDiag(t, ctx.Diagnostics(), types.DiagGroupUnreferenced)
+	})
 }
 
 // --- checkOpaqueSMIv2 ---

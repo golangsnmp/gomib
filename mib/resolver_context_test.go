@@ -92,15 +92,9 @@ func TestRecordUnresolvedSeverityConsistency(t *testing.T) {
 			tt.emit(ctx)
 
 			diags := ctx.Diagnostics()
-			var found bool
-			for _, d := range diags {
-				if d.Code == tt.code {
-					found = true
-					testutil.Equal(t, SeverityError, d.Severity, "diagnostic %q severity", tt.code)
-					testutil.Equal(t, "TEST-MIB", d.Module, "diagnostic %q module", tt.code)
-				}
-			}
-			testutil.True(t, found, "no diagnostic with code  emitted")
+			diag := hasDiag(t, diags, tt.code)
+			testutil.Equal(t, SeverityError, diag.Severity, "diagnostic %q severity", tt.code)
+			testutil.Equal(t, "TEST-MIB", diag.Module, "diagnostic %q module", tt.code)
 		})
 	}
 }
@@ -245,6 +239,60 @@ func TestLookupNodeForModule(t *testing.T) {
 
 	_, ok = ctx.LookupNodeForModule(modA, "y")
 	testutil.False(t, ok, "LookupNodeForModule: expected false for unknown symbol")
+}
+
+func TestLookupObjectInModuleScope(t *testing.T) {
+	modA := &module.Module{Name: "A"}
+	modB := &module.Module{Name: "B"}
+
+	t.Run("prefers current module object", func(t *testing.T) {
+		ctx := newTestContext()
+		resolvedA := newModule("A")
+		resolvedB := newModule("B")
+		ctx.moduleToResolved[modA] = resolvedA
+		ctx.moduleToResolved[modB] = resolvedB
+		ctx.moduleImports[modA] = map[string]*module.Module{"sharedObj": modB}
+
+		localObj := newObject("sharedObj")
+		importedObj := newObject("sharedObj")
+		resolvedA.addObject(localObj)
+		resolvedB.addObject(importedObj)
+
+		got := ctx.lookupObjectInModuleScope(modA, "sharedObj")
+		testutil.Equal(t, localObj, got, "lookup should prefer the current module object")
+		testutil.Nil(t, ctx.usedImports[modA], "local lookups should not mark imports used")
+	})
+
+	t.Run("resolves imported object and marks usage", func(t *testing.T) {
+		ctx := newTestContext()
+		resolvedA := newModule("A")
+		resolvedB := newModule("B")
+		ctx.moduleToResolved[modA] = resolvedA
+		ctx.moduleToResolved[modB] = resolvedB
+		ctx.moduleImports[modA] = map[string]*module.Module{"importedObj": modB}
+
+		importedObj := newObject("importedObj")
+		resolvedB.addObject(importedObj)
+
+		got := ctx.lookupObjectInModuleScope(modA, "importedObj")
+		testutil.Equal(t, importedObj, got, "lookup should return imported object")
+		testutil.True(t, ctx.usedImports[modA] != nil, "imported lookup should create usage tracking")
+		_, ok := ctx.usedImports[modA]["importedObj"]
+		testutil.True(t, ok, "imported lookup should mark the symbol as used")
+	})
+
+	t.Run("returns nil when imported module lacks object", func(t *testing.T) {
+		ctx := newTestContext()
+		resolvedA := newModule("A")
+		resolvedB := newModule("B")
+		ctx.moduleToResolved[modA] = resolvedA
+		ctx.moduleToResolved[modB] = resolvedB
+		ctx.moduleImports[modA] = map[string]*module.Module{"missingObj": modB}
+
+		got := ctx.lookupObjectInModuleScope(modA, "missingObj")
+		testutil.Nil(t, got, "lookup should fail when the imported module has no object")
+		testutil.Nil(t, ctx.usedImports[modA], "failed imported lookups should not mark usage")
+	})
 }
 
 func TestLookupNodeInModule(t *testing.T) {
@@ -661,6 +709,46 @@ func TestDropModules(t *testing.T) {
 	testutil.NotNil(t, ctx.moduleSymbolToNode, "expected ModuleSymbolToNode to survive DropModules")
 	testutil.NotNil(t, ctx.moduleSymbolToType, "expected ModuleSymbolToType to survive DropModules")
 	testutil.NotNil(t, ctx.moduleImports, "expected ModuleImports to survive DropModules")
+}
+
+func TestCopyUsedImportsToModules_Direct(t *testing.T) {
+	importer := &module.Module{Name: "IMPORTER-MIB"}
+	source := &module.Module{Name: "SOURCE-MIB"}
+	ctx := newTestContextForModules(DefaultConfig(), importer, source)
+
+	ctx.usedImports[importer] = map[string]struct{}{
+		"usedOne": {},
+		"usedTwo": {},
+	}
+	ctx.usedImports[&module.Module{Name: "UNMAPPED-MIB"}] = map[string]struct{}{
+		"ignored": {},
+	}
+
+	copyUsedImportsToModules(ctx)
+
+	resolvedImporter := ctx.moduleToResolved[importer]
+	testutil.True(t, resolvedImporter.IsImportUsed("usedOne"), "usedOne should be copied to the resolved module")
+	testutil.True(t, resolvedImporter.IsImportUsed("usedTwo"), "usedTwo should be copied to the resolved module")
+	testutil.False(t, resolvedImporter.IsImportUsed("ignored"), "usage from unmapped modules should be ignored")
+}
+
+func TestCopyResolvedImportsToModules_Direct(t *testing.T) {
+	importer := &module.Module{Name: "IMPORTER-MIB"}
+	source := &module.Module{Name: "SOURCE-MIB"}
+	unmapped := &module.Module{Name: "UNMAPPED-MIB"}
+	ctx := newTestContextForModules(DefaultConfig(), importer, source)
+
+	ctx.moduleImports[importer] = map[string]*module.Module{
+		"goodImport": source,
+		"skipImport": unmapped,
+	}
+
+	copyResolvedImportsToModules(ctx)
+
+	resolvedImporter := ctx.moduleToResolved[importer]
+	resolvedSource := ctx.moduleToResolved[source]
+	testutil.Equal(t, resolvedSource, resolvedImporter.ImportSource("goodImport"), "resolved import source")
+	testutil.Nil(t, resolvedImporter.ImportSource("skipImport"), "imports without resolved module mappings should be skipped")
 }
 
 func TestDiagnosticConfig_Getter(t *testing.T) {
