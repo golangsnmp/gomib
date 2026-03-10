@@ -2954,3 +2954,719 @@ func TestCheckIpAddressDeprecation(t *testing.T) {
 		noDiag(t, m.Diagnostics(), types.DiagIpAddressInSyntax)
 	})
 }
+
+// --- checkRangeConstraints tests ---
+
+func TestCheckRangeConstraints_SizeIllegalOnInteger(t *testing.T) {
+	// SIZE constraint on an Integer32 type should emit size-illegal.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "BadSize"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeSigned(0, 255, types.Span{})}},
+			},
+			Status: types.StatusCurrent,
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagSizeIllegal)
+}
+
+func TestCheckRangeConstraints_SizeValidOnOctetString(t *testing.T) {
+	// SIZE constraint on OCTET STRING is valid, no diagnostic.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "goodSize"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxOctetString{},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeSigned(0, 255, types.Span{})}},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagSizeIllegal)
+}
+
+func TestCheckRangeConstraints_RangeIllegalOnOctetString(t *testing.T) {
+	// Value range constraint on OCTET STRING should emit range-illegal.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "BadRange"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxOctetString{},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(0, 255, types.Span{})}},
+			},
+			Status: types.StatusCurrent,
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagRangeIllegal)
+}
+
+func TestCheckRangeConstraints_CounterRange(t *testing.T) {
+	// Range constraint on Counter32 should emit counter-range-illegal.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "BadCounter"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxTypeRef{Name: "Counter32"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(0, 100, types.Span{})}},
+			},
+			Status: types.StatusCurrent,
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagCounterRangeIllegal)
+}
+
+func TestCheckRangeConstraints_TimeticksRange(t *testing.T) {
+	// Range constraint on TimeTicks should emit timeticks-range-illegal.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "TimeTicks", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "BadTicks"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxTypeRef{Name: "TimeTicks"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(0, 100, types.Span{})}},
+			},
+			Status: types.StatusCurrent,
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagTimeticksRangeIllegal)
+}
+
+func TestCheckRangeConstraints_ExchangedLimits(t *testing.T) {
+	// Range with min > max should emit range-exchanged.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "Exchanged"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(100, 0, types.Span{})}},
+			},
+			Status: types.StatusCurrent,
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagRangeExchanged)
+}
+
+func TestCheckRangeConstraints_RangeBoundsExceeded(t *testing.T) {
+	// Range exceeding Integer32 bounds should emit range-bounds.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "OutOfBounds"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base: &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{
+					module.NewRangeSigned(0, 3000000000, types.Span{}),
+				}},
+			},
+			Status: types.StatusCurrent,
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagRangeBounds)
+}
+
+func TestCheckRangeConstraints_RangeOverlap(t *testing.T) {
+	// Overlapping ranges should emit range-overlap.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "Overlap"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base: &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{
+					module.NewRangeSigned(0, 10, types.Span{}),
+					module.NewRangeSigned(5, 20, types.Span{}),
+				}},
+			},
+			Status: types.StatusCurrent,
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagRangeOverlap)
+}
+
+func TestCheckRangeConstraints_RangeAscending(t *testing.T) {
+	// Ranges not in ascending order should emit range-ascending.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "Descending"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base: &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{
+					module.NewRangeSigned(10, 20, types.Span{}),
+					module.NewRangeSigned(0, 5, types.Span{}),
+				}},
+			},
+			Status: types.StatusCurrent,
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagRangeAscending)
+}
+
+func TestCheckRangeConstraints_ValidRange(t *testing.T) {
+	// Valid non-overlapping ascending ranges should produce no range diagnostics.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "GoodRange"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base: &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{
+					module.NewRangeSigned(0, 10, types.Span{}),
+					module.NewRangeSigned(20, 30, types.Span{}),
+				}},
+			},
+			Status: types.StatusCurrent,
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(),
+		types.DiagRangeExchanged,
+		types.DiagRangeBounds,
+		types.DiagRangeOverlap,
+		types.DiagRangeAscending,
+		types.DiagSizeIllegal,
+		types.DiagRangeIllegal,
+	)
+}
+
+func TestCheckRangeConstraints_ObjectTypeSizeIllegal(t *testing.T) {
+	// SIZE constraint on an OBJECT-TYPE with Integer32 syntax.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "badObjSize"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Constraint: &module.ConstraintSize{Ranges: []module.Range{module.NewRangeSigned(0, 10, types.Span{})}},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagSizeIllegal)
+}
+
+func TestCheckRangeConstraints_ObjectTypeRangeOnGauge(t *testing.T) {
+	// Valid range constraint on Gauge32 OBJECT-TYPE - no diagnostic.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Gauge32", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "goodGauge"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxTypeRef{Name: "Gauge32"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeUnsigned(0, 100, types.Span{})}},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(),
+		types.DiagRangeIllegal,
+		types.DiagCounterRangeIllegal,
+		types.DiagRangeBounds,
+	)
+}
+
+// --- checkDefvalConstraints tests ---
+
+func TestCheckDefvalConstraints_CounterDefval(t *testing.T) {
+	// DEFVAL on Counter32 should emit counter-defval-illegal.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "badCounter"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Counter32"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			DefVal:  &module.DefValInteger{Value: 0},
+			Oid:     testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagCounterDefvalIllegal)
+}
+
+func TestCheckDefvalConstraints_BasetypeExceeded(t *testing.T) {
+	// DEFVAL exceeding Integer32 range should emit defval-basetype.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "bigVal"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			DefVal:  &module.DefValInteger{Value: 3000000000},
+			Oid:     testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagDefvalBasetype)
+}
+
+func TestCheckDefvalConstraints_OutsideRange(t *testing.T) {
+	// DEFVAL outside RANGE constraint should emit defval-range.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "outOfRange"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(1, 10, types.Span{})}},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			DefVal: &module.DefValInteger{Value: 50},
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagDefvalRange)
+}
+
+func TestCheckDefvalConstraints_WithinRange(t *testing.T) {
+	// DEFVAL within RANGE constraint should not emit defval-range.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "inRange"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base:       &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(1, 10, types.Span{})}},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			DefVal: &module.DefValInteger{Value: 5},
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagDefvalRange, types.DiagDefvalBasetype)
+}
+
+func TestCheckDefvalConstraints_EnumLabelInvalid(t *testing.T) {
+	// DEFVAL with enum label not in the type should emit defval-enum.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "badEnum"},
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				NamedNumbers: []module.NamedNumber{
+					{Name: "up", Value: 1},
+					{Name: "down", Value: 2},
+				},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			DefVal: &module.DefValEnum{Name: "unknown"},
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagDefvalEnum)
+}
+
+func TestCheckDefvalConstraints_EnumLabelValid(t *testing.T) {
+	// DEFVAL with valid enum label should not emit defval-enum.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "goodEnum"},
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				NamedNumbers: []module.NamedNumber{
+					{Name: "up", Value: 1},
+					{Name: "down", Value: 2},
+				},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			DefVal: &module.DefValEnum{Name: "up"},
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagDefvalEnum)
+}
+
+func TestCheckDefvalConstraints_BitsLabelInvalid(t *testing.T) {
+	// DEFVAL with BITS label not in the type should emit defval-bits.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "badBits"},
+			Syntax: &module.TypeSyntaxBits{
+				NamedBits: []module.NamedBit{
+					{Name: "read", Position: 0},
+					{Name: "write", Position: 1},
+				},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			DefVal: &module.DefValBits{Labels: []string{"execute"}},
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagDefvalBits)
+}
+
+func TestCheckDefvalConstraints_BitsLabelValid(t *testing.T) {
+	// DEFVAL with valid BITS labels should not emit defval-bits.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "goodBits"},
+			Syntax: &module.TypeSyntaxBits{
+				NamedBits: []module.NamedBit{
+					{Name: "read", Position: 0},
+					{Name: "write", Position: 1},
+				},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			DefVal: &module.DefValBits{Labels: []string{"read", "write"}},
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagDefvalBits)
+}
+
+// --- checkSequenceFields tests ---
+
+// buildTableModule constructs a module with a table, row, and columns.
+// The SEQUENCE type has the given fields, while columns are the actual
+// OBJECT-TYPE children of the row.
+func buildTableModule(seqFields []module.SequenceField, columns []string) *module.Module {
+	imports := []module.Import{
+		module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+	}
+
+	defs := []module.Definition{
+		&module.ValueAssignment{
+			DefBase: module.DefBase{Name: "testRoot"},
+			Oid:     testOid("enterprises", 99999),
+		},
+		// SEQUENCE type definition
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "TestEntry"},
+			Syntax:  &module.TypeSyntaxSequence{Fields: seqFields},
+		},
+		// Table
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testTable"},
+			Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testRoot", 1),
+		},
+		// Row
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testEntry"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+			Status:  types.StatusCurrent,
+			Index:   []module.IndexItem{{Object: "col1"}},
+			Oid:     testOid("testTable", 1),
+		},
+	}
+
+	// Add columns in order
+	for i, name := range columns {
+		defs = append(defs, &module.ObjectType{
+			DefBase: module.DefBase{Name: name},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", uint32(i+1)),
+		})
+	}
+
+	return &module.Module{
+		Name:        "TEST-MIB",
+		Language:    types.LanguageSMIv2,
+		Imports:     imports,
+		Definitions: defs,
+	}
+}
+
+func TestCheckSequenceFields_Valid(t *testing.T) {
+	// SEQUENCE fields match columns exactly - no diagnostics.
+	fields := []module.SequenceField{
+		{Name: "col1", Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"}},
+		{Name: "col2", Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"}},
+	}
+	mod := buildTableModule(fields, []string{"col1", "col2"})
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(),
+		types.DiagSequenceNoColumn,
+		types.DiagSequenceMissingColumn,
+		types.DiagSequenceOrder,
+		types.DiagSequenceTypeMismatch,
+	)
+}
+
+func TestCheckSequenceFields_NoColumn(t *testing.T) {
+	// SEQUENCE field "col3" has no matching column object.
+	fields := []module.SequenceField{
+		{Name: "col1", Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"}},
+		{Name: "col3", Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"}},
+	}
+	mod := buildTableModule(fields, []string{"col1", "col2"})
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagSequenceNoColumn)
+}
+
+func TestCheckSequenceFields_MissingColumn(t *testing.T) {
+	// Column "col2" exists but is not listed in the SEQUENCE.
+	fields := []module.SequenceField{
+		{Name: "col1", Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"}},
+	}
+	mod := buildTableModule(fields, []string{"col1", "col2"})
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagSequenceMissingColumn)
+}
+
+func TestCheckSequenceFields_OrderMismatch(t *testing.T) {
+	// SEQUENCE lists col2 before col1, but OID order is col1(1), col2(2).
+	fields := []module.SequenceField{
+		{Name: "col2", Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"}},
+		{Name: "col1", Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"}},
+	}
+	mod := buildTableModule(fields, []string{"col1", "col2"})
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagSequenceOrder)
+}
+
+func TestCheckSequenceFields_TypeMismatch(t *testing.T) {
+	// SEQUENCE field says DisplayString but column object uses Integer32.
+	fields := []module.SequenceField{
+		{Name: "col1", Syntax: &module.TypeSyntaxTypeRef{Name: "DisplayString"}},
+		{Name: "col2", Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"}},
+	}
+	mod := buildTableModule(fields, []string{"col1", "col2"})
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagSequenceTypeMismatch)
+}
+
+// --- checkEnumSubtyping tests ---
+
+func TestCheckEnumSubtyping_InvalidValue(t *testing.T) {
+	// Subtype enum with a named value not in parent should emit subtype-enumeration-illegal.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		// Parent type with enum values
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "ParentEnum"},
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				NamedNumbers: []module.NamedNumber{
+					{Name: "up", Value: 1},
+					{Name: "down", Value: 2},
+				},
+			},
+			Status:              types.StatusCurrent,
+			IsTextualConvention: true,
+		},
+		// Subtype referencing ParentEnum with invalid value "testing(3)"
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "badSubtype"},
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				Base: "ParentEnum",
+				NamedNumbers: []module.NamedNumber{
+					{Name: "up", Value: 1},
+					{Name: "testing", Value: 3},
+				},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagSubtypeEnumIllegal)
+}
+
+func TestCheckEnumSubtyping_ValidSubset(t *testing.T) {
+	// Subtype enum with values all present in parent - no diagnostic.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "ParentEnum"},
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				NamedNumbers: []module.NamedNumber{
+					{Name: "up", Value: 1},
+					{Name: "down", Value: 2},
+					{Name: "testing", Value: 3},
+				},
+			},
+			Status:              types.StatusCurrent,
+			IsTextualConvention: true,
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "goodSubtype"},
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				Base: "ParentEnum",
+				NamedNumbers: []module.NamedNumber{
+					{Name: "up", Value: 1},
+					{Name: "down", Value: 2},
+				},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagSubtypeEnumIllegal)
+}
+
+// --- checkObsoleteImports tests ---
+
+func TestCheckObsoleteImports_RFC1155InSMIv2(t *testing.T) {
+	// An SMIv2 module importing from RFC1155-SMI should emit obsolete-import.
+	mod := buildTestModule(testModuleConfig{
+		language:    types.LanguageSMIv2,
+		baseImport:  module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		includeRoot: true,
+	})
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagObsoleteImport)
+}
+
+func TestCheckObsoleteImports_RFC1213DisplayStringInSMIv2(t *testing.T) {
+	// SMIv2 module importing DisplayString from RFC1213-MIB should emit obsolete-import.
+	mod := buildTestModule(testModuleConfig{
+		language:   types.LanguageSMIv2,
+		baseImport: module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		extraImports: []module.Import{
+			module.NewImport("RFC1213-MIB", "DisplayString", types.Span{}),
+		},
+		includeRoot: true,
+	})
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagObsoleteImport)
+}
+
+func TestCheckObsoleteImports_SMIv1ModuleSkipped(t *testing.T) {
+	// An SMIv1 module importing from RFC1155-SMI should NOT emit obsolete-import.
+	mod := buildTestModule(testModuleConfig{
+		language:    types.LanguageSMIv1,
+		baseImport:  module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		includeRoot: true,
+	})
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagObsoleteImport)
+}
+
+func TestCheckObsoleteImports_RFC1065InSMIv2(t *testing.T) {
+	// SMIv2 module importing from RFC1065-SMI should emit obsolete-import.
+	mod := buildTestModule(testModuleConfig{
+		language:    types.LanguageSMIv2,
+		baseImport:  module.NewImport("RFC1065-SMI", "enterprises", types.Span{}),
+		includeRoot: true,
+	})
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagObsoleteImport)
+}
