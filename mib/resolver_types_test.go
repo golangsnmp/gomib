@@ -505,6 +505,327 @@ func TestResolveBaseFromChain(t *testing.T) {
 	})
 }
 
+func TestResolveTypeRefParentsGraph(t *testing.T) {
+	makeTypeDef := func(name, baseName string) *module.TypeDef {
+		return &module.TypeDef{
+			DefBase: module.DefBase{Name: name},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: baseName},
+		}
+	}
+
+	t.Run("links local and imported parents", func(t *testing.T) {
+		baseMod := module.NewModule("BASE-MIB", types.Span{})
+		baseMod.Definitions = []module.Definition{
+			makeTypeDef("BaseText", "INTEGER"),
+		}
+
+		userMod := module.NewModule("USER-MIB", types.Span{})
+		userMod.Imports = []module.Import{
+			module.NewImport("BASE-MIB", "BaseText", types.Span{}),
+		}
+		userMod.Definitions = []module.Definition{
+			makeTypeDef("MidText", "BaseText"),
+			makeTypeDef("LeafText", "MidText"),
+		}
+
+		ctx := newTestContextForModules(DefaultConfig(), baseMod, userMod)
+		ctx.snmpv2SMIModule = baseMod
+		ctx.moduleDefNames[baseMod] = map[string]struct{}{
+			"BaseText": {},
+			"INTEGER":  {},
+		}
+		ctx.moduleDefNames[userMod] = map[string]struct{}{
+			"MidText":  {},
+			"LeafText": {},
+		}
+		ctx.registerImport(userMod, "BaseText", baseMod)
+
+		integerType := newType("INTEGER")
+		integerType.setBase(BaseInteger32)
+		ctx.registerModuleTypeSymbol(baseMod, "INTEGER", integerType)
+
+		createUserTypes(ctx)
+		resolveTypeRefParentsGraph(ctx)
+
+		baseText, ok := ctx.LookupTypeForModule(baseMod, "BaseText")
+		testutil.True(t, ok, "BaseText should exist")
+		midText, ok := ctx.LookupTypeForModule(userMod, "MidText")
+		testutil.True(t, ok, "MidText should exist")
+		leafText, ok := ctx.LookupTypeForModule(userMod, "LeafText")
+		testutil.True(t, ok, "LeafText should exist")
+
+		testutil.Equal(t, integerType, baseText.Parent(), "BaseText parent")
+		testutil.Equal(t, baseText, midText.Parent(), "MidText parent")
+		testutil.Equal(t, midText, leafText.Parent(), "LeafText parent")
+		testutil.Len(t, ctx.unresolvedTypes, 0, "unresolved types")
+	})
+
+	t.Run("records each cycle participant as unresolved", func(t *testing.T) {
+		mod := module.NewModule("CYCLE-MIB", types.Span{})
+		mod.Definitions = []module.Definition{
+			makeTypeDef("TypeA", "TypeB"),
+			makeTypeDef("TypeB", "TypeA"),
+		}
+
+		ctx := newTestContextForModules(DefaultConfig(), mod)
+		ctx.moduleDefNames[mod] = map[string]struct{}{
+			"TypeA": {},
+			"TypeB": {},
+		}
+
+		createUserTypes(ctx)
+		resolveTypeRefParentsGraph(ctx)
+
+		testutil.Len(t, ctx.unresolvedTypes, 2, "unresolved types")
+		pairs := map[string]struct{}{}
+		for _, unresolved := range ctx.unresolvedTypes {
+			pairs[unresolved.referrer+"->"+unresolved.referenced] = struct{}{}
+		}
+		_, hasAB := pairs["TypeA->TypeB"]
+		_, hasBA := pairs["TypeB->TypeA"]
+		testutil.True(t, hasAB, "expected TypeA->TypeB unresolved pair")
+		testutil.True(t, hasBA, "expected TypeB->TypeA unresolved pair")
+	})
+}
+
+func TestSeedPrimitiveTypes(t *testing.T) {
+	t.Run("seeds ASN.1 primitives into SNMPv2-SMI module", func(t *testing.T) {
+		smiMod := module.NewModule(moduleSNMPv2SMI, types.Span{})
+		ctx := newTestContextForModules(DefaultConfig(), smiMod)
+		ctx.snmpv2SMIModule = smiMod
+
+		seedPrimitiveTypes(ctx)
+
+		tests := []struct {
+			name string
+			base BaseType
+		}{
+			{"INTEGER", BaseInteger32},
+			{"OCTET STRING", BaseOctetString},
+			{"OBJECT IDENTIFIER", BaseObjectIdentifier},
+			{"BITS", BaseBits},
+		}
+		for _, tt := range tests {
+			typ, ok := ctx.LookupTypeForModule(smiMod, tt.name)
+			testutil.True(t, ok, "expected primitive type to be registered")
+			testutil.Equal(t, tt.base, typ.Base(), tt.name+" base")
+		}
+		testutil.Equal(t, 4, ctx.TypeCount(), "type count")
+	})
+
+	t.Run("without SNMPv2-SMI module does nothing", func(t *testing.T) {
+		ctx := newTestContext()
+		seedPrimitiveTypes(ctx)
+		testutil.Equal(t, 0, ctx.TypeCount(), "type count")
+	})
+}
+
+func TestFindTypeDefiningModule(t *testing.T) {
+	localMod := module.NewModule("LOCAL-MIB", types.Span{})
+	sourceMod := module.NewModule("SOURCE-MIB", types.Span{})
+	smiMod := module.NewModule(moduleSNMPv2SMI, types.Span{})
+
+	ctx := newTestContextForModules(DefaultConfig(), localMod, sourceMod, smiMod)
+	ctx.snmpv2SMIModule = smiMod
+	ctx.moduleDefNames[localMod] = map[string]struct{}{"LocalType": {}}
+	ctx.registerImport(localMod, "ImportedType", sourceMod)
+
+	t.Run("prefers local definition", func(t *testing.T) {
+		got := findTypeDefiningModule(ctx, localMod, "LocalType")
+		testutil.Equal(t, "LOCAL-MIB", got, "module")
+	})
+
+	t.Run("follows imports", func(t *testing.T) {
+		got := findTypeDefiningModule(ctx, localMod, "ImportedType")
+		testutil.Equal(t, "SOURCE-MIB", got, "module")
+	})
+
+	t.Run("falls back to well-known module", func(t *testing.T) {
+		got := findTypeDefiningModule(ctx, localMod, "INTEGER")
+		testutil.Equal(t, moduleSNMPv2SMI, got, "module")
+	})
+
+	t.Run("missing type returns empty string", func(t *testing.T) {
+		got := findTypeDefiningModule(ctx, localMod, "MissingType")
+		testutil.Equal(t, "", got, "module")
+	})
+}
+
+func TestTryResolveTypeParent(t *testing.T) {
+	mod := module.NewModule("TEST-MIB", types.Span{})
+	ctx := newTestContextForModules(DefaultConfig(), mod)
+
+	parent := newType("ParentType")
+	parent.setBase(BaseInteger32)
+	ctx.registerModuleTypeSymbol(mod, "ParentType", parent)
+
+	child := newType("ChildType")
+	entry := typeResolutionEntry{
+		mod: mod,
+		td: &module.TypeDef{
+			DefBase: module.DefBase{Name: "ChildType"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "ParentType"},
+		},
+		typ: child,
+	}
+
+	t.Run("sets parent when referenced type exists", func(t *testing.T) {
+		ok := tryResolveTypeParent(ctx, entry)
+		testutil.True(t, ok, "expected parent resolution to succeed")
+		testutil.Equal(t, parent, child.Parent(), "parent")
+	})
+
+	t.Run("returns false for unresolved type", func(t *testing.T) {
+		other := newType("OtherType")
+		ok := tryResolveTypeParent(ctx, typeResolutionEntry{
+			mod: mod,
+			td: &module.TypeDef{
+				DefBase: module.DefBase{Name: "OtherType"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MissingType"},
+			},
+			typ: other,
+		})
+		testutil.False(t, ok, "expected parent resolution to fail")
+		testutil.Nil(t, other.Parent(), "parent")
+	})
+}
+
+func TestLinkPrimitiveSyntaxParents(t *testing.T) {
+	smiMod := module.NewModule(moduleSNMPv2SMI, types.Span{})
+	userMod := module.NewModule("USER-MIB", types.Span{})
+	userMod.Definitions = []module.Definition{
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "MyOctets"},
+			Syntax:  &module.TypeSyntaxOctetString{},
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "MyEnum"},
+			Syntax:  &module.TypeSyntaxIntegerEnum{NamedNumbers: []module.NamedNumber{{Name: "up", Value: 1}}},
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "MyBits"},
+			Syntax:  &module.TypeSyntaxBits{NamedBits: []module.NamedBit{{Name: "flag", Position: 0}}},
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "MyOid"},
+			Syntax:  &module.TypeSyntaxObjectIdentifier{},
+		},
+	}
+
+	ctx := newTestContextForModules(DefaultConfig(), smiMod, userMod)
+	ctx.snmpv2SMIModule = smiMod
+	seedPrimitiveTypes(ctx)
+	createUserTypes(ctx)
+
+	linkPrimitiveSyntaxParents(ctx)
+
+	cases := []struct {
+		name       string
+		parentName string
+	}{
+		{"MyOctets", "OCTET STRING"},
+		{"MyEnum", "INTEGER"},
+		{"MyBits", "BITS"},
+		{"MyOid", "OBJECT IDENTIFIER"},
+	}
+	for _, tc := range cases {
+		typ, ok := ctx.LookupTypeForModule(userMod, tc.name)
+		testutil.True(t, ok, "expected type to exist")
+		parent, ok := ctx.LookupType(tc.parentName)
+		testutil.True(t, ok, "expected primitive parent to exist")
+		testutil.Equal(t, parent, typ.Parent(), tc.name+" parent")
+	}
+
+	t.Run("existing parent is preserved", func(t *testing.T) {
+		mod := module.NewModule("KEEP-MIB", types.Span{})
+		mod.Definitions = []module.Definition{
+			&module.TypeDef{
+				DefBase: module.DefBase{Name: "AlreadyLinked"},
+				Syntax:  &module.TypeSyntaxOctetString{},
+			},
+		}
+		ctx := newTestContextForModules(DefaultConfig(), smiMod, mod)
+		ctx.snmpv2SMIModule = smiMod
+		seedPrimitiveTypes(ctx)
+		createUserTypes(ctx)
+
+		typ, _ := ctx.LookupTypeForModule(mod, "AlreadyLinked")
+		customParent := newType("CustomParent")
+		typ.setParent(customParent)
+
+		linkPrimitiveSyntaxParents(ctx)
+
+		testutil.Equal(t, customParent, typ.Parent(), "parent")
+	})
+}
+
+func TestLinkRFC1213TypesToTCs(t *testing.T) {
+	rfc1213 := module.NewModule("RFC1213-MIB", types.Span{})
+	rfc1213.Definitions = []module.Definition{
+		&module.TypeDef{DefBase: module.DefBase{Name: "DisplayString"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
+		&module.TypeDef{DefBase: module.DefBase{Name: "PhysAddress"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
+	}
+	snmpv2tc := module.NewModule(moduleSNMPv2TC, types.Span{})
+	snmpv2tc.Definitions = []module.Definition{
+		&module.TypeDef{DefBase: module.DefBase{Name: "DisplayString"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
+		&module.TypeDef{DefBase: module.DefBase{Name: "PhysAddress"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
+	}
+
+	ctx := newTestContextForModules(DefaultConfig(), rfc1213, snmpv2tc)
+	createUserTypes(ctx)
+
+	linkRFC1213TypesToTCs(ctx)
+
+	rfcDisplay, _ := ctx.LookupTypeForModule(rfc1213, "DisplayString")
+	tcDisplay, _ := ctx.LookupTypeForModule(snmpv2tc, "DisplayString")
+	testutil.Equal(t, tcDisplay, rfcDisplay.Parent(), "DisplayString parent")
+
+	rfcPhys, _ := ctx.LookupTypeForModule(rfc1213, "PhysAddress")
+	tcPhys, _ := ctx.LookupTypeForModule(snmpv2tc, "PhysAddress")
+	testutil.Equal(t, tcPhys, rfcPhys.Parent(), "PhysAddress parent")
+}
+
+func TestInheritBaseTypes(t *testing.T) {
+	t.Run("inherits base type from parent chain", func(t *testing.T) {
+		ctx := newTestContext()
+
+		root := newType("OCTET STRING")
+		root.setBase(BaseOctetString)
+		mid := newType("DisplayString")
+		mid.setBase(BaseUnknown)
+		mid.setParent(root)
+		leaf := newType("VendorString")
+		leaf.setBase(BaseUnknown)
+		leaf.setParent(mid)
+
+		ctx.mib.addType(root)
+		ctx.mib.addType(mid)
+		ctx.mib.addType(leaf)
+
+		inheritBaseTypes(ctx)
+
+		testutil.Equal(t, BaseOctetString, mid.Base(), "mid base")
+		testutil.Equal(t, BaseOctetString, leaf.Base(), "leaf base")
+	})
+
+	t.Run("application base types are preserved", func(t *testing.T) {
+		ctx := newTestContext()
+
+		root := newType("INTEGER")
+		root.setBase(BaseInteger32)
+		app := newType("Counter32")
+		app.setBase(BaseCounter32)
+		app.setParent(root)
+
+		ctx.mib.addType(root)
+		ctx.mib.addType(app)
+
+		inheritBaseTypes(ctx)
+
+		testutil.Equal(t, BaseCounter32, app.Base(), "application base")
+	})
+}
+
 func TestCreateUserTypes_Reference(t *testing.T) {
 	// A TEXTUAL-CONVENTION with a REFERENCE clause should have its
 	// Reference() populated on the resolved Type.

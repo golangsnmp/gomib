@@ -24,17 +24,7 @@ func TestBaseModuleTypeDescriptions(t *testing.T) {
 	}
 
 	for _, name := range typesWithDescs {
-		typ := m.Type(name)
-		if typ == nil {
-			t.Errorf("type %q not found", name)
-			continue
-		}
-		if typ.Description() == "" {
-			t.Errorf("type %q has empty description", name)
-		}
-		if typ.Reference() == "" {
-			t.Errorf("type %q has empty reference", name)
-		}
+		requireTypeDescriptionAndReference(t, m, name)
 	}
 }
 
@@ -49,14 +39,7 @@ func TestBaseModuleNodeDescriptions(t *testing.T) {
 	}
 
 	for _, name := range nodesWithDescs {
-		node := m.Node(name)
-		if node == nil {
-			t.Errorf("node %q not found", name)
-			continue
-		}
-		if node.Description() == "" {
-			t.Errorf("node %q has empty description", name)
-		}
+		requireNodeDescription(t, m, name)
 	}
 }
 
@@ -72,14 +55,7 @@ func TestBaseModuleNodeReferences(t *testing.T) {
 	}
 
 	for _, name := range nodesWithRefs {
-		node := m.Node(name)
-		if node == nil {
-			t.Errorf("node %q not found", name)
-			continue
-		}
-		if node.Reference() == "" {
-			t.Errorf("node %q has empty reference", name)
-		}
+		requireNodeReference(t, m, name)
 	}
 }
 
