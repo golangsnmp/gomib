@@ -434,8 +434,10 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 		// distinguish based on type code
 		isBitsType := cNode._type == 12 // TYPE_BITSTRING
 		for j := range int(cNode.enum_count) {
-			val := int(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.enum_values)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
-			namePtr := *(**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.enum_names)) + uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
+			valPtr := (*C.int)(unsafe.Add(unsafe.Pointer(cNode.enum_values), uintptr(j)*unsafe.Sizeof(C.int(0))))
+			val := int(*valPtr)
+			namePtrPtr := (**C.char)(unsafe.Add(unsafe.Pointer(cNode.enum_names), uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
+			namePtr := *namePtrPtr
 			name := C.GoString(namePtr)
 			if isBitsType {
 				node.BitValues[val] = name
@@ -445,8 +447,10 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 		}
 
 		for j := range int(cNode.index_count) {
-			idxPtr := *(**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.indexes)) + uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
-			implied := *(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.implied_flags)) + uintptr(j)*unsafe.Sizeof(C.int(0))))
+			idxPtrPtr := (**C.char)(unsafe.Add(unsafe.Pointer(cNode.indexes), uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
+			idxPtr := *idxPtrPtr
+			impliedPtr := (*C.int)(unsafe.Add(unsafe.Pointer(cNode.implied_flags), uintptr(j)*unsafe.Sizeof(C.int(0))))
+			implied := *impliedPtr
 			node.Indexes = append(node.Indexes, IndexInfo{
 				Name:    C.GoString(idxPtr),
 				Implied: implied != 0,
@@ -454,13 +458,16 @@ func collectNetSnmpNodes() map[string]*NormalizedNode {
 		}
 
 		for j := range int(cNode.range_count) {
-			low := int64(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.range_lows)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
-			high := int64(*(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.range_highs)) + uintptr(j)*unsafe.Sizeof(C.int(0)))))
+			lowPtr := (*C.int)(unsafe.Add(unsafe.Pointer(cNode.range_lows), uintptr(j)*unsafe.Sizeof(C.int(0))))
+			highPtr := (*C.int)(unsafe.Add(unsafe.Pointer(cNode.range_highs), uintptr(j)*unsafe.Sizeof(C.int(0))))
+			low := int64(*lowPtr)
+			high := int64(*highPtr)
 			node.Ranges = append(node.Ranges, RangeInfo{Low: low, High: high})
 		}
 
 		for j := range int(cNode.varbind_count) {
-			vbPtr := *(**C.char)(unsafe.Pointer(uintptr(unsafe.Pointer(cNode.varbinds)) + uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
+			vbPtrPtr := (**C.char)(unsafe.Add(unsafe.Pointer(cNode.varbinds), uintptr(j)*unsafe.Sizeof((*C.char)(nil))))
+			vbPtr := *vbPtrPtr
 			node.Varbinds = append(node.Varbinds, C.GoString(vbPtr))
 		}
 
