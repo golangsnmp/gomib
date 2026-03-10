@@ -169,26 +169,41 @@ func tryPartialResolution(ctx *resolverContext, candidates []*module.Module, sym
 	var unresolved []importSymbol
 
 	for _, sym := range symbols {
-		found := false
-		for _, candidate := range candidates {
-			defNames := ctx.moduleDefNames[candidate]
-			if defNames != nil {
-				if _, isDirect := defNames[sym.name]; isDirect {
-					resolved = append(resolved, forwardedSymbol{
-						symbol: sym.name,
-						source: candidate,
-					})
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
+		if source, ok := resolveImportedSymbol(ctx, candidates, sym.name); ok {
+			resolved = append(resolved, forwardedSymbol{
+				symbol: sym.name,
+				source: source,
+			})
+		} else {
 			unresolved = append(unresolved, sym)
 		}
 	}
 
 	return resolved, unresolved
+}
+
+func resolveImportedSymbol(ctx *resolverContext, candidates []*module.Module, symbol string) (*module.Module, bool) {
+	for _, candidate := range candidates {
+		defNames := ctx.moduleDefNames[candidate]
+		if defNames != nil {
+			if _, isDirect := defNames[symbol]; isDirect {
+				return candidate, true
+			}
+		}
+
+		for _, imp := range candidate.Imports {
+			if imp.Symbol != symbol {
+				continue
+			}
+			sourceCandidates := ctx.moduleIndex[imp.Module]
+			if len(sourceCandidates) > 0 {
+				return bestCandidate(sourceCandidates), true
+			}
+			break
+		}
+	}
+
+	return nil, false
 }
 
 func tryImportForwarding(ctx *resolverContext, candidates []*module.Module, symbols []importSymbol) []forwardedSymbol {

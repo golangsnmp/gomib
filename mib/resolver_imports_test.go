@@ -367,6 +367,36 @@ func TestResolveImportsFromModule(t *testing.T) {
 		testutil.Equal(t, reasonSymbolNotExported, ctx.unresolvedImports[0].reason, "unresolved reason")
 	})
 
+	t.Run("partial resolution keeps forwarded symbols", func(t *testing.T) {
+		ctx := newTestContextWithConfig(DefaultConfig())
+
+		realSource := &module.Module{Name: "REAL-SOURCE"}
+		ctx.moduleIndex["REAL-SOURCE"] = []*module.Module{realSource}
+
+		source := &module.Module{
+			Name: "PARTIAL-FWD-MIB",
+			Imports: []module.Import{
+				{Module: "REAL-SOURCE", Symbol: "forwarded"},
+			},
+		}
+		ctx.moduleDefNames[source] = map[string]struct{}{
+			"local": {},
+		}
+		ctx.moduleIndex["PARTIAL-FWD-MIB"] = []*module.Module{source}
+
+		importing := &module.Module{Name: "IMPORTER"}
+		resolveImportsFromModule(ctx, importing, "PARTIAL-FWD-MIB",
+			syms("local", "forwarded", "missing"))
+
+		imports := ctx.moduleImports[importing]
+		testutil.Equal(t, 2, len(imports), "import count")
+		testutil.Equal(t, source, imports["local"], "local should resolve to PARTIAL-FWD-MIB")
+		testutil.Equal(t, realSource, imports["forwarded"], "forwarded should resolve to REAL-SOURCE")
+		testutil.Len(t, ctx.unresolvedImports, 1, "unresolved count")
+		testutil.Equal(t, "missing", ctx.unresolvedImports[0].symbol, "unresolved symbol")
+		testutil.Equal(t, reasonSymbolNotExported, ctx.unresolvedImports[0].reason, "unresolved reason")
+	})
+
 	t.Run("module not found", func(t *testing.T) {
 		ctx := newTestContext()
 		importing := &module.Module{Name: "IMPORTER"}
