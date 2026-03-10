@@ -243,205 +243,199 @@ func TestBinaryToBytes(t *testing.T) {
 	})
 }
 
-func TestConvertDefValInteger(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
-	syntax := &module.TypeSyntaxTypeRef{Name: "Integer32"}
+func TestConvertDefVal(t *testing.T) {
+	t.Run("integer", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		syntax := &module.TypeSyntaxTypeRef{Name: "Integer32"}
 
-	dv := convertDefVal(ctx, &module.DefValInteger{Value: 42}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindInt, dv.Kind(), "kind")
-	v, ok := DefValAs[int64](*dv)
-	testutil.True(t, ok, "DefValAs[int64] ok")
-	testutil.Equal(t, int64(42), v, "value")
-	testutil.Equal(t, "42", dv.Raw(), "raw")
-}
+		tests := []struct {
+			name  string
+			input int64
+			raw   string
+		}{
+			{"positive", 42, "42"},
+			{"negative", -1, "-1"},
+			{"zero", 0, "0"},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				dv := convertDefVal(ctx, &module.DefValInteger{Value: tt.input}, mod, syntax, types.Span{})
+				testutil.NotNil(t, dv, "convertDefVal returned nil")
+				testutil.Equal(t, DefValKindInt, dv.Kind(), "kind")
+				v, ok := DefValAs[int64](*dv)
+				testutil.True(t, ok, "DefValAs[int64] ok")
+				testutil.Equal(t, tt.input, v, "value")
+				testutil.Equal(t, tt.raw, dv.Raw(), "raw")
+			})
+		}
+	})
 
-func TestConvertDefValNegativeInteger(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
-	syntax := &module.TypeSyntaxTypeRef{Name: "Integer32"}
+	t.Run("unsigned", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		syntax := &module.TypeSyntaxTypeRef{Name: "Counter64"}
 
-	dv := convertDefVal(ctx, &module.DefValInteger{Value: -1}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindInt, dv.Kind(), "kind")
-	v, ok := DefValAs[int64](*dv)
-	testutil.True(t, ok, "DefValAs[int64] ok")
-	testutil.Equal(t, int64(-1), v, "value")
-	testutil.Equal(t, "-1", dv.Raw(), "raw")
-}
+		dv := convertDefVal(ctx, &module.DefValUnsigned{Value: 12345}, mod, syntax, types.Span{})
+		testutil.NotNil(t, dv, "convertDefVal returned nil")
+		testutil.Equal(t, DefValKindUint, dv.Kind(), "kind")
+		v, ok := DefValAs[uint64](*dv)
+		testutil.True(t, ok, "DefValAs[uint64] ok")
+		testutil.Equal(t, uint64(12345), v, "value")
+		testutil.Equal(t, "12345", dv.Raw(), "raw")
+	})
 
-func TestConvertDefValUnsigned(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
-	syntax := &module.TypeSyntaxTypeRef{Name: "Counter64"}
+	t.Run("string", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
 
-	dv := convertDefVal(ctx, &module.DefValUnsigned{Value: 12345}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindUint, dv.Kind(), "kind")
-	v, ok := DefValAs[uint64](*dv)
-	testutil.True(t, ok, "DefValAs[uint64] ok")
-	testutil.Equal(t, uint64(12345), v, "value")
-	testutil.Equal(t, "12345", dv.Raw(), "raw")
-}
+		dv := convertDefVal(ctx, &module.DefValString{Value: "public"}, mod, &module.TypeSyntaxTypeRef{Name: "DisplayString"}, types.Span{})
+		testutil.NotNil(t, dv, "convertDefVal returned nil")
+		testutil.Equal(t, DefValKindString, dv.Kind(), "kind")
+		v, ok := DefValAs[string](*dv)
+		testutil.True(t, ok, "DefValAs[string] ok")
+		testutil.Equal(t, "public", v, "value")
+		testutil.Equal(t, `"public"`, dv.Raw(), "raw")
+	})
 
-func TestConvertDefValString(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
-	syntax := &module.TypeSyntaxTypeRef{Name: "DisplayString"}
+	t.Run("hex string", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
 
-	dv := convertDefVal(ctx, &module.DefValString{Value: "public"}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindString, dv.Kind(), "kind")
-	v, ok := DefValAs[string](*dv)
-	testutil.True(t, ok, "DefValAs[string] ok")
-	testutil.Equal(t, "public", v, "value")
-	testutil.Equal(t, `"public"`, dv.Raw(), "raw")
-}
+		dv := convertDefVal(ctx, &module.DefValHexString{Value: "FF00"}, mod, &module.TypeSyntaxOctetString{}, types.Span{})
+		testutil.NotNil(t, dv, "convertDefVal returned nil")
+		testutil.Equal(t, DefValKindBytes, dv.Kind(), "kind")
+		bytes, ok := DefValAs[[]byte](*dv)
+		testutil.True(t, ok, "value is not []byte")
+		want := []byte{0xFF, 0x00}
+		testutil.Len(t, bytes, len(want), "bytes len")
+		for i := range bytes {
+			testutil.Equal(t, want[i], bytes[i], "bytes[")
+		}
+		testutil.Equal(t, "'FF00'H", dv.Raw(), "raw")
+	})
 
-func TestConvertDefValHexString(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
-	syntax := &module.TypeSyntaxOctetString{}
+	t.Run("binary string", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
 
-	dv := convertDefVal(ctx, &module.DefValHexString{Value: "FF00"}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindBytes, dv.Kind(), "kind")
-	bytes, ok := DefValAs[[]byte](*dv)
-	testutil.True(t, ok, "value is not []byte")
-	want := []byte{0xFF, 0x00}
-	testutil.Len(t, bytes, len(want), "bytes len")
-	for i := range bytes {
-		testutil.Equal(t, want[i], bytes[i], "bytes[")
-	}
-	testutil.Equal(t, "'FF00'H", dv.Raw(), "raw")
-}
+		dv := convertDefVal(ctx, &module.DefValBinaryString{Value: "10101010"}, mod, &module.TypeSyntaxOctetString{}, types.Span{})
+		testutil.NotNil(t, dv, "convertDefVal returned nil")
+		testutil.Equal(t, DefValKindBytes, dv.Kind(), "kind")
+		bytes, ok := DefValAs[[]byte](*dv)
+		testutil.True(t, ok, "value is not []byte")
+		testutil.Len(t, bytes, 1, "bytes len")
+		testutil.Equal(t, byte(0xAA), bytes[0], "bytes[0]")
+		testutil.Equal(t, "'10101010'B", dv.Raw(), "raw")
+	})
 
-func TestConvertDefValBinaryString(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
-	syntax := &module.TypeSyntaxOctetString{}
+	t.Run("enum", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		syntax := &module.TypeSyntaxIntegerEnum{
+			NamedNumbers: []module.NamedNumber{
+				{Name: "enabled", Value: 1},
+				{Name: "disabled", Value: 2},
+			},
+		}
 
-	dv := convertDefVal(ctx, &module.DefValBinaryString{Value: "10101010"}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindBytes, dv.Kind(), "kind")
-	bytes, ok := DefValAs[[]byte](*dv)
-	testutil.True(t, ok, "value is not []byte")
-	testutil.Len(t, bytes, 1, "bytes len")
-	testutil.Equal(t, byte(0xAA), bytes[0], "bytes[0]")
-	testutil.Equal(t, "'10101010'B", dv.Raw(), "raw")
-}
+		dv := convertDefVal(ctx, &module.DefValEnum{Name: "enabled"}, mod, syntax, types.Span{})
+		testutil.NotNil(t, dv, "convertDefVal returned nil")
+		testutil.Equal(t, DefValKindEnum, dv.Kind(), "kind")
+		v, ok := DefValAs[string](*dv)
+		testutil.True(t, ok, "DefValAs[string] ok")
+		testutil.Equal(t, "enabled", v, "value")
+		testutil.Equal(t, "enabled", dv.Raw(), "raw")
+	})
 
-func TestConvertDefValEnum(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
-	syntax := &module.TypeSyntaxIntegerEnum{
-		NamedNumbers: []module.NamedNumber{
-			{Name: "enabled", Value: 1},
-			{Name: "disabled", Value: 2},
-		},
-	}
+	t.Run("enum on OID type resolves to OID", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
 
-	dv := convertDefVal(ctx, &module.DefValEnum{Name: "enabled"}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindEnum, dv.Kind(), "kind")
-	v, ok := DefValAs[string](*dv)
-	testutil.True(t, ok, "DefValAs[string] ok")
-	testutil.Equal(t, "enabled", v, "value")
-	testutil.Equal(t, "enabled", dv.Raw(), "raw")
-}
+		root := ctx.mib.Root()
+		child := root.getOrCreateChild(1)
+		grandchild := child.getOrCreateChild(3)
+		grandchild.setName("myTarget")
+		ctx.registerModuleNodeSymbol(mod, "myTarget", grandchild)
 
-func TestConvertDefValEnumOnOIDType(t *testing.T) {
-	// When syntax is OID type, DefValEnum is treated as an OID reference.
-	// If the node exists, it resolves to an OID DefVal.
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
+		syntax := &module.TypeSyntaxObjectIdentifier{}
+		dv := convertDefVal(ctx, &module.DefValEnum{Name: "myTarget"}, mod, syntax, types.Span{})
+		testutil.NotNil(t, dv, "convertDefVal returned nil")
+		testutil.Equal(t, DefValKindOID, dv.Kind(), "kind")
+		oid, ok := DefValAs[OID](*dv)
+		testutil.True(t, ok, "value is not OID")
+		testutil.Len(t, oid, 2, "oid len")
+		testutil.Equal(t, uint32(1), oid[0], "oid[0]")
+		testutil.Equal(t, uint32(3), oid[1], "oid[1]")
+	})
 
-	// Set up a node so the OID lookup succeeds
-	root := ctx.mib.Root()
-	child := root.getOrCreateChild(1)
-	grandchild := child.getOrCreateChild(3)
-	grandchild.setName("myTarget")
-	ctx.registerModuleNodeSymbol(mod, "myTarget", grandchild)
+	t.Run("enum on OID type falls back when unresolved", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		syntax := &module.TypeSyntaxObjectIdentifier{}
 
-	syntax := &module.TypeSyntaxObjectIdentifier{}
-	dv := convertDefVal(ctx, &module.DefValEnum{Name: "myTarget"}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindOID, dv.Kind(), "kind")
-	oid, ok := DefValAs[OID](*dv)
-	testutil.True(t, ok, "value is not OID")
-	testutil.Len(t, oid, 2, "oid len")
-	testutil.Equal(t, uint32(1), oid[0], "oid[0]")
-	testutil.Equal(t, uint32(3), oid[1], "oid[1]")
-}
+		dv := convertDefVal(ctx, &module.DefValEnum{Name: "unknownOid"}, mod, syntax, types.Span{})
+		testutil.NotNil(t, dv, "convertDefVal returned nil")
+		testutil.Equal(t, DefValKindEnum, dv.Kind(), "kind")
+	})
 
-func TestConvertDefValEnumOnOIDTypeFallback(t *testing.T) {
-	// When syntax is OID type but node lookup fails, falls back to enum.
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
-	syntax := &module.TypeSyntaxObjectIdentifier{}
+	t.Run("bits", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		syntax := &module.TypeSyntaxBits{}
 
-	dv := convertDefVal(ctx, &module.DefValEnum{Name: "unknownOid"}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindEnum, dv.Kind(), "kind")
-}
+		dv := convertDefVal(ctx, &module.DefValBits{Labels: []string{"flag1", "flag2"}}, mod, syntax, types.Span{})
+		testutil.NotNil(t, dv, "convertDefVal returned nil")
+		testutil.Equal(t, DefValKindBits, dv.Kind(), "kind")
+		labels, ok := DefValAs[[]string](*dv)
+		testutil.True(t, ok, "value is not []string")
+		testutil.Len(t, labels, 2, "labels len")
+		testutil.Equal(t, "flag1", labels[0], "labels[0]")
+		testutil.Equal(t, "flag2", labels[1], "labels[1]")
+		testutil.Equal(t, "{ flag1, flag2 }", dv.Raw(), "raw")
+	})
 
-func TestConvertDefValBits(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
-	syntax := &module.TypeSyntaxBits{}
+	t.Run("bits empty", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
+		syntax := &module.TypeSyntaxBits{}
 
-	dv := convertDefVal(ctx, &module.DefValBits{Labels: []string{"flag1", "flag2"}}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindBits, dv.Kind(), "kind")
-	labels, ok := DefValAs[[]string](*dv)
-	testutil.True(t, ok, "value is not []string")
-	testutil.Len(t, labels, 2, "labels len")
-	testutil.Equal(t, "flag1", labels[0], "labels[0]")
-	testutil.Equal(t, "flag2", labels[1], "labels[1]")
-	testutil.Equal(t, "{ flag1, flag2 }", dv.Raw(), "raw")
-}
+		dv := convertDefVal(ctx, &module.DefValBits{Labels: []string{}}, mod, syntax, types.Span{})
+		testutil.NotNil(t, dv, "convertDefVal returned nil")
+		testutil.Equal(t, "{ }", dv.Raw(), "raw")
+	})
 
-func TestConvertDefValBitsEmpty(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
-	syntax := &module.TypeSyntaxBits{}
+	t.Run("OID ref resolved", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
 
-	dv := convertDefVal(ctx, &module.DefValBits{Labels: []string{}}, mod, syntax, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, "{ }", dv.Raw(), "raw")
-}
+		root := ctx.mib.Root()
+		child := root.getOrCreateChild(1)
+		child.setName("sysName")
+		ctx.registerModuleNodeSymbol(mod, "sysName", child)
 
-func TestConvertDefValOidRef(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
+		dv := convertDefVal(ctx, &module.DefValOidRef{Name: "sysName"}, mod, nil, types.Span{})
+		testutil.NotNil(t, dv, "convertDefVal returned nil")
+		testutil.Equal(t, DefValKindOID, dv.Kind(), "kind")
+	})
 
-	root := ctx.mib.Root()
-	child := root.getOrCreateChild(1)
-	child.setName("sysName")
-	ctx.registerModuleNodeSymbol(mod, "sysName", child)
+	t.Run("OID ref unresolved", func(t *testing.T) {
+		ctx := newTestContext()
+		mod := &module.Module{Name: "TEST-MIB"}
 
-	dv := convertDefVal(ctx, &module.DefValOidRef{Name: "sysName"}, mod, nil, types.Span{})
-	testutil.NotNil(t, dv, "convertDefVal returned nil")
-	testutil.Equal(t, DefValKindOID, dv.Kind(), "kind")
-}
+		dv := convertDefVal(ctx, &module.DefValOidRef{Name: "missing"}, mod, nil, types.Span{})
+		testutil.Nil(t, dv, "expected nil for unresolved OID ref, got")
+	})
 
-func TestConvertDefValOidRefUnresolved(t *testing.T) {
-	ctx := newTestContext()
-	mod := &module.Module{Name: "TEST-MIB"}
+	t.Run("unparsed emits diagnostic", func(t *testing.T) {
+		ctx := newResolverContext(nil, nil, ResolverNormal, VerboseConfig())
+		mod := &module.Module{Name: "TEST-MIB"}
 
-	dv := convertDefVal(ctx, &module.DefValOidRef{Name: "missing"}, mod, nil, types.Span{})
-	testutil.Nil(t, dv, "expected nil for unresolved OID ref, got")
-}
+		dv := convertDefVal(ctx, &module.DefValUnparsed{}, mod, nil, types.Span{})
+		testutil.Nil(t, dv, "expected nil for unparsed DefVal, got")
 
-func TestConvertDefValUnknown(t *testing.T) {
-	ctx := newResolverContext(nil, nil, ResolverNormal, VerboseConfig())
-	mod := &module.Module{Name: "TEST-MIB"}
-
-	dv := convertDefVal(ctx, &module.DefValUnparsed{}, mod, nil, types.Span{})
-	testutil.Nil(t, dv, "expected nil for unparsed DefVal, got")
-
-	hasDiag(t, ctx.Diagnostics(), types.DiagDefvalUnresolved)
+		hasDiag(t, ctx.Diagnostics(), types.DiagDefvalUnresolved)
+	})
 }
 
 func TestResolveTypeSyntax(t *testing.T) {
@@ -1793,51 +1787,183 @@ func TestLookupMemberNode(t *testing.T) {
 	})
 }
 
-func TestCreateResolvedObjectGroups(t *testing.T) {
-	t.Run("creates group with members", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase:     module.DefBase{Name: "testGroup"},
-					Objects:     []string{"obj1", "obj2"},
-					Status:      types.StatusCurrent,
-					Description: "test group",
-				},
-			},
+// groupTestDef creates a module definition for either an ObjectGroup or
+// NotificationGroup depending on isNotifGrp, with the given name and members.
+func groupTestDef(name string, members []string, isNotifGrp bool) module.Definition {
+	if isNotifGrp {
+		return &module.NotificationGroup{
+			DefBase:       module.DefBase{Name: name},
+			Notifications: members,
+		}
+	}
+	return &module.ObjectGroup{
+		DefBase: module.DefBase{Name: name},
+		Objects: members,
+	}
+}
+
+func TestCreateResolvedGroups(t *testing.T) {
+	for _, isNotifGrp := range []bool{false, true} {
+		label := "object-group"
+		if isNotifGrp {
+			label = "notification-group"
 		}
 
-		ctx := newTestContextForModules(DefaultConfig(), mod)
+		t.Run(label+"/creates group with members", func(t *testing.T) {
+			def := groupTestDef("testGroup", []string{"m1", "m2"}, isNotifGrp)
+			mod := &module.Module{
+				Name:        "TEST-MIB",
+				Definitions: []module.Definition{def},
+			}
 
-		root := ctx.mib.Root()
+			ctx := newTestContextForModules(DefaultConfig(), mod)
+			root := ctx.mib.Root()
 
-		// Group node.
-		grpNode := registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
+			grpNode := registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
+			n1 := registerNodeWithSymbol(ctx, mod, root, "m1", 1, 2)
+			n2 := registerNodeWithSymbol(ctx, mod, root, "m2", 1, 3)
 
-		// Member nodes.
-		m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 2)
+			createResolvedGroups(ctx)
 
-		m2 := registerNodeWithSymbol(ctx, mod, root, "obj2", 1, 3)
+			groups := ctx.mib.Groups()
+			testutil.Len(t, groups, 1, "mib groups")
+			testutil.Equal(t, "testGroup", groups[0].Name(), "group name")
+			testutil.Equal(t, isNotifGrp, groups[0].IsNotificationGroup(), "IsNotificationGroup")
+			testutil.Len(t, groups[0].Members(), 2, "members")
+			testutil.Equal(t, n1, groups[0].Members()[0], "member 0")
+			testutil.Equal(t, n2, groups[0].Members()[1], "member 1")
 
-		createResolvedGroups(ctx)
+			testutil.NotNil(t, grpNode.Group(), "group should be set on node")
+			testutil.Equal(t, "testGroup", grpNode.Group().Name(), "group name on node")
+			testutil.Len(t, ctx.moduleToResolved[mod].Groups(), 1, "module groups")
+		})
 
-		groups := ctx.mib.Groups()
-		testutil.Len(t, groups, 1, "mib groups")
-		testutil.Equal(t, "testGroup", groups[0].Name(), "group name")
-		testutil.False(t, groups[0].IsNotificationGroup(), "should not be notification group")
-		testutil.Len(t, groups[0].Members(), 2, "members")
-		testutil.Equal(t, m1, groups[0].Members()[0], "member 0")
-		testutil.Equal(t, m2, groups[0].Members()[1], "member 1")
+		t.Run(label+"/unresolved group node skipped", func(t *testing.T) {
+			def := groupTestDef("missingGroup", []string{"m1"}, isNotifGrp)
+			mod := &module.Module{
+				Name:        "TEST-MIB",
+				Definitions: []module.Definition{def},
+			}
 
-		// Verify registered on node.
-		testutil.NotNil(t, grpNode.Group(), "group should be set on node")
-		testutil.Equal(t, "testGroup", grpNode.Group().Name(), "group name on node")
+			ctx := newTestContextForModules(DefaultConfig(), mod)
 
-		// Verify registered on module.
-		testutil.Len(t, ctx.moduleToResolved[mod].Groups(), 1, "module groups")
-	})
+			createResolvedGroups(ctx)
+			testutil.Len(t, ctx.mib.Groups(), 0, "should create no groups when node is missing")
+		})
 
-	t.Run("not-accessible member emits diagnostic", func(t *testing.T) {
+		t.Run(label+"/unresolved member emits diagnostic", func(t *testing.T) {
+			def := groupTestDef("testGroup", []string{"m1", "missing"}, isNotifGrp)
+			mod := &module.Module{
+				Name:        "TEST-MIB",
+				Definitions: []module.Definition{def},
+			}
+
+			ctx := newTestContextForModules(DefaultConfig(), mod)
+			root := ctx.mib.Root()
+
+			registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
+			n1 := registerNodeWithSymbol(ctx, mod, root, "m1", 1, 2)
+
+			createResolvedGroups(ctx)
+
+			groups := ctx.mib.Groups()
+			testutil.Len(t, groups, 1, "mib groups")
+			testutil.Len(t, groups[0].Members(), 1, "only resolved member should be present")
+			testutil.Equal(t, n1, groups[0].Members()[0], "resolved member")
+
+			hasDiag(t, ctx.Diagnostics(), types.DiagGroupMemberUnresolved)
+		})
+
+		t.Run(label+"/wrong-kind member emits diagnostic", func(t *testing.T) {
+			def := groupTestDef("testGroup", []string{"wrong1"}, isNotifGrp)
+			mod := &module.Module{
+				Name:        "TEST-MIB",
+				Definitions: []module.Definition{def},
+			}
+
+			ctx := newTestContextForModules(DefaultConfig(), mod)
+			root := ctx.mib.Root()
+
+			registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
+
+			m := registerNodeWithSymbol(ctx, mod, root, "wrong1", 1, 2)
+			if isNotifGrp {
+				m.setKind(types.KindScalar)
+			} else {
+				m.setKind(types.KindNotification)
+			}
+
+			createResolvedGroups(ctx)
+
+			if isNotifGrp {
+				hasDiag(t, ctx.Diagnostics(), types.DiagGroupNotificationsObject)
+			} else {
+				hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectsNotification)
+			}
+		})
+
+		t.Run(label+"/mixed members emit group-member-mixed", func(t *testing.T) {
+			def := groupTestDef("mixedGroup", []string{"obj1", "notif1"}, isNotifGrp)
+			mod := &module.Module{
+				Name:        "TEST-MIB",
+				Definitions: []module.Definition{def},
+			}
+
+			ctx := newTestContextForModules(DefaultConfig(), mod)
+			root := ctx.mib.Root()
+
+			registerNodeWithSymbol(ctx, mod, root, "mixedGroup", 1, 1)
+
+			m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 2)
+			m1.setKind(types.KindScalar)
+
+			n1 := registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 3)
+			n1.setKind(types.KindNotification)
+
+			createResolvedGroups(ctx)
+
+			hasDiag(t, ctx.Diagnostics(), types.DiagGroupMemberMixed)
+			if isNotifGrp {
+				hasDiag(t, ctx.Diagnostics(), types.DiagGroupNotificationsObject)
+			} else {
+				hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectsNotification)
+			}
+		})
+
+		t.Run(label+"/deprecated member in current group emits status diagnostic", func(t *testing.T) {
+			def := groupTestDef("currentGroup", []string{"depMember"}, isNotifGrp)
+			mod := &module.Module{
+				Name:        "TEST-MIB",
+				Definitions: []module.Definition{def},
+			}
+
+			ctx := newTestContextForModules(VerboseConfig(), mod)
+			root := ctx.mib.Root()
+
+			registerNodeWithSymbol(ctx, mod, root, "currentGroup", 1, 1)
+
+			m := registerNodeWithSymbol(ctx, mod, root, "depMember", 1, 2)
+			if isNotifGrp {
+				m.setKind(types.KindNotification)
+				notif := newNotification("depMember")
+				notif.setStatus(types.StatusDeprecated)
+				m.setNotification(notif)
+			} else {
+				m.setKind(types.KindScalar)
+				obj := newObject("depMember")
+				obj.setStatus(types.StatusObsolete)
+				m.setObject(obj)
+			}
+
+			createResolvedGroups(ctx)
+
+			hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectStatus)
+		})
+	}
+
+	// Object-group-specific tests.
+
+	t.Run("object-group/not-accessible member emits diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
@@ -1849,14 +1975,12 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		}
 
 		ctx := newTestContextForModules(DefaultConfig(), mod)
-
 		root := ctx.mib.Root()
 
 		registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
 
 		memberNode := registerNodeWithSymbol(ctx, mod, root, "notAccessObj", 1, 2)
 
-		// Attach an Object with not-accessible access.
 		memberObj := newObject("notAccessObj")
 		memberObj.setAccess(types.AccessNotAccessible)
 		memberNode.setObject(memberObj)
@@ -1866,138 +1990,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		hasDiag(t, ctx.Diagnostics(), types.DiagGroupNotAccessible)
 	})
 
-	t.Run("unresolved group node skipped", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "missingGroup"},
-					Objects: []string{"obj1"},
-				},
-			},
-		}
-
-		ctx := newTestContextForModules(DefaultConfig(), mod)
-
-		createResolvedGroups(ctx)
-		testutil.Len(t, ctx.mib.Groups(), 0, "should create no groups when node is missing")
-	})
-
-	t.Run("unresolved member emits diagnostic", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "testGroup"},
-					Objects: []string{"obj1", "missing"},
-				},
-			},
-		}
-
-		ctx := newTestContextForModules(DefaultConfig(), mod)
-
-		root := ctx.mib.Root()
-
-		registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
-
-		m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 2)
-		// "missing" is not registered.
-
-		createResolvedGroups(ctx)
-
-		groups := ctx.mib.Groups()
-		testutil.Len(t, groups, 1, "mib groups")
-		testutil.Len(t, groups[0].Members(), 1, "only resolved member should be present")
-		testutil.Equal(t, m1, groups[0].Members()[0], "resolved member")
-
-		hasDiag(t, ctx.Diagnostics(), types.DiagGroupMemberUnresolved)
-	})
-
-	t.Run("notification member emits group-objects-notification", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "testGroup"},
-					Objects: []string{"notif1"},
-				},
-			},
-		}
-
-		ctx := newTestContextForModules(DefaultConfig(), mod)
-
-		root := ctx.mib.Root()
-
-		registerNodeWithSymbol(ctx, mod, root, "testGroup", 1, 1)
-
-		n1 := registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 2)
-		n1.setKind(types.KindNotification)
-
-		createResolvedGroups(ctx)
-
-		hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectsNotification)
-	})
-
-	t.Run("mixed members emit group-member-mixed", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "mixedGroup"},
-					Objects: []string{"obj1", "notif1"},
-				},
-			},
-		}
-
-		ctx := newTestContextForModules(DefaultConfig(), mod)
-
-		root := ctx.mib.Root()
-
-		registerNodeWithSymbol(ctx, mod, root, "mixedGroup", 1, 1)
-
-		m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 2)
-		m1.setKind(types.KindScalar)
-
-		n1 := registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 3)
-		n1.setKind(types.KindNotification)
-
-		createResolvedGroups(ctx)
-
-		hasDiag(t, ctx.Diagnostics(), types.DiagGroupMemberMixed)
-		hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectsNotification)
-	})
-
-	t.Run("obsolete member in current group emits group-object-status", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "currentGroup"},
-					Objects: []string{"obsoleteObj"},
-					Status:  types.StatusCurrent,
-				},
-			},
-		}
-
-		ctx := newTestContextForModules(VerboseConfig(), mod)
-
-		root := ctx.mib.Root()
-
-		registerNodeWithSymbol(ctx, mod, root, "currentGroup", 1, 1)
-
-		m1 := registerNodeWithSymbol(ctx, mod, root, "obsoleteObj", 1, 2)
-		m1.setKind(types.KindScalar)
-
-		obj := newObject("obsoleteObj")
-		obj.setStatus(types.StatusObsolete)
-		m1.setObject(obj)
-
-		createResolvedGroups(ctx)
-
-		hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectStatus)
-	})
-
-	t.Run("current member in current group no status diagnostic", func(t *testing.T) {
+	t.Run("object-group/current member in current group no status diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
@@ -2010,7 +2003,6 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		}
 
 		ctx := newTestContextForModules(VerboseConfig(), mod)
-
 		root := ctx.mib.Root()
 
 		registerNodeWithSymbol(ctx, mod, root, "currentGroup", 1, 1)
@@ -2027,7 +2019,7 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		noDiag(t, ctx.Diagnostics(), types.DiagGroupObjectStatus)
 	})
 
-	t.Run("smiv1 status member skips status check", func(t *testing.T) {
+	t.Run("object-group/smiv1 status member skips status check", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
 			Definitions: []module.Definition{
@@ -2040,7 +2032,6 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		}
 
 		ctx := newTestContextForModules(VerboseConfig(), mod)
-
 		root := ctx.mib.Root()
 
 		registerNodeWithSymbol(ctx, mod, root, "currentGroup", 1, 1)
@@ -2055,153 +2046,6 @@ func TestCreateResolvedObjectGroups(t *testing.T) {
 		createResolvedGroups(ctx)
 
 		noDiag(t, ctx.Diagnostics(), types.DiagGroupObjectStatus)
-	})
-}
-
-func TestCreateResolvedNotificationGroups(t *testing.T) {
-	t.Run("creates notification group with members", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.NotificationGroup{
-					DefBase:       module.DefBase{Name: "testNotifGroup"},
-					Notifications: []string{"notif1", "notif2"},
-					Status:        types.StatusCurrent,
-					Description:   "notification group",
-				},
-			},
-		}
-
-		ctx := newTestContextForModules(DefaultConfig(), mod)
-
-		root := ctx.mib.Root()
-
-		registerNodeWithSymbol(ctx, mod, root, "testNotifGroup", 1, 1)
-
-		registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 2)
-
-		registerNodeWithSymbol(ctx, mod, root, "notif2", 1, 3)
-
-		createResolvedGroups(ctx)
-
-		groups := ctx.mib.Groups()
-		testutil.Len(t, groups, 1, "mib groups")
-		testutil.True(t, groups[0].IsNotificationGroup(), "should be notification group")
-		testutil.Len(t, groups[0].Members(), 2, "members")
-	})
-
-	t.Run("unresolved member emits diagnostic", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.NotificationGroup{
-					DefBase:       module.DefBase{Name: "testNotifGroup"},
-					Notifications: []string{"notif1", "missing"},
-				},
-			},
-		}
-
-		ctx := newTestContextForModules(DefaultConfig(), mod)
-
-		root := ctx.mib.Root()
-
-		registerNodeWithSymbol(ctx, mod, root, "testNotifGroup", 1, 1)
-
-		n1 := registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 2)
-		// "missing" is not registered.
-
-		createResolvedGroups(ctx)
-
-		groups := ctx.mib.Groups()
-		testutil.Len(t, groups, 1, "mib groups")
-		testutil.Len(t, groups[0].Members(), 1, "only resolved member should be present")
-		testutil.Equal(t, n1, groups[0].Members()[0], "resolved member")
-
-		hasDiag(t, ctx.Diagnostics(), types.DiagGroupMemberUnresolved)
-	})
-
-	t.Run("object member emits group-notifications-object", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.NotificationGroup{
-					DefBase:       module.DefBase{Name: "testNotifGroup"},
-					Notifications: []string{"obj1"},
-				},
-			},
-		}
-
-		ctx := newTestContextForModules(DefaultConfig(), mod)
-
-		root := ctx.mib.Root()
-
-		registerNodeWithSymbol(ctx, mod, root, "testNotifGroup", 1, 1)
-
-		m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 2)
-		m1.setKind(types.KindScalar)
-
-		createResolvedGroups(ctx)
-
-		hasDiag(t, ctx.Diagnostics(), types.DiagGroupNotificationsObject)
-	})
-
-	t.Run("mixed members emit group-member-mixed", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.NotificationGroup{
-					DefBase:       module.DefBase{Name: "mixedNotifGroup"},
-					Notifications: []string{"notif1", "obj1"},
-				},
-			},
-		}
-
-		ctx := newTestContextForModules(DefaultConfig(), mod)
-
-		root := ctx.mib.Root()
-
-		registerNodeWithSymbol(ctx, mod, root, "mixedNotifGroup", 1, 1)
-
-		n1 := registerNodeWithSymbol(ctx, mod, root, "notif1", 1, 2)
-		n1.setKind(types.KindNotification)
-
-		m1 := registerNodeWithSymbol(ctx, mod, root, "obj1", 1, 3)
-		m1.setKind(types.KindColumn)
-
-		createResolvedGroups(ctx)
-
-		hasDiag(t, ctx.Diagnostics(), types.DiagGroupMemberMixed)
-		hasDiag(t, ctx.Diagnostics(), types.DiagGroupNotificationsObject)
-	})
-
-	t.Run("deprecated member in current notification group emits status diagnostic", func(t *testing.T) {
-		mod := &module.Module{
-			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.NotificationGroup{
-					DefBase:       module.DefBase{Name: "currentNotifGroup"},
-					Notifications: []string{"depNotif"},
-					Status:        types.StatusCurrent,
-				},
-			},
-		}
-
-		ctx := newTestContextForModules(VerboseConfig(), mod)
-
-		root := ctx.mib.Root()
-
-		registerNodeWithSymbol(ctx, mod, root, "currentNotifGroup", 1, 1)
-
-		n1 := registerNodeWithSymbol(ctx, mod, root, "depNotif", 1, 2)
-		n1.setKind(types.KindNotification)
-
-		notif := newNotification("depNotif")
-		notif.setStatus(types.StatusDeprecated)
-		n1.setNotification(notif)
-
-		createResolvedGroups(ctx)
-
-		hasDiag(t, ctx.Diagnostics(), types.DiagGroupObjectStatus)
 	})
 }
 

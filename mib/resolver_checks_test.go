@@ -500,68 +500,67 @@ func TestIndexElementSubIds(t *testing.T) {
 	}
 }
 
-func TestCheckAccessInvalidSMIv1(t *testing.T) {
-	// accessible-for-notify is SMIv2-only.
-	mod := testSMIv1Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "badAccess"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
-			Access:  types.AccessAccessibleForNotify,
-			Status:  types.StatusMandatory,
-			Oid:     testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagAccessInvalidSMIv1)
-}
+func TestCheckAccessValidity(t *testing.T) {
+	t.Run("accessible-for-notify invalid in SMIv1", func(t *testing.T) {
+		mod := testSMIv1Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badAccess"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessAccessibleForNotify,
+				Status:  types.StatusMandatory,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagAccessInvalidSMIv1)
+	})
 
-func TestCheckAccessInvalidSMIv1_ReadCreate(t *testing.T) {
-	// read-create is SMIv2-only.
-	mod := testSMIv1Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "badAccess"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
-			Access:  types.AccessReadCreate,
-			Status:  types.StatusMandatory,
-			Oid:     testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagAccessInvalidSMIv1)
-}
+	t.Run("read-create invalid in SMIv1", func(t *testing.T) {
+		mod := testSMIv1Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badAccess"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessReadCreate,
+				Status:  types.StatusMandatory,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagAccessInvalidSMIv1)
+	})
 
-func TestCheckAccessWriteOnlySMIv2(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase:       module.DefBase{Name: "badAccess"},
-			Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Access:        types.AccessWriteOnly,
-			AccessKeyword: types.AccessKeywordMaxAccess,
-			Status:        types.StatusCurrent,
-			Oid:           testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagAccessWriteOnlySMIv2)
-}
+	t.Run("write-only invalid in SMIv2", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "badAccess"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:        types.AccessWriteOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagAccessWriteOnlySMIv2)
+	})
 
-func TestCheckAccessValid_NoDiag(t *testing.T) {
-	// read-write in SMIv1 should not produce any access diagnostic.
-	mod := testSMIv1Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "validObj"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
-			Access:  types.AccessReadWrite,
-			Status:  types.StatusMandatory,
-			Oid:     testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagAccessInvalidSMIv1, types.DiagAccessWriteOnlySMIv2)
+	t.Run("read-write valid in SMIv1", func(t *testing.T) {
+		mod := testSMIv1Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "validObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessReadWrite,
+				Status:  types.StatusMandatory,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagAccessInvalidSMIv1, types.DiagAccessWriteOnlySMIv2)
+	})
 }
 
 func TestCheckMaxAccessInSMIv1(t *testing.T) {
@@ -662,165 +661,164 @@ func TestCheckScalarNotCreatable(t *testing.T) {
 	hasDiag(t, m.Diagnostics(), types.DiagScalarNotCreatable)
 }
 
-func TestCheckAccessCounterIllegal(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase:       module.DefBase{Name: "badCounter"},
-			Syntax:        &module.TypeSyntaxTypeRef{Name: "Counter32"},
-			Access:        types.AccessReadWrite,
-			AccessKeyword: types.AccessKeywordMaxAccess,
-			Status:        types.StatusCurrent,
-			Oid:           testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagAccessCounterIllegal)
+func TestCheckAccessCounter(t *testing.T) {
+	t.Run("read-write illegal for Counter32", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "badCounter"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Counter32"},
+				Access:        types.AccessReadWrite,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagAccessCounterIllegal)
+	})
+
+	t.Run("read-only valid for Counter32", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "goodCounter"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Counter32"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagAccessCounterIllegal)
+	})
 }
 
-func TestCheckAccessCounterReadOnly_NoDiag(t *testing.T) {
-	// Counter32 with read-only should not trigger.
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase:       module.DefBase{Name: "goodCounter"},
-			Syntax:        &module.TypeSyntaxTypeRef{Name: "Counter32"},
-			Access:        types.AccessReadOnly,
-			AccessKeyword: types.AccessKeywordMaxAccess,
-			Status:        types.StatusCurrent,
-			Oid:           testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagAccessCounterIllegal)
+func TestCheckStatusValidity(t *testing.T) {
+	t.Run("current invalid in SMIv1", func(t *testing.T) {
+		mod := testSMIv1Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badStatus"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagStatusInvalidSMIv1)
+	})
+
+	t.Run("mandatory invalid in SMIv2", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "badStatus"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusMandatory,
+				Oid:           testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagStatusInvalidSMIv2)
+	})
+
+	t.Run("mandatory valid in SMIv1", func(t *testing.T) {
+		mod := testSMIv1Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "validObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusMandatory,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagStatusInvalidSMIv1, types.DiagStatusInvalidSMIv2)
+	})
 }
 
-func TestCheckStatusInvalidSMIv1(t *testing.T) {
-	// "current" is SMIv2-only.
-	mod := testSMIv1Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "badStatus"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagStatusInvalidSMIv1)
-}
+func TestCheckTypeStatus(t *testing.T) {
+	t.Run("deprecated type emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "DeprecatedType"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:              types.StatusDeprecated,
+				Description:         "deprecated type for testing",
+				IsTextualConvention: true,
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "usesDeprecated"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "DeprecatedType"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagTypeStatusDeprecated)
+	})
 
-func TestCheckStatusInvalidSMIv2(t *testing.T) {
-	// "mandatory" is SMIv1-only.
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase:       module.DefBase{Name: "badStatus"},
-			Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Access:        types.AccessReadOnly,
-			AccessKeyword: types.AccessKeywordMaxAccess,
-			Status:        types.StatusMandatory,
-			Oid:           testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagStatusInvalidSMIv2)
-}
+	t.Run("obsolete type emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "ObsoleteType"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:              types.StatusObsolete,
+				Description:         "obsolete type for testing",
+				IsTextualConvention: true,
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "usesObsolete"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "ObsoleteType"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagTypeStatusObsolete)
+	})
 
-func TestCheckStatusValid_NoDiag(t *testing.T) {
-	// "mandatory" in SMIv1 should not produce status diagnostic.
-	mod := testSMIv1Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "validObj"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusMandatory,
-			Oid:     testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagStatusInvalidSMIv1, types.DiagStatusInvalidSMIv2)
-}
-
-func TestCheckTypeStatusDeprecated(t *testing.T) {
-	// Define a deprecated TC, then use it in an object.
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "DeprecatedType"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Status:              types.StatusDeprecated,
-			Description:         "deprecated type for testing",
-			IsTextualConvention: true,
-		},
-		&module.ObjectType{
-			DefBase:       module.DefBase{Name: "usesDeprecated"},
-			Syntax:        &module.TypeSyntaxTypeRef{Name: "DeprecatedType"},
-			Access:        types.AccessReadOnly,
-			AccessKeyword: types.AccessKeywordMaxAccess,
-			Status:        types.StatusCurrent,
-			Oid:           testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagTypeStatusDeprecated)
-}
-
-func TestCheckTypeStatusObsolete(t *testing.T) {
-	// Define an obsolete TC, then use it in an object.
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "ObsoleteType"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Status:              types.StatusObsolete,
-			Description:         "obsolete type for testing",
-			IsTextualConvention: true,
-		},
-		&module.ObjectType{
-			DefBase:       module.DefBase{Name: "usesObsolete"},
-			Syntax:        &module.TypeSyntaxTypeRef{Name: "ObsoleteType"},
-			Access:        types.AccessReadOnly,
-			AccessKeyword: types.AccessKeywordMaxAccess,
-			Status:        types.StatusCurrent,
-			Oid:           testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagTypeStatusObsolete)
-}
-
-func TestCheckTypeStatusCurrent_NoDiag(t *testing.T) {
-	// A current type should not trigger type-status diagnostics.
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase:       module.DefBase{Name: "validObj"},
-			Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Access:        types.AccessReadOnly,
-			AccessKeyword: types.AccessKeywordMaxAccess,
-			Status:        types.StatusCurrent,
-			Oid:           testOid("testRoot", 1),
-		},
-	)
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagTypeStatusDeprecated, types.DiagTypeStatusObsolete)
+	t.Run("current type no diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase:       module.DefBase{Name: "validObj"},
+				Syntax:        &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Access:        types.AccessReadOnly,
+				AccessKeyword: types.AccessKeywordMaxAccess,
+				Status:        types.StatusCurrent,
+				Oid:           testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagTypeStatusDeprecated, types.DiagTypeStatusObsolete)
+	})
 }
 
 func TestCheckGroupMembership_NoGroups(t *testing.T) {
@@ -1719,218 +1717,204 @@ func makeTypedObject(base BaseType, sizes *[]Range) *Object {
 }
 
 func TestCheckUnusedImports(t *testing.T) {
-	// DisplayString is imported but never referenced in any definition.
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
-			module.NewImport("SNMPv2-TC", "DisplayString", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testObj"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testRoot", 1),
-		},
-	)
+	t.Run("unused import emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+				module.NewImport("SNMPv2-TC", "DisplayString", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		d := hasDiag(t, m.Diagnostics(), types.DiagImportUnused)
+		testutil.True(t, d.Message != "", "expected non-empty message")
+	})
 
-	m := resolveStrict(mod)
-
-	d := hasDiag(t, m.Diagnostics(), types.DiagImportUnused)
-	testutil.True(t, d.Message != "", "expected non-empty message")
-}
-
-func TestCheckUnusedImports_AllUsed(t *testing.T) {
-	// All imports are used; no unused import diagnostic expected.
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testObj"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testRoot", 1),
-		},
-	)
-
-	m := resolveStrict(mod)
-
-	noDiag(t, m.Diagnostics(), types.DiagImportUnused)
+	t.Run("all used no diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagImportUnused)
+	})
 }
 
 func TestCheckBasetypeNotImported(t *testing.T) {
-	// Integer32 used without import from SNMPv2-SMI.
-	mod := testSMIv2Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testObj"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testRoot", 1),
-		},
-	)
+	t.Run("not imported emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		d := hasDiag(t, m.Diagnostics(), types.DiagBasetypeNotImported)
+		testutil.True(t, d.Message != "", "expected non-empty message")
+	})
 
-	m := resolveStrict(mod)
-
-	d := hasDiag(t, m.Diagnostics(), types.DiagBasetypeNotImported)
-	testutil.True(t, d.Message != "", "expected non-empty message")
-}
-
-func TestCheckBasetypeNotImported_WhenImported(t *testing.T) {
-	// Integer32 is properly imported; no diagnostic expected.
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testObj"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testRoot", 1),
-		},
-	)
-
-	m := resolveStrict(mod)
-
-	noDiag(t, m.Diagnostics(), types.DiagBasetypeNotImported)
+	t.Run("imported no diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagBasetypeNotImported)
+	})
 }
 
 // --- description-missing ---
 
-func TestCheckDescriptionMissing_ObjectType(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase:     module.DefBase{Name: "noDesc"},
-			Syntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Status:      types.StatusCurrent,
-			Description: "",
-			Oid:         testOid("testRoot", 1),
-		},
-	)
+func TestCheckDescriptionMissing(t *testing.T) {
+	t.Run("missing in SMIv2 emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "noDesc"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:      types.StatusCurrent,
+				Description: "",
+				Oid:         testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagDescriptionMissing)
+	})
 
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagDescriptionMissing)
+	t.Run("SMIv1 no diagnostic", func(t *testing.T) {
+		mod := testSMIv1Module(
+			[]module.Import{
+				module.NewImport("RFC1155-SMI", "INTEGER", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase:     module.DefBase{Name: "noDesc"},
+				Syntax:      &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Status:      types.StatusMandatory,
+				Description: "",
+				Oid:         testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagDescriptionMissing)
+	})
+
+	t.Run("with description no diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase:        module.DefBase{Name: "hasDesc"},
+				Syntax:         &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:         types.StatusCurrent,
+				Description:    "This object has a description",
+				HasDescription: true,
+				Oid:            testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagDescriptionMissing)
+	})
 }
-
-func TestCheckDescriptionMissing_SMIv1_NoDiag(t *testing.T) {
-	// SMIv1 modules should not trigger description-missing.
-	mod := testSMIv1Module(
-		[]module.Import{
-			module.NewImport("RFC1155-SMI", "INTEGER", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase:     module.DefBase{Name: "noDesc"},
-			Syntax:      &module.TypeSyntaxTypeRef{Name: "INTEGER"},
-			Status:      types.StatusMandatory,
-			Description: "",
-			Oid:         testOid("testRoot", 1),
-		},
-	)
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagDescriptionMissing)
-}
-
-func TestCheckDescriptionMissing_WithDescription_NoDiag(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase:        module.DefBase{Name: "hasDesc"},
-			Syntax:         &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			Status:         types.StatusCurrent,
-			Description:    "This object has a description",
-			HasDescription: true,
-			Oid:            testOid("testRoot", 1),
-		},
-	)
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagDescriptionMissing)
-}
-
-// --- textual-convention-nested ---
 
 func TestCheckTCNested(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "ParentTC"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
-			Status:              types.StatusCurrent,
-			Description:         "A parent TC",
-			IsTextualConvention: true,
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "ChildTC"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "ParentTC"},
-			Status:              types.StatusCurrent,
-			Description:         "A nested TC",
-			IsTextualConvention: true,
-		},
-	)
+	t.Run("TC from TC emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "ParentTC"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				Status:              types.StatusCurrent,
+				Description:         "A parent TC",
+				IsTextualConvention: true,
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "ChildTC"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "ParentTC"},
+				Status:              types.StatusCurrent,
+				Description:         "A nested TC",
+				IsTextualConvention: true,
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagTCNested)
+	})
 
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagTCNested)
+	t.Run("TC from base type no diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "MyString"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				Status:              types.StatusCurrent,
+				Description:         "A TC from base type",
+				IsTextualConvention: true,
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagTCNested)
+	})
 }
-
-func TestCheckTCNested_FromBase_NoDiag(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "MyString"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
-			Status:              types.StatusCurrent,
-			Description:         "A TC from base type",
-			IsTextualConvention: true,
-		},
-	)
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagTCNested)
-}
-
-// --- type-assignment-smiv2 ---
 
 func TestCheckTypeAssignmentSMIv2(t *testing.T) {
-	mod := testSMIv2Module(nil,
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "MyType"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "INTEGER"},
-			Status:              types.StatusCurrent,
-			IsTextualConvention: false,
-		},
-	)
+	t.Run("plain typedef emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(nil,
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "MyType"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+				Status:              types.StatusCurrent,
+				IsTextualConvention: false,
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagTypeAssignmentSMIv2)
+	})
 
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagTypeAssignmentSMIv2)
-}
-
-func TestCheckTypeAssignmentSMIv2_TC_NoDiag(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "MyTC"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
-			Status:              types.StatusCurrent,
-			Description:         "A proper TC",
-			IsTextualConvention: true,
-		},
-	)
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagTypeAssignmentSMIv2)
+	t.Run("TC no diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "MyTC"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				Status:              types.StatusCurrent,
+				Description:         "A proper TC",
+				IsTextualConvention: true,
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagTypeAssignmentSMIv2)
+	})
 }
 
 // --- table/row naming ---
@@ -2035,106 +2019,100 @@ func TestCheckTableRowNaming_PrefixMismatch(t *testing.T) {
 	hasDiag(t, m.Diagnostics(), types.DiagRowNameTableName)
 }
 
-// --- named-numbers-ascending ---
-
 func TestCheckNamedNumbersAscending(t *testing.T) {
-	mod := testSMIv2Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "badOrder"},
-			Syntax: &module.TypeSyntaxIntegerEnum{
-				NamedNumbers: []module.NamedNumber{
-					{Name: "high", Value: 5},
-					{Name: "low", Value: 1},
+	t.Run("descending order emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badOrder"},
+				Syntax: &module.TypeSyntaxIntegerEnum{
+					NamedNumbers: []module.NamedNumber{
+						{Name: "high", Value: 5},
+						{Name: "low", Value: 1},
+					},
 				},
+				Status:      types.StatusCurrent,
+				Description: "Descending enum",
+				Oid:         testOid("testRoot", 1),
 			},
-			Status:      types.StatusCurrent,
-			Description: "Descending enum",
-			Oid:         testOid("testRoot", 1),
-		},
-	)
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagNamedNumbersAscending)
+	})
 
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagNamedNumbersAscending)
-}
-
-func TestCheckNamedNumbersAscending_NoDiag(t *testing.T) {
-	mod := testSMIv2Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "goodOrder"},
-			Syntax: &module.TypeSyntaxIntegerEnum{
-				NamedNumbers: []module.NamedNumber{
-					{Name: "low", Value: 1},
-					{Name: "high", Value: 5},
+	t.Run("ascending order no diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "goodOrder"},
+				Syntax: &module.TypeSyntaxIntegerEnum{
+					NamedNumbers: []module.NamedNumber{
+						{Name: "low", Value: 1},
+						{Name: "high", Value: 5},
+					},
 				},
+				Status:      types.StatusCurrent,
+				Description: "Ascending enum",
+				Oid:         testOid("testRoot", 1),
 			},
-			Status:      types.StatusCurrent,
-			Description: "Ascending enum",
-			Oid:         testOid("testRoot", 1),
-		},
-	)
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagNamedNumbersAscending)
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagNamedNumbersAscending)
+	})
 }
-
-// --- hyphen-in-label ---
 
 func TestCheckHyphenInLabel(t *testing.T) {
-	mod := testSMIv2Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "badLabel"},
-			Syntax: &module.TypeSyntaxIntegerEnum{
-				NamedNumbers: []module.NamedNumber{
-					{Name: "my-value", Value: 1},
+	t.Run("hyphen in SMIv2 emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "badLabel"},
+				Syntax: &module.TypeSyntaxIntegerEnum{
+					NamedNumbers: []module.NamedNumber{
+						{Name: "my-value", Value: 1},
+					},
 				},
+				Status:      types.StatusCurrent,
+				Description: "Enum with hyphenated label",
+				Oid:         testOid("testRoot", 1),
 			},
-			Status:      types.StatusCurrent,
-			Description: "Enum with hyphenated label",
-			Oid:         testOid("testRoot", 1),
-		},
-	)
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagHyphenInLabel)
+	})
 
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagHyphenInLabel)
-}
-
-func TestCheckHyphenInLabel_SMIv1_NoDiag(t *testing.T) {
-	// Hyphenated labels are allowed in SMIv1.
-	mod := testSMIv1Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "okLabel"},
-			Syntax: &module.TypeSyntaxIntegerEnum{
-				NamedNumbers: []module.NamedNumber{
-					{Name: "my-value", Value: 1},
+	t.Run("hyphen in SMIv1 no diagnostic", func(t *testing.T) {
+		mod := testSMIv1Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "okLabel"},
+				Syntax: &module.TypeSyntaxIntegerEnum{
+					NamedNumbers: []module.NamedNumber{
+						{Name: "my-value", Value: 1},
+					},
 				},
+				Status:      types.StatusMandatory,
+				Description: "Hyphen is OK in SMIv1",
+				Oid:         testOid("testRoot", 1),
 			},
-			Status:      types.StatusMandatory,
-			Description: "Hyphen is OK in SMIv1",
-			Oid:         testOid("testRoot", 1),
-		},
-	)
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagHyphenInLabel)
+	})
 
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagHyphenInLabel)
-}
-
-func TestCheckHyphenInLabel_NoHyphen_NoDiag(t *testing.T) {
-	mod := testSMIv2Module(nil,
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "goodLabel"},
-			Syntax: &module.TypeSyntaxIntegerEnum{
-				NamedNumbers: []module.NamedNumber{
-					{Name: "myValue", Value: 1},
+	t.Run("no hyphen no diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(nil,
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "goodLabel"},
+				Syntax: &module.TypeSyntaxIntegerEnum{
+					NamedNumbers: []module.NamedNumber{
+						{Name: "myValue", Value: 1},
+					},
 				},
+				Status:      types.StatusCurrent,
+				Description: "Clean label",
+				Oid:         testOid("testRoot", 1),
 			},
-			Status:      types.StatusCurrent,
-			Description: "Clean label",
-			Oid:         testOid("testRoot", 1),
-		},
-	)
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagHyphenInLabel)
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagHyphenInLabel)
+	})
 }
 
 func TestValidateDisplayHintInteger(t *testing.T) {
@@ -2192,274 +2170,255 @@ func TestValidateDisplayHintOctetString(t *testing.T) {
 	}
 }
 
-func TestCheckInvalidFormat_BadIntegerHint(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "BadHint"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			DisplayHint:         "zz",
-			Status:              types.StatusCurrent,
-			Description:         "bad integer hint",
-			IsTextualConvention: true,
-		},
-	)
-
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagInvalidFormat)
-}
-
-func TestCheckInvalidFormat_ValidIntegerHint(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
-			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "GoodHint"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
-			DisplayHint:         "d-2",
-			Status:              types.StatusCurrent,
-			Description:         "valid integer hint",
-			IsTextualConvention: true,
-		},
-	)
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagInvalidFormat)
-}
-
-func TestCheckInvalidFormat_BadOctetStringHint(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "BadOSHint"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
-			DisplayHint:         "xyz",
-			Status:              types.StatusCurrent,
-			Description:         "bad octet string hint",
-			IsTextualConvention: true,
-		},
-	)
-
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagInvalidFormat)
-}
-
-func TestCheckInvalidFormat_ValidOctetStringHint(t *testing.T) {
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "GoodOSHint"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
-			DisplayHint:         "1x:",
-			Status:              types.StatusCurrent,
-			Description:         "valid octet string hint",
-			IsTextualConvention: true,
-		},
-	)
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagInvalidFormat)
-}
-
-func TestCheckInvalidFormat_UnsupportedBasetype(t *testing.T) {
-	// Counter32 should not have a DISPLAY-HINT
-	mod := testSMIv2Module(
-		[]module.Import{
-			module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
-			module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
-		},
-		&module.TypeDef{
-			DefBase:             module.DefBase{Name: "BadCounterHint"},
-			Syntax:              &module.TypeSyntaxTypeRef{Name: "Counter32"},
-			DisplayHint:         "d",
-			Status:              types.StatusCurrent,
-			Description:         "counter with hint",
-			IsTextualConvention: true,
-		},
-	)
-
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagInvalidFormat)
-}
-
-// --- node-implicit tests ---
-
-func TestCheckNodeImplicit_Fires(t *testing.T) {
-	// OID path { enterprises 99999 1 } creates an implicit node at
-	// enterprises.99999 (unnamed KindInternal).
-	mod := &module.Module{
-		Name:     "TEST-MIB",
-		Language: types.LanguageSMIv2,
-		Imports: []module.Import{
-			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
-		},
-		Definitions: []module.Definition{
-			&module.ModuleIdentity{
-				DefBase:     module.DefBase{Name: "testMIB"},
-				Description: "test",
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "enterprises"},
-					&module.OidComponentNumber{Value: 99999},
-					&module.OidComponentNumber{Value: 1},
-				}, types.Span{}),
+func TestCheckInvalidFormat(t *testing.T) {
+	t.Run("bad integer hint", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+				module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
 			},
-		},
-	}
-
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagNodeImplicit)
-}
-
-func TestCheckNodeImplicit_NoFireWhenNamed(t *testing.T) {
-	// Explicit enterprise root avoids implicit node.
-	mod := &module.Module{
-		Name:     "TEST-MIB",
-		Language: types.LanguageSMIv2,
-		Imports: []module.Import{
-			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
-		},
-		Definitions: []module.Definition{
-			&module.ModuleIdentity{
-				DefBase:     module.DefBase{Name: "testMIB"},
-				Description: "test",
-				Oid:         testOid("testEnterprise", 1),
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "BadHint"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				DisplayHint:         "zz",
+				Status:              types.StatusCurrent,
+				Description:         "bad integer hint",
+				IsTextualConvention: true,
 			},
-			&module.ValueAssignment{
-				DefBase: module.DefBase{Name: "testEnterprise"},
-				Oid:     testOid("enterprises", 99999),
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagInvalidFormat)
+	})
+
+	t.Run("valid integer hint", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+				module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
 			},
-		},
-	}
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagNodeImplicit)
-}
-
-// --- module-identity-registration tests ---
-
-func TestCheckModuleIdentityRegistration_UncontrolledMgmt(t *testing.T) {
-	// MODULE-IDENTITY under mgmt (1.3.6.1.2) but not under mib-2,
-	// transmission, or snmpModules.
-	mod := &module.Module{
-		Name:     "TEST-MIB",
-		Language: types.LanguageSMIv2,
-		Imports: []module.Import{
-			module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
-		},
-		Definitions: []module.Definition{
-			&module.ModuleIdentity{
-				DefBase:     module.DefBase{Name: "testMIB"},
-				Description: "test",
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					// 1.3.6.1.2.99 - under mgmt but not under mib-2
-					&module.OidComponentNamedNumber{NameValue: "iso", NumberValue: 1},
-					&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
-					&module.OidComponentNamedNumber{NameValue: "dod", NumberValue: 6},
-					&module.OidComponentNamedNumber{NameValue: "internet", NumberValue: 1},
-					&module.OidComponentNamedNumber{NameValue: "mgmt", NumberValue: 2},
-					&module.OidComponentNumber{Value: 99},
-				}, types.Span{}),
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "GoodHint"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				DisplayHint:         "d-2",
+				Status:              types.StatusCurrent,
+				Description:         "valid integer hint",
+				IsTextualConvention: true,
 			},
-		},
-	}
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagInvalidFormat)
+	})
 
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagModuleIdentityReg)
-}
-
-func TestCheckModuleIdentityRegistration_Mib2OK(t *testing.T) {
-	// MODULE-IDENTITY under mib-2 (1.3.6.1.2.1) should not fire.
-	mod := &module.Module{
-		Name:     "TEST-MIB",
-		Language: types.LanguageSMIv2,
-		Imports: []module.Import{
-			module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "mib-2", types.Span{}),
-		},
-		Definitions: []module.Definition{
-			&module.ModuleIdentity{
-				DefBase:     module.DefBase{Name: "testMIB"},
-				Description: "test",
-				Oid:         testOid("mib-2", 999),
+	t.Run("bad octet string hint", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
 			},
-		},
-	}
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagModuleIdentityReg)
-}
-
-func TestCheckModuleIdentityRegistration_EnterprisesOK(t *testing.T) {
-	// MODULE-IDENTITY under enterprises should not fire (not under mgmt).
-	mod := &module.Module{
-		Name:     "TEST-MIB",
-		Language: types.LanguageSMIv2,
-		Imports: []module.Import{
-			module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
-			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
-		},
-		Definitions: []module.Definition{
-			&module.ModuleIdentity{
-				DefBase:     module.DefBase{Name: "testMIB"},
-				Description: "test",
-				Oid:         testOid("enterprises", 12345),
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "BadOSHint"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				DisplayHint:         "xyz",
+				Status:              types.StatusCurrent,
+				Description:         "bad octet string hint",
+				IsTextualConvention: true,
 			},
-		},
-	}
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagInvalidFormat)
+	})
 
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagModuleIdentityReg)
+	t.Run("valid octet string hint", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "GoodOSHint"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "OCTET STRING"},
+				DisplayHint:         "1x:",
+				Status:              types.StatusCurrent,
+				Description:         "valid octet string hint",
+				IsTextualConvention: true,
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagInvalidFormat)
+	})
+
+	t.Run("unsupported basetype", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
+				module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
+			},
+			&module.TypeDef{
+				DefBase:             module.DefBase{Name: "BadCounterHint"},
+				Syntax:              &module.TypeSyntaxTypeRef{Name: "Counter32"},
+				DisplayHint:         "d",
+				Status:              types.StatusCurrent,
+				Description:         "counter with hint",
+				IsTextualConvention: true,
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagInvalidFormat)
+	})
 }
 
-// --- RowStatus/StorageType default tests ---
+func TestCheckNodeImplicit(t *testing.T) {
+	t.Run("implicit node emits diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TEST-MIB",
+			Language: types.LanguageSMIv2,
+			Imports: []module.Import{
+				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+			},
+			Definitions: []module.Definition{
+				&module.ModuleIdentity{
+					DefBase:     module.DefBase{Name: "testMIB"},
+					Description: "test",
+					Oid: module.NewOidAssignment([]module.OidComponent{
+						&module.OidComponentName{NameValue: "enterprises"},
+						&module.OidComponentNumber{Value: 99999},
+						&module.OidComponentNumber{Value: 1},
+					}, types.Span{}),
+				},
+			},
+		}
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagNodeImplicit)
+	})
 
-func TestCheckRowStatusDefault_IllegalAction(t *testing.T) {
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "RowStatus", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testRowStatus"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "RowStatus"},
-			Access:  types.AccessReadCreate,
-			Status:  types.StatusCurrent,
-			DefVal:  &module.DefValEnum{Name: "createAndGo"},
-			Oid:     testOid("testEntry", 2),
-		},
-	)
-
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagRowStatusDefault)
+	t.Run("named node no diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TEST-MIB",
+			Language: types.LanguageSMIv2,
+			Imports: []module.Import{
+				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+			},
+			Definitions: []module.Definition{
+				&module.ModuleIdentity{
+					DefBase:     module.DefBase{Name: "testMIB"},
+					Description: "test",
+					Oid:         testOid("testEnterprise", 1),
+				},
+				&module.ValueAssignment{
+					DefBase: module.DefBase{Name: "testEnterprise"},
+					Oid:     testOid("enterprises", 99999),
+				},
+			},
+		}
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagNodeImplicit)
+	})
 }
 
-func TestCheckRowStatusDefault_ValidActive(t *testing.T) {
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "RowStatus", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testRowStatus"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "RowStatus"},
-			Access:  types.AccessReadCreate,
-			Status:  types.StatusCurrent,
-			DefVal:  &module.DefValInteger{Value: 1},
-			Oid:     testOid("testEntry", 2),
-		},
-	)
+func TestCheckModuleIdentityRegistration(t *testing.T) {
+	t.Run("uncontrolled mgmt emits diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TEST-MIB",
+			Language: types.LanguageSMIv2,
+			Imports: []module.Import{
+				module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+			},
+			Definitions: []module.Definition{
+				&module.ModuleIdentity{
+					DefBase:     module.DefBase{Name: "testMIB"},
+					Description: "test",
+					Oid: module.NewOidAssignment([]module.OidComponent{
+						&module.OidComponentNamedNumber{NameValue: "iso", NumberValue: 1},
+						&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+						&module.OidComponentNamedNumber{NameValue: "dod", NumberValue: 6},
+						&module.OidComponentNamedNumber{NameValue: "internet", NumberValue: 1},
+						&module.OidComponentNamedNumber{NameValue: "mgmt", NumberValue: 2},
+						&module.OidComponentNumber{Value: 99},
+					}, types.Span{}),
+				},
+			},
+		}
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagModuleIdentityReg)
+	})
 
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagRowStatusDefault)
+	t.Run("mib-2 no diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TEST-MIB",
+			Language: types.LanguageSMIv2,
+			Imports: []module.Import{
+				module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "mib-2", types.Span{}),
+			},
+			Definitions: []module.Definition{
+				&module.ModuleIdentity{
+					DefBase:     module.DefBase{Name: "testMIB"},
+					Description: "test",
+					Oid:         testOid("mib-2", 999),
+				},
+			},
+		}
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagModuleIdentityReg)
+	})
+
+	t.Run("enterprises no diagnostic", func(t *testing.T) {
+		mod := &module.Module{
+			Name:     "TEST-MIB",
+			Language: types.LanguageSMIv2,
+			Imports: []module.Import{
+				module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+			},
+			Definitions: []module.Definition{
+				&module.ModuleIdentity{
+					DefBase:     module.DefBase{Name: "testMIB"},
+					Description: "test",
+					Oid:         testOid("enterprises", 12345),
+				},
+			},
+		}
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagModuleIdentityReg)
+	})
+}
+
+func TestCheckRowStatusDefault(t *testing.T) {
+	t.Run("illegal action emits diagnostic", func(t *testing.T) {
+		mod := testTableModule(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "RowStatus", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testRowStatus"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "RowStatus"},
+				Access:  types.AccessReadCreate,
+				Status:  types.StatusCurrent,
+				DefVal:  &module.DefValEnum{Name: "createAndGo"},
+				Oid:     testOid("testEntry", 2),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagRowStatusDefault)
+	})
+
+	t.Run("valid active no diagnostic", func(t *testing.T) {
+		mod := testTableModule(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "RowStatus", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testRowStatus"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "RowStatus"},
+				Access:  types.AccessReadCreate,
+				Status:  types.StatusCurrent,
+				DefVal:  &module.DefValInteger{Value: 1},
+				Oid:     testOid("testEntry", 2),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagRowStatusDefault)
+	})
 }
 
 func TestCheckRowStatusAccess_NotReadCreate(t *testing.T) {
@@ -2480,88 +2439,86 @@ func TestCheckRowStatusAccess_NotReadCreate(t *testing.T) {
 	hasDiag(t, m.Diagnostics(), types.DiagRowStatusAccess)
 }
 
-func TestCheckStorageTypeDefault_Permanent(t *testing.T) {
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "StorageType", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testStorage"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "StorageType"},
-			Access:  types.AccessReadCreate,
-			Status:  types.StatusCurrent,
-			DefVal:  &module.DefValEnum{Name: "permanent"},
-			Oid:     testOid("testEntry", 2),
-		},
-	)
+func TestCheckStorageTypeDefault(t *testing.T) {
+	t.Run("permanent emits diagnostic", func(t *testing.T) {
+		mod := testTableModule(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "StorageType", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testStorage"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "StorageType"},
+				Access:  types.AccessReadCreate,
+				Status:  types.StatusCurrent,
+				DefVal:  &module.DefValEnum{Name: "permanent"},
+				Oid:     testOid("testEntry", 2),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagStorageTypeDefault)
+	})
 
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagStorageTypeDefault)
+	t.Run("nonVolatile no diagnostic", func(t *testing.T) {
+		mod := testTableModule(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "StorageType", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testStorage"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "StorageType"},
+				Access:  types.AccessReadCreate,
+				Status:  types.StatusCurrent,
+				DefVal:  &module.DefValInteger{Value: 3},
+				Oid:     testOid("testEntry", 2),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagStorageTypeDefault)
+	})
 }
 
-func TestCheckStorageTypeDefault_NonVolatileOK(t *testing.T) {
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "StorageType", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testStorage"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "StorageType"},
-			Access:  types.AccessReadCreate,
-			Status:  types.StatusCurrent,
-			DefVal:  &module.DefValInteger{Value: 3},
-			Oid:     testOid("testEntry", 2),
-		},
-	)
+func TestCheckTAddressTDomain(t *testing.T) {
+	t.Run("missing TDomain emits diagnostic", func(t *testing.T) {
+		mod := testTableModule(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "TAddress", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testAddr"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TAddress"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 2),
+			},
+		)
+		m := resolveStrict(mod)
+		hasDiag(t, m.Diagnostics(), types.DiagTAddressTDomain)
+	})
 
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagStorageTypeDefault)
-}
-
-// --- TAddress/TDomain pairing test ---
-
-func TestCheckTAddressTDomain_MissingTDomain(t *testing.T) {
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "TAddress", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddr"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "TAddress"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testEntry", 2),
-		},
-	)
-
-	m := resolveStrict(mod)
-	hasDiag(t, m.Diagnostics(), types.DiagTAddressTDomain)
-}
-
-func TestCheckTAddressTDomain_WithTDomainOK(t *testing.T) {
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("SNMPv2-TC", "TAddress", types.Span{}),
-			module.NewImport("SNMPv2-TC", "TDomain", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testDomain"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "TDomain"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testEntry", 2),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddr"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "TAddress"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testEntry", 3),
-		},
-	)
-
-	m := resolveStrict(mod)
-	noDiag(t, m.Diagnostics(), types.DiagTAddressTDomain)
+	t.Run("with TDomain no diagnostic", func(t *testing.T) {
+		mod := testTableModule(
+			[]module.Import{
+				module.NewImport("SNMPv2-TC", "TAddress", types.Span{}),
+				module.NewImport("SNMPv2-TC", "TDomain", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testDomain"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TDomain"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 2),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testAddr"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "TAddress"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 3),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagTAddressTDomain)
+	})
 }
 
 func TestCheckIndexAccessAndDefval(t *testing.T) {
@@ -2763,104 +2720,135 @@ func testInetAddressMIB() *module.Module {
 	return mod
 }
 
-func TestCheckInetAddressPairing_MissingType(t *testing.T) {
-	inetMod := testInetAddressMIB()
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("INET-ADDRESS-MIB", "InetAddress", types.Span{}),
+func TestCheckAddressPairing(t *testing.T) {
+	families := []struct {
+		label        string
+		depMod       func() *module.Module
+		depModName   string
+		addrType     string
+		addrTypeName string
+		specificType string
+		diagPairing  string
+		diagSpecific string
+		diagSubtyped string
+		subtypeEnums []module.NamedNumber
+	}{
+		{
+			label:        "InetAddress",
+			depMod:       testInetAddressMIB,
+			depModName:   "INET-ADDRESS-MIB",
+			addrType:     "InetAddress",
+			addrTypeName: "InetAddressType",
+			specificType: "InetAddressIPv4",
+			diagPairing:  types.DiagInetAddressPairing,
+			diagSpecific: types.DiagInetAddressSpecific,
+			diagSubtyped: types.DiagInetAddressTypeSubtyped,
+			subtypeEnums: []module.NamedNumber{{Name: "ipv4", Value: 1}, {Name: "ipv6", Value: 2}},
 		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddr"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "InetAddress"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testEntry", 2),
+		{
+			label:        "TransportAddress",
+			depMod:       testTransportAddressMIB,
+			depModName:   "TRANSPORT-ADDRESS-MIB",
+			addrType:     "TransportAddress",
+			addrTypeName: "TransportAddressType",
+			specificType: "TransportAddressIPv4",
+			diagPairing:  types.DiagTransportAddressPairing,
+			diagSpecific: types.DiagTransportAddressSpecific,
+			diagSubtyped: types.DiagTransportAddressTypeSubtyped,
+			subtypeEnums: []module.NamedNumber{{Name: "udpIpv4", Value: 1}, {Name: "udpIpv6", Value: 2}},
 		},
-	)
+	}
 
-	m := resolveStrict(inetMod, mod)
-	hasDiag(t, m.Diagnostics(), types.DiagInetAddressPairing)
-}
-
-func TestCheckInetAddressPairing_WithTypeOK(t *testing.T) {
-	inetMod := testInetAddressMIB()
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("INET-ADDRESS-MIB", "InetAddress", types.Span{}),
-			module.NewImport("INET-ADDRESS-MIB", "InetAddressType", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddrType"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "InetAddressType"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testEntry", 2),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddr"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "InetAddress"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testEntry", 3),
-		},
-	)
-
-	m := resolveStrict(inetMod, mod)
-	noDiag(t, m.Diagnostics(), types.DiagInetAddressPairing)
-}
-
-func TestCheckInetAddressSpecific(t *testing.T) {
-	inetMod := testInetAddressMIB()
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("INET-ADDRESS-MIB", "InetAddressIPv4", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddr"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "InetAddressIPv4"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testEntry", 2),
-		},
-	)
-
-	m := resolveStrict(inetMod, mod)
-	hasDiag(t, m.Diagnostics(), types.DiagInetAddressSpecific)
-}
-
-func TestCheckInetAddressTypeSubtyped(t *testing.T) {
-	inetMod := testInetAddressMIB()
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("INET-ADDRESS-MIB", "InetAddress", types.Span{}),
-			module.NewImport("INET-ADDRESS-MIB", "InetAddressType", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddrType"},
-			// InetAddressType subtyped to only ipv4/ipv6
-			Syntax: &module.TypeSyntaxIntegerEnum{
-				Base: "InetAddressType",
-				NamedNumbers: []module.NamedNumber{
-					{Name: "ipv4", Value: 1},
-					{Name: "ipv6", Value: 2},
+	for _, fam := range families {
+		t.Run(fam.label+"/missing type", func(t *testing.T) {
+			mod := testTableModule(
+				[]module.Import{
+					module.NewImport(fam.depModName, fam.addrType, types.Span{}),
 				},
-			},
-			Access: types.AccessReadOnly,
-			Status: types.StatusCurrent,
-			Oid:    testOid("testEntry", 2),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddr"},
-			// InetAddress without SIZE constraint
-			Syntax: &module.TypeSyntaxTypeRef{Name: "InetAddress"},
-			Access: types.AccessReadOnly,
-			Status: types.StatusCurrent,
-			Oid:    testOid("testEntry", 3),
-		},
-	)
+				&module.ObjectType{
+					DefBase: module.DefBase{Name: "testAddr"},
+					Syntax:  &module.TypeSyntaxTypeRef{Name: fam.addrType},
+					Access:  types.AccessReadOnly,
+					Status:  types.StatusCurrent,
+					Oid:     testOid("testEntry", 2),
+				},
+			)
+			m := resolveStrict(fam.depMod(), mod)
+			hasDiag(t, m.Diagnostics(), fam.diagPairing)
+		})
 
-	m := resolveStrict(inetMod, mod)
-	hasDiag(t, m.Diagnostics(), types.DiagInetAddressTypeSubtyped)
+		t.Run(fam.label+"/specific type", func(t *testing.T) {
+			mod := testTableModule(
+				[]module.Import{
+					module.NewImport(fam.depModName, fam.specificType, types.Span{}),
+				},
+				&module.ObjectType{
+					DefBase: module.DefBase{Name: "testAddr"},
+					Syntax:  &module.TypeSyntaxTypeRef{Name: fam.specificType},
+					Access:  types.AccessReadOnly,
+					Status:  types.StatusCurrent,
+					Oid:     testOid("testEntry", 2),
+				},
+			)
+			m := resolveStrict(fam.depMod(), mod)
+			hasDiag(t, m.Diagnostics(), fam.diagSpecific)
+		})
+
+		t.Run(fam.label+"/type subtyped", func(t *testing.T) {
+			mod := testTableModule(
+				[]module.Import{
+					module.NewImport(fam.depModName, fam.addrType, types.Span{}),
+					module.NewImport(fam.depModName, fam.addrTypeName, types.Span{}),
+				},
+				&module.ObjectType{
+					DefBase: module.DefBase{Name: "testAddrType"},
+					Syntax: &module.TypeSyntaxIntegerEnum{
+						Base:         fam.addrTypeName,
+						NamedNumbers: fam.subtypeEnums,
+					},
+					Access: types.AccessReadOnly,
+					Status: types.StatusCurrent,
+					Oid:    testOid("testEntry", 2),
+				},
+				&module.ObjectType{
+					DefBase: module.DefBase{Name: "testAddr"},
+					Syntax:  &module.TypeSyntaxTypeRef{Name: fam.addrType},
+					Access:  types.AccessReadOnly,
+					Status:  types.StatusCurrent,
+					Oid:     testOid("testEntry", 3),
+				},
+			)
+			m := resolveStrict(fam.depMod(), mod)
+			hasDiag(t, m.Diagnostics(), fam.diagSubtyped)
+		})
+	}
+
+	// InetAddress-specific: pairing present suppresses diagnostic.
+	t.Run("InetAddress/with type OK", func(t *testing.T) {
+		inetMod := testInetAddressMIB()
+		mod := testTableModule(
+			[]module.Import{
+				module.NewImport("INET-ADDRESS-MIB", "InetAddress", types.Span{}),
+				module.NewImport("INET-ADDRESS-MIB", "InetAddressType", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testAddrType"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "InetAddressType"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 2),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testAddr"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "InetAddress"},
+				Access:  types.AccessReadOnly,
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testEntry", 3),
+			},
+		)
+		m := resolveStrict(inetMod, mod)
+		noDiag(t, m.Diagnostics(), types.DiagInetAddressPairing)
+	})
 }
 
 func testTransportAddressMIB() *module.Module {
@@ -2925,79 +2913,6 @@ func testTransportAddressMIB() *module.Module {
 		},
 	}
 	return mod
-}
-
-func TestCheckTransportAddressPairing_MissingType(t *testing.T) {
-	taMod := testTransportAddressMIB()
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("TRANSPORT-ADDRESS-MIB", "TransportAddress", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddr"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "TransportAddress"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testEntry", 2),
-		},
-	)
-
-	m := resolveStrict(taMod, mod)
-	hasDiag(t, m.Diagnostics(), types.DiagTransportAddressPairing)
-}
-
-func TestCheckTransportAddressSpecific(t *testing.T) {
-	taMod := testTransportAddressMIB()
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("TRANSPORT-ADDRESS-MIB", "TransportAddressIPv4", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddr"},
-			Syntax:  &module.TypeSyntaxTypeRef{Name: "TransportAddressIPv4"},
-			Access:  types.AccessReadOnly,
-			Status:  types.StatusCurrent,
-			Oid:     testOid("testEntry", 2),
-		},
-	)
-
-	m := resolveStrict(taMod, mod)
-	hasDiag(t, m.Diagnostics(), types.DiagTransportAddressSpecific)
-}
-
-func TestCheckTransportAddressTypeSubtyped(t *testing.T) {
-	taMod := testTransportAddressMIB()
-	mod := testTableModule(
-		[]module.Import{
-			module.NewImport("TRANSPORT-ADDRESS-MIB", "TransportAddress", types.Span{}),
-			module.NewImport("TRANSPORT-ADDRESS-MIB", "TransportAddressType", types.Span{}),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddrType"},
-			// TransportAddressType subtyped to only udpIpv4/udpIpv6
-			Syntax: &module.TypeSyntaxIntegerEnum{
-				Base: "TransportAddressType",
-				NamedNumbers: []module.NamedNumber{
-					{Name: "udpIpv4", Value: 1},
-					{Name: "udpIpv6", Value: 2},
-				},
-			},
-			Access: types.AccessReadOnly,
-			Status: types.StatusCurrent,
-			Oid:    testOid("testEntry", 2),
-		},
-		&module.ObjectType{
-			DefBase: module.DefBase{Name: "testAddr"},
-			// TransportAddress without SIZE constraint
-			Syntax: &module.TypeSyntaxTypeRef{Name: "TransportAddress"},
-			Access: types.AccessReadOnly,
-			Status: types.StatusCurrent,
-			Oid:    testOid("testEntry", 3),
-		},
-	)
-
-	m := resolveStrict(taMod, mod)
-	hasDiag(t, m.Diagnostics(), types.DiagTransportAddressTypeSubtyped)
 }
 
 func TestCheckIpAddressDeprecation(t *testing.T) {
