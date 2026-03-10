@@ -8,26 +8,25 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-func TestResolveNilModulesNilLoggerNilConfig(t *testing.T) {
-	m := Resolve(nil, nil, nil, nil)
-	testutil.NotNil(t, m, "Resolve returned nil Mib")
-	// Should have base modules registered even with nil input.
-	testutil.NotEmpty(t, m.Modules(), "expected at least base modules, got 0")
-}
+func TestResolveNilOrEmptyInput(t *testing.T) {
+	t.Run("nil modules", func(t *testing.T) {
+		m := Resolve(nil, nil, nil, nil)
+		testutil.NotNil(t, m, "Resolve returned nil Mib")
+		testutil.NotEmpty(t, m.Modules(), "expected at least base modules, got 0")
+	})
 
-func TestResolveEmptyModulesNilLoggerNilConfig(t *testing.T) {
-	m := Resolve([]*module.Module{}, nil, nil, nil)
-	testutil.NotNil(t, m, "Resolve returned nil Mib")
-	// Empty user modules still gets base modules.
-	testutil.NotEmpty(t, m.Modules(), "expected at least base modules, got 0")
-}
+	t.Run("empty modules", func(t *testing.T) {
+		m := Resolve([]*module.Module{}, nil, nil, nil)
+		testutil.NotNil(t, m, "Resolve returned nil Mib")
+		testutil.NotEmpty(t, m.Modules(), "expected at least base modules, got 0")
+	})
 
-func TestResolveNilModulesWithCustomConfig(t *testing.T) {
-	cfg := VerboseConfig()
-	m := Resolve(nil, nil, nil, &cfg)
-	testutil.NotNil(t, m, "Resolve returned nil Mib")
-	// With strict config, the pipeline should still complete.
-	testutil.NotEmpty(t, m.Modules(), "expected at least base modules, got 0")
+	t.Run("with custom config", func(t *testing.T) {
+		cfg := VerboseConfig()
+		m := Resolve(nil, nil, nil, &cfg)
+		testutil.NotNil(t, m, "Resolve returned nil Mib")
+		testutil.NotEmpty(t, m.Modules(), "expected at least base modules, got 0")
+	})
 }
 
 func TestResolveBaseModulesRegistered(t *testing.T) {
@@ -184,14 +183,6 @@ func TestResolveUnresolvedImportProducesDiagnostic(t *testing.T) {
 	testutil.True(t, foundDiag, "expected diagnostic with code import-module-not-found for BAD-IMPORT-MIB")
 }
 
-func TestResolvePermissiveConfig(t *testing.T) {
-	cfg := DefaultConfig()
-	m := Resolve(nil, nil, nil, &cfg)
-	testutil.NotNil(t, m, "Resolve returned nil Mib")
-	// Should still produce base modules.
-	testutil.NotEmpty(t, m.Modules(), "expected at least base modules")
-}
-
 func TestResolveNoUserModulesNodeCount(t *testing.T) {
 	m := Resolve(nil, nil, nil, nil)
 	// Base modules define OID nodes (iso, org, dod, internet, etc.).
@@ -205,15 +196,9 @@ func TestResolveNoUserModulesTypeCount(t *testing.T) {
 	testutil.True(t, len(m.Types()) >= 4, "expected at least 4 types (ASN.1 primitives), got %d", len(m.Types()))
 }
 
-func TestResolveNoUserModulesHasNoUnresolved(t *testing.T) {
-	// With only base modules and no user modules, there should be no
-	// unresolved references.
+func TestResolveBaseOnlyIsClean(t *testing.T) {
 	m := Resolve(nil, nil, nil, nil)
 	testutil.Len(t, m.Unresolved(), 0, "expected no unresolved references for base-only resolution, got")
-}
-
-func TestResolveBaseOnlyHasNoErrors(t *testing.T) {
-	m := Resolve(nil, nil, nil, nil)
 	testutil.False(t, m.HasErrors(), "expected no errors for base-only resolution, diagnostics:")
 }
 
