@@ -257,21 +257,8 @@ func TestProblemNotifications(t *testing.T) {
 // Ground truth: smilint [3] "node is an invalid member of object group"
 func TestProblemNotifBadGroup(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-NOTIFICATIONS-MIB")
-
-	found := false
-	for _, d := range m.Diagnostics() {
-		if d.Code == "group-not-accessible" && d.Module == "PROBLEM-NOTIFICATIONS-MIB" {
-			found = true
-			if !strings.Contains(d.Message, "problemNotifIndex") {
-				t.Errorf("diagnostic should mention problemNotifIndex, got: %s", d.Message)
-			}
-			if !strings.Contains(d.Message, "problemNotifBadGroup") {
-				t.Errorf("diagnostic should mention problemNotifBadGroup, got: %s", d.Message)
-			}
-		}
-	}
-	testutil.True(t, found,
-		"should emit group-not-accessible diagnostic for not-accessible index in OBJECT-GROUP")
+	requireModuleDiagnostic(t, m, "PROBLEM-NOTIFICATIONS-MIB",
+		"group-not-accessible", 1, "problemNotifIndex", "problemNotifBadGroup")
 }
 
 // TestProblemNotifObjectAccess verifies that a diagnostic is emitted when a
@@ -279,21 +266,8 @@ func TestProblemNotifBadGroup(t *testing.T) {
 // Ground truth: smilint [3] "object must not be not-accessible"
 func TestProblemNotifObjectAccess(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-NOTIFICATIONS-MIB")
-
-	found := false
-	for _, d := range m.Diagnostics() {
-		if d.Code == "notification-object-access" && d.Module == "PROBLEM-NOTIFICATIONS-MIB" {
-			found = true
-			if !strings.Contains(d.Message, "problemNotifIndex") {
-				t.Errorf("diagnostic should mention problemNotifIndex, got: %s", d.Message)
-			}
-			if !strings.Contains(d.Message, "problemNotifWithIndex") {
-				t.Errorf("diagnostic should mention problemNotifWithIndex, got: %s", d.Message)
-			}
-		}
-	}
-	testutil.True(t, found,
-		"should emit notification-object-access diagnostic for not-accessible object in OBJECTS")
+	requireModuleDiagnostic(t, m, "PROBLEM-NOTIFICATIONS-MIB",
+		"notification-object-access", 1, "problemNotifIndex", "problemNotifWithIndex")
 }
 
 // TestProblemNotifNotReversible verifies that a diagnostic is emitted when a
@@ -301,18 +275,8 @@ func TestProblemNotifObjectAccess(t *testing.T) {
 // Ground truth: smilint [5] "notification is not reverse mappable"
 func TestProblemNotifNotReversible(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-NOTIFICATIONS-MIB")
-
-	found := false
-	for _, d := range m.Diagnostics() {
-		if d.Code == "notification-not-reversible" && d.Module == "PROBLEM-NOTIFICATIONS-MIB" {
-			found = true
-			if !strings.Contains(d.Message, "problemNotifNotReversible") {
-				t.Errorf("diagnostic should mention problemNotifNotReversible, got: %s", d.Message)
-			}
-		}
-	}
-	testutil.True(t, found,
-		"should emit notification-not-reversible for notification under non-zero parent")
+	requireModuleDiagnostic(t, m, "PROBLEM-NOTIFICATIONS-MIB",
+		"notification-not-reversible", 1, "problemNotifNotReversible")
 
 	// Notifications under .0. prefix should not trigger the diagnostic.
 	for _, d := range m.Diagnostics() {
@@ -327,18 +291,8 @@ func TestProblemNotifNotReversible(t *testing.T) {
 // Ground truth: smilint [5] "last sub-identifier of notification too large"
 func TestProblemNotifIdTooLarge(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-NOTIFICATIONS-MIB")
-
-	found := false
-	for _, d := range m.Diagnostics() {
-		if d.Code == "notification-id-too-large" && d.Module == "PROBLEM-NOTIFICATIONS-MIB" {
-			found = true
-			if !strings.Contains(d.Message, "problemNotifIdTooLarge") {
-				t.Errorf("diagnostic should mention problemNotifIdTooLarge, got: %s", d.Message)
-			}
-		}
-	}
-	testutil.True(t, found,
-		"should emit notification-id-too-large for sub-id > 2147483647")
+	requireModuleDiagnostic(t, m, "PROBLEM-NOTIFICATIONS-MIB",
+		"notification-id-too-large", 1, "problemNotifIdTooLarge")
 }
 
 // TestProblemRevisions verifies that MODULE-IDENTITY revision handling works
