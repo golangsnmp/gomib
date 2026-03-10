@@ -3670,3 +3670,261 @@ func TestCheckObsoleteImports_RFC1065InSMIv2(t *testing.T) {
 	m := resolveStrict(mod)
 	hasDiag(t, m.Diagnostics(), types.DiagObsoleteImport)
 }
+
+// --- checkIntegerMisuse ---
+
+func TestCheckIntegerMisuse_ObjectType(t *testing.T) {
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "badObj"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagIntegerInSMIv2)
+}
+
+func TestCheckIntegerMisuse_TypeDef(t *testing.T) {
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "BadType"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagIntegerInSMIv2)
+}
+
+func TestCheckIntegerMisuse_ConstrainedInteger(t *testing.T) {
+	// INTEGER with range constraint should still trigger.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "rangeObj"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base: &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+			},
+			Status: types.StatusCurrent,
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagIntegerInSMIv2)
+}
+
+func TestCheckIntegerMisuse_Integer32NoDiag(t *testing.T) {
+	// Integer32 is the correct SMIv2 form; no diagnostic.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "goodObj"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagIntegerInSMIv2)
+}
+
+func TestCheckIntegerMisuse_IntegerEnumNoDiag(t *testing.T) {
+	// INTEGER with named values (enum) should not trigger.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "enumObj"},
+			Syntax: &module.TypeSyntaxIntegerEnum{
+				NamedNumbers: []module.NamedNumber{{Name: "up", Value: 1}, {Name: "down", Value: 2}},
+			},
+			Status: types.StatusCurrent,
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagIntegerInSMIv2)
+}
+
+func TestCheckIntegerMisuse_SMIv1Skipped(t *testing.T) {
+	// INTEGER in SMIv1 module should not trigger.
+	mod := testSMIv1Module(nil,
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "v1Obj"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+			Status:  types.StatusMandatory,
+			Oid:     testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagIntegerInSMIv2)
+}
+
+// --- checkTrapInSMIv2 ---
+
+func TestCheckTrapInSMIv2_TrapTypeEmitsDiag(t *testing.T) {
+	mod := testSMIv2Module(nil,
+		&module.Notification{
+			DefBase:  module.DefBase{Name: "badTrap"},
+			TrapInfo: &module.TrapInfo{Enterprise: "testRoot", TrapNumber: 1},
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagTrapInSMIv2)
+}
+
+func TestCheckTrapInSMIv2_NotificationTypeNoDiag(t *testing.T) {
+	// NOTIFICATION-TYPE (not a trap) should not trigger.
+	notifOid := testOid("testRoot", 1)
+	mod := testSMIv2Module(nil,
+		&module.Notification{
+			DefBase: module.DefBase{Name: "goodNotif"},
+			Status:  types.StatusCurrent,
+			Oid:     &notifOid,
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagTrapInSMIv2)
+}
+
+func TestCheckTrapInSMIv2_SMIv1TrapSkipped(t *testing.T) {
+	// TRAP-TYPE in SMIv1 module should not trigger.
+	mod := testSMIv1Module(nil,
+		&module.Notification{
+			DefBase:  module.DefBase{Name: "v1Trap"},
+			TrapInfo: &module.TrapInfo{Enterprise: "testRoot", TrapNumber: 1},
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagTrapInSMIv2)
+}
+
+// --- checkOpaqueSMIv2 ---
+
+func TestCheckOpaqueSMIv2_EmitsDiag(t *testing.T) {
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Opaque", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "opaqueObj"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Opaque"},
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagOpaqueSMIv2)
+}
+
+func TestCheckOpaqueSMIv2_NonOpaqueNoDiag(t *testing.T) {
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "normalObj"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagOpaqueSMIv2)
+}
+
+func TestCheckOpaqueSMIv2_SMIv1Skipped(t *testing.T) {
+	// Opaque in SMIv1 module should not trigger.
+	mod := testSMIv1Module(
+		[]module.Import{
+			module.NewImport("RFC1155-SMI", "Opaque", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "v1Opaque"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Opaque"},
+			Status:  types.StatusMandatory,
+			Oid:     testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagOpaqueSMIv2)
+}
+
+// --- checkNotificationReversibility ---
+
+func TestCheckNotificationReversibility_NotReversible(t *testing.T) {
+	// Notification whose parent arc is not 0 should emit not-reversible.
+	// Place notification directly under testRoot (arc 99999, not 0).
+	notifOid := testOid("testRoot", 1)
+	mod := testSMIv2Module(nil,
+		&module.Notification{
+			DefBase: module.DefBase{Name: "badNotif"},
+			Status:  types.StatusCurrent,
+			Oid:     &notifOid,
+		},
+	)
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagNotifNotReversible)
+}
+
+func TestCheckNotificationReversibility_Reversible(t *testing.T) {
+	// Proper structure: notification under a .0. node.
+	// testRoot { enterprises 99999 } -> testNotifs { testRoot 0 } -> myNotif { testNotifs 1 }
+	notifsOid := testOid("testRoot", 0)
+	notifOid := testOid("testNotifs", 1)
+	mod := testSMIv2Module(nil,
+		&module.ValueAssignment{
+			DefBase: module.DefBase{Name: "testNotifs"},
+			Oid:     notifsOid,
+		},
+		&module.Notification{
+			DefBase: module.DefBase{Name: "myNotif"},
+			Status:  types.StatusCurrent,
+			Oid:     &notifOid,
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagNotifNotReversible)
+}
+
+func TestCheckNotificationReversibility_SMIv1Skipped(t *testing.T) {
+	// SMIv1 trap should not be checked for reversibility.
+	mod := testSMIv1Module(nil,
+		&module.Notification{
+			DefBase:  module.DefBase{Name: "v1Trap"},
+			TrapInfo: &module.TrapInfo{Enterprise: "testRoot", TrapNumber: 1},
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagNotifNotReversible, types.DiagNotifIdTooLarge)
+}
