@@ -340,7 +340,7 @@ func TestSNMPv2SMI_ExtUTCTime(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-SMI")
 	td := findDef[*TypeDef](t, mod, "ExtUTCTime")
 
-	testutil.Equal(t, types.StatusObsolete, td.Status, "ExtUTCTime status")
+	testutil.Equal(t, types.StatusCurrent, td.Status, "ExtUTCTime status")
 
 	constrained, ok := td.Syntax.(*TypeSyntaxConstrained)
 	testutil.True(t, ok, "ExtUTCTime syntax should be constrained")

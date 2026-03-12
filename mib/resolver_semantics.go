@@ -165,14 +165,14 @@ func resolveTableSemantics(ctx *resolverContext, objRefs []objectTypeRef) {
 					if isBareTypeIndex(item.Object) {
 						continue
 					}
-					ctx.RecordUnresolvedIndex(ref.mod, obj.Name, item.Object, obj.Span)
+					ctx.RecordUnresolvedIndex(ref.mod, obj.Name, item.Object, item.Span)
 				}
 			}
 		}
 
 		if obj.Augments != "" {
 			if _, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); !ok {
-				ctx.RecordUnresolvedOid(ref.mod, obj.Name, obj.Augments, obj.Span)
+				ctx.RecordUnresolvedOid(ref.mod, obj.Name, obj.Augments, obj.AugmentsSpan)
 			}
 		}
 	}
@@ -209,7 +209,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 		resolved.setUnits(obj.Units)
 		resolved.setReference(obj.Reference)
 
-		if t, ok := resolveTypeSyntax(ctx, obj.Syntax, ref.mod, obj.Name, obj.Span); ok {
+		if t, ok := resolveTypeSyntax(ctx, obj.Syntax, ref.mod, obj.Name, obj.SyntaxSpan); ok {
 			resolved.setType(t)
 		}
 
@@ -422,36 +422,60 @@ func createResolvedNotifications(ctx *resolverContext) {
 		}
 
 		for _, objName := range notif.Objects {
-			var objNode *Node
-			var ok bool
+			// Use module-scoped object lookup to get the object from the
+			// correct module, not whichever module won node preference.
+			if obj := ctx.lookupObjectInModuleScope(ref.mod, objName); obj != nil {
+				resolved.addObject(obj)
+				if obj.Access() == AccessNotAccessible {
+					ctx.EmitDiagnostic(types.DiagNotifObjectAccess,
+						ref.mod, notif.Span,
+						fmt.Sprintf("notification %q references %q which is not-accessible", notif.Name, objName))
+				}
+				continue
+			}
 
-			objNode, ok = ctx.LookupNodeForModule(ref.mod, objName)
-
-			// Permissive only: global lookup for objects not explicitly imported
-			if !ok && ctx.ResolverStrictness().AllowGlobalFallbacks() {
-				objNode, ok = ctx.LookupNodeGlobal(objName)
-				if ok && ctx.TraceEnabled() {
-					ctx.Trace("permissive: resolved notification object via global lookup",
-						slog.String("object", objName),
-						slog.String("notification", notif.Name))
+			// Permissive only: global lookup for objects not explicitly imported.
+			// No module scope available, so use the node-attached object.
+			if ctx.ResolverStrictness().AllowGlobalFallbacks() {
+				if objNode, ok := ctx.LookupNodeGlobal(objName); ok {
+					if ctx.TraceEnabled() {
+						ctx.Trace("permissive: resolved notification object via global lookup",
+							slog.String("object", objName),
+							slog.String("notification", notif.Name))
+					}
+					if objNode.Object() != nil {
+						resolved.addObject(objNode.Object())
+						if objNode.Object().Access() == AccessNotAccessible {
+							ctx.EmitDiagnostic(types.DiagNotifObjectAccess,
+								ref.mod, notif.Span,
+								fmt.Sprintf("notification %q references %q which is not-accessible", notif.Name, objName))
+						}
+						continue
+					}
+					// Node exists but has no object definition.
+					ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, ref.mod, notif.Span,
+						fmt.Sprintf("notification %q references %q which is not an object definition", notif.Name, objName))
+					continue
 				}
 			}
 
+			// Try node lookup to distinguish "not found" from "not an object".
+			objNode, ok := ctx.LookupNodeForModule(ref.mod, objName)
 			switch {
-			case ok && objNode.Object() != nil:
+			case !ok:
+				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
+			case objNode.Object() == nil:
+				ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, ref.mod, notif.Span,
+					fmt.Sprintf("notification %q references %q which is not an object definition", notif.Name, objName))
+			default:
+				// Node has an object but it belongs to a different module
+				// (not in our import scope). Still add it since we found it.
 				resolved.addObject(objNode.Object())
 				if objNode.Object().Access() == AccessNotAccessible {
 					ctx.EmitDiagnostic(types.DiagNotifObjectAccess,
 						ref.mod, notif.Span,
 						fmt.Sprintf("notification %q references %q which is not-accessible", notif.Name, objName))
 				}
-			case !ok:
-				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
-			default:
-				// Node exists but has no object definition (intermediate node
-				// or non-object definition).
-				ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, ref.mod, notif.Span,
-					fmt.Sprintf("notification %q references %q which is not an object definition", notif.Name, objName))
 			}
 		}
 
@@ -680,8 +704,8 @@ func convertComplianceModules(ctx *resolverContext, mod *module.Module, modules 
 					Description: o.Description,
 					Span:        o.Span,
 				}
-				objects[j].Syntax = resolveSyntaxConstraints(ctx, o.Syntax, mod, o.Object)
-				objects[j].WriteSyntax = resolveSyntaxConstraints(ctx, o.WriteSyntax, mod, o.Object)
+				objects[j].Syntax = resolveSyntaxConstraints(ctx, o.Syntax, mod, o.Object, o.Span)
+				objects[j].WriteSyntax = resolveSyntaxConstraints(ctx, o.WriteSyntax, mod, o.Object, o.Span)
 				if o.MinAccess != nil {
 					objects[j].MinAccess = o.MinAccess
 				}
@@ -758,8 +782,8 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 					Description: v.Description,
 					Span:        v.Span,
 				}
-				ov.Syntax = resolveSyntaxConstraints(ctx, v.Syntax, mod, v.Name)
-				ov.WriteSyntax = resolveSyntaxConstraints(ctx, v.WriteSyntax, mod, v.Name)
+				ov.Syntax = resolveSyntaxConstraints(ctx, v.Syntax, mod, v.Name, v.Span)
+				ov.WriteSyntax = resolveSyntaxConstraints(ctx, v.WriteSyntax, mod, v.Name, v.Span)
 				if len(v.CreationRequires) > 0 {
 					ov.CreationRequires = slices.Clone(v.CreationRequires)
 				}
@@ -858,12 +882,12 @@ func emitMixedGroupDiagnostic(ctx *resolverContext, mod *module.Module, span typ
 	}
 }
 
-func resolveSyntaxConstraints(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, ownerName string) *SyntaxConstraints {
+func resolveSyntaxConstraints(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, ownerName string, syntaxSpan types.Span) *SyntaxConstraints {
 	if syntax == nil {
 		return nil
 	}
 	sc := &SyntaxConstraints{}
-	if t, ok := resolveTypeSyntax(ctx, syntax, mod, ownerName, types.Span{}); ok {
+	if t, ok := resolveTypeSyntax(ctx, syntax, mod, ownerName, syntaxSpan); ok {
 		sc.Type = t
 	}
 	sc.Sizes, sc.Ranges = extractConstraints(syntax)

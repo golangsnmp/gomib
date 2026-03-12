@@ -339,22 +339,22 @@ func tryResolveOidDefinition(ctx *resolverContext, def oidDefinition) bool {
 func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *Node, component module.OidComponent, isLast bool) (*Node, bool) {
 	switch c := component.(type) {
 	case *module.OidComponentName:
-		return resolveNameComponent(ctx, def, c.NameValue)
+		return resolveNameComponent(ctx, def, c.NameValue, c.ComponentSpan())
 	case *module.OidComponentNumber:
 		return resolveNumericComponent(ctx, currentNode, c.Value), true
 	case *module.OidComponentNamedNumber:
 		return resolveNamedNumberComponent(ctx, def, currentNode, c.NameValue, c.NumberValue, isLast)
 	case *module.OidComponentQualifiedName:
-		return resolveQualifiedNameComponent(ctx, def, c.ModuleValue, c.NameValue)
+		return resolveQualifiedNameComponent(ctx, def, c.ModuleValue, c.NameValue, c.ComponentSpan())
 	case *module.OidComponentQualifiedNamedNumber:
 		return resolveQualifiedNamedNumberComponent(ctx, def, currentNode, c.ModuleValue, c.NameValue, c.NumberValue, isLast)
 	default:
-		ctx.RecordUnresolvedOid(def.mod, def.defName(), "", def.oid().Span)
+		ctx.RecordUnresolvedOid(def.mod, def.defName(), "", component.ComponentSpan())
 		return nil, false
 	}
 }
 
-func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) (*Node, bool) {
+func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string, compSpan types.Span) (*Node, bool) {
 	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
 		return node, true
 	}
@@ -373,7 +373,7 @@ func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string) 
 			return node, true
 		}
 	}
-	ctx.RecordUnresolvedOid(def.mod, def.defName(), name, def.oid().Span)
+	ctx.RecordUnresolvedOid(def.mod, def.defName(), name, compSpan)
 	return nil, false
 }
 
@@ -384,11 +384,11 @@ func resolveNamedNumberComponent(ctx *resolverContext, def oidDefinition, curren
 	return createNamedChild(ctx, def, currentNode, name, number, isLast)
 }
 
-func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, moduleName, name string) (*Node, bool) {
+func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, moduleName, name string, compSpan types.Span) (*Node, bool) {
 	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
 		return node, true
 	}
-	ctx.RecordUnresolvedOid(def.mod, def.defName(), moduleName+"."+name, def.oid().Span)
+	ctx.RecordUnresolvedOid(def.mod, def.defName(), moduleName+"."+name, compSpan)
 	return nil, false
 }
 
@@ -491,6 +491,7 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *Node, 
 		case *module.ObjectIdentity:
 			node.setDescription(d.Description)
 			node.setReference(d.Reference)
+			node.setObjectIdentity(d.Status)
 		}
 		node.setModule(newMod)
 		if def.kind == defModuleIdentity {

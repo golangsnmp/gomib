@@ -27,6 +27,8 @@ type Node struct {
 	group       *Group
 	compliance  *Compliance
 	capability  *Capability
+	isObjIdent  bool // true if this node came from an OBJECT-IDENTITY definition
+	objIdentSt  Status
 	parent      *Node
 	children    map[uint32]*Node
 	oidCache    OID                     // lazily computed full OID; nil = not yet computed
@@ -109,6 +111,18 @@ func (n *Node) Compliance() *Compliance { return n.compliance }
 
 // Capability returns the AGENT-CAPABILITIES attached to this node, or nil.
 func (n *Node) Capability() *Capability { return n.capability }
+
+// IsObjectIdentity reports whether this node was defined by an OBJECT-IDENTITY macro.
+func (n *Node) IsObjectIdentity() bool { return n.isObjIdent }
+
+// ObjectIdentityStatus returns the STATUS clause from an OBJECT-IDENTITY definition.
+// Returns zero Status and false for non-OBJECT-IDENTITY nodes.
+func (n *Node) ObjectIdentityStatus() (Status, bool) {
+	if !n.isObjIdent {
+		return 0, false
+	}
+	return n.objIdentSt, true
+}
 
 // Parent returns the parent node, or nil for the root.
 func (n *Node) Parent() *Node { return n.parent }
@@ -223,3 +237,7 @@ func (n *Node) setNotification(notif *Notification) { n.notif = notif }
 func (n *Node) setGroup(g *Group)                   { n.group = g }
 func (n *Node) setCompliance(c *Compliance)         { n.compliance = c }
 func (n *Node) setCapability(c *Capability)         { n.capability = c }
+func (n *Node) setObjectIdentity(status Status) {
+	n.isObjIdent = true
+	n.objIdentSt = status
+}

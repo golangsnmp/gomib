@@ -31,7 +31,7 @@ Commands:
   load       Load and resolve MIB modules
   lint       Check modules for issues (linter mode)
   get        Query OID or name lookups
-  dump       Output modules or subtrees as JSON
+  dump       Export resolved MIB data as canonical JSON
   normalize  Emit modules as canonical SMIv2 text
   trace      Trace symbol resolution for debugging
   paths      Show MIB search paths

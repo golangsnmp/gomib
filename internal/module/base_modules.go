@@ -226,12 +226,12 @@ func makeOidValue(name string, components []OidComponent, desc, ref string) Defi
 
 func basePtr(b types.BaseType) *types.BaseType { return &b }
 
-func makeTypeDef(name string, syntax TypeSyntax, base *types.BaseType, status types.Status, desc, ref string) Definition {
+func makeTypeDef(name string, syntax TypeSyntax, base *types.BaseType, desc, ref string) Definition {
 	return &TypeDef{
 		DefBase:     DefBase{Name: name, Span: types.Synthetic},
 		Syntax:      syntax,
 		BaseType:    base,
-		Status:      status,
+		Status:      types.StatusCurrent,
 		Description: desc,
 		Reference:   ref,
 	}
@@ -370,75 +370,75 @@ func createBaseTypeDefinitions() []Definition {
 				&RangeValueSigned{Value: int32Min},
 				&RangeValueSigned{Value: int32Max},
 			),
-			basePtr(types.BaseInteger32), types.StatusCurrent,
+			basePtr(types.BaseInteger32),
 			"A 32-bit signed integer. The range is -2147483648 to 2147483647.",
 			rfc2578+".1",
 		),
 		// Counter32 ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDef("Counter32", constrainedUintRange(uint32Max), basePtr(types.BaseCounter32), types.StatusCurrent,
+		makeTypeDef("Counter32", constrainedUintRange(uint32Max), basePtr(types.BaseCounter32),
 			"A non-negative 32-bit counter that monotonically increases until it wraps at 2^32-1. A Counter32 has no defined initial value and must not be used for a MIB object that has a MAX-ACCESS of read-write or read-create.",
 			rfc2578+".6",
 		),
 		// Counter64 ::= [APPLICATION 6] IMPLICIT INTEGER (0..18446744073709551615)
-		makeTypeDef("Counter64", constrainedUintRange(uint64Max), basePtr(types.BaseCounter64), types.StatusCurrent,
+		makeTypeDef("Counter64", constrainedUintRange(uint64Max), basePtr(types.BaseCounter64),
 			"A non-negative 64-bit counter for high-speed interfaces where Counter32 would wrap too frequently. Counter64 should only be used when Counter32 wrapping is a problem.",
 			rfc2578+".8",
 		),
 		// Gauge32 ::= [APPLICATION 2] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDef("Gauge32", constrainedUintRange(uint32Max), basePtr(types.BaseGauge32), types.StatusCurrent,
+		makeTypeDef("Gauge32", constrainedUintRange(uint32Max), basePtr(types.BaseGauge32),
 			"A non-negative 32-bit integer that may increase or decrease but latches at a maximum value of 2^32-1.",
 			rfc2578+".7",
 		),
 		// Unsigned32 ::= [APPLICATION 2] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDef("Unsigned32", constrainedUintRange(uint32Max), basePtr(types.BaseUnsigned32), types.StatusCurrent,
+		makeTypeDef("Unsigned32", constrainedUintRange(uint32Max), basePtr(types.BaseUnsigned32),
 			"A 32-bit unsigned integer with range 0 to 4294967295. Shares the same APPLICATION tag as Gauge32.",
 			rfc2578+".1",
 		),
 		// TimeTicks ::= [APPLICATION 3] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDef("TimeTicks", constrainedUintRange(uint32Max), basePtr(types.BaseTimeTicks), types.StatusCurrent,
+		makeTypeDef("TimeTicks", constrainedUintRange(uint32Max), basePtr(types.BaseTimeTicks),
 			"A non-negative 32-bit integer representing time in hundredths of a second since some reference epoch.",
 			rfc2578+".2",
 		),
 		// IpAddress ::= [APPLICATION 0] IMPLICIT OCTET STRING (SIZE (4))
-		makeTypeDef("IpAddress", constrainedOctetFixed(4), basePtr(types.BaseIpAddress), types.StatusCurrent,
+		makeTypeDef("IpAddress", constrainedOctetFixed(4), basePtr(types.BaseIpAddress),
 			"An IPv4 address represented as a 4-byte OCTET STRING in network byte order. New MIBs should use InetAddress from INET-ADDRESS-MIB instead.",
 			rfc2578+".3",
 		),
 		// Opaque ::= [APPLICATION 4] IMPLICIT OCTET STRING
-		makeTypeDef("Opaque", &TypeSyntaxOctetString{}, basePtr(types.BaseOpaque), types.StatusCurrent,
+		makeTypeDef("Opaque", &TypeSyntaxOctetString{}, basePtr(types.BaseOpaque),
 			"An arbitrary ASN.1 value encoded as an OCTET STRING for transparent transport. Use of Opaque is discouraged in new MIB definitions.",
 			rfc2578+".4",
 		),
 		// ObjectName ::= OBJECT IDENTIFIER
-		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}, nil, types.StatusCurrent,
+		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}, nil,
 			"An OBJECT IDENTIFIER value that names a managed object.",
 			rfc2578,
 		),
 		// NotificationName ::= OBJECT IDENTIFIER
-		makeTypeDef("NotificationName", &TypeSyntaxObjectIdentifier{}, nil, types.StatusCurrent,
+		makeTypeDef("NotificationName", &TypeSyntaxObjectIdentifier{}, nil,
 			"An OBJECT IDENTIFIER value that names a notification.",
 			rfc2578,
 		),
-		// ExtUTCTime ::= OCTET STRING (SIZE (11 | 13)) - obsolete
+		// ExtUTCTime ::= OCTET STRING (SIZE (11 | 13))
 		makeTypeDef("ExtUTCTime",
 			constrainedOctetSize([]Range{
 				{Min: &RangeValueUnsigned{Value: 11}, Max: nil},
 				{Min: &RangeValueUnsigned{Value: 13}, Max: nil},
 			}),
-			nil, types.StatusObsolete,
-			"An obsolete date-time format. Replaced by DateAndTime from SNMPv2-TC.",
+			nil,
+			"",
 			rfc2578,
 		),
 		// ObjectSyntax, SimpleSyntax, ApplicationSyntax - protocol meta-types
-		makeTypeDef("ObjectSyntax", &TypeSyntaxTypeRef{Name: "SimpleSyntax"}, nil, types.StatusCurrent,
+		makeTypeDef("ObjectSyntax", &TypeSyntaxTypeRef{Name: "SimpleSyntax"}, nil,
 			"The union of all SMIv2 data types that may be used in OBJECT-TYPE definitions.",
 			rfc2578,
 		),
-		makeTypeDef("SimpleSyntax", &TypeSyntaxTypeRef{Name: "INTEGER"}, nil, types.StatusCurrent,
+		makeTypeDef("SimpleSyntax", &TypeSyntaxTypeRef{Name: "INTEGER"}, nil,
 			"The union of primitive ASN.1 types: INTEGER, OCTET STRING, and OBJECT IDENTIFIER.",
 			rfc2578,
 		),
-		makeTypeDef("ApplicationSyntax", &TypeSyntaxTypeRef{Name: "IpAddress"}, nil, types.StatusCurrent,
+		makeTypeDef("ApplicationSyntax", &TypeSyntaxTypeRef{Name: "IpAddress"}, nil,
 			"The union of application-wide types: IpAddress, Counter32, Gauge32, Unsigned32, TimeTicks, Opaque, and Counter64.",
 			rfc2578,
 		),
@@ -452,37 +452,37 @@ func createSMIv1TypeDefinitions() []Definition {
 
 	return []Definition{
 		// Counter ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDef("Counter", constrainedUintRange(uint32Max), basePtr(types.BaseCounter32), types.StatusCurrent,
+		makeTypeDef("Counter", constrainedUintRange(uint32Max), basePtr(types.BaseCounter32),
 			"A non-negative 32-bit counter that monotonically increases until it wraps at 2^32-1. The SMIv1 equivalent of Counter32.",
 			rfc1155+".3",
 		),
 		// Gauge ::= [APPLICATION 2] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDef("Gauge", constrainedUintRange(uint32Max), basePtr(types.BaseGauge32), types.StatusCurrent,
+		makeTypeDef("Gauge", constrainedUintRange(uint32Max), basePtr(types.BaseGauge32),
 			"A non-negative 32-bit integer that may increase or decrease but latches at a maximum value. The SMIv1 equivalent of Gauge32.",
 			rfc1155+".4",
 		),
 		// IpAddress ::= [APPLICATION 0] IMPLICIT OCTET STRING (SIZE (4))
-		makeTypeDef("IpAddress", constrainedOctetFixed(4), basePtr(types.BaseIpAddress), types.StatusCurrent,
+		makeTypeDef("IpAddress", constrainedOctetFixed(4), basePtr(types.BaseIpAddress),
 			"An IPv4 address represented as a 4-byte OCTET STRING in network byte order.",
 			rfc1155+".1",
 		),
 		// NetworkAddress ::= CHOICE { internet IpAddress }
-		makeTypeDef("NetworkAddress", &TypeSyntaxTypeRef{Name: "IpAddress"}, basePtr(types.BaseIpAddress), types.StatusCurrent,
+		makeTypeDef("NetworkAddress", &TypeSyntaxTypeRef{Name: "IpAddress"}, basePtr(types.BaseIpAddress),
 			"A network address from one of possibly several protocol families. In practice, only the internet family (IpAddress) is used.",
 			rfc1155+".1",
 		),
 		// TimeTicks ::= [APPLICATION 3] IMPLICIT INTEGER (0..4294967295)
-		makeTypeDef("TimeTicks", constrainedUintRange(uint32Max), basePtr(types.BaseTimeTicks), types.StatusCurrent,
+		makeTypeDef("TimeTicks", constrainedUintRange(uint32Max), basePtr(types.BaseTimeTicks),
 			"A non-negative 32-bit integer representing time in hundredths of a second since some reference epoch.",
 			rfc1155+".5",
 		),
 		// Opaque ::= [APPLICATION 4] IMPLICIT OCTET STRING
-		makeTypeDef("Opaque", &TypeSyntaxOctetString{}, basePtr(types.BaseOpaque), types.StatusCurrent,
+		makeTypeDef("Opaque", &TypeSyntaxOctetString{}, basePtr(types.BaseOpaque),
 			"An arbitrary ASN.1 value encoded as an OCTET STRING for transparent transport.",
 			rfc1155+".6",
 		),
 		// ObjectName ::= OBJECT IDENTIFIER
-		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}, nil, types.StatusCurrent,
+		makeTypeDef("ObjectName", &TypeSyntaxObjectIdentifier{}, nil,
 			"An OBJECT IDENTIFIER value that names a managed object.",
 			"RFC 1155, Section 3.2",
 		),

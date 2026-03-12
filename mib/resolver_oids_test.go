@@ -1256,7 +1256,7 @@ func TestResolveQualifiedNameComponent(t *testing.T) {
 			kind: defValueAssignment,
 		}
 
-		got, ok := resolveQualifiedNameComponent(ctx, def, "SNMPv2-SMI", "enterprises")
+		got, ok := resolveQualifiedNameComponent(ctx, def, "SNMPv2-SMI", "enterprises", types.Synthetic)
 		testutil.True(t, ok, "expected ok")
 		testutil.Equal(t, entNode, got, "expected node from named module")
 	})
@@ -1274,7 +1274,7 @@ func TestResolveQualifiedNameComponent(t *testing.T) {
 			kind: defValueAssignment,
 		}
 
-		got, ok := resolveQualifiedNameComponent(ctx, def, "UNKNOWN-MIB", "foo")
+		got, ok := resolveQualifiedNameComponent(ctx, def, "UNKNOWN-MIB", "foo", types.Synthetic)
 		testutil.False(t, ok, "expected false for missing module")
 		testutil.Nil(t, got, "expected nil node")
 
@@ -1565,7 +1565,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 			kind: defValueAssignment,
 		}
 
-		got, ok := resolveNameComponent(ctx, def, "iso")
+		got, ok := resolveNameComponent(ctx, def, "iso", types.Synthetic)
 		testutil.True(t, ok, "expected ok for well-known root")
 		testutil.Equal(t, uint32(1), got.Arc(), "iso should be arc 1")
 	})
@@ -1588,7 +1588,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 			kind: defValueAssignment,
 		}
 
-		got, ok := resolveNameComponent(ctx, def, "enterprises")
+		got, ok := resolveNameComponent(ctx, def, "enterprises", types.Synthetic)
 		testutil.True(t, ok, "expected ok in Normal+")
 		testutil.Equal(t, entNode, got, "expected enterprises node")
 	})
@@ -1606,7 +1606,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 			kind: defValueAssignment,
 		}
 
-		_, ok := resolveNameComponent(ctx, def, "enterprises")
+		_, ok := resolveNameComponent(ctx, def, "enterprises", types.Synthetic)
 		testutil.False(t, ok, "expected false in strict mode")
 
 		diags := ctx.Diagnostics()
@@ -1627,7 +1627,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 			kind: defValueAssignment,
 		}
 
-		_, ok := resolveNameComponent(ctx, def, "totallyUnknown")
+		_, ok := resolveNameComponent(ctx, def, "totallyUnknown", types.Synthetic)
 		testutil.False(t, ok, "expected false for unknown name")
 
 		diags := ctx.Diagnostics()
