@@ -136,35 +136,33 @@ func (m *Mib) Capability(name string) *Capability {
 // node entities (object > notification > group > compliance > capability > plain node),
 // then Type. Returns a zero Symbol if not found.
 func (m *Mib) Symbol(name string) Symbol {
-	// Check node-attached entities first.
-	for _, nd := range m.nameToNodes[name] {
-		if nd.obj != nil {
+	nodes := m.nameToNodes[name]
+	// Single pass: track best match by priority (lower = better).
+	bestPri := 6 // worse than any real priority
+	var best Symbol
+	for _, nd := range nodes {
+		switch {
+		case nd.obj != nil:
 			return symbolFromObject(nd.obj)
+		case nd.notif != nil && bestPri > 1:
+			bestPri = 1
+			best = symbolFromNotification(nd.notif)
+		case nd.group != nil && bestPri > 2:
+			bestPri = 2
+			best = symbolFromGroup(nd.group)
+		case nd.compliance != nil && bestPri > 3:
+			bestPri = 3
+			best = symbolFromCompliance(nd.compliance)
+		case nd.capability != nil && bestPri > 4:
+			bestPri = 4
+			best = symbolFromCapability(nd.capability)
+		case bestPri > 5:
+			bestPri = 5
+			best = symbolFromNode(nd)
 		}
 	}
-	for _, nd := range m.nameToNodes[name] {
-		if nd.notif != nil {
-			return symbolFromNotification(nd.notif)
-		}
-	}
-	for _, nd := range m.nameToNodes[name] {
-		if nd.group != nil {
-			return symbolFromGroup(nd.group)
-		}
-	}
-	for _, nd := range m.nameToNodes[name] {
-		if nd.compliance != nil {
-			return symbolFromCompliance(nd.compliance)
-		}
-	}
-	for _, nd := range m.nameToNodes[name] {
-		if nd.capability != nil {
-			return symbolFromCapability(nd.capability)
-		}
-	}
-	// Plain node (no entity attachment).
-	if nodes := m.nameToNodes[name]; len(nodes) > 0 {
-		return symbolFromNode(nodes[0])
+	if bestPri < 6 {
+		return best
 	}
 	// Type lookup.
 	if t := m.typeByName[name]; t != nil {
