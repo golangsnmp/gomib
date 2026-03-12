@@ -1064,7 +1064,7 @@ func TestResolveSyntaxConstraints(t *testing.T) {
 	ctx.registerModuleTypeSymbol(mod, "Integer32", intType)
 
 	t.Run("nil syntax", func(t *testing.T) {
-		testutil.Nil(t, resolveSyntaxConstraints(ctx, nil, mod, "testObj"), "expected nil constraints for nil syntax")
+		testutil.Nil(t, resolveSyntaxConstraints(ctx, nil, mod, "testObj", types.Span{}), "expected nil constraints for nil syntax")
 	})
 
 	t.Run("type and range constraints", func(t *testing.T) {
@@ -1073,7 +1073,7 @@ func TestResolveSyntaxConstraints(t *testing.T) {
 			Constraint: &module.ConstraintRange{
 				Ranges: []module.Range{module.NewRangeSigned(1, 10, types.Span{})},
 			},
-		}, mod, "testObj")
+		}, mod, "testObj", types.Span{})
 
 		testutil.NotNil(t, sc, "syntax constraints")
 		testutil.Equal(t, intType, sc.Type, "constraint type")
@@ -1088,7 +1088,7 @@ func TestResolveSyntaxConstraints(t *testing.T) {
 				{Name: "featureA", Position: 0},
 				{Name: "featureB", Position: 1},
 			},
-		}, mod, "bitsObj")
+		}, mod, "bitsObj", types.Span{})
 
 		testutil.NotNil(t, sc, "syntax constraints")
 		testutil.Len(t, sc.Bits, 2, "bits len")

@@ -145,6 +145,92 @@ func TestCapabilitySupports(t *testing.T) {
 		"sysORLastChange ACCESS should be not-implemented")
 }
 
+func loadVariationSyntaxMIB(t testing.TB) *mib.Mib {
+	t.Helper()
+	return loadProblemMIB(t, "PROBLEM-VARIATION-SYNTAX-MIB")
+}
+
+func TestVariationSyntaxAndWriteSyntax(t *testing.T) {
+	m := loadVariationSyntaxMIB(t)
+
+	c := m.Capability("problemVarCapability")
+	if c == nil {
+		t.Fatal("problemVarCapability not found")
+	}
+
+	supports := c.Supports()
+	testutil.Equal(t, 1, len(supports), "should have 1 SUPPORTS clause")
+
+	sup := supports[0]
+	var statusVar mib.ObjectVariation
+	for _, v := range sup.ObjectVariations {
+		if v.Object == "problemVarStatus" {
+			statusVar = v
+			break
+		}
+	}
+	testutil.Equal(t, "problemVarStatus", statusVar.Object, "should find problemVarStatus variation")
+
+	// SYNTAX INTEGER { active(1), notInService(2) }
+	testutil.NotNil(t, statusVar.Syntax, "syntax should be resolved")
+	testutil.Equal(t, 2, len(statusVar.Syntax.Enums), "syntax should have 2 enum values")
+	enumMap := make(map[string]int64)
+	for _, e := range statusVar.Syntax.Enums {
+		enumMap[e.Label] = e.Value
+	}
+	testutil.Equal(t, int64(1), enumMap["active"], "active(1)")
+	testutil.Equal(t, int64(2), enumMap["notInService"], "notInService(2)")
+
+	// WRITE-SYNTAX INTEGER { createAndGo(4), destroy(6) }
+	testutil.NotNil(t, statusVar.WriteSyntax, "write_syntax should be resolved")
+	testutil.Equal(t, 2, len(statusVar.WriteSyntax.Enums), "write_syntax should have 2 enum values")
+	wsMap := make(map[string]int64)
+	for _, e := range statusVar.WriteSyntax.Enums {
+		wsMap[e.Label] = e.Value
+	}
+	testutil.Equal(t, int64(4), wsMap["createAndGo"], "createAndGo(4)")
+	testutil.Equal(t, int64(6), wsMap["destroy"], "destroy(6)")
+}
+
+func TestVariationSyntaxWithRangeAndDefVal(t *testing.T) {
+	m := loadVariationSyntaxMIB(t)
+
+	c := m.Capability("problemVarCapability")
+	if c == nil {
+		t.Fatal("problemVarCapability not found")
+	}
+
+	sup := c.Supports()[0]
+	var valueVar mib.ObjectVariation
+	for _, v := range sup.ObjectVariations {
+		if v.Object == "problemVarValue" {
+			valueVar = v
+			break
+		}
+	}
+	testutil.Equal(t, "problemVarValue", valueVar.Object, "should find problemVarValue variation")
+
+	// SYNTAX Integer32 (0..50)
+	testutil.NotNil(t, valueVar.Syntax, "syntax should be resolved")
+	testutil.NotNil(t, valueVar.Syntax.Type, "syntax should have resolved type")
+	testutil.Equal(t, 1, len(valueVar.Syntax.Ranges), "syntax should have 1 range")
+	testutil.Equal(t, int64(0), valueVar.Syntax.Ranges[0].Min, "syntax range min")
+	testutil.Equal(t, int64(50), valueVar.Syntax.Ranges[0].Max, "syntax range max")
+
+	// WRITE-SYNTAX Integer32 (1..25)
+	testutil.NotNil(t, valueVar.WriteSyntax, "write_syntax should be resolved")
+	testutil.NotNil(t, valueVar.WriteSyntax.Type, "write_syntax should have resolved type")
+	testutil.Equal(t, 1, len(valueVar.WriteSyntax.Ranges), "write_syntax should have 1 range")
+	testutil.Equal(t, int64(1), valueVar.WriteSyntax.Ranges[0].Min, "write_syntax range min")
+	testutil.Equal(t, int64(25), valueVar.WriteSyntax.Ranges[0].Max, "write_syntax range max")
+
+	// DEFVAL { 10 }
+	testutil.False(t, valueVar.DefVal.IsZero(), "defval should be set")
+	v, ok := mib.DefValAs[int64](valueVar.DefVal)
+	testutil.True(t, ok, "DefValAs[int64] ok")
+	testutil.Equal(t, int64(10), v, "defval value")
+}
+
 func TestCapabilityString(t *testing.T) {
 	m := loadCapabilityMIB(t)
 

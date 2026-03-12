@@ -181,7 +181,7 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 		if tryResolveTypeParent(ctx, entry) {
 			resolved++
 		} else if baseName := getTypeRefBaseName(entry.td.Syntax); baseName != "" {
-			ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Span)
+			ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.SyntaxSpan)
 		}
 	}
 
@@ -193,7 +193,7 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 			}
 			baseName := getTypeRefBaseName(entry.td.Syntax)
 			if baseName != "" {
-				ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Span)
+				ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.SyntaxSpan)
 			}
 		}
 	}
