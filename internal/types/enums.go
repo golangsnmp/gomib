@@ -41,12 +41,20 @@ func (s Severity) AtLeast(other Severity) bool {
 	return s <= other
 }
 
-// ResolverStrictness controls resolver fallback behavior.
+// ResolverStrictness controls which heuristic fallbacks the resolver uses
+// when resolving ambiguous or missing references.
+//
+// This only affects resolution strategy. It does not control which
+// diagnostics cause failure - that is [DiagnosticConfig.FailAt].
 type ResolverStrictness int
 
 const (
+	// ResolverStrict uses tier-1 only: no fallbacks.
 	ResolverStrict ResolverStrictness = iota
+	// ResolverNormal uses tier-1 + tier-2 constrained fallbacks (default).
 	ResolverNormal
+	// ResolverPermissive uses all tiers including global fallbacks.
+	// Best effort for vendor MIBs with spec violations.
 	ResolverPermissive
 )
 

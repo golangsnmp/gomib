@@ -40,8 +40,7 @@ func (c *cli) cmdLoad(args []string) int {
 	fs.Usage = func() { fmt.Fprint(os.Stderr, loadUsage) }
 
 	loadAll := fs.Bool("all", false, "load all MIBs from search path")
-	strict := fs.Bool("strict", false, "use strict RFC compliance mode")
-	permissive := fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
+	strict, permissive := addStrictnessFlags(fs)
 	report := fs.String("report", "default", "diagnostic reporting: silent|quiet|default|verbose")
 	stats := fs.Bool("stats", false, "show detailed statistics")
 	help := addHelpFlag(fs)
@@ -61,13 +60,7 @@ func (c *cli) cmdLoad(args []string) int {
 		return exitError
 	}
 
-	var opts []gomib.LoadOption
-	switch {
-	case *strict:
-		opts = append(opts, gomib.WithResolverStrictness(mib.ResolverStrict))
-	case *permissive:
-		opts = append(opts, gomib.WithResolverStrictness(mib.ResolverPermissive))
-	}
+	opts := strictnessOpts(*strict, *permissive)
 	switch *report {
 	case "silent":
 		opts = append(opts, gomib.WithDiagnosticConfig(mib.SilentConfig()))

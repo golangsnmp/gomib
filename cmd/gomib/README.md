@@ -80,7 +80,7 @@ gomib dump --all -p testdata/corpus/primary
 gomib dump --no-descriptions --compact IF-MIB | jq '.modules'
 ```
 
-Flags: `-m MODULE` (repeatable), `--all` (load all modules from search path), `-o OID` (subtree filter), `--compact` (minified), `--no-descriptions`, `--strictness` (`permissive`/`normal`/`strict`).
+Flags: `-m MODULE` (repeatable), `--all` (load all modules from search path), `-o OID` (subtree filter), `--compact` (minified), `--no-descriptions`, `--strict` (RFC compliance), `--permissive` (vendor MIBs).
 
 ### normalize
 

@@ -40,13 +40,22 @@ func (d Diagnostic) String() string {
 }
 
 // DiagnosticConfig controls diagnostic reporting and failure policy.
+//
+// This is independent of [ResolverStrictness], which controls resolver
+// fallback behavior. DiagnosticConfig determines which diagnostics are
+// reported and which cause loading to fail, regardless of how permissive
+// the resolver is. For best-effort loading of vendor MIB sets, configure
+// both permissive resolution and FailAt = SeverityFatal.
 type DiagnosticConfig struct {
 	// Reporting controls baseline diagnostic output verbosity.
 	Reporting ReportingLevel
 
 	// FailAt sets the severity threshold for failure.
-	// If any diagnostic has severity <= FailAt, loading fails.
-	// Default (0) means fail on Fatal only.
+	// If any diagnostic has severity <= FailAt, loading returns
+	// ErrDiagnosticThreshold (the Mib is still returned with all
+	// resolved data). Lower severity numbers are more severe.
+	// Default is SeveritySevere. Set to SeverityFatal for best-effort
+	// loading that only fails on unrecoverable parse errors.
 	FailAt Severity
 
 	// Overrides change severity for specific diagnostic codes.

@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/golangsnmp/gomib"
-	"github.com/golangsnmp/gomib/mib"
 )
 
 const dumpUsage = `gomib dump - Export resolved MIB data as canonical JSON
@@ -22,7 +19,8 @@ Options:
   -o, --oid OID          Filter to subtree starting at OID
   --compact              Minified JSON (no indentation)
   --no-descriptions      Omit description fields
-  --strictness LEVEL     Resolver strictness: permissive, normal, strict (default: normal)
+  --strict               Resolver strictness: strict (tier-1 only)
+  --permissive           Resolver strictness: permissive (tier-1/2/3)
   -h, --help             Show help
 
 Examples:
@@ -41,7 +39,7 @@ func (c *cli) cmdDump(args []string) int {
 	fs.StringVar(oidFilter, "oid", "", "filter to subtree starting at OID")
 	compact := fs.Bool("compact", false, "minified JSON")
 	noDescriptions := fs.Bool("no-descriptions", false, "omit descriptions")
-	strictness := fs.String("strictness", "normal", "resolver strictness level")
+	strict, permissive := addStrictnessFlags(fs)
 	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
@@ -61,29 +59,20 @@ func (c *cli) cmdDump(args []string) int {
 		return code
 	}
 
-	var strictnessLevel mib.ResolverStrictness
-	switch *strictness {
-	case "permissive":
-		strictnessLevel = mib.ResolverPermissive
-	case "normal":
-		strictnessLevel = mib.ResolverNormal
-	case "strict":
-		strictnessLevel = mib.ResolverStrict
-	default:
-		printError("unknown strictness level: %s (expected permissive, normal, strict)", *strictness)
-		return exitError
-	}
-
 	mods := modulesToLoad(*modules, *loadAll)
-	m, err := c.loadMibWithOpts(mods,
-		gomib.WithResolverStrictness(strictnessLevel),
-	)
-	if err != nil {
+	m, err := c.loadMibWithOpts(mods, strictnessOpts(*strict, *permissive)...)
+	if err != nil && m == nil {
 		printError("failed to load: %v", err)
 		return exitError
 	}
 
-	export := buildV1Export(m, *strictness)
+	strictnessName := "normal"
+	if *strict {
+		strictnessName = "strict"
+	} else if *permissive {
+		strictnessName = "permissive"
+	}
+	export := buildV1Export(m, strictnessName)
 
 	if *oidFilter != "" {
 		node := m.Resolve(*oidFilter)
