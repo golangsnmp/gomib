@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 	"github.com/golangsnmp/gomib/smiwrite"
 )
 
@@ -21,6 +23,8 @@ Options:
   --no-conformance         Omit conformance constructs
   --no-descriptions        Omit DESCRIPTION clauses
   --no-sequences           Omit reconstructed SEQUENCE types
+  --strict                 Resolver strictness: strict (tier-1 only)
+  --permissive             Resolver strictness: permissive (tier-1/2/3)
   -h, --help               Show help
 
 Examples:
@@ -40,6 +44,8 @@ func (c *cli) cmdNormalize(args []string) int {
 	noConformance := fs.Bool("no-conformance", false, "omit conformance constructs")
 	noDescriptions := fs.Bool("no-descriptions", false, "omit DESCRIPTION clauses")
 	noSequences := fs.Bool("no-sequences", false, "omit reconstructed SEQUENCE types")
+	strict := fs.Bool("strict", false, "use strict RFC compliance mode")
+	permissive := fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
 	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
@@ -61,14 +67,24 @@ func (c *cli) cmdNormalize(args []string) int {
 	if !*loadAll {
 		loadModules = modules
 	}
-	m, err := c.loadMib(loadModules)
-	if err != nil {
-		printError("failed to load: %v", err)
+	var loadOpts []gomib.LoadOption
+	switch {
+	case *strict:
+		loadOpts = append(loadOpts, gomib.WithResolverStrictness(mib.ResolverStrict))
+	case *permissive:
+		loadOpts = append(loadOpts, gomib.WithResolverStrictness(mib.ResolverPermissive))
+	}
+	m, loadErr := c.loadMibWithOpts(loadModules, loadOpts...)
+	if loadErr != nil && m == nil {
+		printError("failed to load: %v", loadErr)
 		return exitError
 	}
 
 	if *loadAll {
 		for _, mod := range m.Modules() {
+			if mod.IsBase() {
+				continue
+			}
 			modules = append(modules, mod.Name())
 		}
 	}
