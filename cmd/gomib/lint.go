@@ -18,8 +18,10 @@ const lintUsage = `gomib lint - Check MIB modules for issues
 
 Usage:
   gomib lint [options] MODULE...
+  gomib lint --all [options]
 
 Options:
+  --all           Load all MIBs from search path
   --level N       Report errors and warnings up to severity N (0-6, default: 3)
   --fail-on N     Exit non-zero if any diagnostic at severity N or below (default: 2)
   --ignore CODE   Ignore diagnostic codes (repeatable, supports globs like "identifier-*")
@@ -42,6 +44,7 @@ Severity Levels:
 
 Examples:
   gomib lint IF-MIB
+  gomib lint --all -p testdata/corpus/primary
   gomib lint --level 6 IF-MIB                 # Show all diagnostics
   gomib lint --level 1 IF-MIB                 # Only fatal and severe
   gomib lint --fail-on 3 IF-MIB              # Fail on minor or worse
@@ -111,6 +114,7 @@ func (c *cli) cmdLint(args []string) int {
 		format: "text",
 	}
 
+	loadAll := fs.Bool("all", false, "load all MIBs from search path")
 	fs.Var((*severityFlag)(&cfg.level), "level", "report threshold")
 	fs.Var((*severityFlag)(&cfg.failOn), "fail-on", "failure threshold")
 	fs.Func("ignore", "ignore codes", func(s string) error {
@@ -142,8 +146,8 @@ func (c *cli) cmdLint(args []string) int {
 	}
 
 	modules := fs.Args()
-	if len(modules) == 0 {
-		printError("no modules specified")
+	if !*loadAll && len(modules) == 0 {
+		printError("specify MODULE name(s) or --all")
 		fmt.Fprint(os.Stderr, lintUsage)
 		return exitError
 	}
@@ -162,6 +166,10 @@ func (c *cli) cmdLint(args []string) int {
 	default:
 		printError("unknown group-by: %s", cfg.groupBy)
 		return exitError
+	}
+
+	if *loadAll {
+		modules = nil
 	}
 
 	result := c.runLint(modules, &cfg)
