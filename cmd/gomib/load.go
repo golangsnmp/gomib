@@ -13,8 +13,10 @@ const loadUsage = `gomib load - Load and resolve MIB modules
 
 Usage:
   gomib load [options] MODULE...
+  gomib load --all [options]
 
 Options:
+  --all           Load all MIBs from search path
   --strict        Resolver strictness: strict (tier-1 only)
   --permissive    Resolver strictness: permissive (tier-1/2/3)
   --report LEVEL  Diagnostic reporting: silent|quiet|default|verbose
@@ -24,6 +26,7 @@ Options:
 Examples:
   gomib load IF-MIB
   gomib load IF-MIB SNMPv2-MIB
+  gomib load --all -p testdata/corpus/primary
   gomib load -v IF-MIB                 # Debug logging
   gomib load -vv IF-MIB                # Trace logging
   gomib load --strict IF-MIB           # strict resolver behavior
@@ -36,6 +39,7 @@ func (c *cli) cmdLoad(args []string) int {
 	fs := flag.NewFlagSet("load", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, loadUsage) }
 
+	loadAll := fs.Bool("all", false, "load all MIBs from search path")
 	strict := fs.Bool("strict", false, "use strict RFC compliance mode")
 	permissive := fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
 	report := fs.String("report", "default", "diagnostic reporting: silent|quiet|default|verbose")
@@ -51,8 +55,8 @@ func (c *cli) cmdLoad(args []string) int {
 	}
 
 	modules := fs.Args()
-	if len(modules) == 0 {
-		printError("no modules specified")
+	if !*loadAll && len(modules) == 0 {
+		printError("specify MODULE name(s) or --all")
 		fmt.Fprint(os.Stderr, loadUsage)
 		return exitError
 	}
@@ -76,6 +80,10 @@ func (c *cli) cmdLoad(args []string) int {
 	default:
 		printError("invalid --report value %q (use silent|quiet|default|verbose)", *report)
 		return exitError
+	}
+
+	if *loadAll {
+		modules = nil
 	}
 
 	m, loadErr := c.loadMibWithOpts(modules, opts...)

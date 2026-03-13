@@ -242,7 +242,7 @@ func (c *cli) checkHelp(help *bool, usageText string) bool {
 // Returns an exit code and true if the validation failed.
 func requireModuleOrAll(modules moduleList, loadAll bool, usageText string) (int, bool) {
 	if !loadAll && len(modules) == 0 {
-		printError("specify -m MODULE or --all")
+		printError("specify -m MODULE(s) or --all")
 		fmt.Fprint(os.Stderr, usageText)
 		return exitError, true
 	}
