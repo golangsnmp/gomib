@@ -71,15 +71,16 @@ Flags: `-m MODULE` (repeatable), `--all` (load all modules from search path), `-
 
 ### dump
 
-Output modules or subtrees as JSON. Includes types, objects, notifications, groups, compliances, and capabilities.
+Export resolved MIB data as canonical JSON.
 
 ```
 gomib dump IF-MIB
 gomib dump -o 1.3.6.1.2.1.2 IF-MIB
-gomib dump --compact IF-MIB
+gomib dump --all -p testdata/corpus/primary
+gomib dump --no-descriptions --compact IF-MIB | jq '.modules'
 ```
 
-Flags: `-o OID` (subtree filter), `--compact` (minified), `--no-tree`, `--no-descriptions`.
+Flags: `-m MODULE` (repeatable), `--all` (load all modules from search path), `-o OID` (subtree filter), `--compact` (minified), `--no-descriptions`, `--strictness` (`permissive`/`normal`/`strict`).
 
 ### normalize
 
@@ -90,10 +91,13 @@ gomib normalize IF-MIB
 gomib normalize --no-conformance IF-MIB
 gomib normalize --no-descriptions IF-MIB
 gomib normalize --no-sequences IF-MIB
+gomib normalize --permissive --all -o /tmp/normalized -p /path/to/mibs
 gomib normalize -o /tmp/normalized IF-MIB SNMPv2-MIB
 ```
 
-Flags: `-o DIR` (write each module to a file in DIR), `--no-conformance` (omit conformance constructs), `--no-descriptions` (omit DESCRIPTION clauses), `--no-sequences` (omit reconstructed SEQUENCE types).
+Flags: `-o DIR` (write each module to a file in DIR), `--no-conformance` (omit conformance constructs), `--no-descriptions` (omit DESCRIPTION clauses), `--no-sequences` (omit reconstructed SEQUENCE types), `--strict` (RFC compliance), `--permissive` (vendor MIBs).
+
+When using `--all`, synthetic base modules (SNMPv2-SMI, SNMPv2-TC, etc.) are excluded from output since consumers provide their own built-in definitions.
 
 ### lint
 
