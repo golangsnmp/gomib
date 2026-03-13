@@ -51,12 +51,35 @@ func WithLogger(logger *slog.Logger) LoadOption {
 	return func(c *loadConfig) { c.logger = logger }
 }
 
-// WithDiagnosticConfig sets the diagnostic reporting/failure configuration.
+// WithDiagnosticConfig sets the diagnostic reporting and failure configuration.
+//
+// DiagnosticConfig controls two independent concerns:
+//   - Reporting: which diagnostics appear in [mib.Mib.Diagnostics] (verbosity filter).
+//   - FailAt: which severity level causes [Load] to return [ErrDiagnosticThreshold].
+//
+// This is separate from [WithResolverStrictness], which controls how the
+// resolver handles ambiguous or missing references. A permissive resolver
+// still collects diagnostics, and those diagnostics are still subject to
+// the FailAt threshold. Callers loading large vendor MIB sets typically
+// want both permissive resolution and a relaxed FailAt (e.g. SeverityFatal).
 func WithDiagnosticConfig(cfg mib.DiagnosticConfig) LoadOption {
 	return func(c *loadConfig) { c.diagConfig = cfg }
 }
 
-// WithResolverStrictness sets resolver fallback behavior.
+// WithResolverStrictness sets resolver fallback behavior for ambiguous or
+// missing references.
+//
+// This controls which heuristic fallbacks the resolver may use:
+//   - [mib.ResolverStrict]: tier-1 only, no fallbacks. Unresolved references
+//     are left unresolved.
+//   - [mib.ResolverNormal]: tier-1 + tier-2 constrained fallbacks (default).
+//   - [mib.ResolverPermissive]: tier-1 + tier-2 + tier-3 global fallbacks.
+//     Best effort for vendor MIBs with spec violations.
+//
+// This does not affect diagnostic failure policy. A permissive resolver
+// still produces diagnostics that may exceed the [DiagnosticConfig.FailAt]
+// threshold. To also suppress failure on non-fatal diagnostics, configure
+// [WithDiagnosticConfig] with FailAt set to [mib.SeverityFatal].
 func WithResolverStrictness(level mib.ResolverStrictness) LoadOption {
 	return func(c *loadConfig) { c.resolverStrictness = level }
 }

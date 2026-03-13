@@ -256,3 +256,34 @@ func modulesToLoad(modules moduleList, loadAll bool) []string {
 	}
 	return modules
 }
+
+// addStrictnessFlags registers --strict and --permissive on the given FlagSet.
+func addStrictnessFlags(fs *flag.FlagSet) (strict, permissive *bool) {
+	return fs.Bool("strict", false, "use strict RFC compliance mode"),
+		fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
+}
+
+// strictnessOpts returns LoadOptions for the given --strict/--permissive flags.
+//
+// --strict sets resolver strictness to tier-1 only (no fallbacks).
+// --permissive sets resolver strictness to tier-3 (all fallbacks) and relaxes
+// the diagnostic failure threshold so only fatal parse errors cause failure.
+// This makes --permissive a "best effort" mode suitable for loading large
+// vendor MIB sets that may contain spec violations.
+func strictnessOpts(strict, permissive bool) []gomib.LoadOption {
+	switch {
+	case strict:
+		return []gomib.LoadOption{
+			gomib.WithResolverStrictness(mib.ResolverStrict),
+		}
+	case permissive:
+		cfg := mib.DefaultConfig()
+		cfg.FailAt = mib.SeverityFatal
+		return []gomib.LoadOption{
+			gomib.WithResolverStrictness(mib.ResolverPermissive),
+			gomib.WithDiagnosticConfig(cfg),
+		}
+	default:
+		return nil
+	}
+}
