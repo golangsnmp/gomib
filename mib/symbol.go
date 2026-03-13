@@ -142,6 +142,27 @@ func (s Symbol) Capability() *Capability { return s.capability }
 // Type returns the Type if this symbol is a type definition, or nil.
 func (s Symbol) Type() *Type { return s.typ }
 
+// Description returns the DESCRIPTION clause text of this symbol's
+// definition, or "" for plain nodes and zero symbols.
+func (s Symbol) Description() string {
+	switch {
+	case s.object != nil:
+		return s.object.Description()
+	case s.notification != nil:
+		return s.notification.Description()
+	case s.group != nil:
+		return s.group.Description()
+	case s.compliance != nil:
+		return s.compliance.Description()
+	case s.capability != nil:
+		return s.capability.Description()
+	case s.typ != nil:
+		return s.typ.Description()
+	default:
+		return ""
+	}
+}
+
 // Status returns the status of this symbol's definition (current,
 // deprecated, obsolete, etc.), or 0 for plain nodes and zero symbols.
 func (s Symbol) Status() Status {
