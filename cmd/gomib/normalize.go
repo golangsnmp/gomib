@@ -96,7 +96,7 @@ func (c *cli) cmdNormalize(args []string) int {
 			return exitError
 		}
 		for _, name := range modules {
-			path := filepath.Join(*outputDir, name)
+			path := filepath.Join(*outputDir, filepath.Base(name))
 			f, err := os.Create(path)
 			if err != nil {
 				printError("failed to create %s: %v", path, err)
