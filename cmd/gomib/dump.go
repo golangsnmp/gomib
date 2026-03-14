@@ -10,7 +10,7 @@ import (
 const dumpUsage = `gomib dump - Export resolved MIB data as canonical JSON
 
 Usage:
-  gomib dump [options] MODULE...
+  gomib dump [options] [MODULE...]
   gomib dump --all [options]
 
 Options:
@@ -48,6 +48,10 @@ func (c *cli) cmdDump(args []string) int {
 
 	if c.checkHelp(help, dumpUsage) {
 		return exitOK
+	}
+
+	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+		return code
 	}
 
 	// Accept positional module names as well

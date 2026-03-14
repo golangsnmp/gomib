@@ -391,7 +391,7 @@ gomib get -m IF-MIB ifIndex          # query by name
 gomib get -m IF-MIB 1.3.6.1.2.1.2   # query by OID
 gomib dump IF-MIB                    # JSON output
 gomib lint IF-MIB                    # check for issues
-gomib find --all 'if*'               # search by pattern
+gomib find --all -p testdata/corpus/primary 'if*'  # search by pattern
 gomib normalize IF-MIB               # emit canonical SMIv2 text
 gomib trace -m IF-MIB ifEntry        # trace resolution
 gomib paths                          # show search paths

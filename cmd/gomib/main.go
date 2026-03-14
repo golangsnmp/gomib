@@ -38,11 +38,13 @@ Commands:
   list       List available module names
   find       Search for names across loaded MIBs
   version    Show version
+  help       Show help
 
 Common options:
   -p, --path PATH   Add MIB search path (repeatable)
   -v, --verbose     Enable debug logging
   -vv               Enable trace logging (implies -v)
+  --version         Show version
   -h, --help        Show help
 
 Examples:
@@ -71,12 +73,15 @@ func run() int {
 	args := os.Args[1:]
 	var cmdArgs []string
 	var cmd string
+	versionFlag := false
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
 		case arg == "-h" || arg == "--help":
 			c.helpFlag = true
+		case (arg == "--version" || arg == "-V") && cmd == "":
+			versionFlag = true
 		case arg == "-v" || arg == "--verbose":
 			if c.verbose < 1 {
 				c.verbose = 1
@@ -107,6 +112,10 @@ func run() int {
 
 	if c.helpFlag && cmd == "" {
 		_, _ = fmt.Fprint(os.Stdout, usage)
+		return exitOK
+	}
+	if versionFlag && cmd == "" {
+		printVersion()
 		return exitOK
 	}
 
@@ -261,6 +270,53 @@ func modulesToLoad(modules moduleList, loadAll bool) []string {
 func addStrictnessFlags(fs *flag.FlagSet) (strict, permissive *bool) {
 	return fs.Bool("strict", false, "use strict RFC compliance mode"),
 		fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
+}
+
+func validateStrictnessFlags(strict, permissive bool) (int, bool) {
+	if strict && permissive {
+		printError("--strict and --permissive are mutually exclusive")
+		return exitError, true
+	}
+	return exitOK, false
+}
+
+func parseSingleTargetArgs(modules *moduleList, loadAll bool, args []string, usageText, targetLabel string) (string, int, bool) {
+	var target string
+	dashIdx := -1
+	for i, arg := range args {
+		if arg == "--" {
+			dashIdx = i
+			break
+		}
+	}
+
+	if dashIdx >= 0 {
+		*modules = append(*modules, args[:dashIdx]...)
+		tail := args[dashIdx+1:]
+		switch len(tail) {
+		case 0:
+			// handled below
+		case 1:
+			target = tail[0]
+		default:
+			printError("too many %s arguments after --", targetLabel)
+			fmt.Fprint(os.Stderr, usageText)
+			return "", exitError, true
+		}
+	} else if len(args) > 0 {
+		target = args[len(args)-1]
+		if !loadAll && len(*modules) == 0 && len(args) > 1 {
+			*modules = moduleList(args[:len(args)-1])
+		}
+	}
+
+	if target == "" {
+		printError("no %s specified", targetLabel)
+		fmt.Fprint(os.Stderr, usageText)
+		return "", exitError, true
+	}
+
+	return target, exitOK, false
 }
 
 // strictnessOpts returns LoadOptions for the given --strict/--permissive flags.
