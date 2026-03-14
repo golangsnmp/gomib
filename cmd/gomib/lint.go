@@ -615,6 +615,6 @@ func printDiagnosticCodes() {
 			fmt.Printf("%s:\n", info.Phase)
 			currentPhase = info.Phase
 		}
-		fmt.Printf("  %s\n", info.Code)
+		fmt.Printf("  %-36s %s\n", info.Code, info.Severity)
 	}
 }

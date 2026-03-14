@@ -53,6 +53,10 @@ func (c *cli) cmdNormalize(args []string) int {
 		return exitOK
 	}
 
+	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+		return code
+	}
+
 	modules := fs.Args()
 	if !*loadAll && len(modules) == 0 {
 		printError("specify MODULE name(s) or --all")

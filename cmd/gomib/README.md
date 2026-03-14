@@ -12,6 +12,7 @@ gomib <command> [options] [arguments]
 -p, --path PATH   Add MIB search path (repeatable)
 -v, --verbose     Enable debug logging
 -vv               Enable trace logging (implies -v)
+--version         Show version
 -h, --help        Show help
 ```
 
@@ -51,7 +52,7 @@ gomib load --permissive IF-MIB
 gomib load --stats IF-MIB
 ```
 
-Flags: `--strict` (RFC compliance), `--permissive` (vendor MIBs), `--level N` (diagnostic level 0-6, higher is more verbose), `--stats` (detailed statistics).
+Flags: `--all` (load all modules when no MODULE is given), `--strict` (RFC compliance), `--permissive` (vendor MIBs), `--report LEVEL` (silent/quiet/default/verbose), `--stats` (detailed statistics).
 
 ### get
 
@@ -61,13 +62,14 @@ Query OID or name lookups. Accepts numeric OIDs, plain names, or qualified names
 gomib get -m IF-MIB ifIndex
 gomib get -m IF-MIB 1.3.6.1.2.1.2.2.1.1
 gomib get IF-MIB SNMPv2-MIB -- sysDescr
+gomib get IF-MIB sysDescr
 gomib get -m IF-MIB -t ifTable
 gomib get --all -p testdata/corpus/primary ifIndex
 gomib get -m IF-MIB --format json ifIndex
 gomib get -m IF-MIB --full ifIndex
 ```
 
-Flags: `-m MODULE` (repeatable), `--all` (load all modules from search path), `-t`/`--tree` (show subtree), `--max-depth N`, `--format` (text/json), `--full` (untruncated descriptions).
+Flags: `-m MODULE` (repeatable), positional `MODULE... -- QUERY` or `MODULE... QUERY`, `--all` (load all modules from search path), `-t`/`--tree` (show subtree), `--max-depth N` (implies `--tree`), `--format` (text/json), `--full` (full descriptions in text output), `--strict`, `--permissive`.
 
 ### dump
 
@@ -117,16 +119,17 @@ Flags: `--level N` (report up to severity N, 0-6, higher is more verbose), `--fa
 
 ### find
 
-Search for object names across loaded MIBs using glob patterns.
+Search for object and notification names across loaded MIBs using glob patterns.
 
 ```
 gomib find --all -p testdata/corpus/primary 'if*'
 gomib find --all -p testdata/corpus/primary --kind table '*'
 gomib find --all -p testdata/corpus/primary --type Counter32 'if*'
+gomib find IF-MIB 'if*'
 gomib find -m IF-MIB -p testdata/corpus/primary --count 'if*'
 ```
 
-Flags: `-m MODULE` (repeatable), `--all` (load all modules), `--kind` (scalar/table/row/column/notification), `--type` (base type filter), `--count` (print count only).
+Flags: `-m MODULE` (repeatable), positional `MODULE... -- PATTERN` or `MODULE... PATTERN`, `--all` (load all modules), `--kind` (scalar/table/row/column/notification), `--type` (base type filter for objects), `--count` (print count only), `--strict`, `--permissive`.
 
 ### trace
 
@@ -135,10 +138,11 @@ Trace symbol resolution for debugging. Shows where a symbol is defined, how it r
 ```
 gomib trace -m IF-MIB ifIndex
 gomib trace -m IF-MIB ifEntry
+gomib trace IF-MIB ifEntry
 gomib trace --all -p testdata/corpus/primary ifEntry
 ```
 
-Flags: `-m MODULE` (repeatable), `--all` (load all modules from search path).
+Flags: `-m MODULE` (repeatable), positional `MODULE... -- SYMBOL` or `MODULE... SYMBOL`, `--all` (load all modules from search path), `--strict`, `--permissive`.
 
 ### version
 

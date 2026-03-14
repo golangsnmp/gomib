@@ -13,10 +13,12 @@ import (
 const findUsage = `gomib find - Search for names across loaded MIBs
 
 Usage:
-  gomib find [options] PATTERN
+  gomib find [options] -m MODULE PATTERN
+  gomib find [options] MODULE... -- PATTERN
+  gomib find [options] MODULE... PATTERN
+  gomib find [options] --all PATTERN
 
-Searches object and type names using glob-style patterns (*, ?).
-Requires either -m MODULE or --all.
+Searches object and notification names using glob-style patterns (*, ?).
 
 Options:
   -m, --module MODULE   Module to load (repeatable)
@@ -24,12 +26,15 @@ Options:
   --kind KIND           Filter by node kind (scalar, table, row, column, notification)
   --type BASE           Filter by base type (Integer32, OctetString, Counter32, etc.)
   --count               Print only the match count
+  --strict              Resolver strictness: strict (tier-1 only)
+  --permissive          Resolver strictness: permissive (tier-1/2/3)
   -h, --help            Show help
 
 Examples:
   gomib find --all -p testdata/corpus/primary 'if*'
   gomib find --all -p testdata/corpus/primary --kind table '*'
   gomib find --all -p testdata/corpus/primary --type Counter32 '*'
+  gomib find IF-MIB 'if*'
   gomib find -m IF-MIB -p testdata/corpus/primary 'if*'
 `
 
@@ -41,6 +46,7 @@ func (c *cli) cmdFind(args []string) int {
 	kindFilter := fs.String("kind", "", "filter by node kind")
 	typeFilter := fs.String("type", "", "filter by base type name")
 	count := fs.Bool("count", false, "print only match count")
+	strict, permissive := addStrictnessFlags(fs)
 	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
@@ -51,13 +57,15 @@ func (c *cli) cmdFind(args []string) int {
 		return exitOK
 	}
 
-	remaining := fs.Args()
-	if len(remaining) == 0 {
-		printError("no pattern specified")
-		fmt.Fprint(os.Stderr, findUsage)
-		return exitError
+	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+		return code
 	}
-	pattern := strings.ToLower(remaining[0])
+
+	pattern, code, failed := parseSingleTargetArgs(modules, *loadAll, fs.Args(), findUsage, "pattern")
+	if failed {
+		return code
+	}
+	pattern = strings.ToLower(pattern)
 
 	if _, err := filepath.Match(pattern, ""); err != nil {
 		printError("invalid pattern: %v", err)
@@ -68,7 +76,7 @@ func (c *cli) cmdFind(args []string) int {
 		return code
 	}
 
-	m, err := c.loadMib(modulesToLoad(*modules, *loadAll))
+	m, err := c.loadMibWithOpts(modulesToLoad(*modules, *loadAll), strictnessOpts(*strict, *permissive)...)
 	if err != nil {
 		printError("failed to load: %v", err)
 		return exitError
@@ -107,6 +115,23 @@ func (c *cli) cmdFind(args []string) int {
 		}
 	}
 
+	for _, notif := range m.Notifications() {
+		if !matchGlob(pattern, strings.ToLower(notif.Name())) {
+			continue
+		}
+		if *kindFilter != "" && mib.KindNotification != kind {
+			continue
+		}
+		matches++
+		if !*count {
+			modName := ""
+			if notif.Module() != nil {
+				modName = notif.Module().Name()
+			}
+			fmt.Printf("%s::%s  %s  %s\n", modName, notif.Name(), notif.OID(), mib.KindNotification)
+		}
+	}
+
 	if *count {
 		fmt.Println(matches)
 	}
@@ -137,8 +162,6 @@ func parseKindFilter(s string) (mib.Kind, bool) {
 		return mib.KindColumn, true
 	case "notification":
 		return mib.KindNotification, true
-	case "node":
-		return mib.KindNode, true
 	default:
 		return 0, false
 	}

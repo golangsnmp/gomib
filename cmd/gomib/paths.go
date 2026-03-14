@@ -8,6 +8,8 @@ import (
 	"github.com/golangsnmp/gomib"
 )
 
+var discoverSystemPaths = gomib.DiscoverSystemPaths
+
 const pathsUsage = `gomib paths - Show MIB search paths
 
 Usage:
@@ -42,12 +44,12 @@ func (c *cli) cmdPaths(args []string) int {
 	if len(c.paths) > 0 {
 		paths = c.paths
 	} else {
-		paths = gomib.DiscoverSystemPaths()
+		paths = discoverSystemPaths()
 	}
 
 	if len(paths) == 0 {
 		fmt.Fprintln(os.Stderr, "no search paths found")
-		return exitOK
+		return exitError
 	}
 
 	for _, p := range paths {

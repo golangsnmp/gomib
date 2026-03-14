@@ -12,11 +12,10 @@ import (
 const loadUsage = `gomib load - Load and resolve MIB modules
 
 Usage:
-  gomib load [options] MODULE...
-  gomib load --all [options]
+  gomib load [options] [MODULE...]
 
 Options:
-  --all           Load all MIBs from search path
+  --all           Load all MIBs from search path (default when MODULE is omitted)
   --strict        Resolver strictness: strict (tier-1 only)
   --permissive    Resolver strictness: permissive (tier-1/2/3)
   --report LEVEL  Diagnostic reporting: silent|quiet|default|verbose
@@ -54,9 +53,16 @@ func (c *cli) cmdLoad(args []string) int {
 	}
 
 	modules := fs.Args()
-	if !*loadAll && len(modules) == 0 {
-		printError("specify MODULE name(s) or --all")
-		fmt.Fprint(os.Stderr, loadUsage)
+	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+		return code
+	}
+
+	if *loadAll || len(modules) == 0 {
+		modules = nil
+	}
+
+	if *loadAll && len(fs.Args()) > 0 {
+		printError("cannot combine MODULE arguments with --all")
 		return exitError
 	}
 
@@ -73,10 +79,6 @@ func (c *cli) cmdLoad(args []string) int {
 	default:
 		printError("invalid --report value %q (use silent|quiet|default|verbose)", *report)
 		return exitError
-	}
-
-	if *loadAll {
-		modules = nil
 	}
 
 	m, loadErr := c.loadMibWithOpts(modules, opts...)

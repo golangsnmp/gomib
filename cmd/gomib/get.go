@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/golangsnmp/gomib/mib"
@@ -19,6 +20,7 @@ const getUsage = `gomib get - Query OID or name lookups
 Usage:
   gomib get [options] -m MODULE QUERY
   gomib get [options] MODULE... -- QUERY
+  gomib get [options] MODULE... QUERY
   gomib get [options] --all QUERY
 
 Query formats:
@@ -31,14 +33,17 @@ Options:
   --all                 Load all MIBs from search path
   -t, --tree            Show subtree instead of single node
   --max-depth N         Limit subtree depth (default: unlimited)
-  --full                Show full descriptions (no truncation)
+  --full                Show full descriptions in text output
   --format FMT          Output format: text, json (default: text)
+  --strict              Resolver strictness: strict (tier-1 only)
+  --permissive          Resolver strictness: permissive (tier-1/2/3)
   -h, --help            Show help
 
 Examples:
   gomib get -m IF-MIB ifIndex
   gomib get -m IF-MIB 1.3.6.1.2.1.2.2.1.1
   gomib get IF-MIB SNMPv2-MIB -- sysDescr
+  gomib get IF-MIB sysDescr
   gomib get -m IF-MIB -t ifTable
   gomib get --all ifIndex
 `
@@ -51,6 +56,28 @@ func (m *moduleList) Set(value string) error {
 	return nil
 }
 
+type depthFlag struct {
+	value int
+	set   bool
+}
+
+func (f *depthFlag) String() string {
+	return fmt.Sprintf("%d", f.value)
+}
+
+func (f *depthFlag) Set(value string) error {
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return err
+	}
+	if n < 0 {
+		return fmt.Errorf("depth must be >= 0")
+	}
+	f.value = n
+	f.set = true
+	return nil
+}
+
 func (c *cli) cmdGet(args []string) int {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, getUsage) }
@@ -58,9 +85,11 @@ func (c *cli) cmdGet(args []string) int {
 	modules, loadAll := addModuleFlags(fs)
 	tree := fs.Bool("t", false, "show subtree")
 	fs.BoolVar(tree, "tree", false, "show subtree")
-	maxDepth := fs.Int("max-depth", 0, "limit subtree depth")
+	var maxDepth depthFlag
+	fs.Var(&maxDepth, "max-depth", "limit subtree depth")
 	full := fs.Bool("full", false, "show full descriptions")
 	format := fs.String("format", "text", "output format: text, json")
+	strict, permissive := addStrictnessFlags(fs)
 	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
@@ -71,40 +100,20 @@ func (c *cli) cmdGet(args []string) int {
 		return exitOK
 	}
 
-	remaining := fs.Args()
-
-	var query string
-	dashIdx := -1
-	for i, arg := range remaining {
-		if arg == "--" {
-			dashIdx = i
-			break
-		}
+	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+		return code
 	}
 
-	if dashIdx >= 0 {
-		*modules = append(*modules, remaining[:dashIdx]...)
-		if dashIdx+1 < len(remaining) {
-			query = remaining[dashIdx+1]
-		}
-	} else if len(remaining) > 0 {
-		query = remaining[len(remaining)-1]
-		if !*loadAll && len(*modules) == 0 && len(remaining) > 1 {
-			*modules = moduleList(remaining[:len(remaining)-1])
-		}
+	query, code, failed := parseSingleTargetArgs(modules, *loadAll, fs.Args(), getUsage, "query")
+	if failed {
+		return code
 	}
 
 	if code, ok := requireModuleOrAll(*modules, *loadAll, getUsage); ok {
 		return code
 	}
 
-	if query == "" {
-		printError("no query specified")
-		fmt.Fprint(os.Stderr, getUsage)
-		return exitError
-	}
-
-	m, err := c.loadMib(modulesToLoad(*modules, *loadAll))
+	m, err := c.loadMibWithOpts(modulesToLoad(*modules, *loadAll), strictnessOpts(*strict, *permissive)...)
 	if err != nil {
 		printError("failed to load: %v", err)
 		return exitError
@@ -123,10 +132,10 @@ func (c *cli) cmdGet(args []string) int {
 
 	switch *format {
 	case formatJSON:
-		return printNodeJSON(node, *tree, *maxDepth)
+		return printNodeJSON(node, *tree || maxDepth.set, maxDepth)
 	case formatText, "":
-		if *tree {
-			printNodeTree(node, *maxDepth)
+		if *tree || maxDepth.set {
+			printNodeTree(node, maxDepth)
 		} else {
 			printNode(node, descLimit)
 		}
@@ -137,12 +146,12 @@ func (c *cli) cmdGet(args []string) int {
 	}
 }
 
-func printNodeJSON(node *mib.Node, tree bool, maxDepth int) int {
+func printNodeJSON(node *mib.Node, tree bool, maxDepth depthFlag) int {
 	opts := JSONOptions{IncludeDescr: true}
 	if tree {
 		output := buildTreeJSON(node, opts)
-		if maxDepth > 0 {
-			trimTreeDepth(output, 0, maxDepth)
+		if maxDepth.set {
+			trimTreeDepth(output, 0, maxDepth.value)
 		}
 		if err := writeJSON(os.Stdout, output, true); err != nil {
 			printError("encoding JSON: %v", err)
@@ -370,12 +379,12 @@ func normalizeDescription(s string, maxLen int) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-func printNodeTree(node *mib.Node, maxDepth int) {
+func printNodeTree(node *mib.Node, maxDepth depthFlag) {
 	printNodeTreeRecursive(node, 0, maxDepth)
 }
 
-func printNodeTreeRecursive(node *mib.Node, depth, maxDepth int) {
-	if maxDepth > 0 && depth > maxDepth {
+func printNodeTreeRecursive(node *mib.Node, depth int, maxDepth depthFlag) {
+	if maxDepth.set && depth > maxDepth.value {
 		return
 	}
 
