@@ -1,5 +1,9 @@
 # gomib
 
+[![CI](https://github.com/golangsnmp/gomib/actions/workflows/ci.yml/badge.svg)](https://github.com/golangsnmp/gomib/actions/workflows/ci.yml)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/golangsnmp/gomib)](https://pkg.go.dev/github.com/golangsnmp/gomib)
+[![Go Report Card](https://goreportcard.com/badge/github.com/golangsnmp/gomib)](https://goreportcard.com/report/github.com/golangsnmp/gomib)
+
 Go library for parsing and querying SNMP MIB files.
 
 Supports SMIv1 and SMIv2 modules. Loads MIBs from directories, directory trees, or embedded filesystems. Resolves imports, builds the OID tree, and provides typed access to objects, types, notifications, and conformance definitions.
