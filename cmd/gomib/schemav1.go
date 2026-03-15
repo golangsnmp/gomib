@@ -154,7 +154,7 @@ type V1Notification struct {
 	Status      string     `json:"status"`
 	Kind        string     `json:"kind"`
 	Trap        *V1Trap    `json:"trap"`
-	Description string     `json:"description"`
+	Description *string    `json:"description"`
 	Reference   *string    `json:"reference"`
 	Objects     []V1ObjRef `json:"objects"`
 }
@@ -171,7 +171,7 @@ type V1Group struct {
 	Module      string     `json:"module"`
 	Kind        string     `json:"kind"`
 	Status      string     `json:"status"`
-	Description string     `json:"description"`
+	Description *string    `json:"description"`
 	Reference   *string    `json:"reference"`
 	Members     []V1ObjRef `json:"members"`
 }
@@ -182,7 +182,7 @@ type V1Compliance struct {
 	Name        string               `json:"name"`
 	Module      string               `json:"module"`
 	Status      string               `json:"status"`
-	Description string               `json:"description"`
+	Description *string              `json:"description"`
 	Reference   *string              `json:"reference"`
 	Modules     []V1ComplianceModule `json:"modules"`
 }
@@ -215,7 +215,7 @@ type V1Capability struct {
 	Module         string                 `json:"module"`
 	Status         string                 `json:"status"`
 	ProductRelease *string                `json:"productRelease"`
-	Description    string                 `json:"description"`
+	Description    *string                `json:"description"`
 	Reference      *string                `json:"reference"`
 	Supports       []V1CapabilitySupports `json:"supports"`
 }
@@ -1027,7 +1027,7 @@ func buildV1Notification(notif *mib.Notification, m *mib.Mib) V1Notification {
 		Name:        notif.Name(),
 		Module:      modName,
 		Status:      v1Status(notif.Status()),
-		Description: notif.Description(),
+		Description: strPtr(notif.Description()),
 		Objects:     make([]V1ObjRef, 0),
 	}
 
@@ -1072,7 +1072,7 @@ func buildV1Group(grp *mib.Group) V1Group {
 		Name:        grp.Name(),
 		Module:      modName,
 		Status:      v1Status(grp.Status()),
-		Description: grp.Description(),
+		Description: strPtr(grp.Description()),
 		Members:     make([]V1ObjRef, 0),
 	}
 
@@ -1105,7 +1105,7 @@ func buildV1Compliance(comp *mib.Compliance, m *mib.Mib) V1Compliance {
 		Name:        comp.Name(),
 		Module:      modName,
 		Status:      v1Status(comp.Status()),
-		Description: comp.Description(),
+		Description: strPtr(comp.Description()),
 		Modules:     make([]V1ComplianceModule, 0),
 	}
 
@@ -1174,7 +1174,7 @@ func buildV1Capability(cap *mib.Capability, m *mib.Mib) V1Capability {
 		Name:        cap.Name(),
 		Module:      modName,
 		Status:      v1Status(cap.Status()),
-		Description: cap.Description(),
+		Description: strPtr(cap.Description()),
 		Supports:    make([]V1CapabilitySupports, 0),
 	}
 
