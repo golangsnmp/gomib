@@ -251,6 +251,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			resolvedMod.addObject(resolved)
+			resolvedMod.addNode(node)
 		}
 	}
 
@@ -611,6 +612,9 @@ func registerNotification(ctx *resolverContext, mod *module.Module, node *Node, 
 		currentMod = n.Module()
 	}
 	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.mib.addNotification, node.setNotification, (*Module).addNotification)
+	if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
+		resolvedMod.addNode(node)
+	}
 }
 
 func registerGroup(ctx *resolverContext, mod *module.Module, node *Node, resolved *Group) {
@@ -619,6 +623,9 @@ func registerGroup(ctx *resolverContext, mod *module.Module, node *Node, resolve
 		currentMod = g.Module()
 	}
 	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.mib.addGroup, node.setGroup, (*Module).addGroup)
+	if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
+		resolvedMod.addNode(node)
+	}
 }
 
 func registerCompliance(ctx *resolverContext, mod *module.Module, node *Node, resolved *Compliance) {
@@ -627,6 +634,9 @@ func registerCompliance(ctx *resolverContext, mod *module.Module, node *Node, re
 		currentMod = c.Module()
 	}
 	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.mib.addCompliance, node.setCompliance, (*Module).addCompliance)
+	if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
+		resolvedMod.addNode(node)
+	}
 }
 
 func registerCapability(ctx *resolverContext, mod *module.Module, node *Node, resolved *Capability) {
@@ -635,6 +645,9 @@ func registerCapability(ctx *resolverContext, mod *module.Module, node *Node, re
 		currentMod = c.Module()
 	}
 	registerResolvedEntity(ctx, mod, currentMod, resolved, ctx.mib.addCapability, node.setCapability, (*Module).addCapability)
+	if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
+		resolvedMod.addNode(node)
+	}
 }
 
 type complianceRef struct {
