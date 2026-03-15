@@ -99,7 +99,7 @@ func (c *cli) cmdDump(args []string) int {
 	} else if *permissive {
 		strictnessName = "permissive"
 	}
-	export := buildV1Export(m, strictnessName)
+	export := buildExportPayload(m, strictnessName)
 
 	if *oidFilter != "" {
 		node := m.Resolve(*oidFilter)
@@ -107,11 +107,11 @@ func (c *cli) cmdDump(args []string) int {
 			printError("OID not found: %s", *oidFilter)
 			return exitIssue
 		}
-		filterV1ByOID(export, node.OID().String())
+		filterByOID(export, node.OID().String())
 	}
 
 	if *noDescriptions {
-		stripV1Descriptions(export)
+		stripDescriptions(export)
 	}
 
 	if err := writeJSON(os.Stdout, export, !*compact); err != nil {
@@ -121,18 +121,18 @@ func (c *cli) cmdDump(args []string) int {
 	return exitOK
 }
 
-func filterV1ByOID(export *V1Export, prefix string) {
+func filterByOID(export *ExportPayload, prefix string) {
 	dotPrefix := prefix + "."
 	matches := func(oid string) bool {
 		return oid == prefix || strings.HasPrefix(oid, dotPrefix)
 	}
 
-	export.Nodes = filterSlice(export.Nodes, func(n V1Node) bool { return matches(n.OID) })
-	export.Objects = filterSlice(export.Objects, func(o V1Object) bool { return matches(o.OID) })
-	export.Notifications = filterSlice(export.Notifications, func(n V1Notification) bool { return matches(n.OID) })
-	export.Groups = filterSlice(export.Groups, func(g V1Group) bool { return matches(g.OID) })
-	export.Compliances = filterSlice(export.Compliances, func(c V1Compliance) bool { return matches(c.OID) })
-	export.Capabilities = filterSlice(export.Capabilities, func(c V1Capability) bool { return matches(c.OID) })
+	export.Nodes = filterSlice(export.Nodes, func(n ExportNode) bool { return matches(n.OID) })
+	export.Objects = filterSlice(export.Objects, func(o ExportObject) bool { return matches(o.OID) })
+	export.Notifications = filterSlice(export.Notifications, func(n ExportNotification) bool { return matches(n.OID) })
+	export.Groups = filterSlice(export.Groups, func(g ExportGroup) bool { return matches(g.OID) })
+	export.Compliances = filterSlice(export.Compliances, func(c ExportCompliance) bool { return matches(c.OID) })
+	export.Capabilities = filterSlice(export.Capabilities, func(c ExportCapability) bool { return matches(c.OID) })
 }
 
 func filterSlice[T any](s []T, keep func(T) bool) []T {
@@ -145,7 +145,7 @@ func filterSlice[T any](s []T, keep func(T) bool) []T {
 	return result
 }
 
-func stripV1Descriptions(export *V1Export) {
+func stripDescriptions(export *ExportPayload) {
 	for i := range export.Modules {
 		export.Modules[i].Description = nil
 		for j := range export.Modules[i].Revisions {
