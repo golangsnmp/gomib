@@ -1,8 +1,3 @@
-// Package smiwrite emits resolved MIB models as canonical SMIv2 text.
-//
-// The emitter normalizes all variation in MIB files (SMIv1/v2 differences,
-// OID syntax forms, bare type assignments, TRAP-TYPE) into a single
-// consistent SMIv2 output format.
 package smiwrite
 
 import (

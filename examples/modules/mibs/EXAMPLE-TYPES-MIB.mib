@@ -1,0 +1,24 @@
+EXAMPLE-TYPES-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, enterprises
+        FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, DisplayString
+        FROM SNMPv2-TC;
+
+exampleTypesMIB MODULE-IDENTITY
+    LAST-UPDATED "202603150000Z"
+    ORGANIZATION "Example Corp"
+    CONTACT-INFO "support@example.com"
+    DESCRIPTION  "Shared textual conventions for examples."
+    REVISION     "202603150000Z"
+    DESCRIPTION  "Initial version."
+    ::= { enterprises 99997 }
+
+ExampleName ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "64a"
+    STATUS current
+    DESCRIPTION "A short example name."
+    SYNTAX DisplayString (SIZE (1..64))
+
+END

@@ -1,5 +1,3 @@
-// Package token provides public access to gomib's lexer token types
-// and a simple tokenization entry point.
 package token
 
 import (

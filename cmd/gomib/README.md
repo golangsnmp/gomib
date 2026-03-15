@@ -119,6 +119,18 @@ gomib lint --list-codes
 
 Flags: `--level N` (report up to severity N, 0-6, higher is more verbose), `--fail-on N`, `--ignore CODE` (repeatable, supports globs), `--only CODE`, `--format` (text/json/sarif/compact), `--group-by` (module/code/severity), `--summary`, `--quiet`, `--list-codes` (show all diagnostic codes).
 
+Severity ordering matches gomib's libsmi-style scale, where lower numbers are more severe:
+
+- `0` fatal
+- `1` severe
+- `2` error
+- `3` minor
+- `4` style
+- `5` warning
+- `6` info
+
+This is separate from resolver strictness. `--strict` and `--permissive` control fallback behavior for loading and query commands; `lint --level` and `lint --fail-on` control which diagnostics are shown and which cause a non-zero exit.
+
 ### find
 
 Search for names across loaded MIBs using glob patterns. Searches objects, notifications, groups, compliances, capabilities, and OID tree nodes. Modules selected via -m flag, defaults to all. Uses permissive+silent strictness by default.

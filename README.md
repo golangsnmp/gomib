@@ -80,6 +80,13 @@ Files are matched by extension: no extension, `.mib`, `.smi`, `.txt`, `.my`. Ove
 names := gomib.ScanModuleNames(content) // e.g. ["IF-MIB"]
 ```
 
+Sources can also list the modules they know about without parsing them:
+
+```go
+src, _ := gomib.Dir("/usr/share/snmp/mibs")
+names, _ := src.ListModules() // e.g. ["IF-MIB", "IP-MIB", ...]
+```
+
 ### Options
 
 ```go
@@ -162,6 +169,39 @@ node  = m.LongestPrefixByOID(oid)   // longest matching prefix
 mod := m.Module("IF-MIB")
 obj := mod.Object("ifIndex")
 typ := mod.Type("InterfaceIndex")
+```
+
+### Module metadata and imports
+
+`Module` exposes both MODULE-IDENTITY metadata and import-resolution details:
+
+```go
+mod := m.Module("IF-MIB")
+
+mod.Name()         // "IF-MIB"
+mod.Language()     // SMIv2
+mod.SourcePath()   // file path, or "" for synthetic base modules
+mod.IsBase()       // false for user/system modules, true for built-ins
+mod.OID()          // module identity OID
+mod.Organization() // ORGANIZATION clause
+mod.ContactInfo()  // CONTACT-INFO clause
+mod.Description()  // DESCRIPTION clause
+mod.LastUpdated()  // LAST-UPDATED value
+mod.Revisions()    // []Revision
+mod.Imports()      // []Import from the IMPORTS clause
+
+mod.ImportsSymbol("DisplayString") // true if listed in IMPORTS
+mod.IsImportUsed("DisplayString")  // true if referenced during resolution
+mod.ImportSource("DisplayString")  // resolved source module
+```
+
+Base modules are always present and define the SMI language itself:
+
+```go
+base := m.Module("SNMPv2-SMI")
+base.IsBase()      // true
+base.SourcePath()  // ""
+base.Node("enterprises").OID() // 1.3.6.1.4.1
 ```
 
 Module introspection methods:
@@ -300,6 +340,40 @@ for _, obj := range notif.Objects() {
 }
 ```
 
+SMIv1 `TRAP-TYPE` definitions populate `TrapInfo()`:
+
+```go
+if trap := notif.TrapInfo(); trap != nil {
+    fmt.Printf("enterprise=%s trap-number=%d\n", trap.Enterprise, trap.TrapNumber)
+}
+```
+
+## Conformance
+
+`gomib` also exposes `OBJECT-GROUP`, `NOTIFICATION-GROUP`, `MODULE-COMPLIANCE`, and `AGENT-CAPABILITIES`:
+
+```go
+grp := m.Group("ifGeneralInformationGroup")
+grp.IsNotificationGroup() // false for OBJECT-GROUP
+for _, member := range grp.Members() {
+    fmt.Println(member.Name(), member.OID())
+}
+
+comp := m.Compliance("ifCompliance3")
+for _, mod := range comp.Modules() {
+    fmt.Println("MODULE", mod.ModuleName) // empty = current module
+    fmt.Println("mandatory groups:", mod.MandatoryGroups)
+}
+
+cap := m.Capability("someAgentCaps")
+if cap != nil {
+    fmt.Println(cap.ProductRelease())
+    for _, sup := range cap.Supports() {
+        fmt.Println("SUPPORTS", sup.ModuleName, sup.Includes)
+    }
+}
+```
+
 ## Diagnostics
 
 Loading produces diagnostics for issues found during parsing and resolution.
@@ -350,6 +424,13 @@ gomib.WithDiagnosticConfig(mib.DiagnosticConfig{
 })
 ```
 
+CLI equivalents follow the same split:
+
+- `gomib load --strict` and `gomib load --permissive` change resolver behavior.
+- `gomib load --report silent|quiet|default|verbose` changes diagnostic output.
+- `gomib get` and `gomib find` default to permissive resolution with silent reporting.
+- `gomib lint` is separate from resolver strictness and filters diagnostics by severity.
+
 ## Tokenization
 
 The `token` package provides direct access to the lexer for tooling, linting, or syntax highlighting:
@@ -391,7 +472,7 @@ gomib get -m IF-MIB ifIndex          # query by name
 gomib get -m IF-MIB 1.3.6.1.2.1.2   # query by OID
 gomib dump IF-MIB                    # JSON output
 gomib lint IF-MIB                    # check for issues
-gomib find --all -p testdata/corpus/primary 'if*'  # search by pattern
+gomib find -p testdata/corpus/primary 'if*'        # search by pattern
 gomib normalize IF-MIB               # emit canonical SMIv2 text
 gomib trace -m IF-MIB ifEntry        # trace resolution
 gomib paths                          # show search paths

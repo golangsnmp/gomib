@@ -1,8 +1,3 @@
-// Package gomib loads and resolves SNMP MIB modules.
-//
-// Call [Load] with one or more [Source] values to parse MIB files,
-// resolve cross-module imports, build the OID tree, and return a
-// read-only [mib.Mib] containing the merged result.
 package gomib
 
 import (
@@ -77,7 +72,7 @@ func WithDiagnosticConfig(cfg mib.DiagnosticConfig) LoadOption {
 //     Best effort for vendor MIBs with spec violations.
 //
 // This does not affect diagnostic failure policy. A permissive resolver
-// still produces diagnostics that may exceed the [DiagnosticConfig.FailAt]
+// still produces diagnostics that may exceed the [mib.DiagnosticConfig.FailAt]
 // threshold. To also suppress failure on non-fatal diagnostics, configure
 // [WithDiagnosticConfig] with FailAt set to [mib.SeverityFatal].
 func WithResolverStrictness(level mib.ResolverStrictness) LoadOption {

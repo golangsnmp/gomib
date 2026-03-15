@@ -1,0 +1,34 @@
+EXAMPLE-MODULES-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises
+        FROM SNMPv2-SMI
+    ExampleName
+        FROM EXAMPLE-TYPES-MIB;
+
+exampleModulesMIB MODULE-IDENTITY
+    LAST-UPDATED "202603150000Z"
+    ORGANIZATION "Example Corp"
+    CONTACT-INFO "support@example.com"
+    DESCRIPTION  "Example module metadata and import relationships."
+    REVISION     "202603150000Z"
+    DESCRIPTION  "Initial version."
+    ::= { enterprises 99996 }
+
+exampleObjects OBJECT IDENTIFIER ::= { exampleModulesMIB 1 }
+
+exampleDeviceName OBJECT-TYPE
+    SYNTAX ExampleName
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Example device name."
+    ::= { exampleObjects 1 }
+
+exampleDeviceSlots OBJECT-TYPE
+    SYNTAX Integer32 (0..32)
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Example slot count."
+    ::= { exampleObjects 2 }
+
+END
