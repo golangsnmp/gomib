@@ -356,12 +356,25 @@ func TestModuleScopedLookups(t *testing.T) {
 	})
 
 	t.Run("Node lookup", func(t *testing.T) {
-		// ifMIBObjects is defined in IF-MIB as a node
+		// ifMIBObjects is defined in IF-MIB as a node (non-semantic)
 		node := ifMIB.Node("ifMIBObjects")
 		if node == nil {
 			t.Fatal("Module.Node(ifMIBObjects) returned nil")
 		}
 		testutil.Equal(t, "ifMIBObjects", node.Name(), "module-scoped node name")
+	})
+
+	t.Run("Node lookup for OBJECT-TYPE", func(t *testing.T) {
+		// ifIndex is an OBJECT-TYPE (semantic definition)
+		node := ifMIB.Node("ifIndex")
+		testutil.NotNil(t, node, "Module.Node(ifIndex)")
+		testutil.Equal(t, "ifIndex", node.Name(), "module-scoped OBJECT-TYPE node name")
+	})
+
+	t.Run("Qualified name resolve", func(t *testing.T) {
+		node := m.Resolve("IF-MIB::ifIndex")
+		testutil.NotNil(t, node, "Resolve(IF-MIB::ifIndex)")
+		testutil.Equal(t, "ifIndex", node.Name(), "qualified resolve name")
 	})
 
 	t.Run("Type lookup", func(t *testing.T) {
