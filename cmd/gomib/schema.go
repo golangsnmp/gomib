@@ -12,83 +12,83 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// V1 schema JSON types per compare-schema-v1.md
+// Export schema JSON types.
 
-type V1Export struct {
-	SchemaVersion int              `json:"schemaVersion"`
-	ExportKind    string           `json:"exportKind"`
-	Strictness    string           `json:"strictness"`
-	Exporter      V1Exporter       `json:"exporter"`
-	Modules       []V1Module       `json:"modules"`
-	Types         []V1Type         `json:"types"`
-	Nodes         []V1Node         `json:"nodes"`
-	Objects       []V1Object       `json:"objects"`
-	Notifications []V1Notification `json:"notifications"`
-	Groups        []V1Group        `json:"groups"`
-	Compliances   []V1Compliance   `json:"compliances"`
-	Capabilities  []V1Capability   `json:"capabilities"`
-	Diagnostics   []V1Diagnostic   `json:"diagnostics"`
+type ExportPayload struct {
+	SchemaVersion int                  `json:"schemaVersion"`
+	ExportKind    string               `json:"exportKind"`
+	Strictness    string               `json:"strictness"`
+	Exporter      Exporter             `json:"exporter"`
+	Modules       []ExportModule       `json:"modules"`
+	Types         []ExportType         `json:"types"`
+	Nodes         []ExportNode         `json:"nodes"`
+	Objects       []ExportObject       `json:"objects"`
+	Notifications []ExportNotification `json:"notifications"`
+	Groups        []ExportGroup        `json:"groups"`
+	Compliances   []ExportCompliance   `json:"compliances"`
+	Capabilities  []ExportCapability   `json:"capabilities"`
+	Diagnostics   []ExportDiagnostic   `json:"diagnostics"`
 }
 
-type V1Exporter struct {
+type Exporter struct {
 	Implementation string `json:"implementation"`
 	Version        string `json:"version"`
 	Commit         string `json:"commit"`
 }
 
-type V1Module struct {
-	Name         string       `json:"name"`
-	OID          *string      `json:"oid"`
-	Language     *string      `json:"language"`
-	Organization *string      `json:"organization"`
-	ContactInfo  *string      `json:"contactInfo"`
-	Description  *string      `json:"description"`
-	LastUpdated  *string      `json:"lastUpdated"`
-	Revisions    []V1Revision `json:"revisions"`
+type ExportModule struct {
+	Name         string           `json:"name"`
+	OID          *string          `json:"oid"`
+	Language     *string          `json:"language"`
+	Organization *string          `json:"organization"`
+	ContactInfo  *string          `json:"contactInfo"`
+	Description  *string          `json:"description"`
+	LastUpdated  *string          `json:"lastUpdated"`
+	Revisions    []ExportRevision `json:"revisions"`
 }
 
-type V1Revision struct {
+type ExportRevision struct {
 	Date        string  `json:"date"`
 	Description *string `json:"description"`
 }
 
-type V1Type struct {
-	Key                 string        `json:"key"`
-	Name                string        `json:"name"`
-	Module              string        `json:"module"`
-	Parent              *string       `json:"parent"`
-	Base                string        `json:"base"`
-	Status              *string       `json:"status"`
-	DisplayHint         *string       `json:"displayHint"`
-	Description         *string       `json:"description"`
-	Reference           *string       `json:"reference"`
-	IsTextualConvention bool          `json:"isTextualConvention"`
-	Constraints         V1Constraints `json:"constraints"`
+type ExportType struct {
+	Key                 string            `json:"key"`
+	Name                string            `json:"name"`
+	Module              string            `json:"module"`
+	Parent              *string           `json:"parent"`
+	Base                string            `json:"base"`
+	Status              *string           `json:"status"`
+	DisplayHint         *string           `json:"displayHint"`
+	Description         *string           `json:"description"`
+	Reference           *string           `json:"reference"`
+	IsTextualConvention bool              `json:"isTextualConvention"`
+	Constraints         ExportConstraints `json:"constraints"`
 }
 
-type V1Constraints struct {
-	Sizes  []V1Range     `json:"sizes"`
-	Ranges []V1Range     `json:"ranges"`
-	Enums  []V1EnumEntry `json:"enums"`
-	Bits   []V1BitEntry  `json:"bits"`
+type ExportConstraints struct {
+	Sizes  []ExportRange     `json:"sizes"`
+	Ranges []ExportRange     `json:"ranges"`
+	Enums  []ExportEnumEntry `json:"enums"`
+	Bits   []ExportBitEntry  `json:"bits"`
 }
 
-type V1Range struct {
+type ExportRange struct {
 	Min string `json:"min"`
 	Max string `json:"max"`
 }
 
-type V1EnumEntry struct {
+type ExportEnumEntry struct {
 	Name  string `json:"name"`
 	Value int64  `json:"value"`
 }
 
-type V1BitEntry struct {
+type ExportBitEntry struct {
 	Name     string `json:"name"`
 	Position int64  `json:"position"`
 }
 
-type V1Node struct {
+type ExportNode struct {
 	Key         string  `json:"key"`
 	OID         string  `json:"oid"`
 	Name        string  `json:"name"`
@@ -99,151 +99,151 @@ type V1Node struct {
 	Reference   *string `json:"reference"`
 }
 
-type V1Object struct {
-	Key              string             `json:"key"`
-	OID              string             `json:"oid"`
-	Name             string             `json:"name"`
-	Module           string             `json:"module"`
-	Kind             string             `json:"kind"`
-	Status           string             `json:"status"`
-	Access           string             `json:"access"`
-	Description      *string            `json:"description"`
-	Reference        *string            `json:"reference"`
-	Units            *string            `json:"units"`
-	DefaultValue     *V1DefaultValue    `json:"defaultValue"`
-	Syntax           *V1EffectiveSyntax `json:"syntax"`
-	Indexes          []V1IndexEntry     `json:"indexes"`
-	EffectiveIndexes []V1IndexEntry     `json:"effectiveIndexes"`
-	Augments         *V1ObjRef          `json:"augments"`
-	AugmentedBy      []V1ObjRef         `json:"augmentedBy"`
-	Table            *V1ObjRef          `json:"table"`
-	Row              *V1ObjRef          `json:"row"`
-	Columns          []V1ObjRef         `json:"columns"`
+type ExportObject struct {
+	Key              string                 `json:"key"`
+	OID              string                 `json:"oid"`
+	Name             string                 `json:"name"`
+	Module           string                 `json:"module"`
+	Kind             string                 `json:"kind"`
+	Status           string                 `json:"status"`
+	Access           string                 `json:"access"`
+	Description      *string                `json:"description"`
+	Reference        *string                `json:"reference"`
+	Units            *string                `json:"units"`
+	DefaultValue     *ExportDefaultValue    `json:"defaultValue"`
+	Syntax           *ExportEffectiveSyntax `json:"syntax"`
+	Indexes          []ExportIndexEntry     `json:"indexes"`
+	EffectiveIndexes []ExportIndexEntry     `json:"effectiveIndexes"`
+	Augments         *ExportObjRef          `json:"augments"`
+	AugmentedBy      []ExportObjRef         `json:"augmentedBy"`
+	Table            *ExportObjRef          `json:"table"`
+	Row              *ExportObjRef          `json:"row"`
+	Columns          []ExportObjRef         `json:"columns"`
 }
 
-type V1EffectiveSyntax struct {
-	TypeRef     *string       `json:"typeRef"`
-	Base        string        `json:"base"`
-	DisplayHint *string       `json:"displayHint"`
-	Constraints V1Constraints `json:"constraints"`
+type ExportEffectiveSyntax struct {
+	TypeRef     *string           `json:"typeRef"`
+	Base        string            `json:"base"`
+	DisplayHint *string           `json:"displayHint"`
+	Constraints ExportConstraints `json:"constraints"`
 }
 
-type V1ObjRef struct {
+type ExportObjRef struct {
 	Name   string `json:"name"`
 	Module string `json:"module"`
 	OID    string `json:"oid"`
 }
 
-type V1IndexEntry struct {
-	Object  *V1ObjRef          `json:"object"`
-	Implied bool               `json:"implied"`
-	Syntax  *V1EffectiveSyntax `json:"syntax"`
+type ExportIndexEntry struct {
+	Object  *ExportObjRef          `json:"object"`
+	Implied bool                   `json:"implied"`
+	Syntax  *ExportEffectiveSyntax `json:"syntax"`
 }
 
-type V1DefaultValue struct {
+type ExportDefaultValue struct {
 	Kind  string `json:"kind"`
 	Value any    `json:"value"`
 	Raw   string `json:"raw"`
 }
 
-type V1Notification struct {
-	Key         string     `json:"key"`
-	OID         string     `json:"oid"`
-	Name        string     `json:"name"`
-	Module      string     `json:"module"`
-	Status      string     `json:"status"`
-	Kind        string     `json:"kind"`
-	Trap        *V1Trap    `json:"trap"`
-	Description *string    `json:"description"`
-	Reference   *string    `json:"reference"`
-	Objects     []V1ObjRef `json:"objects"`
+type ExportNotification struct {
+	Key         string         `json:"key"`
+	OID         string         `json:"oid"`
+	Name        string         `json:"name"`
+	Module      string         `json:"module"`
+	Status      string         `json:"status"`
+	Kind        string         `json:"kind"`
+	Trap        *ExportTrap    `json:"trap"`
+	Description *string        `json:"description"`
+	Reference   *string        `json:"reference"`
+	Objects     []ExportObjRef `json:"objects"`
 }
 
-type V1Trap struct {
-	Enterprise V1ObjRef `json:"enterprise"`
-	TrapNumber uint32   `json:"trapNumber"`
+type ExportTrap struct {
+	Enterprise ExportObjRef `json:"enterprise"`
+	TrapNumber uint32       `json:"trapNumber"`
 }
 
-type V1Group struct {
-	Key         string     `json:"key"`
-	OID         string     `json:"oid"`
-	Name        string     `json:"name"`
-	Module      string     `json:"module"`
-	Kind        string     `json:"kind"`
-	Status      string     `json:"status"`
-	Description *string    `json:"description"`
-	Reference   *string    `json:"reference"`
-	Members     []V1ObjRef `json:"members"`
+type ExportGroup struct {
+	Key         string         `json:"key"`
+	OID         string         `json:"oid"`
+	Name        string         `json:"name"`
+	Module      string         `json:"module"`
+	Kind        string         `json:"kind"`
+	Status      string         `json:"status"`
+	Description *string        `json:"description"`
+	Reference   *string        `json:"reference"`
+	Members     []ExportObjRef `json:"members"`
 }
 
-type V1Compliance struct {
-	Key         string               `json:"key"`
-	OID         string               `json:"oid"`
-	Name        string               `json:"name"`
-	Module      string               `json:"module"`
-	Status      string               `json:"status"`
-	Description *string              `json:"description"`
-	Reference   *string              `json:"reference"`
-	Modules     []V1ComplianceModule `json:"modules"`
+type ExportCompliance struct {
+	Key         string                   `json:"key"`
+	OID         string                   `json:"oid"`
+	Name        string                   `json:"name"`
+	Module      string                   `json:"module"`
+	Status      string                   `json:"status"`
+	Description *string                  `json:"description"`
+	Reference   *string                  `json:"reference"`
+	Modules     []ExportComplianceModule `json:"modules"`
 }
 
-type V1ComplianceModule struct {
-	Module          string               `json:"module"`
-	IsCurrentModule bool                 `json:"isCurrentModule"`
-	MandatoryGroups []V1ObjRef           `json:"mandatoryGroups"`
-	Groups          []V1ComplianceGroup  `json:"groups"`
-	Objects         []V1ComplianceObject `json:"objects"`
+type ExportComplianceModule struct {
+	Module          string                   `json:"module"`
+	IsCurrentModule bool                     `json:"isCurrentModule"`
+	MandatoryGroups []ExportObjRef           `json:"mandatoryGroups"`
+	Groups          []ExportComplianceGroup  `json:"groups"`
+	Objects         []ExportComplianceObject `json:"objects"`
 }
 
-type V1ComplianceGroup struct {
-	Group       V1ObjRef `json:"group"`
-	Description *string  `json:"description"`
+type ExportComplianceGroup struct {
+	Group       ExportObjRef `json:"group"`
+	Description *string      `json:"description"`
 }
 
-type V1ComplianceObject struct {
-	Object      V1ObjRef           `json:"object"`
-	Syntax      *V1EffectiveSyntax `json:"syntax"`
-	WriteSyntax *V1EffectiveSyntax `json:"writeSyntax"`
-	MinAccess   *string            `json:"minAccess"`
-	Description *string            `json:"description"`
+type ExportComplianceObject struct {
+	Object      ExportObjRef           `json:"object"`
+	Syntax      *ExportEffectiveSyntax `json:"syntax"`
+	WriteSyntax *ExportEffectiveSyntax `json:"writeSyntax"`
+	MinAccess   *string                `json:"minAccess"`
+	Description *string                `json:"description"`
 }
 
-type V1Capability struct {
-	Key            string                 `json:"key"`
-	OID            string                 `json:"oid"`
-	Name           string                 `json:"name"`
-	Module         string                 `json:"module"`
-	Status         string                 `json:"status"`
-	ProductRelease *string                `json:"productRelease"`
-	Description    *string                `json:"description"`
-	Reference      *string                `json:"reference"`
-	Supports       []V1CapabilitySupports `json:"supports"`
+type ExportCapability struct {
+	Key            string                     `json:"key"`
+	OID            string                     `json:"oid"`
+	Name           string                     `json:"name"`
+	Module         string                     `json:"module"`
+	Status         string                     `json:"status"`
+	ProductRelease *string                    `json:"productRelease"`
+	Description    *string                    `json:"description"`
+	Reference      *string                    `json:"reference"`
+	Supports       []ExportCapabilitySupports `json:"supports"`
 }
 
-type V1CapabilitySupports struct {
-	Module                 string                    `json:"module"`
-	Includes               []V1ObjRef                `json:"includes"`
-	ObjectVariations       []V1ObjectVariation       `json:"objectVariations"`
-	NotificationVariations []V1NotificationVariation `json:"notificationVariations"`
+type ExportCapabilitySupports struct {
+	Module                 string                        `json:"module"`
+	Includes               []ExportObjRef                `json:"includes"`
+	ObjectVariations       []ExportObjectVariation       `json:"objectVariations"`
+	NotificationVariations []ExportNotificationVariation `json:"notificationVariations"`
 }
 
-type V1ObjectVariation struct {
-	Object           V1ObjRef           `json:"object"`
-	Syntax           *V1EffectiveSyntax `json:"syntax"`
-	WriteSyntax      *V1EffectiveSyntax `json:"writeSyntax"`
-	Access           *string            `json:"access"`
-	CreationRequires []V1ObjRef         `json:"creationRequires"`
-	DefaultValue     *V1DefaultValue    `json:"defaultValue"`
-	Description      *string            `json:"description"`
+type ExportObjectVariation struct {
+	Object           ExportObjRef           `json:"object"`
+	Syntax           *ExportEffectiveSyntax `json:"syntax"`
+	WriteSyntax      *ExportEffectiveSyntax `json:"writeSyntax"`
+	Access           *string                `json:"access"`
+	CreationRequires []ExportObjRef         `json:"creationRequires"`
+	DefaultValue     *ExportDefaultValue    `json:"defaultValue"`
+	Description      *string                `json:"description"`
 }
 
-type V1NotificationVariation struct {
-	Notification V1ObjRef `json:"notification"`
-	Access       *string  `json:"access"`
-	Description  *string  `json:"description"`
+type ExportNotificationVariation struct {
+	Notification ExportObjRef `json:"notification"`
+	Access       *string      `json:"access"`
+	Description  *string      `json:"description"`
 }
 
-type V1Diagnostic struct {
+type ExportDiagnostic struct {
 	Phase    string  `json:"phase"`
 	Code     string  `json:"code"`
 	Severity string  `json:"severity"`
@@ -253,8 +253,8 @@ type V1Diagnostic struct {
 	Message  string  `json:"message"`
 }
 
-// v1BaseType maps BaseType to the v1 schema vocabulary.
-func v1BaseType(b mib.BaseType) string {
+// exportBaseType maps BaseType to the export schema vocabulary.
+func exportBaseType(b mib.BaseType) string {
 	switch b {
 	case mib.BaseUnknown:
 		return "Unknown"
@@ -285,8 +285,8 @@ func v1BaseType(b mib.BaseType) string {
 	}
 }
 
-// v1Language maps Language to the v1 schema vocabulary.
-func v1Language(l mib.Language) *string {
+// exportLanguage maps Language to the export schema vocabulary.
+func exportLanguage(l mib.Language) *string {
 	switch l {
 	case mib.LanguageSMIv1:
 		return strPtr("SMIv1")
@@ -297,8 +297,8 @@ func v1Language(l mib.Language) *string {
 	}
 }
 
-// v1Severity maps Severity to the v1 schema vocabulary.
-func v1Severity(s mib.Severity) string {
+// exportSeverity maps Severity to the export schema vocabulary.
+func exportSeverity(s mib.Severity) string {
 	switch s {
 	case mib.SeverityFatal, mib.SeveritySevere, mib.SeverityError:
 		return "error"
@@ -315,8 +315,8 @@ func v1Severity(s mib.Severity) string {
 	}
 }
 
-// v1Status maps Status to the v1 schema string, or nil for zero-value.
-func v1Status(s mib.Status) string {
+// exportStatus maps Status to the export schema string, or nil for zero-value.
+func exportStatus(s mib.Status) string {
 	return s.String()
 }
 
@@ -336,7 +336,7 @@ func init() {
 	}
 }
 
-func v1DiagPhase(code string) string {
+func exportDiagPhase(code string) string {
 	if p, ok := diagCodePhase[code]; ok {
 		return p
 	}
@@ -361,7 +361,7 @@ func intPtr(n int) *int {
 // type rather than a primitive base type alias from a base module.
 // Textual conventions are always user-defined. Non-TC types from base modules
 // are schema built-ins and should not be emitted as qualified parent/typeRef
-// values in the v1 export.
+// values in the export.
 func isUserDefinedType(t *mib.Type) bool {
 	if t.IsTextualConvention() {
 		return true
@@ -372,7 +372,7 @@ func isUserDefinedType(t *mib.Type) bool {
 	return true
 }
 
-func v1ObjectKind(k mib.Kind) string {
+func exportObjectKind(k mib.Kind) string {
 	switch k {
 	case mib.KindScalar:
 		return "scalar"
@@ -387,12 +387,12 @@ func v1ObjectKind(k mib.Kind) string {
 	}
 }
 
-func v1Key(mod, name string) string {
+func exportKey(mod, name string) string {
 	return mod + "::" + name
 }
 
-func v1ObjRef(obj *mib.Object) V1ObjRef {
-	ref := V1ObjRef{Name: obj.Name()}
+func exportObjRef(obj *mib.Object) ExportObjRef {
+	ref := ExportObjRef{Name: obj.Name()}
 	if obj.Module() != nil {
 		ref.Module = obj.Module().Name()
 	}
@@ -402,8 +402,8 @@ func v1ObjRef(obj *mib.Object) V1ObjRef {
 	return ref
 }
 
-func v1NodeRef(node *mib.Node) V1ObjRef {
-	ref := V1ObjRef{Name: node.Name()}
+func exportNodeRef(node *mib.Node) ExportObjRef {
+	ref := ExportObjRef{Name: node.Name()}
 	if node.Module() != nil {
 		ref.Module = node.Module().Name()
 	}
@@ -413,10 +413,10 @@ func v1NodeRef(node *mib.Node) V1ObjRef {
 	return ref
 }
 
-func v1Ranges(ranges []mib.Range) []V1Range {
-	result := make([]V1Range, 0, len(ranges))
+func exportRanges(ranges []mib.Range) []ExportRange {
+	result := make([]ExportRange, 0, len(ranges))
 	for _, r := range ranges {
-		result = append(result, V1Range{
+		result = append(result, ExportRange{
 			Min: strconv.FormatInt(r.Min, 10),
 			Max: strconv.FormatInt(r.Max, 10),
 		})
@@ -424,40 +424,40 @@ func v1Ranges(ranges []mib.Range) []V1Range {
 	return result
 }
 
-func v1Enums(enums []mib.NamedValue) []V1EnumEntry {
-	result := make([]V1EnumEntry, 0, len(enums))
+func exportEnums(enums []mib.NamedValue) []ExportEnumEntry {
+	result := make([]ExportEnumEntry, 0, len(enums))
 	for _, e := range enums {
-		result = append(result, V1EnumEntry{Name: e.Label, Value: e.Value})
+		result = append(result, ExportEnumEntry{Name: e.Label, Value: e.Value})
 	}
 	return result
 }
 
-func v1Bits(bits []mib.NamedValue) []V1BitEntry {
-	result := make([]V1BitEntry, 0, len(bits))
+func exportBits(bits []mib.NamedValue) []ExportBitEntry {
+	result := make([]ExportBitEntry, 0, len(bits))
 	for _, b := range bits {
-		result = append(result, V1BitEntry{Name: b.Label, Position: b.Value})
+		result = append(result, ExportBitEntry{Name: b.Label, Position: b.Value})
 	}
 	return result
 }
 
-func v1Constraints(sizes, ranges []mib.Range, enums, bits []mib.NamedValue) V1Constraints {
-	return V1Constraints{
-		Sizes:  v1Ranges(sizes),
-		Ranges: v1Ranges(ranges),
-		Enums:  v1Enums(enums),
-		Bits:   v1Bits(bits),
+func exportConstraints(sizes, ranges []mib.Range, enums, bits []mib.NamedValue) ExportConstraints {
+	return ExportConstraints{
+		Sizes:  exportRanges(sizes),
+		Ranges: exportRanges(ranges),
+		Enums:  exportEnums(enums),
+		Bits:   exportBits(bits),
 	}
 }
 
-func v1EffectiveSyntax(obj *mib.Object) *V1EffectiveSyntax {
+func exportEffectiveSyntax(obj *mib.Object) *ExportEffectiveSyntax {
 	t := obj.Type()
 	if t == nil {
 		return nil
 	}
-	syn := &V1EffectiveSyntax{
-		Base:        v1BaseType(t.EffectiveBase()),
+	syn := &ExportEffectiveSyntax{
+		Base:        exportBaseType(t.EffectiveBase()),
 		DisplayHint: strPtr(obj.EffectiveDisplayHint()),
-		Constraints: v1Constraints(
+		Constraints: exportConstraints(
 			obj.EffectiveSizes(),
 			obj.EffectiveRanges(),
 			obj.EffectiveEnums(),
@@ -469,46 +469,46 @@ func v1EffectiveSyntax(obj *mib.Object) *V1EffectiveSyntax {
 		if t.Module() != nil {
 			modName = t.Module().Name()
 		}
-		ref := v1Key(modName, t.Name())
+		ref := exportKey(modName, t.Name())
 		syn.TypeRef = &ref
 	}
 	return syn
 }
 
-func v1SyntaxConstraints(sc *mib.SyntaxConstraints) *V1EffectiveSyntax {
+func exportSyntaxConstraints(sc *mib.SyntaxConstraints) *ExportEffectiveSyntax {
 	if sc == nil {
 		return nil
 	}
-	syn := &V1EffectiveSyntax{
+	syn := &ExportEffectiveSyntax{
 		Base:        "Unknown",
-		Constraints: v1Constraints(sc.Sizes, sc.Ranges, v1SCEnums(sc.Enums), v1SCBits(sc.Bits)),
+		Constraints: exportConstraints(sc.Sizes, sc.Ranges, exportSCEnums(sc.Enums), exportSCBits(sc.Bits)),
 	}
 	if sc.Type != nil {
-		syn.Base = v1BaseType(sc.Type.EffectiveBase())
+		syn.Base = exportBaseType(sc.Type.EffectiveBase())
 		syn.DisplayHint = strPtr(sc.Type.EffectiveDisplayHint())
 		if sc.Type.Name() != "" && isUserDefinedType(sc.Type) {
 			modName := ""
 			if sc.Type.Module() != nil {
 				modName = sc.Type.Module().Name()
 			}
-			ref := v1Key(modName, sc.Type.Name())
+			ref := exportKey(modName, sc.Type.Name())
 			syn.TypeRef = &ref
 		}
 	}
 	return syn
 }
 
-// v1SCEnums converts NamedValue slice to the types expected by v1Constraints.
-func v1SCEnums(nv []mib.NamedValue) []mib.NamedValue { return nv }
+// exportSCEnums converts NamedValue slice to the types expected by exportConstraints.
+func exportSCEnums(nv []mib.NamedValue) []mib.NamedValue { return nv }
 
-// v1SCBits converts NamedValue slice to the types expected by v1Constraints.
-func v1SCBits(nv []mib.NamedValue) []mib.NamedValue { return nv }
+// exportSCBits converts NamedValue slice to the types expected by exportConstraints.
+func exportSCBits(nv []mib.NamedValue) []mib.NamedValue { return nv }
 
-func v1DefaultValue(dv mib.DefVal) *V1DefaultValue {
+func exportDefaultValue(dv mib.DefVal) *ExportDefaultValue {
 	if dv.IsZero() {
 		return nil
 	}
-	result := &V1DefaultValue{
+	result := &ExportDefaultValue{
 		Kind: dv.Kind().String(),
 		Raw:  dv.Raw(),
 	}
@@ -541,33 +541,33 @@ func v1DefaultValue(dv mib.DefVal) *V1DefaultValue {
 	return result
 }
 
-func v1IndexEntries(m *mib.Mib, indexes []mib.IndexEntry) []V1IndexEntry {
-	result := make([]V1IndexEntry, 0, len(indexes))
+func exportIndexEntries(m *mib.Mib, indexes []mib.IndexEntry) []ExportIndexEntry {
+	result := make([]ExportIndexEntry, 0, len(indexes))
 	for _, idx := range indexes {
-		entry := V1IndexEntry{Implied: idx.Implied}
+		entry := ExportIndexEntry{Implied: idx.Implied}
 		if idx.Object != nil {
-			ref := v1ObjRef(idx.Object)
+			ref := exportObjRef(idx.Object)
 			entry.Object = &ref
 		} else {
 			// Type-backed index - resolve effective syntax from type name
-			syn := &V1EffectiveSyntax{
+			syn := &ExportEffectiveSyntax{
 				Base: "Unknown",
-				Constraints: V1Constraints{
-					Sizes: []V1Range{}, Ranges: []V1Range{},
-					Enums: []V1EnumEntry{}, Bits: []V1BitEntry{},
+				Constraints: ExportConstraints{
+					Sizes: []ExportRange{}, Ranges: []ExportRange{},
+					Enums: []ExportEnumEntry{}, Bits: []ExportBitEntry{},
 				},
 			}
 			if t := m.Type(idx.TypeName); t != nil {
-				syn.Base = v1BaseType(t.EffectiveBase())
+				syn.Base = exportBaseType(t.EffectiveBase())
 				syn.DisplayHint = strPtr(t.EffectiveDisplayHint())
 				if t.Name() != "" {
 					modName := ""
 					if t.Module() != nil {
 						modName = t.Module().Name()
 					}
-					ref := v1Key(modName, t.Name())
+					ref := exportKey(modName, t.Name())
 					syn.TypeRef = &ref
-					syn.Constraints = v1Constraints(
+					syn.Constraints = exportConstraints(
 						t.Sizes(), t.Ranges(), t.Enums(), t.Bits(),
 					)
 				}
@@ -603,7 +603,7 @@ func compareOID(a, b string) int {
 	return 0
 }
 
-func v1ExporterInfo() V1Exporter {
+func exporterInfo() Exporter {
 	version := ""
 	commit := ""
 	if info, ok := debug.ReadBuildInfo(); ok {
@@ -617,33 +617,33 @@ func v1ExporterInfo() V1Exporter {
 			}
 		}
 	}
-	return V1Exporter{
+	return Exporter{
 		Implementation: "gomib",
 		Version:        version,
 		Commit:         commit,
 	}
 }
 
-func buildV1Export(m *mib.Mib, strictness string) *V1Export {
-	export := &V1Export{
+func buildExportPayload(m *mib.Mib, strictness string) *ExportPayload {
+	export := &ExportPayload{
 		SchemaVersion: 1,
 		ExportKind:    "resolved-mib",
 		Strictness:    strictness,
-		Exporter:      v1ExporterInfo(),
-		Modules:       make([]V1Module, 0),
-		Types:         make([]V1Type, 0),
-		Nodes:         make([]V1Node, 0),
-		Objects:       make([]V1Object, 0),
-		Notifications: make([]V1Notification, 0),
-		Groups:        make([]V1Group, 0),
-		Compliances:   make([]V1Compliance, 0),
-		Capabilities:  make([]V1Capability, 0),
-		Diagnostics:   make([]V1Diagnostic, 0),
+		Exporter:      exporterInfo(),
+		Modules:       make([]ExportModule, 0),
+		Types:         make([]ExportType, 0),
+		Nodes:         make([]ExportNode, 0),
+		Objects:       make([]ExportObject, 0),
+		Notifications: make([]ExportNotification, 0),
+		Groups:        make([]ExportGroup, 0),
+		Compliances:   make([]ExportCompliance, 0),
+		Capabilities:  make([]ExportCapability, 0),
+		Diagnostics:   make([]ExportDiagnostic, 0),
 	}
 
 	// Modules - sorted by name
 	for _, mod := range m.Modules() {
-		export.Modules = append(export.Modules, buildV1Module(mod))
+		export.Modules = append(export.Modules, buildExportModule(mod))
 	}
 	sort.Slice(export.Modules, func(i, j int) bool {
 		return export.Modules[i].Name < export.Modules[j].Name
@@ -651,7 +651,7 @@ func buildV1Export(m *mib.Mib, strictness string) *V1Export {
 
 	// Types - sorted by module, then name
 	for _, typ := range m.Types() {
-		export.Types = append(export.Types, buildV1Type(typ))
+		export.Types = append(export.Types, buildExportType(typ))
 	}
 	sort.Slice(export.Types, func(i, j int) bool {
 		if export.Types[i].Module != export.Types[j].Module {
@@ -669,7 +669,7 @@ func buildV1Export(m *mib.Mib, strictness string) *V1Export {
 		if node.Object() != nil || node.Notification() != nil || node.Group() != nil || node.Compliance() != nil || node.Capability() != nil {
 			continue
 		}
-		export.Nodes = append(export.Nodes, buildV1Node(node, m))
+		export.Nodes = append(export.Nodes, buildExportNode(node, m))
 	}
 	sort.Slice(export.Nodes, func(i, j int) bool {
 		if export.Nodes[i].Module != export.Nodes[j].Module {
@@ -680,7 +680,7 @@ func buildV1Export(m *mib.Mib, strictness string) *V1Export {
 
 	// Objects - sorted by numeric OID, then module, then name
 	for _, obj := range m.Objects() {
-		export.Objects = append(export.Objects, buildV1Object(m, obj))
+		export.Objects = append(export.Objects, buildExportObject(m, obj))
 	}
 	sort.Slice(export.Objects, func(i, j int) bool {
 		c := compareOID(export.Objects[i].OID, export.Objects[j].OID)
@@ -695,7 +695,7 @@ func buildV1Export(m *mib.Mib, strictness string) *V1Export {
 
 	// Notifications - sorted by numeric OID, then module, then name
 	for _, notif := range m.Notifications() {
-		export.Notifications = append(export.Notifications, buildV1Notification(notif, m))
+		export.Notifications = append(export.Notifications, buildExportNotification(notif, m))
 	}
 	sort.Slice(export.Notifications, func(i, j int) bool {
 		c := compareOID(export.Notifications[i].OID, export.Notifications[j].OID)
@@ -714,7 +714,7 @@ func buildV1Export(m *mib.Mib, strictness string) *V1Export {
 
 	// Groups - sorted by numeric OID, then module, then name
 	for _, grp := range m.Groups() {
-		export.Groups = append(export.Groups, buildV1Group(grp))
+		export.Groups = append(export.Groups, buildExportGroup(grp))
 	}
 	sort.Slice(export.Groups, func(i, j int) bool {
 		c := compareOID(export.Groups[i].OID, export.Groups[j].OID)
@@ -733,7 +733,7 @@ func buildV1Export(m *mib.Mib, strictness string) *V1Export {
 
 	// Compliances
 	for _, comp := range m.Compliances() {
-		export.Compliances = append(export.Compliances, buildV1Compliance(comp, m))
+		export.Compliances = append(export.Compliances, buildExportCompliance(comp, m))
 	}
 	sort.Slice(export.Compliances, func(i, j int) bool {
 		c := compareOID(export.Compliances[i].OID, export.Compliances[j].OID)
@@ -748,7 +748,7 @@ func buildV1Export(m *mib.Mib, strictness string) *V1Export {
 
 	// Capabilities
 	for _, cap := range m.Capabilities() {
-		export.Capabilities = append(export.Capabilities, buildV1Capability(cap, m))
+		export.Capabilities = append(export.Capabilities, buildExportCapability(cap, m))
 	}
 	sort.Slice(export.Capabilities, func(i, j int) bool {
 		c := compareOID(export.Capabilities[i].OID, export.Capabilities[j].OID)
@@ -763,7 +763,7 @@ func buildV1Export(m *mib.Mib, strictness string) *V1Export {
 
 	// Diagnostics - sorted canonically
 	for _, d := range m.Diagnostics() {
-		export.Diagnostics = append(export.Diagnostics, buildV1Diagnostic(d))
+		export.Diagnostics = append(export.Diagnostics, buildExportDiagnostic(d))
 	}
 	sort.Slice(export.Diagnostics, func(i, j int) bool {
 		a, b := export.Diagnostics[i], export.Diagnostics[j]
@@ -831,11 +831,11 @@ func buildV1Export(m *mib.Mib, strictness string) *V1Export {
 	return export
 }
 
-func buildV1Module(mod *mib.Module) V1Module {
-	m := V1Module{
+func buildExportModule(mod *mib.Module) ExportModule {
+	m := ExportModule{
 		Name:      mod.Name(),
-		Language:  v1Language(mod.Language()),
-		Revisions: make([]V1Revision, 0),
+		Language:  exportLanguage(mod.Language()),
+		Revisions: make([]ExportRevision, 0),
 	}
 	if oid := mod.OID(); oid != nil {
 		s := oid.String()
@@ -847,7 +847,7 @@ func buildV1Module(mod *mib.Module) V1Module {
 	m.LastUpdated = strPtr(mod.LastUpdated())
 
 	for _, rev := range mod.Revisions() {
-		m.Revisions = append(m.Revisions, V1Revision{
+		m.Revisions = append(m.Revisions, ExportRevision{
 			Date:        rev.Date,
 			Description: strPtr(rev.Description),
 		})
@@ -855,18 +855,18 @@ func buildV1Module(mod *mib.Module) V1Module {
 	return m
 }
 
-func buildV1Type(typ *mib.Type) V1Type {
+func buildExportType(typ *mib.Type) ExportType {
 	modName := ""
 	if typ.Module() != nil {
 		modName = typ.Module().Name()
 	}
-	t := V1Type{
-		Key:                 v1Key(modName, typ.Name()),
+	t := ExportType{
+		Key:                 exportKey(modName, typ.Name()),
 		Name:                typ.Name(),
 		Module:              modName,
-		Base:                v1BaseType(typ.EffectiveBase()),
+		Base:                exportBaseType(typ.EffectiveBase()),
 		IsTextualConvention: typ.IsTextualConvention(),
-		Constraints: v1Constraints(
+		Constraints: exportConstraints(
 			typ.Sizes(), typ.Ranges(), typ.Enums(), typ.Bits(),
 		),
 	}
@@ -876,12 +876,12 @@ func buildV1Type(typ *mib.Type) V1Type {
 		if typ.Parent().Module() != nil {
 			pModName = typ.Parent().Module().Name()
 		}
-		ref := v1Key(pModName, typ.Parent().Name())
+		ref := exportKey(pModName, typ.Parent().Name())
 		t.Parent = &ref
 	}
 
 	if typ.Status() != 0 || typ.IsTextualConvention() {
-		s := v1Status(typ.Status())
+		s := exportStatus(typ.Status())
 		t.Status = &s
 	}
 
@@ -892,7 +892,7 @@ func buildV1Type(typ *mib.Type) V1Type {
 	return t
 }
 
-func buildV1Node(node *mib.Node, _ *mib.Mib) V1Node {
+func buildExportNode(node *mib.Node, _ *mib.Mib) ExportNode {
 	modName := ""
 	if node.Module() != nil {
 		modName = node.Module().Name()
@@ -907,8 +907,8 @@ func buildV1Node(node *mib.Node, _ *mib.Mib) V1Node {
 		kind = "module-identity"
 	}
 
-	n := V1Node{
-		Key:    v1Key(modName, node.Name()),
+	n := ExportNode{
+		Key:    exportKey(modName, node.Name()),
 		OID:    node.OID().String(),
 		Name:   node.Name(),
 		Module: modName,
@@ -919,7 +919,7 @@ func buildV1Node(node *mib.Node, _ *mib.Mib) V1Node {
 	switch kind {
 	case "object-identity":
 		if st, ok := node.ObjectIdentityStatus(); ok {
-			s := v1Status(st)
+			s := exportStatus(st)
 			n.Status = &s
 		}
 	case "module-identity":
@@ -934,34 +934,34 @@ func buildV1Node(node *mib.Node, _ *mib.Mib) V1Node {
 	return n
 }
 
-func buildV1Object(m *mib.Mib, obj *mib.Object) V1Object {
+func buildExportObject(m *mib.Mib, obj *mib.Object) ExportObject {
 	modName := ""
 	if obj.Module() != nil {
 		modName = obj.Module().Name()
 	}
 
-	o := V1Object{
-		Key:              v1Key(modName, obj.Name()),
+	o := ExportObject{
+		Key:              exportKey(modName, obj.Name()),
 		OID:              obj.OID().String(),
 		Name:             obj.Name(),
 		Module:           modName,
-		Kind:             v1ObjectKind(obj.Kind()),
-		Status:           v1Status(obj.Status()),
+		Kind:             exportObjectKind(obj.Kind()),
+		Status:           exportStatus(obj.Status()),
 		Access:           obj.Access().String(),
 		Description:      strPtr(obj.Description()),
 		Reference:        strPtr(obj.Reference()),
 		Units:            strPtr(obj.Units()),
-		DefaultValue:     v1DefaultValue(obj.DefaultValue()),
-		Syntax:           v1EffectiveSyntax(obj),
-		Indexes:          make([]V1IndexEntry, 0),
-		EffectiveIndexes: make([]V1IndexEntry, 0),
-		AugmentedBy:      make([]V1ObjRef, 0),
-		Columns:          make([]V1ObjRef, 0),
+		DefaultValue:     exportDefaultValue(obj.DefaultValue()),
+		Syntax:           exportEffectiveSyntax(obj),
+		Indexes:          make([]ExportIndexEntry, 0),
+		EffectiveIndexes: make([]ExportIndexEntry, 0),
+		AugmentedBy:      make([]ExportObjRef, 0),
+		Columns:          make([]ExportObjRef, 0),
 	}
 
 	// Augments
 	if aug := obj.Augments(); aug != nil {
-		ref := v1ObjRef(aug)
+		ref := exportObjRef(aug)
 		o.Augments = &ref
 	}
 
@@ -972,39 +972,39 @@ func buildV1Object(m *mib.Mib, obj *mib.Object) V1Object {
 		o.Units = nil
 		o.Augments = nil
 		if entry := obj.Entry(); entry != nil {
-			ref := v1ObjRef(entry)
+			ref := exportObjRef(entry)
 			o.Row = &ref
 		}
 		for _, col := range obj.Columns() {
-			o.Columns = append(o.Columns, v1ObjRef(col))
+			o.Columns = append(o.Columns, exportObjRef(col))
 		}
 		sortObjRefs(o.Columns)
 	case mib.KindRow:
 		if tbl := obj.Table(); tbl != nil {
-			ref := v1ObjRef(tbl)
+			ref := exportObjRef(tbl)
 			o.Table = &ref
 		}
-		o.Indexes = v1IndexEntries(m, obj.Index())
-		o.EffectiveIndexes = v1IndexEntries(m, obj.EffectiveIndexes())
+		o.Indexes = exportIndexEntries(m, obj.Index())
+		o.EffectiveIndexes = exportIndexEntries(m, obj.EffectiveIndexes())
 		for _, col := range obj.Columns() {
-			o.Columns = append(o.Columns, v1ObjRef(col))
+			o.Columns = append(o.Columns, exportObjRef(col))
 		}
 		sortObjRefs(o.Columns)
 		for _, aug := range obj.AugmentedBy() {
-			o.AugmentedBy = append(o.AugmentedBy, v1ObjRef(aug))
+			o.AugmentedBy = append(o.AugmentedBy, exportObjRef(aug))
 		}
 		sortObjRefs(o.AugmentedBy)
 	case mib.KindColumn:
 		if tbl := obj.Table(); tbl != nil {
-			ref := v1ObjRef(tbl)
+			ref := exportObjRef(tbl)
 			o.Table = &ref
 		}
 		if row := obj.Row(); row != nil {
-			ref := v1ObjRef(row)
+			ref := exportObjRef(row)
 			o.Row = &ref
 		}
 		o.Augments = nil
-		o.AugmentedBy = make([]V1ObjRef, 0)
+		o.AugmentedBy = make([]ExportObjRef, 0)
 	case mib.KindScalar:
 		// scalar: table, row, augments must be null; columns, augmentedBy must be empty
 		o.Table = nil
@@ -1015,34 +1015,34 @@ func buildV1Object(m *mib.Mib, obj *mib.Object) V1Object {
 	return o
 }
 
-func buildV1Notification(notif *mib.Notification, m *mib.Mib) V1Notification {
+func buildExportNotification(notif *mib.Notification, m *mib.Mib) ExportNotification {
 	modName := ""
 	if notif.Module() != nil {
 		modName = notif.Module().Name()
 	}
 
-	n := V1Notification{
-		Key:         v1Key(modName, notif.Name()),
+	n := ExportNotification{
+		Key:         exportKey(modName, notif.Name()),
 		OID:         notif.OID().String(),
 		Name:        notif.Name(),
 		Module:      modName,
-		Status:      v1Status(notif.Status()),
+		Status:      exportStatus(notif.Status()),
 		Description: strPtr(notif.Description()),
-		Objects:     make([]V1ObjRef, 0),
+		Objects:     make([]ExportObjRef, 0),
 	}
 
 	if notif.TrapInfo() != nil {
 		n.Kind = "trap"
 		ti := notif.TrapInfo()
-		trap := &V1Trap{
+		trap := &ExportTrap{
 			TrapNumber: ti.TrapNumber,
 		}
 		// Resolve enterprise
 		entNode := m.Resolve(ti.Enterprise)
 		if entNode != nil {
-			trap.Enterprise = v1NodeRef(entNode)
+			trap.Enterprise = exportNodeRef(entNode)
 		} else {
-			trap.Enterprise = V1ObjRef{Name: ti.Enterprise}
+			trap.Enterprise = ExportObjRef{Name: ti.Enterprise}
 		}
 		n.Trap = trap
 	} else {
@@ -1054,26 +1054,26 @@ func buildV1Notification(notif *mib.Notification, m *mib.Mib) V1Notification {
 	}
 
 	for _, obj := range notif.Objects() {
-		n.Objects = append(n.Objects, v1ObjRef(obj))
+		n.Objects = append(n.Objects, exportObjRef(obj))
 	}
 
 	return n
 }
 
-func buildV1Group(grp *mib.Group) V1Group {
+func buildExportGroup(grp *mib.Group) ExportGroup {
 	modName := ""
 	if grp.Module() != nil {
 		modName = grp.Module().Name()
 	}
 
-	g := V1Group{
-		Key:         v1Key(modName, grp.Name()),
+	g := ExportGroup{
+		Key:         exportKey(modName, grp.Name()),
 		OID:         grp.OID().String(),
 		Name:        grp.Name(),
 		Module:      modName,
-		Status:      v1Status(grp.Status()),
+		Status:      exportStatus(grp.Status()),
 		Description: strPtr(grp.Description()),
-		Members:     make([]V1ObjRef, 0),
+		Members:     make([]ExportObjRef, 0),
 	}
 
 	if grp.IsNotificationGroup() {
@@ -1087,26 +1087,26 @@ func buildV1Group(grp *mib.Group) V1Group {
 	}
 
 	for _, member := range grp.Members() {
-		g.Members = append(g.Members, v1NodeRef(member))
+		g.Members = append(g.Members, exportNodeRef(member))
 	}
 
 	return g
 }
 
-func buildV1Compliance(comp *mib.Compliance, m *mib.Mib) V1Compliance {
+func buildExportCompliance(comp *mib.Compliance, m *mib.Mib) ExportCompliance {
 	modName := ""
 	if comp.Module() != nil {
 		modName = comp.Module().Name()
 	}
 
-	c := V1Compliance{
-		Key:         v1Key(modName, comp.Name()),
+	c := ExportCompliance{
+		Key:         exportKey(modName, comp.Name()),
 		OID:         comp.OID().String(),
 		Name:        comp.Name(),
 		Module:      modName,
-		Status:      v1Status(comp.Status()),
+		Status:      exportStatus(comp.Status()),
 		Description: strPtr(comp.Description()),
-		Modules:     make([]V1ComplianceModule, 0),
+		Modules:     make([]ExportComplianceModule, 0),
 	}
 
 	if ref := comp.Reference(); ref != "" {
@@ -1119,12 +1119,12 @@ func buildV1Compliance(comp *mib.Compliance, m *mib.Mib) V1Compliance {
 			effectiveModName = modName
 		}
 
-		vcm := V1ComplianceModule{
+		vcm := ExportComplianceModule{
 			Module:          effectiveModName,
 			IsCurrentModule: cm.ModuleName == "",
-			MandatoryGroups: make([]V1ObjRef, 0),
-			Groups:          make([]V1ComplianceGroup, 0),
-			Objects:         make([]V1ComplianceObject, 0),
+			MandatoryGroups: make([]ExportObjRef, 0),
+			Groups:          make([]ExportComplianceGroup, 0),
+			Objects:         make([]ExportComplianceObject, 0),
 		}
 
 		for _, grpName := range cm.MandatoryGroups {
@@ -1134,7 +1134,7 @@ func buildV1Compliance(comp *mib.Compliance, m *mib.Mib) V1Compliance {
 
 		for _, cg := range cm.Groups {
 			ref := resolveGroupRef(m, effectiveModName, cg.Group)
-			vcg := V1ComplianceGroup{
+			vcg := ExportComplianceGroup{
 				Group:       ref,
 				Description: strPtr(cg.Description),
 			}
@@ -1143,10 +1143,10 @@ func buildV1Compliance(comp *mib.Compliance, m *mib.Mib) V1Compliance {
 
 		for _, co := range cm.Objects {
 			ref := resolveObjRefByName(m, effectiveModName, co.Object)
-			vco := V1ComplianceObject{
+			vco := ExportComplianceObject{
 				Object:      ref,
-				Syntax:      v1SyntaxConstraints(co.Syntax),
-				WriteSyntax: v1SyntaxConstraints(co.WriteSyntax),
+				Syntax:      exportSyntaxConstraints(co.Syntax),
+				WriteSyntax: exportSyntaxConstraints(co.WriteSyntax),
 				Description: strPtr(co.Description),
 			}
 			if co.MinAccess != nil {
@@ -1162,20 +1162,20 @@ func buildV1Compliance(comp *mib.Compliance, m *mib.Mib) V1Compliance {
 	return c
 }
 
-func buildV1Capability(cap *mib.Capability, m *mib.Mib) V1Capability {
+func buildExportCapability(cap *mib.Capability, m *mib.Mib) ExportCapability {
 	modName := ""
 	if cap.Module() != nil {
 		modName = cap.Module().Name()
 	}
 
-	c := V1Capability{
-		Key:         v1Key(modName, cap.Name()),
+	c := ExportCapability{
+		Key:         exportKey(modName, cap.Name()),
 		OID:         cap.OID().String(),
 		Name:        cap.Name(),
 		Module:      modName,
-		Status:      v1Status(cap.Status()),
+		Status:      exportStatus(cap.Status()),
 		Description: strPtr(cap.Description()),
-		Supports:    make([]V1CapabilitySupports, 0),
+		Supports:    make([]ExportCapabilitySupports, 0),
 	}
 
 	if pr := cap.ProductRelease(); pr != "" {
@@ -1186,11 +1186,11 @@ func buildV1Capability(cap *mib.Capability, m *mib.Mib) V1Capability {
 	}
 
 	for _, s := range cap.Supports() {
-		vs := V1CapabilitySupports{
+		vs := ExportCapabilitySupports{
 			Module:                 s.ModuleName,
-			Includes:               make([]V1ObjRef, 0),
-			ObjectVariations:       make([]V1ObjectVariation, 0),
-			NotificationVariations: make([]V1NotificationVariation, 0),
+			Includes:               make([]ExportObjRef, 0),
+			ObjectVariations:       make([]ExportObjectVariation, 0),
+			NotificationVariations: make([]ExportNotificationVariation, 0),
 		}
 
 		for _, grpName := range s.Includes {
@@ -1201,13 +1201,13 @@ func buildV1Capability(cap *mib.Capability, m *mib.Mib) V1Capability {
 		for i := range s.ObjectVariations {
 			ov := &s.ObjectVariations[i]
 			ref := resolveObjRefByName(m, s.ModuleName, ov.Object)
-			vov := V1ObjectVariation{
+			vov := ExportObjectVariation{
 				Object:           ref,
-				Syntax:           v1SyntaxConstraints(ov.Syntax),
-				WriteSyntax:      v1SyntaxConstraints(ov.WriteSyntax),
-				DefaultValue:     v1DefaultValue(ov.DefVal),
+				Syntax:           exportSyntaxConstraints(ov.Syntax),
+				WriteSyntax:      exportSyntaxConstraints(ov.WriteSyntax),
+				DefaultValue:     exportDefaultValue(ov.DefVal),
 				Description:      strPtr(ov.Description),
-				CreationRequires: make([]V1ObjRef, 0),
+				CreationRequires: make([]ExportObjRef, 0),
 			}
 			if ov.Access != nil {
 				a := ov.Access.String()
@@ -1222,7 +1222,7 @@ func buildV1Capability(cap *mib.Capability, m *mib.Mib) V1Capability {
 
 		for _, nv := range s.NotificationVariations {
 			ref := resolveNotifRefByName(m, s.ModuleName, nv.Notification)
-			vnv := V1NotificationVariation{
+			vnv := ExportNotificationVariation{
 				Notification: ref,
 				Description:  strPtr(nv.Description),
 			}
@@ -1239,11 +1239,11 @@ func buildV1Capability(cap *mib.Capability, m *mib.Mib) V1Capability {
 	return c
 }
 
-func buildV1Diagnostic(d mib.Diagnostic) V1Diagnostic {
-	return V1Diagnostic{
-		Phase:    v1DiagPhase(d.Code),
+func buildExportDiagnostic(d mib.Diagnostic) ExportDiagnostic {
+	return ExportDiagnostic{
+		Phase:    exportDiagPhase(d.Code),
 		Code:     d.Code,
-		Severity: v1Severity(d.Severity),
+		Severity: exportSeverity(d.Severity),
 		Module:   strPtr(d.Module),
 		Line:     intPtr(d.Line),
 		Column:   intPtr(d.Column),
@@ -1252,45 +1252,45 @@ func buildV1Diagnostic(d mib.Diagnostic) V1Diagnostic {
 }
 
 // resolveGroupRef looks up a group by name and returns an ObjRef.
-func resolveGroupRef(m *mib.Mib, moduleName, groupName string) V1ObjRef {
+func resolveGroupRef(m *mib.Mib, moduleName, groupName string) ExportObjRef {
 	qualified := moduleName + "::" + groupName
 	node := m.Resolve(qualified)
 	if node == nil {
 		node = m.Resolve(groupName)
 	}
 	if node != nil {
-		return v1NodeRef(node)
+		return exportNodeRef(node)
 	}
-	return V1ObjRef{Name: groupName, Module: moduleName}
+	return ExportObjRef{Name: groupName, Module: moduleName}
 }
 
 // resolveObjRefByName looks up an object by name and returns an ObjRef.
-func resolveObjRefByName(m *mib.Mib, moduleName, objName string) V1ObjRef {
+func resolveObjRefByName(m *mib.Mib, moduleName, objName string) ExportObjRef {
 	qualified := moduleName + "::" + objName
 	node := m.Resolve(qualified)
 	if node == nil {
 		node = m.Resolve(objName)
 	}
 	if node != nil {
-		return v1NodeRef(node)
+		return exportNodeRef(node)
 	}
-	return V1ObjRef{Name: objName, Module: moduleName}
+	return ExportObjRef{Name: objName, Module: moduleName}
 }
 
 // resolveNotifRefByName looks up a notification by name and returns an ObjRef.
-func resolveNotifRefByName(m *mib.Mib, moduleName, notifName string) V1ObjRef {
+func resolveNotifRefByName(m *mib.Mib, moduleName, notifName string) ExportObjRef {
 	qualified := moduleName + "::" + notifName
 	node := m.Resolve(qualified)
 	if node == nil {
 		node = m.Resolve(notifName)
 	}
 	if node != nil {
-		return v1NodeRef(node)
+		return exportNodeRef(node)
 	}
-	return V1ObjRef{Name: notifName, Module: moduleName}
+	return ExportObjRef{Name: notifName, Module: moduleName}
 }
 
-func sortObjRefs(refs []V1ObjRef) {
+func sortObjRefs(refs []ExportObjRef) {
 	sort.Slice(refs, func(i, j int) bool {
 		c := compareOID(refs[i].OID, refs[j].OID)
 		if c != 0 {
