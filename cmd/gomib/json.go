@@ -52,7 +52,7 @@ type ColumnSummaryJSON struct {
 	Type     string `json:"type,omitempty"`
 	BaseType string `json:"baseType,omitempty"`
 	Access   string `json:"access"`
-	IsIndex  bool   `json:"isIndex,omitempty"`
+	IsIndex  bool   `json:"isIndex"`
 }
 
 // EnumJSON holds a named enumeration value.

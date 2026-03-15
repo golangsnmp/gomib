@@ -162,13 +162,13 @@ func stripV1Descriptions(export *V1Export) {
 		export.Objects[i].Description = nil
 	}
 	for i := range export.Notifications {
-		export.Notifications[i].Description = ""
+		export.Notifications[i].Description = nil
 	}
 	for i := range export.Groups {
-		export.Groups[i].Description = ""
+		export.Groups[i].Description = nil
 	}
 	for i := range export.Compliances {
-		export.Compliances[i].Description = ""
+		export.Compliances[i].Description = nil
 		for j := range export.Compliances[i].Modules {
 			for k := range export.Compliances[i].Modules[j].Groups {
 				export.Compliances[i].Modules[j].Groups[k].Description = nil
@@ -179,7 +179,7 @@ func stripV1Descriptions(export *V1Export) {
 		}
 	}
 	for i := range export.Capabilities {
-		export.Capabilities[i].Description = ""
+		export.Capabilities[i].Description = nil
 		for j := range export.Capabilities[i].Supports {
 			for k := range export.Capabilities[i].Supports[j].ObjectVariations {
 				export.Capabilities[i].Supports[j].ObjectVariations[k].Description = nil
