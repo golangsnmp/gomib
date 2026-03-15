@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-03-15
+
 ### Breaking Changes
 
 - Remove v1 prefix from export schema types and functions (V1Foo -> ExportFoo, v1Foo -> exportFoo)
@@ -41,4 +43,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix path traversal in normalize output path
 - Fix godoc link to mib.DiagnosticConfig
 
-[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/golangsnmp/gomib/compare/v0.7.1...v0.8.0
