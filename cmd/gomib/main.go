@@ -15,11 +15,11 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
-// Exit codes.
+// Exit codes following the grep/shellcheck convention.
 const (
-	exitOK              = 0 // success
-	exitError           = 1 // user error, processing failure, or error-severity diagnostic
-	exitStrictViolation = 2 // strict mode found errors or unresolved refs
+	exitOK    = 0 // success (clean load, match found, no issues)
+	exitIssue = 1 // negative result (issues/violations found, no match)
+	exitError = 2 // operational error (load failure, parse error)
 )
 
 const usage = `gomib - MIB parser and query tool
@@ -51,7 +51,6 @@ Examples:
   gomib load IF-MIB
   gomib get -m IF-MIB ifIndex
   gomib dump IF-MIB
-  gomib trace -m IF-MIB ifEntry
   gomib paths
   gomib list -p testdata/corpus/primary
 `
@@ -169,10 +168,6 @@ func (c *cli) setupLogger() *slog.Logger {
 	}))
 }
 
-func (c *cli) loadMib(modules []string) (*mib.Mib, error) {
-	return c.loadMibWithOpts(modules)
-}
-
 // buildSources returns the composed source list from -p paths or system path
 // discovery. Returns (nil, true) when no explicit paths are set, indicating
 // that WithSystemPaths() should be used instead.
@@ -230,12 +225,12 @@ func addHelpFlag(fs *flag.FlagSet) *bool {
 	return help
 }
 
-// addModuleFlags registers -m/--module (repeatable) and --all flags.
-func addModuleFlags(fs *flag.FlagSet) (modules *moduleList, loadAll *bool) {
+// addModuleFlag registers -m/--module (repeatable) on the given FlagSet.
+func addModuleFlag(fs *flag.FlagSet) *moduleList {
 	var m moduleList
 	fs.Var(&m, "m", "module to load")
 	fs.Var(&m, "module", "module to load")
-	return &m, fs.Bool("all", false, "load all MIBs from search path")
+	return &m
 }
 
 // checkHelp prints usage and returns true if help was requested.
@@ -245,25 +240,6 @@ func (c *cli) checkHelp(help *bool, usageText string) bool {
 		return true
 	}
 	return false
-}
-
-// requireModuleOrAll validates that either -m or --all was specified.
-// Returns an exit code and true if the validation failed.
-func requireModuleOrAll(modules moduleList, loadAll bool, usageText string) (int, bool) {
-	if !loadAll && len(modules) == 0 {
-		printError("specify -m MODULE(s) or --all")
-		fmt.Fprint(os.Stderr, usageText)
-		return exitError, true
-	}
-	return exitOK, false
-}
-
-// modulesToLoad returns the module list for loading, or nil if --all is set.
-func modulesToLoad(modules moduleList, loadAll bool) []string {
-	if loadAll {
-		return nil
-	}
-	return modules
 }
 
 // addStrictnessFlags registers --strict and --permissive on the given FlagSet.
@@ -280,45 +256,6 @@ func validateStrictnessFlags(strict, permissive bool) (int, bool) {
 	return exitOK, false
 }
 
-func parseSingleTargetArgs(modules *moduleList, loadAll bool, args []string, usageText, targetLabel string) (string, int, bool) {
-	var target string
-	dashIdx := -1
-	for i, arg := range args {
-		if arg == "--" {
-			dashIdx = i
-			break
-		}
-	}
-
-	if dashIdx >= 0 {
-		*modules = append(*modules, args[:dashIdx]...)
-		tail := args[dashIdx+1:]
-		switch len(tail) {
-		case 0:
-			// handled below
-		case 1:
-			target = tail[0]
-		default:
-			printError("too many %s arguments after --", targetLabel)
-			fmt.Fprint(os.Stderr, usageText)
-			return "", exitError, true
-		}
-	} else if len(args) > 0 {
-		target = args[len(args)-1]
-		if !loadAll && len(*modules) == 0 && len(args) > 1 {
-			*modules = moduleList(args[:len(args)-1])
-		}
-	}
-
-	if target == "" {
-		printError("no %s specified", targetLabel)
-		fmt.Fprint(os.Stderr, usageText)
-		return "", exitError, true
-	}
-
-	return target, exitOK, false
-}
-
 // strictnessOpts returns LoadOptions for the given --strict/--permissive flags.
 //
 // --strict sets resolver strictness to tier-1 only (no fallbacks).
@@ -333,13 +270,17 @@ func strictnessOpts(strict, permissive bool) []gomib.LoadOption {
 			gomib.WithResolverStrictness(mib.ResolverStrict),
 		}
 	case permissive:
-		cfg := mib.DefaultConfig()
-		cfg.FailAt = mib.SeverityFatal
-		return []gomib.LoadOption{
-			gomib.WithResolverStrictness(mib.ResolverPermissive),
-			gomib.WithDiagnosticConfig(cfg),
-		}
+		return permissiveSilentOpts()
 	default:
 		return nil
+	}
+}
+
+// permissiveSilentOpts returns LoadOptions for permissive+silent mode,
+// the default for query commands (get, find).
+func permissiveSilentOpts() []gomib.LoadOption {
+	return []gomib.LoadOption{
+		gomib.WithResolverStrictness(mib.ResolverPermissive),
+		gomib.WithDiagnosticConfig(mib.SilentConfig()),
 	}
 }

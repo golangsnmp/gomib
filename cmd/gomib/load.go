@@ -14,8 +14,9 @@ const loadUsage = `gomib load - Load and resolve MIB modules
 Usage:
   gomib load [options] [MODULE...]
 
+Loads all available modules when no MODULE is specified.
+
 Options:
-  --all           Load all MIBs from search path (default when MODULE is omitted)
   --strict        Resolver strictness: strict (tier-1 only)
   --permissive    Resolver strictness: permissive (tier-1/2/3)
   --report LEVEL  Diagnostic reporting: silent|quiet|default|verbose
@@ -25,9 +26,8 @@ Options:
 Examples:
   gomib load IF-MIB
   gomib load IF-MIB SNMPv2-MIB
-  gomib load --all -p testdata/corpus/primary
+  gomib load -p testdata/corpus/primary
   gomib load -v IF-MIB                 # Debug logging
-  gomib load -vv IF-MIB                # Trace logging
   gomib load --strict IF-MIB           # strict resolver behavior
   gomib load --permissive IF-MIB       # permissive resolver behavior
   gomib load --report verbose IF-MIB   # verbose diagnostics
@@ -38,7 +38,6 @@ func (c *cli) cmdLoad(args []string) int {
 	fs := flag.NewFlagSet("load", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, loadUsage) }
 
-	loadAll := fs.Bool("all", false, "load all MIBs from search path")
 	strict, permissive := addStrictnessFlags(fs)
 	report := fs.String("report", "default", "diagnostic reporting: silent|quiet|default|verbose")
 	stats := fs.Bool("stats", false, "show detailed statistics")
@@ -52,18 +51,13 @@ func (c *cli) cmdLoad(args []string) int {
 		return exitOK
 	}
 
-	modules := fs.Args()
 	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
 		return code
 	}
 
-	if *loadAll || len(modules) == 0 {
+	modules := fs.Args()
+	if len(modules) == 0 {
 		modules = nil
-	}
-
-	if *loadAll && len(fs.Args()) > 0 {
-		printError("cannot combine MODULE arguments with --all")
-		return exitError
 	}
 
 	opts := strictnessOpts(*strict, *permissive)
@@ -104,8 +98,8 @@ func (c *cli) cmdLoad(args []string) int {
 	}
 
 	if len(diags) > 0 {
-		fmt.Println()
-		fmt.Println("Diagnostics:")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Diagnostics:")
 		for _, d := range diags {
 			printDiagnostic(d)
 		}
@@ -113,8 +107,8 @@ func (c *cli) cmdLoad(args []string) int {
 
 	unresolved := m.Unresolved()
 	if len(unresolved) > 0 {
-		fmt.Println()
-		fmt.Println("Unresolved references:")
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Unresolved references:")
 		importCount := 0
 		typeCount := 0
 		objectCount := 0
@@ -129,13 +123,13 @@ func (c *cli) cmdLoad(args []string) int {
 			}
 		}
 		if importCount > 0 {
-			fmt.Printf("  %d imports\n", importCount)
+			fmt.Fprintf(os.Stderr, "  %d imports\n", importCount)
 		}
 		if typeCount > 0 {
-			fmt.Printf("  %d types\n", typeCount)
+			fmt.Fprintf(os.Stderr, "  %d types\n", typeCount)
 		}
 		if objectCount > 0 {
-			fmt.Printf("  %d objects\n", objectCount)
+			fmt.Fprintf(os.Stderr, "  %d objects\n", objectCount)
 		}
 	}
 
@@ -144,10 +138,10 @@ func (c *cli) cmdLoad(args []string) int {
 		return exitError
 	}
 	if hasErrors {
-		return exitError
+		return exitIssue
 	}
 	if *strict && len(unresolved) > 0 {
-		return exitStrictViolation
+		return exitIssue
 	}
 	return exitOK
 }
@@ -159,12 +153,12 @@ func printDiagnostic(d mib.Diagnostic) {
 	}
 	if d.Module != "" {
 		if d.Line > 0 {
-			fmt.Printf("%s%s:%d: %s\n", prefix, d.Module, d.Line, d.Message)
+			fmt.Fprintf(os.Stderr, "%s%s:%d: %s\n", prefix, d.Module, d.Line, d.Message)
 		} else {
-			fmt.Printf("%s%s: %s\n", prefix, d.Module, d.Message)
+			fmt.Fprintf(os.Stderr, "%s%s: %s\n", prefix, d.Module, d.Message)
 		}
 	} else {
-		fmt.Printf("%s%s\n", prefix, d.Message)
+		fmt.Fprintf(os.Stderr, "%s%s\n", prefix, d.Message)
 	}
 }
 

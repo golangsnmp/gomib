@@ -18,14 +18,14 @@ Lists all available module names from configured sources without loading or
 parsing them.
 
 Options:
-  --count      Print only the module count
-  --json       Output as JSON array
-  -h, --help   Show help
+  --count         Print only the module count
+  --format FMT    Output format: text, json (default: text)
+  -h, --help      Show help
 
 Examples:
   gomib list -p testdata/corpus/primary
   gomib list -p testdata/corpus/primary --count
-  gomib list -p testdata/corpus/primary --json
+  gomib list -p testdata/corpus/primary --format json
 `
 
 func (c *cli) cmdList(args []string) int {
@@ -33,11 +33,11 @@ func (c *cli) cmdList(args []string) int {
 	fs.Usage = func() { fmt.Fprint(os.Stderr, listUsage) }
 
 	count := fs.Bool("count", false, "print only module count")
-	jsonOut := fs.Bool("json", false, "output as JSON array")
+	format := fs.String("format", "text", "output format: text, json")
 	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return exitError
+		return exitIssue
 	}
 
 	if c.checkHelp(help, listUsage) {
@@ -47,7 +47,7 @@ func (c *cli) cmdList(args []string) int {
 	sources, useSystem, err := c.buildSources()
 	if err != nil {
 		printError("%v", err)
-		return exitError
+		return exitIssue
 	}
 	if useSystem {
 		sources = gomib.DiscoverSystemSources()
@@ -55,14 +55,14 @@ func (c *cli) cmdList(args []string) int {
 
 	if len(sources) == 0 {
 		printError("no sources available")
-		return exitError
+		return exitIssue
 	}
 
 	src := gomib.Multi(sources...)
 	names, err := src.ListModules()
 	if err != nil {
 		printError("listing modules: %v", err)
-		return exitError
+		return exitIssue
 	}
 
 	slices.Sort(names)
@@ -72,16 +72,19 @@ func (c *cli) cmdList(args []string) int {
 		return exitOK
 	}
 
-	if *jsonOut {
+	switch *format {
+	case "json":
 		if err := writeJSON(os.Stdout, names, true); err != nil {
 			printError("encoding JSON: %v", err)
-			return exitError
+			return exitIssue
 		}
-		return exitOK
-	}
-
-	for _, name := range names {
-		fmt.Println(name)
+	case "text", "":
+		for _, name := range names {
+			fmt.Println(name)
+		}
+	default:
+		printError("unknown format: %s", *format)
+		return exitIssue
 	}
 	return exitOK
 }

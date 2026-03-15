@@ -15,8 +15,8 @@ const pathsUsage = `gomib paths - Show MIB search paths
 Usage:
   gomib paths [options]
 
-Shows the MIB search paths that would be used. When -p paths are specified,
-shows those. Otherwise shows system-discovered paths (net-snmp + libsmi config).
+Shows MIB search paths with annotations. When -p is given, custom paths are
+shown first, followed by system-discovered paths.
 
 Options:
   -h, --help   Show help
@@ -33,27 +33,34 @@ func (c *cli) cmdPaths(args []string) int {
 	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return exitError
+		return exitIssue
 	}
 
 	if c.checkHelp(help, pathsUsage) {
 		return exitOK
 	}
 
-	var paths []string
+	systemPaths := discoverSystemPaths()
+	hasOutput := false
+
 	if len(c.paths) > 0 {
-		paths = c.paths
-	} else {
-		paths = discoverSystemPaths()
+		for _, p := range c.paths {
+			fmt.Printf("%s (custom)\n", p)
+		}
+		hasOutput = true
 	}
 
-	if len(paths) == 0 {
+	if len(systemPaths) > 0 {
+		for _, p := range systemPaths {
+			fmt.Printf("%s (system)\n", p)
+		}
+		hasOutput = true
+	}
+
+	if !hasOutput {
 		fmt.Fprintln(os.Stderr, "no search paths found")
-		return exitError
+		return exitIssue
 	}
 
-	for _, p := range paths {
-		fmt.Println(p)
-	}
 	return exitOK
 }

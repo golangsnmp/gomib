@@ -14,16 +14,12 @@ const traceUsage = `gomib trace - Trace symbol resolution for debugging
 
 Usage:
   gomib trace [options] SYMBOL
-  gomib trace [options] -m MODULE SYMBOL
-  gomib trace [options] MODULE... -- SYMBOL
-  gomib trace [options] MODULE... SYMBOL
 
 Traces how a symbol is resolved across loaded modules. Useful for debugging
 resolution issues like missing INDEX references or duplicate definitions.
 
 Options:
-  -m, --module MODULE   Module to load (repeatable, uses WithModules)
-  --all                 Load all MIBs from search path (uses Load)
+  -m, --module MODULE   Module to load (repeatable, default: all)
   --strict              Resolver strictness: strict (tier-1 only)
   --permissive          Resolver strictness: permissive (tier-1/2/3)
   -h, --help            Show help
@@ -38,16 +34,15 @@ Output shows:
 Examples:
   gomib trace -m IF-MIB ifIndex
   gomib trace -m IF-MIB ifEntry
-  gomib trace IF-MIB ifEntry
-  gomib trace --all ifIndex
-  gomib trace --all -p testdata/corpus/primary ifEntry
+  gomib trace ifIndex
+  gomib trace -p testdata/corpus/primary ifEntry
 `
 
 func (c *cli) cmdTrace(args []string) int {
 	fs := flag.NewFlagSet("trace", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, traceUsage) }
 
-	modules, loadAll := addModuleFlags(fs)
+	modules := addModuleFlag(fs)
 	strict, permissive := addStrictnessFlags(fs)
 	help := addHelpFlag(fs)
 
@@ -63,27 +58,32 @@ func (c *cli) cmdTrace(args []string) int {
 		return code
 	}
 
-	symbol, code, failed := parseSingleTargetArgs(modules, *loadAll, fs.Args(), traceUsage, "symbol")
-	if failed {
-		return code
+	positional := fs.Args()
+	if len(positional) == 0 {
+		printError("no symbol specified")
+		fmt.Fprint(os.Stderr, traceUsage)
+		return exitError
+	}
+	if len(positional) > 1 {
+		printError("too many arguments (use -m for module selection)")
+		fmt.Fprint(os.Stderr, traceUsage)
+		return exitError
+	}
+	symbol := positional[0]
+
+	var mods []string
+	if len(*modules) > 0 {
+		mods = *modules
 	}
 
-	if code, ok := requireModuleOrAll(*modules, *loadAll, traceUsage); ok {
-		return code
-	}
-
-	var m *mib.Mib
-	var err error
 	var loadMode string
-
-	if *loadAll {
+	if len(mods) == 0 {
 		loadMode = "Load - all modules from search path"
-		m, err = c.loadMibWithOpts(nil, strictnessOpts(*strict, *permissive)...)
 	} else {
-		loadMode = fmt.Sprintf("Load WithModules(%v)", *modules)
-		m, err = c.loadMibWithOpts(*modules, strictnessOpts(*strict, *permissive)...)
+		loadMode = fmt.Sprintf("Load WithModules(%v)", mods)
 	}
 
+	m, err := c.loadMibWithOpts(mods, strictnessOpts(*strict, *permissive)...)
 	if err != nil {
 		printError("failed to load: %v", err)
 		return exitError

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -18,10 +19,7 @@ const (
 const getUsage = `gomib get - Query OID or name lookups
 
 Usage:
-  gomib get [options] -m MODULE QUERY
-  gomib get [options] MODULE... -- QUERY
-  gomib get [options] MODULE... QUERY
-  gomib get [options] --all QUERY
+  gomib get [options] QUERY
 
 Query formats:
   Numeric OID:     1.3.6.1.2.1.2.2.1.1
@@ -29,8 +27,7 @@ Query formats:
   Qualified:       IF-MIB::ifIndex
 
 Options:
-  -m, --module MODULE   Module to load (repeatable)
-  --all                 Load all MIBs from search path
+  -m, --module MODULE   Module to load (repeatable, default: all)
   -t, --tree            Show subtree instead of single node
   --max-depth N         Limit subtree depth (default: unlimited)
   --full                Show full descriptions in text output
@@ -42,10 +39,9 @@ Options:
 Examples:
   gomib get -m IF-MIB ifIndex
   gomib get -m IF-MIB 1.3.6.1.2.1.2.2.1.1
-  gomib get IF-MIB SNMPv2-MIB -- sysDescr
-  gomib get IF-MIB sysDescr
+  gomib get ifIndex
   gomib get -m IF-MIB -t ifTable
-  gomib get --all ifIndex
+  gomib get IF-MIB::ifIndex
 `
 
 type moduleList []string
@@ -62,7 +58,7 @@ type depthFlag struct {
 }
 
 func (f *depthFlag) String() string {
-	return fmt.Sprintf("%d", f.value)
+	return strconv.Itoa(f.value)
 }
 
 func (f *depthFlag) Set(value string) error {
@@ -71,7 +67,7 @@ func (f *depthFlag) Set(value string) error {
 		return err
 	}
 	if n < 0 {
-		return fmt.Errorf("depth must be >= 0")
+		return errors.New("depth must be >= 0")
 	}
 	f.value = n
 	f.set = true
@@ -82,7 +78,7 @@ func (c *cli) cmdGet(args []string) int {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, getUsage) }
 
-	modules, loadAll := addModuleFlags(fs)
+	modules := addModuleFlag(fs)
 	tree := fs.Bool("t", false, "show subtree")
 	fs.BoolVar(tree, "tree", false, "show subtree")
 	var maxDepth depthFlag
@@ -104,16 +100,31 @@ func (c *cli) cmdGet(args []string) int {
 		return code
 	}
 
-	query, code, failed := parseSingleTargetArgs(modules, *loadAll, fs.Args(), getUsage, "query")
-	if failed {
-		return code
+	positional := fs.Args()
+	if len(positional) == 0 {
+		printError("no query specified")
+		fmt.Fprint(os.Stderr, getUsage)
+		return exitError
+	}
+	if len(positional) > 1 {
+		printError("too many arguments (use -m for module selection)")
+		fmt.Fprint(os.Stderr, getUsage)
+		return exitError
+	}
+	query := positional[0]
+
+	// Default to permissive+silent for query commands
+	opts := strictnessOpts(*strict, *permissive)
+	if len(opts) == 0 {
+		opts = permissiveSilentOpts()
 	}
 
-	if code, ok := requireModuleOrAll(*modules, *loadAll, getUsage); ok {
-		return code
+	var mods []string
+	if len(*modules) > 0 {
+		mods = *modules
 	}
 
-	m, err := c.loadMibWithOpts(modulesToLoad(*modules, *loadAll), strictnessOpts(*strict, *permissive)...)
+	m, err := c.loadMibWithOpts(mods, opts...)
 	if err != nil {
 		printError("failed to load: %v", err)
 		return exitError
@@ -122,7 +133,7 @@ func (c *cli) cmdGet(args []string) int {
 	node := m.Resolve(query)
 	if node == nil {
 		printError("not found: %s", query)
-		return exitError
+		return exitIssue
 	}
 
 	descLimit := 200
@@ -215,15 +226,12 @@ func printNode(node *mib.Node, descLimit int) {
 		moduleName = node.Module().Name()
 	}
 
-	oid := node.OID().String()
-
+	fmt.Printf("Name:    %s\n", label)
 	if moduleName != "" {
-		fmt.Printf("%s  %s::%s  %s\n", label, moduleName, label, oid)
-	} else {
-		fmt.Printf("%s  %s\n", label, oid)
+		fmt.Printf("Module:  %s\n", moduleName)
 	}
-
-	fmt.Printf("  kind:   %s\n", node.Kind().String())
+	fmt.Printf("OID:     %s\n", node.OID().String())
+	fmt.Printf("Kind:    %s\n", node.Kind().String())
 
 	if node.Object() != nil {
 		printObjectDetails(node.Object(), descLimit)
@@ -263,26 +271,26 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 				typeDesc += fmt.Sprintf(" (SIZE(%d..%d))", sr.Min, sr.Max)
 			}
 		}
-		fmt.Printf("  type:   %s\n", typeDesc)
+		fmt.Printf("Type:    %s\n", typeDesc)
 	} else {
 		enums := obj.EffectiveEnums()
 		bits := obj.EffectiveBits()
 		if len(bits) > 0 {
-			fmt.Printf("  type:   BITS\n")
+			fmt.Printf("Type:    BITS\n")
 		} else if len(enums) > 0 {
-			fmt.Printf("  type:   INTEGER (enum)\n")
+			fmt.Printf("Type:    INTEGER (enum)\n")
 		}
 	}
 
-	fmt.Printf("  access: %s\n", obj.Access().String())
-	fmt.Printf("  status: %s\n", obj.Status().String())
+	fmt.Printf("Access:  %s\n", obj.Access().String())
+	fmt.Printf("Status:  %s\n", obj.Status().String())
 
 	if len(obj.Index()) > 0 {
-		fmt.Printf("  index:  [%s]\n", formatIndexList(obj.Index()))
+		fmt.Printf("Index:   [%s]\n", formatIndexList(obj.Index()))
 	}
 
 	if obj.Augments() != nil {
-		fmt.Printf("  augments: %s\n", obj.Augments().Name())
+		fmt.Printf("Augments: %s\n", obj.Augments().Name())
 	}
 
 	if augBy := obj.AugmentedBy(); len(augBy) > 0 {
@@ -290,56 +298,56 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 		for i, a := range augBy {
 			names[i] = a.Name()
 		}
-		fmt.Printf("  augmentedBy: %s\n", strings.Join(names, ", "))
+		fmt.Printf("AugmentedBy: %s\n", strings.Join(names, ", "))
 	}
 
 	if obj.Augments() != nil {
 		effIdx := obj.EffectiveIndexes()
 		if len(effIdx) > 0 {
-			fmt.Printf("  effectiveIndex: [%s]\n", formatIndexList(effIdx))
+			fmt.Printf("EffectiveIndex: [%s]\n", formatIndexList(effIdx))
 		}
 	}
 
 	if dv := obj.DefaultValue(); !dv.IsZero() {
-		fmt.Printf("  defval: %s\n", dv.String())
+		fmt.Printf("DefVal:  %s\n", dv.String())
 	}
 
 	if obj.Units() != "" {
-		fmt.Printf("  units:  %s\n", obj.Units())
+		fmt.Printf("Units:   %s\n", obj.Units())
 	}
 
 	if obj.Description() != "" {
-		fmt.Printf("  descr:  %s\n", normalizeDescription(obj.Description(), descLimit))
+		fmt.Printf("Descr:   %s\n", normalizeDescription(obj.Description(), descLimit))
 	}
 
 	if obj.Reference() != "" {
-		fmt.Printf("  ref:    %s\n", normalizeDescription(obj.Reference(), descLimit))
+		fmt.Printf("Ref:     %s\n", normalizeDescription(obj.Reference(), descLimit))
 	}
 
 	enums := obj.EffectiveEnums()
 	bits := obj.EffectiveBits()
 	if len(enums) > 0 && len(bits) == 0 {
-		fmt.Println("  values:")
+		fmt.Println("Values:")
 		for _, v := range enums {
-			fmt.Printf("    %s(%d)\n", v.Label, v.Value)
+			fmt.Printf("  %s(%d)\n", v.Label, v.Value)
 		}
 	}
 
 	if len(bits) > 0 {
-		fmt.Println("  bits:")
+		fmt.Println("Bits:")
 		for _, b := range bits {
-			fmt.Printf("    %s(%d)\n", b.Label, b.Value)
+			fmt.Printf("  %s(%d)\n", b.Label, b.Value)
 		}
 	}
 
 	// Column details: isIndex, row, table.
 	if obj.Kind() == mib.KindColumn {
-		fmt.Printf("  isIndex: %v\n", obj.IsIndex())
+		fmt.Printf("IsIndex: %v\n", obj.IsIndex())
 		if row := obj.Row(); row != nil {
-			fmt.Printf("  row:    %s\n", row.Name())
+			fmt.Printf("Row:     %s\n", row.Name())
 		}
 		if tbl := obj.Table(); tbl != nil {
-			fmt.Printf("  table:  %s\n", tbl.Name())
+			fmt.Printf("Table:   %s\n", tbl.Name())
 		}
 	}
 
@@ -347,36 +355,37 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 	if obj.Kind() == mib.KindTable || obj.Kind() == mib.KindRow {
 		cols := obj.Columns()
 		if len(cols) > 0 {
-			fmt.Println("  columns:")
+			fmt.Println("Columns:")
 			printColumnTable(cols)
 		}
 	}
 }
 
 func printNotificationDetails(notif *mib.Notification, descLimit int) {
-	fmt.Printf("  status: %s\n", notif.Status().String())
+	fmt.Printf("Status:  %s\n", notif.Status().String())
 
 	if len(notif.Objects()) > 0 {
-		fmt.Println("  objects:")
+		fmt.Println("Objects:")
 		for _, obj := range notif.Objects() {
-			fmt.Printf("    %s\n", obj.Name())
+			fmt.Printf("  %s\n", obj.Name())
 		}
 	}
 
 	if notif.Description() != "" {
-		fmt.Printf("  descr:  %s\n", normalizeDescription(notif.Description(), descLimit))
+		fmt.Printf("Descr:   %s\n", normalizeDescription(notif.Description(), descLimit))
 	}
 
 	if notif.Reference() != "" {
-		fmt.Printf("  ref:    %s\n", normalizeDescription(notif.Reference(), descLimit))
+		fmt.Printf("Ref:     %s\n", normalizeDescription(notif.Reference(), descLimit))
 	}
 }
 
 func normalizeDescription(s string, maxLen int) string {
+	s = strings.Join(strings.Fields(s), " ")
 	if maxLen > 0 && len(s) > maxLen {
 		s = s[:maxLen] + "..."
 	}
-	return strings.Join(strings.Fields(s), " ")
+	return s
 }
 
 func printNodeTree(node *mib.Node, maxDepth depthFlag) {
@@ -448,9 +457,9 @@ func formatIndexList(indexes []mib.IndexEntry) string {
 }
 
 func printColumnTable(cols []*mib.Object) {
-	fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+	fmt.Printf("  %-28s %-20s %-18s %-18s %s\n",
 		"COLUMN", "TYPE", "BASE", "ACCESS", "ROLE")
-	fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+	fmt.Printf("  %-28s %-20s %-18s %-18s %s\n",
 		"------", "----", "----", "------", "----")
 	for _, col := range cols {
 		typeName, base := "", ""
@@ -465,7 +474,7 @@ func printColumnTable(cols []*mib.Object) {
 		if col.IsIndex() {
 			role = "index"
 		}
-		fmt.Printf("    %-28s %-20s %-18s %-18s %s\n",
+		fmt.Printf("  %-28s %-20s %-18s %-18s %s\n",
 			col.Name(), typeName, base, col.Access(), role)
 	}
 }
