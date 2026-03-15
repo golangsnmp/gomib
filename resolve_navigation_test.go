@@ -385,6 +385,46 @@ func TestModuleScopedLookups(t *testing.T) {
 	})
 }
 
+func TestQualifiedNameRoundTrip(t *testing.T) {
+	m := loadTestMIB(t)
+
+	var checked int
+	for node := range m.Nodes() {
+		name := node.Name()
+		mod := node.Module()
+		if name == "" || mod == nil {
+			continue
+		}
+
+		qualified := mod.Name() + "::" + name
+		resolved := m.Resolve(qualified)
+		if resolved == nil {
+			t.Errorf("Resolve(%q) returned nil", qualified)
+			continue
+		}
+		if resolved != node {
+			t.Errorf("Resolve(%q) returned different node: got %s (%s), want %s (%s)",
+				qualified, resolved.Name(), resolved.OID(), node.Name(), node.OID())
+		}
+
+		// Verify OID round-trip through the same qualified path
+		resolvedByOID := m.Resolve(node.OID().String())
+		if resolvedByOID == nil {
+			t.Errorf("Resolve(%q) by OID returned nil", node.OID())
+		} else if resolvedByOID.OID().String() != node.OID().String() {
+			t.Errorf("OID mismatch for %q: got %s, want %s",
+				qualified, resolvedByOID.OID(), node.OID())
+		}
+
+		checked++
+	}
+
+	if checked < 100 {
+		t.Fatalf("expected to check at least 100 nodes, only checked %d", checked)
+	}
+	t.Logf("verified %d nodes", checked)
+}
+
 func TestModuleFilteredCollections(t *testing.T) {
 	m := loadTestMIB(t)
 
