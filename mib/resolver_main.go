@@ -1,17 +1,3 @@
-// Package mib contains the resolver which provides multi-phase MIB resolution.
-//
-// Resolution transforms parsed MIB modules into a fully resolved model where all
-// symbolic references are concrete, OIDs are computed, and types are linked.
-//
-// # Resolution Phases
-//
-// The resolver executes the following phases in order:
-//
-//  1. Registration: Index modules and their definitions
-//  2. Imports: Resolve import references across modules
-//  3. Types: Build the type graph and compute base types
-//  4. OIDs: Build the OID trie from symbolic references
-//  5. Semantics: Infer node kinds (table, row, column, scalar) and create objects
 package mib
 
 import (
@@ -27,9 +13,18 @@ type resolver struct {
 	diagConfig DiagnosticConfig
 }
 
-// Resolve transforms parsed modules into a fully resolved Mib.
-// If logger is nil, logging is disabled. If strictness is nil, defaults to Normal.
-// If diagConfig is nil, defaults to DefaultConfig.
+// Resolve transforms normalized modules into a fully resolved [Mib].
+//
+// Resolution runs these phases in order:
+//
+//  1. Registration: index modules and definitions
+//  2. Imports: resolve imported symbols across modules
+//  3. Types: build type links and compute base types
+//  4. OIDs: build the OID tree from symbolic references
+//  5. Semantics: infer node kinds and create objects
+//
+// If logger is nil, logging is disabled. If strictness is nil, defaults to
+// [ResolverNormal]. If diagConfig is nil, defaults to [DefaultConfig].
 func Resolve(mods []*module.Module, logger *slog.Logger, strictness *ResolverStrictness, diagConfig *DiagnosticConfig) *Mib {
 	resolverStrictness := ResolverNormal
 	if strictness != nil {
