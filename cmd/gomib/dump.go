@@ -5,20 +5,23 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const dumpUsage = `gomib dump - Export resolved MIB data as canonical JSON
 
 Usage:
   gomib dump [options] [MODULE...]
-  gomib dump --all [options]
+
+Dumps all available modules when no MODULE is specified.
 
 Options:
-  -m, --module MODULE    Module to load (repeatable)
-  --all                  Load all MIBs from search path
   -o, --oid OID          Filter to subtree starting at OID
   --compact              Minified JSON (no indentation)
   --no-descriptions      Omit description fields
+  --report LEVEL         Diagnostic reporting: silent|quiet|default|verbose
   --strict               Resolver strictness: strict (tier-1 only)
   --permissive           Resolver strictness: permissive (tier-1/2/3)
   -h, --help             Show help
@@ -26,7 +29,7 @@ Options:
 Examples:
   gomib dump IF-MIB
   gomib dump -o 1.3.6.1.2.1.2 IF-MIB
-  gomib dump --all -p testdata/corpus/primary
+  gomib dump -p testdata/corpus/primary
   gomib dump --no-descriptions --compact IF-MIB | jq '.modules'
 `
 
@@ -34,16 +37,16 @@ func (c *cli) cmdDump(args []string) int {
 	fs := flag.NewFlagSet("dump", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, dumpUsage) }
 
-	modules, loadAll := addModuleFlags(fs)
 	oidFilter := fs.String("o", "", "filter to subtree starting at OID")
 	fs.StringVar(oidFilter, "oid", "", "filter to subtree starting at OID")
 	compact := fs.Bool("compact", false, "minified JSON")
 	noDescriptions := fs.Bool("no-descriptions", false, "omit descriptions")
+	report := fs.String("report", "default", "diagnostic reporting: silent|quiet|default|verbose")
 	strict, permissive := addStrictnessFlags(fs)
 	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return exitError
+		return exitIssue
 	}
 
 	if c.checkHelp(help, dumpUsage) {
@@ -54,20 +57,40 @@ func (c *cli) cmdDump(args []string) int {
 		return code
 	}
 
-	// Accept positional module names as well
-	for _, arg := range fs.Args() {
-		*modules = append(*modules, arg)
+	modules := fs.Args()
+	if len(modules) == 0 {
+		modules = nil
 	}
 
-	if code, failed := requireModuleOrAll(*modules, *loadAll, dumpUsage); failed {
-		return code
+	opts := strictnessOpts(*strict, *permissive)
+	switch *report {
+	case "silent":
+		opts = append(opts, gomib.WithDiagnosticConfig(mib.SilentConfig()))
+	case "quiet":
+		opts = append(opts, gomib.WithDiagnosticConfig(mib.QuietConfig()))
+	case "default":
+		opts = append(opts, gomib.WithDiagnosticConfig(mib.DefaultConfig()))
+	case "verbose":
+		opts = append(opts, gomib.WithDiagnosticConfig(mib.VerboseConfig()))
+	default:
+		printError("invalid --report value %q (use silent|quiet|default|verbose)", *report)
+		return exitIssue
 	}
 
-	mods := modulesToLoad(*modules, *loadAll)
-	m, err := c.loadMibWithOpts(mods, strictnessOpts(*strict, *permissive)...)
+	m, err := c.loadMibWithOpts(modules, opts...)
 	if err != nil && m == nil {
 		printError("failed to load: %v", err)
-		return exitError
+		return exitIssue
+	}
+
+	// Print diagnostics to stderr
+	diags := m.Diagnostics()
+	if len(diags) > 0 {
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Diagnostics:")
+		for _, d := range diags {
+			printDiagnostic(d)
+		}
 	}
 
 	strictnessName := "normal"
@@ -82,7 +105,7 @@ func (c *cli) cmdDump(args []string) int {
 		node := m.Resolve(*oidFilter)
 		if node == nil {
 			printError("OID not found: %s", *oidFilter)
-			return exitError
+			return exitIssue
 		}
 		filterV1ByOID(export, node.OID().String())
 	}
@@ -93,7 +116,7 @@ func (c *cli) cmdDump(args []string) int {
 
 	if err := writeJSON(os.Stdout, export, !*compact); err != nil {
 		printError("failed to marshal JSON: %v", err)
-		return exitError
+		return exitIssue
 	}
 	return exitOK
 }

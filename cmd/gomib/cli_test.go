@@ -63,15 +63,38 @@ func TestGetMaxDepthImpliesTree(t *testing.T) {
 	}
 }
 
-func TestGetRejectsExtraArgsAfterSeparator(t *testing.T) {
+func TestGetRejectsMultiplePositionalArgs(t *testing.T) {
 	dir := writeTestMIB(t)
 
-	code, _, stderr := runCLI(t, "-p", dir, "get", "TEST-MIB", "--", "testMib", "testScalar")
+	code, _, stderr := runCLI(t, "-p", dir, "get", "testMib", "testScalar")
 	if code != exitError {
 		t.Fatalf("expected exit %d, got %d", exitError, code)
 	}
-	if !strings.Contains(stderr, "too many query arguments after --") {
-		t.Fatalf("expected extra-args error, got %q", stderr)
+	if !strings.Contains(stderr, "too many arguments") {
+		t.Fatalf("expected too-many-args error, got %q", stderr)
+	}
+}
+
+func TestGetKeyValueOutput(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "get", "-m", "TEST-MIB", "testScalar")
+	if code != exitOK {
+		t.Fatalf("get exited %d, stderr=%q", code, stderr)
+	}
+	for _, field := range []string{"Name:", "Module:", "OID:", "Kind:", "Access:", "Status:"} {
+		if !strings.Contains(stdout, field) {
+			t.Fatalf("expected key-value field %q in output, got %q", field, stdout)
+		}
+	}
+}
+
+func TestGetNotFoundExitsIssue(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, _, _ := runCLI(t, "-p", dir, "get", "-m", "TEST-MIB", "nonExistentOID")
+	if code != exitIssue {
+		t.Fatalf("expected exit %d for not found, got %d", exitIssue, code)
 	}
 }
 
@@ -99,15 +122,37 @@ func TestFindKindNotificationIncludesNotifications(t *testing.T) {
 	}
 }
 
-func TestFindSupportsPositionalModules(t *testing.T) {
+func TestFindUsesModuleFlag(t *testing.T) {
 	dir := writeTestMIB(t)
 
-	code, stdout, stderr := runCLI(t, "-p", dir, "find", "TEST-MIB", "testScalar")
+	code, stdout, stderr := runCLI(t, "-p", dir, "find", "-m", "TEST-MIB", "testScalar")
 	if code != exitOK {
 		t.Fatalf("find exited %d, stderr=%q", code, stderr)
 	}
 	if !strings.Contains(stdout, "TEST-MIB::testScalar") {
 		t.Fatalf("expected object in output, got %q", stdout)
+	}
+}
+
+func TestFindNoMatchExitsIssue(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, _, _ := runCLI(t, "-p", dir, "find", "-m", "TEST-MIB", "zzz_nonexistent_*")
+	if code != exitIssue {
+		t.Fatalf("expected exit %d for no matches, got %d", exitIssue, code)
+	}
+}
+
+func TestFindExpandedKinds(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	// module-identity kind should match the testMib MODULE-IDENTITY node
+	code, stdout, stderr := runCLI(t, "-p", dir, "find", "-m", "TEST-MIB", "--kind", "node", "testMib")
+	if code != exitOK {
+		t.Fatalf("find --kind node exited %d, stderr=%q", code, stderr)
+	}
+	if !strings.Contains(stdout, "testMib") {
+		t.Fatalf("expected module-identity node in output, got %q", stdout)
 	}
 }
 
@@ -117,11 +162,28 @@ func TestPathsReturnsErrorWhenNoPathsFound(t *testing.T) {
 	t.Cleanup(func() { discoverSystemPaths = orig })
 
 	code, _, stderr := runCLI(t, "paths")
-	if code != exitError {
-		t.Fatalf("expected exit %d, got %d", exitError, code)
+	if code != exitIssue {
+		t.Fatalf("expected exit %d, got %d", exitIssue, code)
 	}
 	if !strings.Contains(stderr, "no search paths found") {
 		t.Fatalf("expected no-paths error, got %q", stderr)
+	}
+}
+
+func TestPathsShowsBothCustomAndSystem(t *testing.T) {
+	orig := discoverSystemPaths
+	discoverSystemPaths = func() []string { return []string{"/sys/path"} }
+	t.Cleanup(func() { discoverSystemPaths = orig })
+
+	code, stdout, stderr := runCLI(t, "-p", "/custom/path", "paths")
+	if code != exitOK {
+		t.Fatalf("paths exited %d, stderr=%q", code, stderr)
+	}
+	if !strings.Contains(stdout, "/custom/path (custom)") {
+		t.Fatalf("expected custom path with annotation, got %q", stdout)
+	}
+	if !strings.Contains(stdout, "/sys/path (system)") {
+		t.Fatalf("expected system path with annotation, got %q", stdout)
 	}
 }
 

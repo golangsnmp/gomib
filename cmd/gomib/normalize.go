@@ -12,11 +12,11 @@ import (
 const normalizeUsage = `gomib normalize - Emit modules as canonical SMIv2 text
 
 Usage:
-  gomib normalize [options] MODULE...
-  gomib normalize --all [options]
+  gomib normalize [options] [MODULE...]
+
+Normalizes all available modules when no MODULE is specified.
 
 Options:
-  --all                    Normalize all MIBs from search path
   -o, --output DIR         Write each module to a file in DIR (default: stdout)
   --no-conformance         Omit conformance constructs
   --no-descriptions        Omit DESCRIPTION clauses
@@ -29,14 +29,13 @@ Examples:
   gomib normalize IF-MIB
   gomib normalize --no-conformance IF-MIB
   gomib normalize -o /tmp/normalized IF-MIB SNMPv2-MIB
-  gomib normalize --all -o /tmp/normalized -p testdata/corpus/primary
+  gomib normalize -o /tmp/normalized -p testdata/corpus/primary
 `
 
 func (c *cli) cmdNormalize(args []string) int {
 	fs := flag.NewFlagSet("normalize", flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, normalizeUsage) }
 
-	loadAll := fs.Bool("all", false, "normalize all MIBs from search path")
 	outputDir := fs.String("o", "", "write each module to a file in DIR")
 	fs.StringVar(outputDir, "output", "", "write each module to a file in DIR")
 	noConformance := fs.Bool("no-conformance", false, "omit conformance constructs")
@@ -58,14 +57,10 @@ func (c *cli) cmdNormalize(args []string) int {
 	}
 
 	modules := fs.Args()
-	if !*loadAll && len(modules) == 0 {
-		printError("specify MODULE name(s) or --all")
-		fmt.Fprint(os.Stderr, normalizeUsage)
-		return exitError
-	}
+	loadAll := len(modules) == 0
 
 	var loadModules []string
-	if !*loadAll {
+	if !loadAll {
 		loadModules = modules
 	}
 	m, loadErr := c.loadMibWithOpts(loadModules, strictnessOpts(*strict, *permissive)...)
@@ -74,7 +69,7 @@ func (c *cli) cmdNormalize(args []string) int {
 		return exitError
 	}
 
-	if *loadAll {
+	if loadAll {
 		for _, mod := range m.Modules() {
 			if mod.IsBase() {
 				continue
