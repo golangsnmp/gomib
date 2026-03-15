@@ -90,13 +90,14 @@ func (c *cli) cmdNormalize(args []string) int {
 	}
 
 	if *outputDir != "" {
-		if err := os.MkdirAll(*outputDir, 0o750); err != nil {
+		cleanDir := filepath.Clean(*outputDir)
+		if err := os.MkdirAll(cleanDir, 0o750); err != nil {
 			printError("failed to create output directory: %v", err)
 			return exitError
 		}
 		for _, name := range modules {
-			path := filepath.Join(*outputDir, filepath.Base(name))
-			f, err := os.Create(path)
+			path := filepath.Join(cleanDir, filepath.Base(name))
+			f, err := os.Create(path) // #nosec G304,G703 -- outputDir is a user-provided CLI flag
 			if err != nil {
 				printError("failed to create %s: %v", path, err)
 				return exitError
