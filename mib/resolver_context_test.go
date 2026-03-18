@@ -472,6 +472,21 @@ func TestLookupType_GlobalModuleScan(t *testing.T) {
 	testutil.Equal(t, vendorType, got, "expected global module scan to find vendor type in permissive mode")
 }
 
+func TestLookupType_GlobalModuleScan_StrictRejects(t *testing.T) {
+	// In strict mode, LookupType should NOT scan all modules for unknown types.
+	// A vendor type that exists in another module should not be discoverable.
+	modA := &module.Module{Name: "A"}
+	vendorType := newType("VendorSpecialType")
+
+	ctx := newResolverContext(nil, ResolverStrict, VerboseConfig())
+	ctx.modules = []*module.Module{modA}
+	ctx.snmpv2SMIModule = &module.Module{Name: "SNMPv2-SMI"}
+	ctx.moduleSymbolToType[modA] = map[string]*Type{"VendorSpecialType": vendorType}
+
+	_, ok := ctx.LookupType("VendorSpecialType")
+	testutil.False(t, ok, "strict mode should not find vendor type via global module scan")
+}
+
 func TestRegisterImport(t *testing.T) {
 	ctx := newTestContext()
 	modA := &module.Module{Name: "A"}

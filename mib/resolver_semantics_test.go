@@ -983,6 +983,92 @@ func TestConvertSupportsModules(t *testing.T) {
 	})
 }
 
+func TestIsNotificationVariation(t *testing.T) {
+	t.Run("permissive global fallback classifies notification", func(t *testing.T) {
+		// The variation name is NOT in the SUPPORTS module or the defining
+		// module's imports; it exists only in a third module. The node has
+		// KindNotification. The variation carries a Syntax field, so the
+		// syntactic heuristic would incorrectly classify it as an object
+		// variation. Permissive global lookup should override the heuristic.
+		modDef := &module.Module{Name: "DEF-MIB"}
+		modThird := &module.Module{Name: "THIRD-MIB"}
+
+		ctx := newResolverContext(nil, ResolverPermissive, DefaultConfig())
+		ctx.modules = []*module.Module{modDef, modThird}
+
+		notifNode := newTestNode("someNotif")
+		notifNode.setKind(KindNotification)
+		ctx.registerModuleNodeSymbol(modThird, "someNotif", notifNode)
+
+		v := &module.Variation{
+			Name:   "someNotif",
+			Syntax: &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+		}
+
+		got := isNotificationVariation(ctx, modDef, "SUPPORTS-MIB", v)
+		testutil.True(t, got, "permissive mode should classify as notification via global lookup")
+	})
+
+	t.Run("strict mode falls back to heuristic", func(t *testing.T) {
+		// Same setup as above, but strict mode. Global lookup is disabled,
+		// so the heuristic runs. Because v.Syntax is non-nil, the heuristic
+		// classifies this as an object variation (returns false).
+		modDef := &module.Module{Name: "DEF-MIB"}
+		modThird := &module.Module{Name: "THIRD-MIB"}
+
+		ctx := newResolverContext(nil, ResolverStrict, VerboseConfig())
+		ctx.modules = []*module.Module{modDef, modThird}
+
+		notifNode := newTestNode("someNotif")
+		notifNode.setKind(KindNotification)
+		ctx.registerModuleNodeSymbol(modThird, "someNotif", notifNode)
+
+		v := &module.Variation{
+			Name:   "someNotif",
+			Syntax: &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+		}
+
+		got := isNotificationVariation(ctx, modDef, "SUPPORTS-MIB", v)
+		testutil.False(t, got, "strict mode should use heuristic (Syntax non-nil -> object variation)")
+	})
+
+	t.Run("supports module lookup takes priority", func(t *testing.T) {
+		// Name found in the SUPPORTS module itself - no global fallback needed.
+		modDef := &module.Module{Name: "DEF-MIB"}
+		supMod := &module.Module{Name: "SUP-MIB"}
+
+		ctx := newTestContext()
+		ctx.modules = []*module.Module{modDef, supMod}
+		ctx.moduleIndex["SUP-MIB"] = append(ctx.moduleIndex["SUP-MIB"], supMod)
+
+		notifNode := newTestNode("linkDown")
+		notifNode.setKind(KindNotification)
+		ctx.registerModuleNodeSymbol(supMod, "linkDown", notifNode)
+
+		v := &module.Variation{Name: "linkDown"}
+		got := isNotificationVariation(ctx, modDef, "SUP-MIB", v)
+		testutil.True(t, got, "should find notification in SUPPORTS module")
+	})
+
+	t.Run("import chain lookup takes priority over global", func(t *testing.T) {
+		// Name found via the defining module's imports.
+		modDef := &module.Module{Name: "DEF-MIB"}
+		modImport := &module.Module{Name: "IMPORT-MIB"}
+
+		ctx := newTestContext()
+		ctx.modules = []*module.Module{modDef, modImport}
+		ctx.registerImport(modDef, "linkDown", modImport)
+
+		notifNode := newTestNode("linkDown")
+		notifNode.setKind(KindNotification)
+		ctx.registerModuleNodeSymbol(modImport, "linkDown", notifNode)
+
+		v := &module.Variation{Name: "linkDown"}
+		got := isNotificationVariation(ctx, modDef, "MISSING-MIB", v)
+		testutil.True(t, got, "should find notification via import chain")
+	})
+}
+
 func TestExtractOidRefs(t *testing.T) {
 	t.Run("nil oid", func(t *testing.T) {
 		testutil.Nil(t, extractOidRefs(nil), "expected nil refs for nil oid")
@@ -2697,6 +2783,36 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 		notifs := ctx.mib.Notifications()
 		testutil.Len(t, notifs, 1, "mib notifications")
 		testutil.Len(t, notifs[0].Objects(), 1, "notification objects via permissive fallback")
+	})
+
+	t.Run("strict mode no global lookup for notification objects", func(t *testing.T) {
+		modA := &module.Module{
+			Name: "A-MIB",
+			Definitions: []module.Definition{
+				&module.Notification{
+					DefBase: module.DefBase{Name: "myNotif"},
+					Objects: []string{"foreignObj"},
+				},
+			},
+		}
+		modB := &module.Module{Name: "B-MIB"}
+
+		ctx := newTestContextForModulesWithPolicy(ResolverStrict, VerboseConfig(), modA, modB)
+
+		root := ctx.mib.Root()
+
+		registerNodeWithSymbol(ctx, modA, root, "myNotif", 1, 1)
+
+		// Object registered only in modB, not imported by modA.
+		foreignNode := registerNodeWithSymbol(ctx, modB, root, "foreignObj", 2, 1)
+		foreignObj := newObject("foreignObj")
+		foreignNode.setObject(foreignObj)
+
+		createResolvedNotifications(ctx)
+
+		notifs := ctx.mib.Notifications()
+		testutil.Len(t, notifs, 1, "mib notifications")
+		testutil.Len(t, notifs[0].Objects(), 0, "strict mode should not resolve foreign notification objects")
 	})
 
 	t.Run("trap info preserved", func(t *testing.T) {
