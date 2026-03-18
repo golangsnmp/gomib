@@ -9,8 +9,8 @@
 // Most callers should stay at this package layer:
 //
 //   - [Load] runs the full parse, lower, and resolve pipeline.
-//   - [Source] implementations such as [Dir], [FS], and [Multi] control
-//     where modules are found.
+//   - [Source] implementations such as [Dir], [File], [Files], [FS],
+//     and [Multi] control where modules are found.
 //   - [WithModules] limits loading to selected modules and their
 //     transitive dependencies.
 //   - [WithSystemPaths] discovers net-snmp and libsmi search paths.

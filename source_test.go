@@ -232,6 +232,57 @@ func TestMultiSourceFindNotExist(t *testing.T) {
 	testutil.True(t, errors.Is(err, fs.ErrNotExist), "Multi.Find should return fs.ErrNotExist")
 }
 
+func TestFileSource(t *testing.T) {
+	path := testutil.PrimaryCorpusDir() + "/ietf/IF-MIB.mib"
+	src, err := File(path)
+	testutil.NoError(t, err, "File")
+
+	names, err := src.ListModules()
+	testutil.NoError(t, err, "ListModules")
+	testutil.True(t, len(names) > 0, "should list at least one module")
+
+	result, err := src.Find("IF-MIB")
+	testutil.NoError(t, err, "Find IF-MIB")
+	testutil.True(t, len(result.Content) > 0, "Content should not be empty")
+	testutil.Equal(t, path, result.Path, "Path should match input")
+
+	_, err = src.Find("NONEXISTENT")
+	testutil.True(t, errors.Is(err, fs.ErrNotExist), "Find unknown should return fs.ErrNotExist")
+}
+
+func TestFilesSource(t *testing.T) {
+	ifMIB := testutil.PrimaryCorpusDir() + "/ietf/IF-MIB.mib"
+	ipMIB := testutil.PrimaryCorpusDir() + "/ietf/IP-MIB.mib"
+
+	src, err := Files(ifMIB, ipMIB)
+	testutil.NoError(t, err, "Files")
+
+	names, err := src.ListModules()
+	testutil.NoError(t, err, "ListModules")
+	testutil.True(t, len(names) >= 2, "should list at least two modules")
+
+	for _, name := range []string{"IF-MIB", "IP-MIB"} {
+		result, err := src.Find(name)
+		testutil.NoError(t, err, "Find %s", name)
+		testutil.True(t, len(result.Content) > 0, "Content for %s should not be empty", name)
+	}
+}
+
+func TestFileSourceNonExistent(t *testing.T) {
+	_, err := File("/this/path/does/not/exist.mib")
+	testutil.Error(t, err, "File with non-existent path should fail")
+}
+
+func TestFileSourceNoModuleDefinition(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "empty.mib")
+	err := os.WriteFile(path, []byte("not a MIB file"), 0o644)
+	testutil.NoError(t, err, "write test file")
+
+	_, err = File(path)
+	testutil.Error(t, err, "File with no module definition should fail")
+}
+
 func TestWithExtensions(t *testing.T) {
 	tmpDir := t.TempDir()
 	content := `EXT-TEST-MIB DEFINITIONS ::= BEGIN
