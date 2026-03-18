@@ -69,7 +69,7 @@ func (c *cli) cmdDump(args []string) int {
 	m, err := c.loadMibWithOpts(modules, opts...)
 	if err != nil && m == nil {
 		printError("failed to load: %v", err)
-		return exitIssue
+		return exitError
 	}
 
 	// Print diagnostics to stderr
