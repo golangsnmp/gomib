@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-03-18
+
+### Added
+
+- Add display hint parsing and formatting API (ParseDisplayHint, FormatInteger, FormatOctets, ScaleInteger)
+- Add parsed display hint accessors on Object and Type
+- Add LookupInstance method and OidLookup type for combined node + instance suffix lookup
+- Add File and Files source constructors for loading individual MIB files by path
+- Add CI, pkg.go.dev, and Go Report Card badges to README
+
+### Changed
+
+- Refactor FormatOID to use LookupInstance internally
+- Move display hint validation from resolver into public displayhint API
+
 ## [0.8.0] - 2026-03-15
 
 ### Breaking Changes
@@ -43,5 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix path traversal in normalize output path
 - Fix godoc link to mib.DiagnosticConfig
 
-[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/golangsnmp/gomib/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/golangsnmp/gomib/compare/v0.7.1...v0.8.0
