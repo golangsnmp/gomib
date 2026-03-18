@@ -307,9 +307,10 @@ func (c *resolverContext) lookupTypeInModuleScope(mod *module.Module, name strin
 	)
 }
 
-// lookupObjectInModuleScope finds the resolved Object for a name using the
-// correct module's object. This avoids using node.Object() which may return
-// an object from a different module when multiple modules define the same OID.
+// lookupObjectInModuleScope finds the resolved Object for a name within a
+// specific module's scope. During resolution, module-scoped lookups are the
+// correct approach since node.Object() returns the globally preferred object
+// which may belong to a different module.
 func (c *resolverContext) lookupObjectInModuleScope(mod *module.Module, name string) *Object {
 	// Check the current module first.
 	if resolved := c.moduleToResolved[mod]; resolved != nil {

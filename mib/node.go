@@ -59,24 +59,11 @@ func (n *Node) Kind() Kind { return n.kind }
 // IsRoot reports whether this is the unnamed root of the OID tree.
 func (n *Node) IsRoot() bool { return n.parent == nil }
 
-// Module returns the module that defines this node's primary entity.
-// Priority: object > notification > group > compliance > capability > base module.
+// Module returns the module that owns this OID point, determined during
+// OID resolution by [shouldPreferModule]. For the defining module of a
+// specific entity, use the entity's own Module() accessor instead
+// (e.g., node.Object().Module()).
 func (n *Node) Module() *Module {
-	if n.obj != nil {
-		return n.obj.module
-	}
-	if n.notif != nil {
-		return n.notif.module
-	}
-	if n.group != nil {
-		return n.group.module
-	}
-	if n.compliance != nil {
-		return n.compliance.module
-	}
-	if n.capability != nil {
-		return n.capability.module
-	}
 	return n.module
 }
 

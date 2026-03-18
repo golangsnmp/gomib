@@ -62,6 +62,11 @@ func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 	tables, rows, scalars := 0, 0, 0
 	var rowNodes []*Node
 
+	// Track which module's OBJECT-TYPE determined each node's kind so
+	// that only the preferred module's structural classification wins
+	// when multiple modules define the same OID.
+	nodeKindModule := make(map[*Node]*Module)
+
 	for _, ref := range objRefs {
 		obj := ref.obj
 		node, ok := ctx.LookupNodeForModule(ref.mod, obj.Name)
@@ -69,22 +74,39 @@ func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 			continue
 		}
 
+		if !shouldPreferModule(ctx, nodeKindModule[node], ref.mod) {
+			continue
+		}
+
+		prevKind := node.Kind()
 		if _, isSequenceOf := obj.Syntax.(*module.TypeSyntaxSequenceOf); isSequenceOf {
 			node.setKind(KindTable)
-			tables++
+			if prevKind != KindTable {
+				tables++
+			}
 		} else if len(obj.Index) > 0 || obj.Augments != "" {
 			node.setKind(KindRow)
-			rows++
+			if prevKind != KindRow {
+				rows++
+			}
 			rowNodes = append(rowNodes, node)
 		} else {
 			node.setKind(KindScalar)
-			scalars++
+			if prevKind != KindScalar {
+				scalars++
+			}
 		}
+		nodeKindModule[node] = ctx.moduleToResolved[ref.mod]
 	}
 
 	// Reclassify scalar children of row nodes as columns
 	columns := 0
+	seen := make(map[*Node]struct{})
 	for _, row := range rowNodes {
+		if _, dup := seen[row]; dup {
+			continue
+		}
+		seen[row] = struct{}{}
 		for _, child := range row.Children() {
 			if child.Kind() == KindScalar {
 				child.setKind(KindColumn)

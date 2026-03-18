@@ -59,6 +59,7 @@ func buildResolveTestMib() *Mib {
 			nd = nd.getOrCreateChild(arc)
 		}
 		nd.setName(name)
+		nd.setModule(mod)
 		nd.setObject(&Object{entity: entity{name: name, module: mod}})
 		m.registerNode(name, nd)
 		mod.addNode(nd)
