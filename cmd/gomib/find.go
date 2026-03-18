@@ -123,23 +123,19 @@ func (c *cli) cmdFind(args []string) int {
 		}
 	}
 
-	baseLower := strings.ToLower(*typeFilter)
+	f := findFilter{
+		pattern:    pattern,
+		kind:       kind,
+		hasKind:    *kindFilter != "",
+		isModIdent: kindIsModIdent,
+		isObjIdent: kindIsObjIdent,
+		baseLower:  strings.ToLower(*typeFilter),
+	}
 	var matches []findMatch
 
-	// Search objects (scalar, table, row, column)
+	// Search objects (kind is per-object, type filter applies)
 	for _, obj := range m.Objects() {
-		if !matchGlob(pattern, strings.ToLower(obj.Name())) {
-			continue
-		}
-		if *kindFilter != "" {
-			if kindIsModIdent || kindIsObjIdent {
-				continue // objects are never module-identity or object-identity
-			}
-			if obj.Kind() != kind {
-				continue
-			}
-		}
-		if *typeFilter != "" && !matchBaseType(obj, baseLower) {
+		if !f.matchName(obj.Name()) || !f.matchKind(obj.Kind()) || !f.matchType(obj) {
 			continue
 		}
 		matches = append(matches, findMatch{
@@ -150,103 +146,18 @@ func (c *cli) cmdFind(args []string) int {
 		})
 	}
 
-	// Search notifications
-	for _, notif := range m.Notifications() {
-		if !matchGlob(pattern, strings.ToLower(notif.Name())) {
-			continue
-		}
-		if *kindFilter != "" && !kindIsModIdent && !kindIsObjIdent && kind != mib.KindNotification {
-			continue
-		}
-		if kindIsModIdent || kindIsObjIdent {
-			continue
-		}
-		matches = append(matches, findMatch{
-			Name:   notif.Name(),
-			Module: moduleName(notif.Module()),
-			OID:    notif.OID().String(),
-			Kind:   mib.KindNotification.String(),
-		})
-	}
+	matches = collectMatches(matches, m.Notifications(), mib.KindNotification, &f)
+	matches = collectMatches(matches, m.Groups(), mib.KindGroup, &f)
+	matches = collectMatches(matches, m.Compliances(), mib.KindCompliance, &f)
+	matches = collectMatches(matches, m.Capabilities(), mib.KindCapability, &f)
 
-	// Search groups
-	for _, grp := range m.Groups() {
-		if !matchGlob(pattern, strings.ToLower(grp.Name())) {
-			continue
-		}
-		if *kindFilter != "" && kind != mib.KindGroup && !kindIsModIdent && !kindIsObjIdent {
-			continue
-		}
-		if kindIsModIdent || kindIsObjIdent {
-			continue
-		}
-		matches = append(matches, findMatch{
-			Name:   grp.Name(),
-			Module: moduleName(grp.Module()),
-			OID:    grp.OID().String(),
-			Kind:   mib.KindGroup.String(),
-		})
-	}
-
-	// Search compliances
-	for _, comp := range m.Compliances() {
-		if !matchGlob(pattern, strings.ToLower(comp.Name())) {
-			continue
-		}
-		if *kindFilter != "" && kind != mib.KindCompliance && !kindIsModIdent && !kindIsObjIdent {
-			continue
-		}
-		if kindIsModIdent || kindIsObjIdent {
-			continue
-		}
-		matches = append(matches, findMatch{
-			Name:   comp.Name(),
-			Module: moduleName(comp.Module()),
-			OID:    comp.OID().String(),
-			Kind:   mib.KindCompliance.String(),
-		})
-	}
-
-	// Search capabilities
-	for _, cap := range m.Capabilities() {
-		if !matchGlob(pattern, strings.ToLower(cap.Name())) {
-			continue
-		}
-		if *kindFilter != "" && kind != mib.KindCapability && !kindIsModIdent && !kindIsObjIdent {
-			continue
-		}
-		if kindIsModIdent || kindIsObjIdent {
-			continue
-		}
-		matches = append(matches, findMatch{
-			Name:   cap.Name(),
-			Module: moduleName(cap.Module()),
-			OID:    cap.OID().String(),
-			Kind:   mib.KindCapability.String(),
-		})
-	}
-
-	// Walk the OID tree for node/module-identity/object-identity
+	// Walk OID tree for node/module-identity/object-identity
 	for node := range m.Nodes() {
-		if node.Kind() != mib.KindNode {
+		if node.Kind() != mib.KindNode || node.Name() == "" {
 			continue
 		}
-		if node.Name() == "" {
+		if !f.matchName(node.Name()) || !f.matchNodeKind(node) {
 			continue
-		}
-		if !matchGlob(pattern, strings.ToLower(node.Name())) {
-			continue
-		}
-		if *kindFilter != "" {
-			if kindIsModIdent && node.IsObjectIdentity() {
-				continue
-			}
-			if kindIsObjIdent && !node.IsObjectIdentity() {
-				continue
-			}
-			if !kindIsModIdent && !kindIsObjIdent && kind != mib.KindNode {
-				continue
-			}
 		}
 		kindLabel := "node"
 		if node.IsObjectIdentity() {
@@ -302,6 +213,82 @@ func matchBaseType(obj *mib.Object, baseLower string) bool {
 		return false
 	}
 	return strings.ToLower(obj.Type().Base().String()) == baseLower
+}
+
+// findFilter holds parsed search criteria for the find command.
+type findFilter struct {
+	pattern    string
+	kind       mib.Kind
+	hasKind    bool
+	isModIdent bool
+	isObjIdent bool
+	baseLower  string
+}
+
+func (f *findFilter) matchName(name string) bool {
+	return matchGlob(f.pattern, strings.ToLower(name))
+}
+
+// matchKind checks whether an entity kind passes the kind filter.
+// Works for objects (dynamic kind) and fixed-kind entities alike.
+func (f *findFilter) matchKind(entityKind mib.Kind) bool {
+	if !f.hasKind {
+		return true
+	}
+	if f.isModIdent || f.isObjIdent {
+		return false
+	}
+	return entityKind == f.kind
+}
+
+// matchNodeKind checks whether a bare node passes the kind filter,
+// handling the module-identity vs object-identity distinction.
+func (f *findFilter) matchNodeKind(node *mib.Node) bool {
+	if !f.hasKind {
+		return true
+	}
+	if f.isModIdent {
+		return !node.IsObjectIdentity()
+	}
+	if f.isObjIdent {
+		return node.IsObjectIdentity()
+	}
+	return f.kind == mib.KindNode
+}
+
+func (f *findFilter) matchType(obj *mib.Object) bool {
+	if f.baseLower == "" {
+		return true
+	}
+	return matchBaseType(obj, f.baseLower)
+}
+
+// findable is the common interface shared by Notification, Group,
+// Compliance, and Capability entity types.
+type findable interface {
+	Name() string
+	Module() *mib.Module
+	OID() mib.OID
+}
+
+// collectMatches appends matching entities of a fixed kind to the results.
+func collectMatches[E findable](matches []findMatch, entities []E, kind mib.Kind, f *findFilter) []findMatch {
+	if !f.matchKind(kind) {
+		return matches
+	}
+	kindStr := kind.String()
+	for _, e := range entities {
+		if !f.matchName(e.Name()) {
+			continue
+		}
+		matches = append(matches, findMatch{
+			Name:   e.Name(),
+			Module: moduleName(e.Module()),
+			OID:    e.OID().String(),
+			Kind:   kindStr,
+		})
+	}
+	return matches
 }
 
 func parseKindFilter(s string) (kind mib.Kind, isModIdent, isObjIdent, ok bool) {
