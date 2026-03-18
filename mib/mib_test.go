@@ -159,6 +159,43 @@ func TestResolveOIDFormatRoundTrip(t *testing.T) {
 	testutil.True(t, oid.Equal(back), "round-trip: got %s, want %s", back, oid)
 }
 
+func TestLookupInstance(t *testing.T) {
+	m := buildResolveTestMib()
+
+	t.Run("with suffix", func(t *testing.T) {
+		lookup := m.LookupInstance(OID{1, 3, 6, 1, 2, 1, 2, 2, 1, 1, 5})
+		testutil.NotNil(t, lookup.Node(), "node")
+		testutil.Equal(t, "ifIndex", lookup.Node().Name(), "node name")
+		testutil.Equal(t, "5", lookup.Suffix().String(), "suffix")
+	})
+
+	t.Run("exact match", func(t *testing.T) {
+		lookup := m.LookupInstance(OID{1, 3, 6, 1, 2, 1, 2, 2, 1, 2})
+		testutil.NotNil(t, lookup.Node(), "node")
+		testutil.Equal(t, "ifDescr", lookup.Node().Name(), "node name")
+		testutil.Len(t, lookup.Suffix(), 0, "suffix should be empty")
+	})
+
+	t.Run("multi-arc suffix", func(t *testing.T) {
+		lookup := m.LookupInstance(OID{1, 3, 6, 1, 2, 1, 2, 2, 1, 2, 5, 3})
+		testutil.NotNil(t, lookup.Node(), "node")
+		testutil.Equal(t, "ifDescr", lookup.Node().Name(), "node name")
+		testutil.Equal(t, "5.3", lookup.Suffix().String(), "suffix")
+	})
+
+	t.Run("no match", func(t *testing.T) {
+		lookup := m.LookupInstance(OID{9, 9, 9})
+		testutil.NotNil(t, lookup.Node(), "root node returned")
+		testutil.Equal(t, "", lookup.Node().Name(), "unnamed root")
+	})
+
+	t.Run("empty OID", func(t *testing.T) {
+		lookup := m.LookupInstance(OID{})
+		testutil.NotNil(t, lookup.Node(), "root node returned")
+		testutil.Len(t, lookup.Suffix(), 0, "suffix should be empty")
+	})
+}
+
 func TestAllSymbols(t *testing.T) {
 	m := newMib()
 

@@ -105,6 +105,12 @@ func main() {
 		fmt.Printf("%-20s %s  (matched from %s)\n", prefix.Name(), prefix.OID(), instanceOID)
 	}
 
+	// LookupInstance returns both the matched node and the instance suffix.
+	// This is the standard pattern for processing SNMP varbinds.
+	fmt.Println("\n=== LookupInstance ===")
+	lookup := m.LookupInstance(instanceOID)
+	fmt.Printf("node=%-16s suffix=%s\n", lookup.Node().Name(), lookup.Suffix())
+
 	// Module-scoped type lookup
 	fmt.Println("\n=== Module-scoped type ===")
 	if mod != nil {

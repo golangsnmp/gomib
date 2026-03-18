@@ -205,6 +205,42 @@ func (m *Mib) LongestPrefixByOID(oid OID) *Node {
 	return nd
 }
 
+// OidLookup is the result of [Mib.LookupInstance], containing the matched
+// node and any remaining instance suffix arcs.
+type OidLookup struct {
+	node   *Node
+	suffix OID
+}
+
+// Node returns the deepest tree node matching the OID prefix.
+func (l OidLookup) Node() *Node { return l.node }
+
+// Suffix returns the instance suffix: arcs from the input OID that follow
+// the matched node's OID. Empty when the input OID exactly matches a tree node.
+func (l OidLookup) Suffix() OID { return l.suffix }
+
+// LookupInstance looks up a numeric OID and returns both the matched node
+// and the instance suffix. This is the standard pattern for processing SNMP
+// varbinds, where you need the base node (for metadata, type info, formatting)
+// and the trailing arcs (the instance index).
+//
+// Examples:
+//
+//	LookupInstance({1,3,6,1,2,1,2,2,1,1,5}).Node().Name() => "ifIndex"
+//	LookupInstance({1,3,6,1,2,1,2,2,1,1,5}).Suffix()      => {5}
+//	LookupInstance({1,3,6,1,2,1,2,2,1,1}).Suffix()         => {}
+func (m *Mib) LookupInstance(oid OID) OidLookup {
+	node := m.LongestPrefixByOID(oid)
+	if node == nil {
+		return OidLookup{}
+	}
+	nodeOID := node.OID()
+	return OidLookup{
+		node:   node,
+		suffix: slices.Clone(oid[len(nodeOID):]),
+	}
+}
+
 // FormatOID translates a numeric OID into a human-readable string using
 // the longest matching prefix in the OID tree. The result uses the form
 // "MODULE::name.suffix" where suffix contains any unmatched trailing arcs.
@@ -219,13 +255,11 @@ func (m *Mib) FormatOID(oid OID) string {
 	if len(oid) == 0 {
 		return ""
 	}
-	node := m.LongestPrefixByOID(oid)
+	lookup := m.LookupInstance(oid)
+	node := lookup.Node()
 	if node == nil || node.Name() == "" {
 		return oid.String()
 	}
-
-	nodeOID := node.OID()
-	suffix := oid[len(nodeOID):]
 
 	var b strings.Builder
 	if mod := node.Module(); mod != nil {
@@ -233,7 +267,7 @@ func (m *Mib) FormatOID(oid OID) string {
 		b.WriteString("::")
 	}
 	b.WriteString(node.Name())
-	for _, arc := range suffix {
+	for _, arc := range lookup.Suffix() {
 		b.WriteByte('.')
 		b.WriteString(strconv.FormatUint(uint64(arc), 10))
 	}

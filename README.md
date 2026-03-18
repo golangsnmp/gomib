@@ -59,11 +59,15 @@ m, err := gomib.Load(ctx, gomib.WithSource(src), gomib.WithModules("IF-MIB", "IP
 
 ### Sources
 
-`Dir` recursively indexes a directory tree using content-derived module names. `FS` wraps an `fs.FS` (useful with `embed.FS`). `Multi` tries multiple sources in order.
+`Dir` recursively indexes a directory tree using content-derived module names. `File`/`Files` load individual files by path. `FS` wraps an `fs.FS` (useful with `embed.FS`). `Multi` tries multiple sources in order.
 
 ```go
 // Directory tree (indexed once at construction)
 src, err := gomib.Dir("/usr/share/snmp/mibs")
+
+// Individual files (module names auto-detected from content)
+src, err := gomib.File("/path/to/IF-MIB.mib")
+src, err  = gomib.Files("/path/to/IF-MIB.mib", "/path/to/IP-MIB.mib")
 
 // Embedded filesystem
 //go:embed mibs
@@ -165,6 +169,14 @@ For cases where you already know the format, lower-level methods avoid parsing:
 oid, _ := mib.ParseOID("1.3.6.1.2.1.2.2.1.1")
 node := m.NodeByOID(oid)            // exact match
 node  = m.LongestPrefixByOID(oid)   // longest matching prefix
+```
+
+`LookupInstance` returns both the matched node and the instance suffix, which is the standard pattern for processing SNMP varbinds:
+
+```go
+lookup := m.LookupInstance(oid)
+lookup.Node().Name()   // "ifIndex"
+lookup.Suffix()        // OID{5} (trailing arcs after the matched node)
 ```
 
 ### Module-scoped queries

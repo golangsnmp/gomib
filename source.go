@@ -3,6 +3,7 @@ package gomib
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"maps"
@@ -313,6 +314,60 @@ func isIdentChar(b byte) bool {
 // not from filenames. Multiple module names from one file each get their own
 // index entry pointing to the same path. First match wins for duplicate names.
 // The readFn parameter provides file content for scanning.
+// File creates a Source from a single MIB file on disk.
+// The module name is extracted from the file content by scanning for
+// "DEFINITIONS ::=" headers, just like [Dir] does for directory trees.
+// The caller does not need to know or provide the module name.
+func File(path string) (Source, error) {
+	return Files(path)
+}
+
+// Files creates a Source from multiple MIB files on disk.
+// Module names are extracted from each file's content by scanning for
+// "DEFINITIONS ::=" headers. When duplicate module names appear across
+// files, the first file wins.
+func Files(paths ...string) (Source, error) {
+	index := make(map[string]fileEntry)
+	for _, path := range paths {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		names := scanModuleNames(content)
+		if len(names) == 0 {
+			return nil, fmt.Errorf("no module definition found in %s", path)
+		}
+		for _, name := range names {
+			if _, exists := index[name]; !exists {
+				index[name] = fileEntry{path: path, content: content}
+			}
+		}
+	}
+	return &fileSource{index: index}, nil
+}
+
+type fileEntry struct {
+	path    string
+	content []byte
+}
+
+type fileSource struct {
+	index map[string]fileEntry
+}
+
+func (s *fileSource) Find(name string) (FindResult, error) {
+	entry, ok := s.index[name]
+	if !ok {
+		return FindResult{}, fs.ErrNotExist
+	}
+	return FindResult{Content: entry.content, Path: entry.path}, nil
+}
+
+func (s *fileSource) ListModules() ([]string, error) {
+	return slices.Sorted(maps.Keys(s.index)), nil
+}
+
+// buildTreeIndex walks a file tree and builds a module name -> path index.
 func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error, readFn func(path string) ([]byte, error)) (map[string]string, error) {
 	extSet := makeExtensionSet(extensions)
 	index := make(map[string]string)
