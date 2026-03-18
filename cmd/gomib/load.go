@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -61,19 +60,11 @@ func (c *cli) cmdLoad(args []string) int {
 	}
 
 	opts := strictnessOpts(*strict, *permissive)
-	switch *report {
-	case "silent":
-		opts = append(opts, gomib.WithDiagnosticConfig(mib.SilentConfig()))
-	case "quiet":
-		opts = append(opts, gomib.WithDiagnosticConfig(mib.QuietConfig()))
-	case "default":
-		opts = append(opts, gomib.WithDiagnosticConfig(mib.DefaultConfig()))
-	case "verbose":
-		opts = append(opts, gomib.WithDiagnosticConfig(mib.VerboseConfig()))
-	default:
-		printError("invalid --report value %q (use silent|quiet|default|verbose)", *report)
+	reportOption, ok := reportOpt(*report)
+	if !ok {
 		return exitError
 	}
+	opts = append(opts, reportOption)
 
 	m, loadErr := c.loadMibWithOpts(modules, opts...)
 	if loadErr != nil && m == nil {

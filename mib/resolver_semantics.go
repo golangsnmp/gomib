@@ -262,6 +262,23 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 }
 
+// oidComponentNameAndModule extracts the symbolic name and optional module
+// qualifier from an OID component. Returns empty strings for numeric-only
+// components.
+func oidComponentNameAndModule(comp module.OidComponent) (name, qualModule string) {
+	switch c := comp.(type) {
+	case *module.OidComponentName:
+		return c.NameValue, ""
+	case *module.OidComponentNamedNumber:
+		return c.NameValue, ""
+	case *module.OidComponentQualifiedName:
+		return c.NameValue, c.ModuleValue
+	case *module.OidComponentQualifiedNamedNumber:
+		return c.NameValue, c.ModuleValue
+	}
+	return "", ""
+}
+
 // extractOidRefs extracts named symbolic references from an OID assignment.
 func extractOidRefs(oid *module.OidAssignment) []OidRef {
 	if oid == nil {
@@ -269,15 +286,8 @@ func extractOidRefs(oid *module.OidAssignment) []OidRef {
 	}
 	var refs []OidRef
 	for _, comp := range oid.Components {
-		switch c := comp.(type) {
-		case *module.OidComponentName:
-			refs = append(refs, OidRef{Name: c.NameValue, Span: c.Span})
-		case *module.OidComponentNamedNumber:
-			refs = append(refs, OidRef{Name: c.NameValue, Span: c.Span})
-		case *module.OidComponentQualifiedName:
-			refs = append(refs, OidRef{Name: c.NameValue, Span: c.Span})
-		case *module.OidComponentQualifiedNamedNumber:
-			refs = append(refs, OidRef{Name: c.NameValue, Span: c.Span})
+		if name, _ := oidComponentNameAndModule(comp); name != "" {
+			refs = append(refs, OidRef{Name: name, Span: comp.ComponentSpan()})
 		}
 	}
 	return refs
@@ -1061,19 +1071,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			emitDefvalUnresolved(ctx, mod, span, "DEFVAL OID value has no components")
 			return nil
 		}
-		var name, qualModule string
-		switch c := v.Components[0].(type) {
-		case *module.OidComponentName:
-			name = c.NameValue
-		case *module.OidComponentNamedNumber:
-			name = c.NameValue
-		case *module.OidComponentQualifiedName:
-			qualModule = c.ModuleValue
-			name = c.NameValue
-		case *module.OidComponentQualifiedNamedNumber:
-			qualModule = c.ModuleValue
-			name = c.NameValue
-		}
+		name, qualModule := oidComponentNameAndModule(v.Components[0])
 		if name == "" {
 			emitDefvalUnresolved(ctx, mod, span, "DEFVAL OID value has no named root component")
 			return nil

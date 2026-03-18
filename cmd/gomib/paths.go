@@ -33,7 +33,7 @@ func (c *cli) cmdPaths(args []string) int {
 	help := addHelpFlag(fs)
 
 	if err := fs.Parse(args); err != nil {
-		return exitIssue
+		return exitError
 	}
 
 	if c.checkHelp(help, pathsUsage) {

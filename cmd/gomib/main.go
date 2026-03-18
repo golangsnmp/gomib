@@ -276,6 +276,24 @@ func strictnessOpts(strict, permissive bool) []gomib.LoadOption {
 	}
 }
 
+// reportOpt returns the LoadOption for the given --report flag value.
+// Returns false if the value is invalid (after printing an error).
+func reportOpt(report string) (gomib.LoadOption, bool) {
+	switch report {
+	case "silent":
+		return gomib.WithDiagnosticConfig(mib.SilentConfig()), true
+	case "quiet":
+		return gomib.WithDiagnosticConfig(mib.QuietConfig()), true
+	case "default":
+		return gomib.WithDiagnosticConfig(mib.DefaultConfig()), true
+	case "verbose":
+		return gomib.WithDiagnosticConfig(mib.VerboseConfig()), true
+	default:
+		printError("invalid --report value %q (use silent|quiet|default|verbose)", report)
+		return nil, false
+	}
+}
+
 // permissiveSilentOpts returns LoadOptions for permissive+silent mode,
 // the default for query commands (get, find).
 func permissiveSilentOpts() []gomib.LoadOption {
