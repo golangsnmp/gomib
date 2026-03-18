@@ -23,7 +23,7 @@ var (
 func loadTestMIB(t testing.TB) *mib.Mib {
 	t.Helper()
 	loadOnce.Do(func() {
-		src, err := Dir(testutil.PrimaryCorpusDir())
+		src, err := Dir(testutil.PrimaryCorpusDir(t))
 		if err != nil {
 			loadErr = err
 			return
@@ -36,8 +36,9 @@ func loadTestMIB(t testing.TB) *mib.Mib {
 	return loadedMib
 }
 
-func fixturePath(module string) string {
-	return testutil.TestdataDir("fixtures", "netsnmp", module+".json")
+func fixturePath(t testing.TB, module string) string {
+	t.Helper()
+	return testutil.TestdataDir(t, "fixtures", "netsnmp", module+".json")
 }
 
 type strictnessCase struct {
@@ -53,7 +54,7 @@ var allStrictnessCases = []strictnessCase{
 
 func loadFixtureNodes(t testing.TB, module string) map[string]*testutil.FixtureNode {
 	t.Helper()
-	return testutil.LoadFixture(t, fixturePath(module))
+	return testutil.LoadFixture(t, fixturePath(t, module))
 }
 
 // isObjectTypeNode filters out containers and conformance nodes that
@@ -340,7 +341,7 @@ func unresolvedSymbols(m *mib.Mib, module string, kind mib.UnresolvedKind) map[s
 // not the synthetic problem corpus.
 func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
 	t.Helper()
-	corpus := mustDir(t, testutil.PrimaryCorpusDir())
+	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
 	allOpts := append([]LoadOption{WithSource(corpus), WithModules(name)}, opts...)
 	m, err := Load(context.Background(), allOpts...)
 	if err != nil {
@@ -353,8 +354,8 @@ func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
 // problems directory at a specific strictness level.
 func loadAtStrictness(t testing.TB, name string, level mib.ResolverStrictness) *mib.Mib {
 	t.Helper()
-	corpus := mustDir(t, testutil.PrimaryCorpusDir())
-	problems := mustDir(t, testutil.ProblemsCorpusDir())
+	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
+	problems := mustDir(t, testutil.ProblemsCorpusDir(t))
 	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
 	m, err := Load(context.Background(),
 		WithSource(corpus, problems),
@@ -372,8 +373,8 @@ func loadAtStrictness(t testing.TB, name string, level mib.ResolverStrictness) *
 // violations directory at a specific strictness level.
 func loadViolationMIB(t testing.TB, name string, level mib.ResolverStrictness) *mib.Mib {
 	t.Helper()
-	corpus := mustDir(t, testutil.PrimaryCorpusDir())
-	violations := mustDir(t, testutil.TestdataDir("strictness", "violations"))
+	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
+	violations := mustDir(t, testutil.TestdataDir(t, "strictness", "violations"))
 	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
 	m, err := Load(context.Background(),
 		WithSource(corpus, violations),

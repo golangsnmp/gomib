@@ -7,12 +7,13 @@ import (
 )
 
 // moduleRoot returns the absolute path to the module root by walking up
-// from the current working directory to find go.mod.
-// Returns "" if go.mod cannot be found.
-func moduleRoot() string {
+// from the current working directory to find go.mod. Fails the test if
+// go.mod cannot be found.
+func moduleRoot(t testing.TB) string {
+	t.Helper()
 	dir, err := os.Getwd()
 	if err != nil {
-		return ""
+		t.Fatalf("testutil: os.Getwd failed: %v", err)
 	}
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
@@ -20,7 +21,7 @@ func moduleRoot() string {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return ""
+			t.Fatal("testutil: could not find go.mod in any parent directory")
 		}
 		dir = parent
 	}
@@ -28,21 +29,24 @@ func moduleRoot() string {
 
 // TestdataDir returns the absolute path to a subdirectory under testdata/.
 // It finds the module root by walking up to go.mod, so it works from any
-// package depth. Example: TestdataDir("corpus", "primary") returns the
+// package depth. Example: TestdataDir(t, "corpus", "primary") returns the
 // path to testdata/corpus/primary.
-func TestdataDir(parts ...string) string {
-	elems := append([]string{moduleRoot(), "testdata"}, parts...)
+func TestdataDir(t testing.TB, parts ...string) string {
+	t.Helper()
+	elems := append([]string{moduleRoot(t), "testdata"}, parts...)
 	return filepath.Join(elems...)
 }
 
 // PrimaryCorpusDir returns the absolute path to testdata/corpus/primary.
-func PrimaryCorpusDir() string {
-	return TestdataDir("corpus", "primary")
+func PrimaryCorpusDir(t testing.TB) string {
+	t.Helper()
+	return TestdataDir(t, "corpus", "primary")
 }
 
 // ProblemsCorpusDir returns the absolute path to testdata/corpus/problems.
-func ProblemsCorpusDir() string {
-	return TestdataDir("corpus", "problems")
+func ProblemsCorpusDir(t testing.TB) string {
+	t.Helper()
+	return TestdataDir(t, "corpus", "problems")
 }
 
 // AddCorpusDirSeeds loads all files from a directory as fuzz seeds.
@@ -50,7 +54,7 @@ func AddCorpusDirSeeds(f *testing.F, dir string) {
 	f.Helper()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return
+		f.Fatalf("testutil: failed to read corpus dir %s: %v", dir, err)
 	}
 	for _, e := range entries {
 		if e.IsDir() {
@@ -66,16 +70,16 @@ func AddCorpusDirSeeds(f *testing.F, dir string) {
 // AddProblemCorpusSeeds loads synthetic problem MIBs as fuzz seeds.
 func AddProblemCorpusSeeds(f *testing.F) {
 	f.Helper()
-	AddCorpusDirSeeds(f, ProblemsCorpusDir())
+	AddCorpusDirSeeds(f, ProblemsCorpusDir(f))
 }
 
 // AddPrimaryCorpusSeeds loads real-world vendor MIBs as fuzz seeds.
 func AddPrimaryCorpusSeeds(f *testing.F) {
 	f.Helper()
-	primaryDir := PrimaryCorpusDir()
+	primaryDir := PrimaryCorpusDir(f)
 	entries, err := os.ReadDir(primaryDir)
 	if err != nil {
-		return
+		f.Fatalf("testutil: failed to read primary corpus dir %s: %v", primaryDir, err)
 	}
 	for _, e := range entries {
 		if !e.IsDir() {
