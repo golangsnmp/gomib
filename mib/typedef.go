@@ -153,6 +153,17 @@ func (t *Type) EffectiveDisplayHint() string {
 	return walkTypeChain(t, func(t *Type) string { return t.hint })
 }
 
+// ParsedDisplayHint parses and validates the effective display hint from the
+// type chain, returning a structured [DisplayHint]. Returns nil if there is no
+// display hint in the chain or the hint is malformed.
+func (t *Type) ParsedDisplayHint() *DisplayHint {
+	h := t.EffectiveDisplayHint()
+	if h == "" {
+		return nil
+	}
+	return ParseDisplayHint(h)
+}
+
 // EffectiveSizes walks the parent type chain and returns the first non-empty
 // size constraint list.
 func (t *Type) EffectiveSizes() []Range {
