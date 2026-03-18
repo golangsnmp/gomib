@@ -379,6 +379,8 @@ func TestScanModuleNames(t *testing.T) {
 		{"inline comment terminated", "-- MY-MIB DEFINITIONS -- REAL-MIB DEFINITIONS ::= BEGIN\nEND", []string{"REAL-MIB"}},
 		{"no assign", "MY-MIB DEFINITIONS but no assign here", nil},
 		{"DEFINITIONS in description", "MY-MIB DEFINITIONS ::= BEGIN\nDESCRIPTION \"see DEFINITIONS\"\nEND", []string{"MY-MIB"}},
+		{"comment before DEFINITIONS", "FROG-MIB\n\n-- -*- mib -*-\n\nDEFINITIONS ::= BEGIN\nEND", []string{"FROG-MIB"}},
+		{"multiple comments before DEFINITIONS", "FROG-MIB\n-- line 1\n-- line 2\nDEFINITIONS ::= BEGIN\nEND", []string{"FROG-MIB"}},
 	}
 
 	for _, tt := range tests {

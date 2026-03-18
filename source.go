@@ -256,10 +256,24 @@ func scanModuleNames(content []byte) []string {
 		}
 
 		// Walk backwards from DEFINITIONS to find the identifier.
-		// Skip whitespace between identifier and DEFINITIONS.
+		// Skip whitespace and comment lines between identifier and DEFINITIONS.
 		pos := idx - 1
-		for pos >= 0 && (rest[pos] == ' ' || rest[pos] == '\t' || rest[pos] == '\r' || rest[pos] == '\n') {
-			pos--
+		for pos >= 0 {
+			if rest[pos] == ' ' || rest[pos] == '\t' || rest[pos] == '\r' || rest[pos] == '\n' {
+				pos--
+				continue
+			}
+			// If we landed inside an ASN.1 comment, skip to the start of
+			// the line and continue (handles comment lines between the
+			// module name and DEFINITIONS, e.g. Emacs mode-line comments).
+			absPos := len(content) - len(rest) + pos
+			if inLineComment(content, absPos) {
+				for pos >= 0 && rest[pos] != '\n' {
+					pos--
+				}
+				continue
+			}
+			break
 		}
 		if pos < 0 {
 			rest = rest[idx+len(sigDefinitions):]
