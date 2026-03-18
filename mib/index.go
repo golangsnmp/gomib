@@ -205,7 +205,7 @@ func DecodeSuffix(indexes []IndexEntry, suffix OID) []DecodedIndex {
 			consumed = 4
 
 		case IndexEncodingFixedString:
-			size := fixedSizeFromIndex(idx)
+			size, _ := idx.FixedSize()
 			if size == 0 || pos+size > len(suffix) {
 				return result
 			}
@@ -279,18 +279,6 @@ func arcsToBytes(arcs []uint32) ([]byte, bool) {
 		bytes[i] = byte(a)
 	}
 	return bytes, true
-}
-
-// fixedSizeFromIndex extracts the fixed size from an index component's SIZE constraint.
-func fixedSizeFromIndex(idx IndexEntry) int {
-	if idx.Object == nil {
-		return 0
-	}
-	sizes := idx.Object.EffectiveSizes()
-	if isFixedSize(sizes) {
-		return int(sizes[0].Min)
-	}
-	return 0
 }
 
 // isOIDBaseType reports whether the index entry's effective base type is ObjectIdentifier.

@@ -196,6 +196,30 @@ func TestLookupInstance(t *testing.T) {
 	})
 }
 
+func TestNodesByName(t *testing.T) {
+	m := newMib()
+
+	bare := &Node{name: "ifDescr"}
+	withObj := &Node{name: "ifDescr", obj: &Object{entity: entity{name: "ifDescr"}}}
+	m.registerNode("ifDescr", bare)
+	m.registerNode("ifDescr", withObj)
+
+	t.Run("returns all nodes", func(t *testing.T) {
+		got := m.NodesByName("ifDescr")
+		testutil.Len(t, got, 2, "NodesByName count")
+	})
+
+	t.Run("returns nil for unknown", func(t *testing.T) {
+		testutil.Nil(t, m.NodesByName("nonexistent"), "expected nil")
+	})
+
+	t.Run("returns clone", func(t *testing.T) {
+		got := m.NodesByName("ifDescr")
+		got[0] = nil
+		testutil.NotNil(t, m.NodesByName("ifDescr")[0], "original should be unmodified")
+	})
+}
+
 func TestAllSymbols(t *testing.T) {
 	m := newMib()
 

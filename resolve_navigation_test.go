@@ -178,6 +178,43 @@ func TestObjectEffectiveIndexes(t *testing.T) {
 	testutil.Equal(t, "ifIndex", indexes[0].Object.Name(), "index should be ifIndex")
 }
 
+func TestColumnEffectiveIndexes(t *testing.T) {
+	m := loadTestMIB(t)
+
+	col := requireObject(t, m, "ifDescr")
+	testutil.Equal(t, mib.KindColumn, col.Kind(), "ifDescr should be a column")
+
+	indexes := col.EffectiveIndexes()
+	testutil.NotEmpty(t, indexes, "EffectiveIndexes() for column ifDescr")
+	testutil.Equal(t, 1, len(indexes), "ifDescr column should yield 1 index from row")
+	testutil.Equal(t, "ifIndex", indexes[0].Object.Name(), "index should be ifIndex")
+}
+
+func TestNodesByName(t *testing.T) {
+	m := loadTestMIB(t)
+
+	t.Run("single definition", func(t *testing.T) {
+		nodes := m.NodesByName("ifIndex")
+		testutil.NotEmpty(t, nodes, "NodesByName(ifIndex)")
+	})
+
+	t.Run("returns nil for unknown", func(t *testing.T) {
+		testutil.Nil(t, m.NodesByName("totallyFakeName"), "expected nil")
+	})
+}
+
+func TestEffectiveTC(t *testing.T) {
+	m := loadTestMIB(t)
+
+	obj := requireObject(t, m, "ifDescr")
+	ty := obj.Type()
+	testutil.NotNil(t, ty, "ifDescr type")
+
+	tc := ty.EffectiveTC()
+	testutil.NotNil(t, tc, "ifDescr should have a TC in its type chain")
+	testutil.Equal(t, "DisplayString", tc.Name(), "ifDescr TC should be DisplayString")
+}
+
 func TestObjectEnumLookup(t *testing.T) {
 	m := loadTestMIB(t)
 

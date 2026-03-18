@@ -189,6 +189,23 @@ func TestEffectiveIndexes(t *testing.T) {
 		testutil.Equal(t, "INTEGER", got[0].TypeName, "bare type TypeName")
 	})
 
+	t.Run("column delegates to row", func(t *testing.T) {
+		row := makeRow("rowEntry", idx)
+		colNode := &Node{kind: KindColumn, parent: row.node}
+		col := &Object{entity: entity{name: "colObj", node: colNode}}
+		colNode.obj = col
+
+		got := col.EffectiveIndexes()
+		testutil.Len(t, got, 1, "effective indexes via column")
+		testutil.Equal(t, sentinel, got[0].Object, "index object via column")
+	})
+
+	t.Run("column with no row returns nil", func(t *testing.T) {
+		colNode := &Node{kind: KindColumn}
+		col := &Object{entity: entity{name: "orphanCol", node: colNode}}
+		testutil.Nil(t, col.EffectiveIndexes(), "expected nil for orphan column")
+	})
+
 	t.Run("augments cycle terminates", func(t *testing.T) {
 		a := makeRow("rowA", nil)
 		b := makeRow("rowB", nil)
@@ -236,6 +253,37 @@ func TestClassifyIndexEncoding(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testutil.Equal(t, tt.want, classifyIndexEncoding(tt.obj, tt.implied), "classifyIndexEncoding()")
+		})
+	}
+}
+
+func TestIndexEntryFixedSize(t *testing.T) {
+	makeObj := func(base BaseType, sizes []Range) *Object {
+		typ := newType("t")
+		typ.setBase(base)
+		return &Object{entity: entity{name: "idx"}, typ: typ, sizes: sizes}
+	}
+
+	tests := []struct {
+		name   string
+		entry  IndexEntry
+		want   int
+		wantOK bool
+	}{
+		{"integer", IndexEntry{Object: makeObj(BaseInteger32, nil), Encoding: IndexEncodingInteger}, 1, true},
+		{"ip address", IndexEntry{Object: makeObj(BaseIpAddress, nil), Encoding: IndexEncodingIpAddress}, 4, true},
+		{"fixed string SIZE 6", IndexEntry{Object: makeObj(BaseOctetString, []Range{{Min: 6, Max: 6}}), Encoding: IndexEncodingFixedString}, 6, true},
+		{"length prefixed", IndexEntry{Object: makeObj(BaseOctetString, nil), Encoding: IndexEncodingLengthPrefixed}, 0, false},
+		{"implied", IndexEntry{Object: makeObj(BaseOctetString, nil), Encoding: IndexEncodingImplied}, 0, false},
+		{"unknown", IndexEntry{Encoding: IndexEncodingUnknown}, 0, false},
+		{"fixed string nil object", IndexEntry{Encoding: IndexEncodingFixedString}, 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := tt.entry.FixedSize()
+			testutil.Equal(t, tt.wantOK, ok, "FixedSize() ok")
+			testutil.Equal(t, tt.want, got, "FixedSize() value")
 		})
 	}
 }

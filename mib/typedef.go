@@ -141,6 +141,17 @@ func walkTypeChainHasSlice[T any](t *Type, get func(*Type) []T) bool {
 	return false
 }
 
+// EffectiveTC walks the parent type chain and returns the first type that
+// is a TEXTUAL-CONVENTION, or nil if none in the chain is a TC.
+func (t *Type) EffectiveTC() *Type {
+	return walkTypeChain(t, func(t *Type) *Type {
+		if t.isTC {
+			return t
+		}
+		return nil
+	})
+}
+
 // EffectiveBase walks the parent type chain and returns the first non-zero
 // base type, or 0 if none is set.
 func (t *Type) EffectiveBase() BaseType {

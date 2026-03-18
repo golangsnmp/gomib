@@ -232,7 +232,17 @@ func (o *Object) EffectiveIndexes() []IndexEntry {
 }
 
 func (o *Object) effectiveIndexes(visited map[*Object]struct{}) []IndexEntry {
-	if o.node == nil || o.node.kind != KindRow {
+	if o.node == nil {
+		return nil
+	}
+	// For columns, delegate to the parent row.
+	if o.node.kind == KindColumn {
+		if row := o.Row(); row != nil {
+			return row.effectiveIndexes(visited)
+		}
+		return nil
+	}
+	if o.node.kind != KindRow {
 		return nil
 	}
 	if len(o.index) > 0 {
@@ -267,11 +277,7 @@ func (o *Object) IsIndex() bool {
 	if o.node == nil || o.node.kind != KindColumn {
 		return false
 	}
-	row := o.Row()
-	if row == nil {
-		return false
-	}
-	for _, idx := range row.EffectiveIndexes() {
+	for _, idx := range o.EffectiveIndexes() {
 		if idx.Object == o {
 			return true
 		}

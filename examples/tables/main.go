@@ -126,9 +126,9 @@ func printTable(table *mib.Object) {
 			role = "index"
 		}
 
-		// Navigation: column -> row, column -> table.
-		_ = col.Row()   // returns the parent row
-		_ = col.Table() // returns the grandparent table
+		// EffectiveIndexes works on columns too, delegating to the parent row.
+		colIdxs := col.EffectiveIndexes()
+		_ = colIdxs // same result as row.EffectiveIndexes()
 
 		fmt.Printf("  %-28s %-20s %-18s %-18s %s\n",
 			col.Name(), typeName, base, col.Access(), role)

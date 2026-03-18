@@ -6,6 +6,59 @@ import (
 	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
+func TestEffectiveTC(t *testing.T) {
+	t.Run("direct TC", func(t *testing.T) {
+		ty := newType("DisplayString")
+		ty.setBase(BaseOctetString)
+		ty.setIsTC(true)
+
+		got := ty.EffectiveTC()
+		testutil.NotNil(t, got, "EffectiveTC")
+		testutil.Equal(t, "DisplayString", got.Name(), "TC name")
+	})
+
+	t.Run("inherited from parent", func(t *testing.T) {
+		tc := newType("DisplayString")
+		tc.setBase(BaseOctetString)
+		tc.setIsTC(true)
+		child := newType("MyString")
+		child.setParent(tc)
+
+		got := child.EffectiveTC()
+		testutil.NotNil(t, got, "EffectiveTC")
+		testutil.Equal(t, "DisplayString", got.Name(), "TC name")
+	})
+
+	t.Run("inherited from grandparent", func(t *testing.T) {
+		tc := newType("DisplayString")
+		tc.setBase(BaseOctetString)
+		tc.setIsTC(true)
+		parent := newType("SnmpAdminString")
+		parent.setParent(tc)
+		parent.setIsTC(true)
+		child := newType("MyString")
+		child.setParent(parent)
+
+		got := child.EffectiveTC()
+		testutil.NotNil(t, got, "EffectiveTC")
+		testutil.Equal(t, "SnmpAdminString", got.Name(), "closest TC wins")
+	})
+
+	t.Run("no TC in chain", func(t *testing.T) {
+		parent := newType("Parent")
+		parent.setBase(BaseInteger32)
+		child := newType("Child")
+		child.setParent(parent)
+
+		testutil.Nil(t, child.EffectiveTC(), "expected nil")
+	})
+
+	t.Run("orphan type", func(t *testing.T) {
+		ty := newType("Bare")
+		testutil.Nil(t, ty.EffectiveTC(), "expected nil for type with no parent and no TC flag")
+	})
+}
+
 func TestEffectiveBase(t *testing.T) {
 	t.Run("direct", func(t *testing.T) {
 		ty := newType("MyInt")

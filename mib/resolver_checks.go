@@ -320,15 +320,8 @@ func indexElementSubIds(entry IndexEntry) (int, bool) {
 		return 0, false
 	}
 	switch entry.Encoding {
-	case IndexEncodingInteger:
-		return 1, true
-	case IndexEncodingIpAddress:
-		return 4, true
-	case IndexEncodingFixedString:
-		if isFixedSize(obj.sizes) {
-			return int(obj.sizes[0].Max), true
-		}
-		return 0, false
+	case IndexEncodingInteger, IndexEncodingIpAddress, IndexEncodingFixedString:
+		return entry.FixedSize()
 	case IndexEncodingLengthPrefixed:
 		t := obj.Type()
 		if t == nil {

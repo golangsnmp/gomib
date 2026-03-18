@@ -71,6 +71,13 @@ func (m *Mib) AllSymbols() iter.Seq[Symbol] {
 	}
 }
 
+// NodesByName returns all nodes registered under the given name, or nil.
+// Unlike [Mib.Node], which returns a single preferred node, this returns
+// every node across all loaded modules that shares the name.
+func (m *Mib) NodesByName(name string) []*Node {
+	return slices.Clone(m.nameToNodes[name])
+}
+
 // Node returns the node with the given name, or nil if not found.
 // Prefers nodes with object definitions, then notifications, then any.
 func (m *Mib) Node(name string) *Node {
@@ -234,11 +241,11 @@ func (l OidLookup) DecodeIndexes() []DecodedIndex {
 	if obj == nil {
 		return nil
 	}
-	row := obj.Row()
-	if row == nil {
+	indexes := obj.EffectiveIndexes()
+	if len(indexes) == 0 {
 		return nil
 	}
-	return DecodeSuffix(row.EffectiveIndexes(), l.suffix)
+	return DecodeSuffix(indexes, l.suffix)
 }
 
 // LookupInstance looks up a numeric OID and returns both the matched node

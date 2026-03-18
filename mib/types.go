@@ -103,6 +103,26 @@ func classifyIndexEncoding(obj *Object, implied bool) IndexEncoding {
 	}
 }
 
+// FixedSize returns the fixed encoding width for this index entry, if
+// determinable. Returns the width in sub-identifiers and true for
+// fixed-width encodings (integer, IP address, fixed-size string).
+// Returns 0 and false for variable-length or unknown encodings.
+func (e IndexEntry) FixedSize() (int, bool) {
+	switch e.Encoding {
+	case IndexEncodingInteger:
+		return 1, true
+	case IndexEncodingIpAddress:
+		return 4, true
+	case IndexEncodingFixedString:
+		if e.Object != nil && isFixedSize(e.Object.sizes) {
+			return int(e.Object.sizes[0].Max), true
+		}
+		return 0, false
+	default:
+		return 0, false
+	}
+}
+
 // isFixedSize reports whether sizes contains exactly one constraint with
 // min == max (and > 0), indicating a fixed-length string.
 func isFixedSize(sizes []Range) bool {

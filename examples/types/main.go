@@ -57,6 +57,21 @@ func main() {
 		fmt.Printf("  EffectiveSizes:       %v\n", typ.EffectiveSizes())
 	}
 
+	// EffectiveTC finds the nearest textual convention in the type chain
+	fmt.Println("\n=== EffectiveTC ===")
+	for _, name := range []string{"ifDescr", "ifIndex", "ifInOctets"} {
+		o := m.Object(name)
+		if o == nil || o.Type() == nil {
+			continue
+		}
+		tc := o.Type().EffectiveTC()
+		tcName := "(none)"
+		if tc != nil {
+			tcName = tc.Name()
+		}
+		fmt.Printf("  %-16s -> %s\n", name, tcName)
+	}
+
 	// Enumeration type (ifType -> IANAifType)
 	fmt.Println("\n=== Enum type: ifType ===")
 	obj := m.Object("ifType")
