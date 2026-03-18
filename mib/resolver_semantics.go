@@ -350,6 +350,27 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 							ref.mod, obj.Span,
 							fmt.Sprintf("INDEX %q of %q resolves to a node without an object definition", item.Object, obj.Name))
 					}
+				} else if ctx.ResolverStrictness().AllowGlobalFallbacks() {
+					if idxNode, ok := ctx.LookupNodeGlobal(item.Object); ok {
+						if idxNode.Object() != nil {
+							indexEntries = append(indexEntries, IndexEntry{
+								Object:   idxNode.Object(),
+								Implied:  item.Implied,
+								Encoding: classifyIndexEncoding(idxNode.Object(), item.Implied),
+								Span:     item.Span,
+							})
+						} else if !isBareTypeIndex(item.Object) {
+							ctx.EmitDiagnostic(types.DiagIndexNotObject,
+								ref.mod, obj.Span,
+								fmt.Sprintf("INDEX %q of %q resolves to a node without an object definition", item.Object, obj.Name))
+						}
+					} else if isBareTypeIndex(item.Object) {
+						indexEntries = append(indexEntries, IndexEntry{
+							TypeName: item.Object,
+							Implied:  item.Implied,
+							Span:     item.Span,
+						})
+					}
 				} else if isBareTypeIndex(item.Object) {
 					indexEntries = append(indexEntries, IndexEntry{
 						TypeName: item.Object,
@@ -371,6 +392,17 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 					ctx.EmitDiagnostic(types.DiagAugmentsNotObject,
 						ref.mod, obj.Span,
 						fmt.Sprintf("AUGMENTS target %q of %q resolves to a node without an object definition", obj.Augments, obj.Name))
+				}
+			} else if ctx.ResolverStrictness().AllowGlobalFallbacks() {
+				if targetNode, ok := ctx.LookupNodeGlobal(obj.Augments); ok {
+					if targetNode.Object() != nil {
+						resolvedObj.setAugments(targetNode.Object())
+						targetNode.Object().addAugmentedBy(resolvedObj)
+					} else {
+						ctx.EmitDiagnostic(types.DiagAugmentsNotObject,
+							ref.mod, obj.Span,
+							fmt.Sprintf("AUGMENTS target %q of %q resolves to a node without an object definition", obj.Augments, obj.Name))
+					}
 				}
 			}
 		}

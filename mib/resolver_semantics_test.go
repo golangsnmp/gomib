@@ -2020,6 +2020,189 @@ func TestLinkObjectIndexes(t *testing.T) {
 		testutil.Equal(t, "INTEGER", idx[0].TypeName, "bare type index TypeName")
 	})
 
+	t.Run("permissive global fallback resolves index", func(t *testing.T) {
+		modA := &module.Module{Name: "A-MIB"}
+		modB := &module.Module{Name: "B-MIB"}
+
+		ctx := newResolverContext(nil, ResolverPermissive, DefaultConfig())
+		ctx.modules = []*module.Module{modA, modB}
+
+		resolvedModA := newModule(modA.Name)
+		ctx.moduleToResolved[modA] = resolvedModA
+		resolvedModB := newModule(modB.Name)
+		ctx.moduleToResolved[modB] = resolvedModB
+
+		root := ctx.mib.Root()
+
+		// Row node and object in module A.
+		rowNode := buildOIDPath(root, 1, 1, 1)
+		rowNode.setName("myEntry")
+		ctx.registerModuleNodeSymbol(modA, "myEntry", rowNode)
+		rowObj := newObject("myEntry")
+		rowObj.setNode(rowNode)
+		resolvedModA.addObject(rowObj)
+		rowNode.setObject(rowObj)
+
+		// Index node and object in module B, NOT imported into A.
+		idxNode := buildOIDPath(root, 2, 1, 1, 1)
+		idxNode.setName("foreignIndex")
+		ctx.registerModuleNodeSymbol(modB, "foreignIndex", idxNode)
+		idxObj := newObject("foreignIndex")
+		idxObj.setNode(idxNode)
+		resolvedModB.addObject(idxObj)
+		idxNode.setObject(idxObj)
+
+		objRefs := []objectTypeRef{
+			{mod: modA, obj: &module.ObjectType{
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "foreignIndex"}},
+			}},
+		}
+
+		linkObjectIndexes(ctx, objRefs)
+
+		idx := rowObj.Index()
+		testutil.Len(t, idx, 1, "permissive mode should resolve index via global fallback")
+		testutil.Equal(t, idxObj, idx[0].Object, "index object from global fallback")
+	})
+
+	t.Run("permissive global fallback resolves augments", func(t *testing.T) {
+		modA := &module.Module{Name: "A-MIB"}
+		modB := &module.Module{Name: "B-MIB"}
+
+		ctx := newResolverContext(nil, ResolverPermissive, DefaultConfig())
+		ctx.modules = []*module.Module{modA, modB}
+
+		resolvedModA := newModule(modA.Name)
+		ctx.moduleToResolved[modA] = resolvedModA
+		resolvedModB := newModule(modB.Name)
+		ctx.moduleToResolved[modB] = resolvedModB
+
+		root := ctx.mib.Root()
+
+		// Augmenting row in module A.
+		augNode := buildOIDPath(root, 1, 2, 1)
+		augNode.setName("myAugEntry")
+		ctx.registerModuleNodeSymbol(modA, "myAugEntry", augNode)
+		augObj := newObject("myAugEntry")
+		augObj.setNode(augNode)
+		resolvedModA.addObject(augObj)
+		augNode.setObject(augObj)
+
+		// Target row in module B, NOT imported into A.
+		targetNode := buildOIDPath(root, 2, 1, 1)
+		targetNode.setName("foreignEntry")
+		ctx.registerModuleNodeSymbol(modB, "foreignEntry", targetNode)
+		targetObj := newObject("foreignEntry")
+		targetObj.setNode(targetNode)
+		resolvedModB.addObject(targetObj)
+		targetNode.setObject(targetObj)
+
+		objRefs := []objectTypeRef{
+			{mod: modA, obj: &module.ObjectType{
+				DefBase:  module.DefBase{Name: "myAugEntry"},
+				Syntax:   &module.TypeSyntaxTypeRef{Name: "MyAugEntry"},
+				Augments: "foreignEntry",
+			}},
+		}
+
+		linkObjectIndexes(ctx, objRefs)
+
+		testutil.NotNil(t, augObj.Augments(), "permissive mode should resolve augments via global fallback")
+		testutil.Equal(t, targetObj, augObj.Augments(), "augments target from global fallback")
+
+		augBy := targetObj.AugmentedBy()
+		testutil.Len(t, augBy, 1, "augmented by via global fallback")
+		testutil.Equal(t, augObj, augBy[0], "augmented by entry from global fallback")
+	})
+
+	t.Run("strict mode no global fallback for index", func(t *testing.T) {
+		modA := &module.Module{Name: "A-MIB"}
+		modB := &module.Module{Name: "B-MIB"}
+
+		ctx := newResolverContext(nil, ResolverStrict, VerboseConfig())
+		ctx.modules = []*module.Module{modA, modB}
+
+		resolvedModA := newModule(modA.Name)
+		ctx.moduleToResolved[modA] = resolvedModA
+		resolvedModB := newModule(modB.Name)
+		ctx.moduleToResolved[modB] = resolvedModB
+
+		root := ctx.mib.Root()
+
+		rowNode := buildOIDPath(root, 1, 1, 1)
+		rowNode.setName("myEntry")
+		ctx.registerModuleNodeSymbol(modA, "myEntry", rowNode)
+		rowObj := newObject("myEntry")
+		rowObj.setNode(rowNode)
+		resolvedModA.addObject(rowObj)
+		rowNode.setObject(rowObj)
+
+		idxNode := buildOIDPath(root, 2, 1, 1, 1)
+		idxNode.setName("foreignIndex")
+		ctx.registerModuleNodeSymbol(modB, "foreignIndex", idxNode)
+		idxObj := newObject("foreignIndex")
+		idxObj.setNode(idxNode)
+		resolvedModB.addObject(idxObj)
+		idxNode.setObject(idxObj)
+
+		objRefs := []objectTypeRef{
+			{mod: modA, obj: &module.ObjectType{
+				DefBase: module.DefBase{Name: "myEntry"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "MyEntry"},
+				Index:   []module.IndexItem{{Object: "foreignIndex"}},
+			}},
+		}
+
+		linkObjectIndexes(ctx, objRefs)
+
+		testutil.Len(t, rowObj.Index(), 0, "strict mode should not resolve index via global fallback")
+	})
+
+	t.Run("strict mode no global fallback for augments", func(t *testing.T) {
+		modA := &module.Module{Name: "A-MIB"}
+		modB := &module.Module{Name: "B-MIB"}
+
+		ctx := newResolverContext(nil, ResolverStrict, VerboseConfig())
+		ctx.modules = []*module.Module{modA, modB}
+
+		resolvedModA := newModule(modA.Name)
+		ctx.moduleToResolved[modA] = resolvedModA
+		resolvedModB := newModule(modB.Name)
+		ctx.moduleToResolved[modB] = resolvedModB
+
+		root := ctx.mib.Root()
+
+		augNode := buildOIDPath(root, 1, 2, 1)
+		augNode.setName("myAugEntry")
+		ctx.registerModuleNodeSymbol(modA, "myAugEntry", augNode)
+		augObj := newObject("myAugEntry")
+		augObj.setNode(augNode)
+		resolvedModA.addObject(augObj)
+		augNode.setObject(augObj)
+
+		targetNode := buildOIDPath(root, 2, 1, 1)
+		targetNode.setName("foreignEntry")
+		ctx.registerModuleNodeSymbol(modB, "foreignEntry", targetNode)
+		targetObj := newObject("foreignEntry")
+		targetObj.setNode(targetNode)
+		resolvedModB.addObject(targetObj)
+		targetNode.setObject(targetObj)
+
+		objRefs := []objectTypeRef{
+			{mod: modA, obj: &module.ObjectType{
+				DefBase:  module.DefBase{Name: "myAugEntry"},
+				Syntax:   &module.TypeSyntaxTypeRef{Name: "MyAugEntry"},
+				Augments: "foreignEntry",
+			}},
+		}
+
+		linkObjectIndexes(ctx, objRefs)
+
+		testutil.Nil(t, augObj.Augments(), "strict mode should not resolve augments via global fallback")
+	})
+
 	t.Run("nil resolved module skipped", func(_ *testing.T) {
 		ctx := newTestContext()
 		mod := &module.Module{Name: "TEST-MIB"}
