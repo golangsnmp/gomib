@@ -621,6 +621,10 @@ func lowerComplianceModule(m ast.ComplianceModule, ctx *LoweringContext) Complia
 		moduleName = m.ModuleName.Name
 	}
 
+	// m.ModuleOid is intentionally not preserved. The optional OID after the
+	// module name (RFC 2580 ModuleIdentifier) is a disambiguation mechanism
+	// that no real-world MIBs use, and neither the resolver nor public model
+	// consume it.
 	return ComplianceModule{
 		ModuleName:      moduleName,
 		MandatoryGroups: identNames(m.MandatoryGroups),
@@ -682,6 +686,7 @@ func lowerSupportsModule(s *ast.SupportsModule, ctx *LoweringContext) SupportsMo
 		variations = append(variations, lowerVariation(&v, ctx))
 	}
 
+	// s.ModuleOid is intentionally not preserved. See lowerComplianceModule.
 	return SupportsModule{
 		ModuleName: s.ModuleName.Name,
 		Includes:   identNames(s.Includes),
