@@ -56,9 +56,9 @@ func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 				&module.ObjectType{DefBase: module.DefBase{Name: "myObject", Span: types.Synthetic}},
 			},
 		}
-		ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
+		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-		registerModules(ctx)
+		registerModules(ctx, []*module.Module{userMod})
 
 		testutil.Equal(t, len(baseNames)+1, len(ctx.modules), "module count (base=%d + user=1)", len(baseNames))
 		for i, name := range baseNames {
@@ -69,9 +69,9 @@ func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 	})
 
 	t.Run("no user modules", func(t *testing.T) {
-		ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
+		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-		registerModules(ctx)
+		registerModules(ctx, nil)
 
 		testutil.Len(t, ctx.modules, len(baseNames), "modules")
 		for i, name := range baseNames {
@@ -90,9 +90,9 @@ func TestRegisterModules_UserBaseNamesFiltered(t *testing.T) {
 			Name:     "MY-MIB",
 			Language: types.LanguageSMIv2,
 		}
-		ctx := newResolverContext([]*module.Module{userSNMP, userMod}, nil, ResolverNormal, DefaultConfig())
+		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-		registerModules(ctx)
+		registerModules(ctx, []*module.Module{userSNMP, userMod})
 
 		count := 0
 		for _, mod := range ctx.modules {
@@ -126,8 +126,8 @@ func TestRegisterModules_UserBaseNamesFiltered(t *testing.T) {
 			Language: types.LanguageSMIv2,
 		})
 
-		ctx := newResolverContext(userMods, nil, ResolverNormal, DefaultConfig())
-		registerModules(ctx)
+		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
+		registerModules(ctx, userMods)
 
 		nameCounts := make(map[string]int)
 		for _, mod := range ctx.modules {
@@ -145,9 +145,9 @@ func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
 		Name:     "MY-MIB",
 		Language: types.LanguageSMIv2,
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-	registerModules(ctx)
+	registerModules(ctx, []*module.Module{userMod})
 
 	// Every module should be indexed by name
 	for _, mod := range ctx.modules {
@@ -158,9 +158,9 @@ func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
 }
 
 func TestRegisterModules_BaseModulePointersCached(t *testing.T) {
-	ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-	registerModules(ctx)
+	registerModules(ctx, nil)
 
 	testutil.NotNil(t, ctx.snmpv2SMIModule, "Snmpv2SMIModule")
 	testutil.Equal(t, "SNMPv2-SMI", ctx.snmpv2SMIModule.Name, "Snmpv2SMIModule.Name")
@@ -182,9 +182,9 @@ func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 				&module.TypeDef{DefBase: module.DefBase{Name: "BarType", Span: types.Synthetic}},
 			},
 		}
-		ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
+		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-		registerModules(ctx)
+		registerModules(ctx, []*module.Module{userMod})
 
 		var found *module.Module
 		for _, mod := range ctx.modules {
@@ -206,9 +206,9 @@ func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 	})
 
 	t.Run("base module", func(t *testing.T) {
-		ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
+		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-		registerModules(ctx)
+		registerModules(ctx, nil)
 
 		var snmpv2smi *module.Module
 		for _, mod := range ctx.modules {
@@ -233,9 +233,9 @@ func TestRegisterModules_ModuleToResolvedMapping(t *testing.T) {
 		Name:     "MY-MIB",
 		Language: types.LanguageSMIv2,
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-	registerModules(ctx)
+	registerModules(ctx, []*module.Module{userMod})
 
 	for _, mod := range ctx.modules {
 		resolved, ok := ctx.moduleToResolved[mod]
@@ -253,9 +253,9 @@ func TestRegisterModules_LanguageSetOnResolved(t *testing.T) {
 		Name:     "MY-MIB",
 		Language: types.LanguageSMIv1,
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-	registerModules(ctx)
+	registerModules(ctx, []*module.Module{userMod})
 
 	var found *module.Module
 	for _, mod := range ctx.modules {
@@ -292,9 +292,9 @@ func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
 			mi,
 		},
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-	registerModules(ctx)
+	registerModules(ctx, []*module.Module{userMod})
 
 	var found *module.Module
 	for _, mod := range ctx.modules {
@@ -328,9 +328,9 @@ func TestRegisterModules_NoModuleIdentity(t *testing.T) {
 			&module.ObjectType{DefBase: module.DefBase{Name: "someObj", Span: types.Synthetic}},
 		},
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-	registerModules(ctx)
+	registerModules(ctx, []*module.Module{userMod})
 
 	var found *module.Module
 	for _, mod := range ctx.modules {
@@ -353,9 +353,9 @@ func TestRegisterModules_BuilderReceivesModules(t *testing.T) {
 		Name:     "MY-MIB",
 		Language: types.LanguageSMIv2,
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-	registerModules(ctx)
+	registerModules(ctx, []*module.Module{userMod})
 
 	baseNames := module.BaseModuleNames()
 	wantCount := len(baseNames) + 1
@@ -435,9 +435,9 @@ func TestRegisterModules_DiagnosticsForwarded(t *testing.T) {
 			{Severity: SeverityWarning, Code: "test-warning", Message: "test", Module: "MY-MIB"},
 		},
 	}
-	ctx := newResolverContext([]*module.Module{userMod}, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
-	registerModules(ctx)
+	registerModules(ctx, []*module.Module{userMod})
 
 	// Build and check diagnostics are present
 	built := ctx.mib

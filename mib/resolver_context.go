@@ -19,6 +19,9 @@ const (
 type resolverContext struct {
 	mib *Mib
 
+	// modules is the working set of modules for resolution. In the normal
+	// pipeline this is populated by registerModules (base modules first,
+	// then user modules). Test code may set it directly.
 	modules []*module.Module
 
 	// moduleIndex maps module name to parsed modules (multiple versions possible).
@@ -110,38 +113,22 @@ type unresolvedNotifObject struct {
 	span         types.Span
 }
 
-func newResolverContext(mods []*module.Module, logger *slog.Logger, strictness ResolverStrictness, diagConfig DiagnosticConfig) *resolverContext {
-	n := len(mods)
-	ctx := &resolverContext{
+func newResolverContext(logger *slog.Logger, strictness ResolverStrictness, diagConfig DiagnosticConfig) *resolverContext {
+	return &resolverContext{
 		mib:                newMib(),
-		modules:            mods,
-		moduleIndex:        make(map[string][]*module.Module, n),
-		moduleToResolved:   make(map[*module.Module]*Module, n),
-		resolvedToModule:   make(map[*Module]*module.Module, n),
-		moduleSymbolToNode: make(map[*module.Module]map[string]*Node, n),
-		moduleImports:      make(map[*module.Module]map[string]*module.Module, n),
-		moduleSymbolToType: make(map[*module.Module]map[string]*Type, n),
-		moduleDefNames:     make(map[*module.Module]map[string]struct{}, n),
-		moduleOidDefNames:  make(map[*module.Module]map[string]struct{}, n),
-		usedImports:        make(map[*module.Module]map[string]struct{}, n),
+		moduleIndex:        make(map[string][]*module.Module),
+		moduleToResolved:   make(map[*module.Module]*Module),
+		resolvedToModule:   make(map[*Module]*module.Module),
+		moduleSymbolToNode: make(map[*module.Module]map[string]*Node),
+		moduleImports:      make(map[*module.Module]map[string]*module.Module),
+		moduleSymbolToType: make(map[*module.Module]map[string]*Type),
+		moduleDefNames:     make(map[*module.Module]map[string]struct{}),
+		moduleOidDefNames:  make(map[*module.Module]map[string]struct{}),
+		usedImports:        make(map[*module.Module]map[string]struct{}),
 		strictness:         strictness,
 		diagConfig:         diagConfig,
 		Logger:             types.Logger{L: logger},
 	}
-	// Pre-populate OID definition name index for all initial modules.
-	// This allows findOidDefiningModule to use O(1) lookups instead of
-	// scanning all definitions. registerModules rebuilds this with
-	// base modules included.
-	for _, mod := range mods {
-		oidDefs := make(map[string]struct{})
-		for _, def := range mod.Definitions {
-			if def.DefinitionOid() != nil {
-				oidDefs[def.DefinitionName()] = struct{}{}
-			}
-		}
-		ctx.moduleOidDefNames[mod] = oidDefs
-	}
-	return ctx
 }
 
 // LookupNodeForModule resolves a node by name, traversing imports from mod.

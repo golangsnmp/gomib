@@ -10,14 +10,15 @@ import (
 
 // registerModules indexes all modules and seeds the resolver context.
 // Synthetic base modules are prepended to user modules so that later
-// phases can resolve primitives and well-known types.
-func registerModules(ctx *resolverContext) {
+// phases can resolve primitives and well-known types. The result is
+// stored in ctx.modules.
+func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 	baseModules := module.CreateBaseModules()
 
 	ctx.Log(slog.LevelDebug, "loaded base modules", slog.Int("count", len(baseModules)))
 
 	var userModules []*module.Module
-	for _, mod := range ctx.modules {
+	for _, mod := range inputModules {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
@@ -72,24 +73,17 @@ func registerModules(ctx *resolverContext) {
 		ctx.moduleIndex[mod.Name] = append(ctx.moduleIndex[mod.Name], mod)
 
 		// Cache definition names for faster import/OID resolution.
-		// ModuleOidDefNames is pre-populated for user modules in
-		// newResolverContext, so only build it for base modules.
 		defNames := make(map[string]struct{}, len(mod.Definitions))
-		var oidDefNames map[string]struct{}
-		if _, exists := ctx.moduleOidDefNames[mod]; !exists {
-			oidDefNames = make(map[string]struct{})
-		}
+		oidDefNames := make(map[string]struct{})
 		for _, def := range mod.Definitions {
 			name := def.DefinitionName()
 			defNames[name] = struct{}{}
-			if oidDefNames != nil && def.DefinitionOid() != nil {
+			if def.DefinitionOid() != nil {
 				oidDefNames[name] = struct{}{}
 			}
 		}
 		ctx.moduleDefNames[mod] = defNames
-		if oidDefNames != nil {
-			ctx.moduleOidDefNames[mod] = oidDefNames
-		}
+		ctx.moduleOidDefNames[mod] = oidDefNames
 
 		if ctx.TraceEnabled() {
 			ctx.Trace("registered module",

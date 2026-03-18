@@ -333,7 +333,8 @@ func TestLookupNodeGlobal(t *testing.T) {
 	nodeY := newTestNode("y")
 	nodeXdup := newTestNode("x")
 
-	ctx := newResolverContext([]*module.Module{modA, modB}, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
+	ctx.modules = []*module.Module{modA, modB}
 	ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
 	ctx.moduleSymbolToNode[modB] = map[string]*Node{"x": nodeXdup, "y": nodeY}
 
@@ -382,7 +383,7 @@ func TestLookupTypeForModule_ASN1Fallback(t *testing.T) {
 func TestTypeLookupFallbacks_Normal(t *testing.T) {
 	// In Normal mode, well-known types resolve via both LookupType and
 	// LookupTypeForModule without explicit imports.
-	ctx := newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 	modA := &module.Module{Name: "A"}
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
@@ -426,7 +427,7 @@ func TestTypeLookupFallbacks_Normal(t *testing.T) {
 
 func TestTypeLookupFallbacks_Strict(t *testing.T) {
 	// In Strict mode, only ASN.1 primitives resolve without import.
-	ctx := newResolverContext(nil, nil, ResolverStrict, VerboseConfig())
+	ctx := newResolverContext(nil, ResolverStrict, VerboseConfig())
 	modA := &module.Module{Name: "A"}
 
 	smiMod := &module.Module{Name: "SNMPv2-SMI"}
@@ -461,7 +462,8 @@ func TestLookupType_GlobalModuleScan(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 	vendorType := newType("VendorSpecialType")
 
-	ctx := newResolverContext([]*module.Module{modA}, nil, ResolverPermissive, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverPermissive, DefaultConfig())
+	ctx.modules = []*module.Module{modA}
 	ctx.snmpv2SMIModule = &module.Module{Name: "SNMPv2-SMI"}
 	ctx.moduleSymbolToType[modA] = map[string]*Type{"VendorSpecialType": vendorType}
 
@@ -565,7 +567,7 @@ func TestEmitDiagnostic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := newResolverContext(nil, nil, ResolverNormal, tt.config)
+			ctx := newResolverContext(nil, ResolverNormal, tt.config)
 			mod := &module.Module{Name: "MOD"}
 			ctx.EmitDiagnostic(tt.code, mod, types.Span{}, "test message")
 			got := len(ctx.Diagnostics())
@@ -587,7 +589,7 @@ func TestEmitDiagnostic_IgnoredCode(t *testing.T) {
 		Reporting: ReportingVerbose,
 		Ignore:    []string{"import-*"},
 	}
-	ctx := newResolverContext(nil, nil, ResolverNormal, config)
+	ctx := newResolverContext(nil, ResolverNormal, config)
 	mod := &module.Module{Name: "MOD"}
 	ctx.EmitDiagnostic(types.DiagImportNotFound, mod, types.Span{}, "ignored")
 	testutil.Len(t, ctx.Diagnostics(), 0, "expected ignored code to produce no diagnostics")
@@ -693,7 +695,8 @@ func TestFinalizeUnresolved_NilModule(t *testing.T) {
 
 func TestDropModules(t *testing.T) {
 	mod := &module.Module{Name: "A"}
-	ctx := newResolverContext([]*module.Module{mod}, nil, ResolverNormal, DefaultConfig())
+	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
+	ctx.modules = []*module.Module{mod}
 	ctx.moduleIndex["A"] = []*module.Module{mod}
 	ctx.moduleDefNames[mod] = map[string]struct{}{"foo": {}}
 
@@ -753,7 +756,7 @@ func TestCopyResolvedImportsToModules_Direct(t *testing.T) {
 
 func TestDiagnosticConfig_Getter(t *testing.T) {
 	config := DefaultConfig()
-	ctx := newResolverContext(nil, nil, ResolverNormal, config)
+	ctx := newResolverContext(nil, ResolverNormal, config)
 	got := ctx.DiagnosticConfig()
 	testutil.Equal(t, config.Reporting, got.Reporting, "DiagnosticConfig().Reporting")
 }

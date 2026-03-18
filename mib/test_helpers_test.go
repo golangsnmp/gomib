@@ -10,19 +10,20 @@ import (
 )
 
 func newTestContext() *resolverContext {
-	return newResolverContext(nil, nil, ResolverNormal, DefaultConfig())
+	return newResolverContext(nil, ResolverNormal, DefaultConfig())
 }
 
 func newTestContextWithConfig(config DiagnosticConfig) *resolverContext {
-	return newResolverContext(nil, nil, ResolverNormal, config)
+	return newResolverContext(nil, ResolverNormal, config)
 }
 
 func newTestContextWithPolicy(strictness ResolverStrictness, config DiagnosticConfig) *resolverContext {
-	return newResolverContext(nil, nil, strictness, config)
+	return newResolverContext(nil, strictness, config)
 }
 
 func newTestContextForModules(config DiagnosticConfig, mods ...*module.Module) *resolverContext {
-	ctx := newResolverContext(mods, nil, ResolverNormal, config)
+	ctx := newResolverContext(nil, ResolverNormal, config)
+	setTestModules(ctx, mods)
 	for _, mod := range mods {
 		ctx.moduleIndex[mod.Name] = append(ctx.moduleIndex[mod.Name], mod)
 		resolvedMod := newModule(mod.Name)
@@ -33,7 +34,8 @@ func newTestContextForModules(config DiagnosticConfig, mods ...*module.Module) *
 }
 
 func newTestContextForModulesWithPolicy(strictness ResolverStrictness, config DiagnosticConfig, mods ...*module.Module) *resolverContext {
-	ctx := newResolverContext(mods, nil, strictness, config)
+	ctx := newResolverContext(nil, strictness, config)
+	setTestModules(ctx, mods)
 	for _, mod := range mods {
 		ctx.moduleIndex[mod.Name] = append(ctx.moduleIndex[mod.Name], mod)
 		resolvedMod := newModule(mod.Name)
@@ -41,6 +43,24 @@ func newTestContextForModulesWithPolicy(strictness ResolverStrictness, config Di
 		ctx.resolvedToModule[resolvedMod] = mod
 	}
 	return ctx
+}
+
+// setTestModules sets ctx.modules and builds the moduleOidDefNames cache
+// for tests that don't go through registerModules.
+func setTestModules(ctx *resolverContext, mods []*module.Module) {
+	ctx.modules = mods
+	for _, mod := range mods {
+		if _, exists := ctx.moduleOidDefNames[mod]; exists {
+			continue
+		}
+		oidDefs := make(map[string]struct{})
+		for _, def := range mod.Definitions {
+			if def.DefinitionOid() != nil {
+				oidDefs[def.DefinitionName()] = struct{}{}
+			}
+		}
+		ctx.moduleOidDefNames[mod] = oidDefs
+	}
 }
 
 // buildOIDPath chains getOrCreateChild calls to build a node path from root.

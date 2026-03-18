@@ -571,7 +571,8 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{importing}, nil, ResolverNormal, DefaultConfig())
+		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
+		ctx.modules = []*module.Module{importing}
 		ctx.moduleIndex["SOURCE-MIB"] = []*module.Module{source}
 		ctx.moduleDefNames[source] = map[string]struct{}{
 			"sysDescr": {},
@@ -597,7 +598,8 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{importing}, nil, ResolverNormal, DefaultConfig())
+		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
+		ctx.modules = []*module.Module{importing}
 		ctx.moduleIndex["MOD-A"] = []*module.Module{sourceA}
 		ctx.moduleIndex["MOD-B"] = []*module.Module{sourceB}
 		ctx.moduleDefNames[sourceA] = map[string]struct{}{"alpha": {}}
@@ -621,7 +623,8 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{importing}, nil, ResolverNormal, DefaultConfig())
+		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
+		ctx.modules = []*module.Module{importing}
 		ctx.moduleIndex["MOD-A"] = []*module.Module{sourceA}
 		ctx.moduleIndex["MOD-B"] = []*module.Module{sourceB}
 		ctx.moduleDefNames[sourceA] = map[string]struct{}{"DisplayString": {}}
@@ -649,7 +652,8 @@ func TestResolveImports(t *testing.T) {
 			},
 		}
 
-		ctx := newResolverContext([]*module.Module{importing}, nil, ResolverNormal, DefaultConfig())
+		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
+		ctx.modules = []*module.Module{importing}
 		ctx.moduleIndex["MOD-A"] = []*module.Module{sourceA}
 		ctx.moduleDefNames[sourceA] = map[string]struct{}{"foo": {}}
 
