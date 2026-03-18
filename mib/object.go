@@ -82,6 +82,46 @@ func (o *Object) DefaultValue() DefVal {
 // EffectiveDisplayHint returns the display hint resolved through the type chain.
 func (o *Object) EffectiveDisplayHint() string { return o.hint }
 
+// ParsedDisplayHint parses and validates this object's effective DISPLAY-HINT,
+// returning a structured [DisplayHint]. Returns nil if the object has no display
+// hint or the hint is malformed.
+func (o *Object) ParsedDisplayHint() *DisplayHint {
+	if o.hint == "" {
+		return nil
+	}
+	return ParseDisplayHint(o.hint)
+}
+
+// FormatInteger formats an integer value using this object's effective
+// DISPLAY-HINT. Returns "" and false if the object has no display hint or the
+// hint is not a valid integer hint.
+func (o *Object) FormatInteger(value int64, hexCase HexCase) (string, bool) {
+	if o.hint == "" {
+		return "", false
+	}
+	return FormatInteger(o.hint, value, hexCase)
+}
+
+// ScaleInteger applies this object's DISPLAY-HINT as numeric scaling. Only
+// "d" and "d-N" hints produce a result. Returns 0 and false if the hint is
+// absent, non-decimal, or malformed.
+func (o *Object) ScaleInteger(value int64) (float64, bool) {
+	if o.hint == "" {
+		return 0, false
+	}
+	return ScaleInteger(o.hint, value)
+}
+
+// FormatOctets formats an octet string using this object's effective
+// DISPLAY-HINT. Returns "" and false if the object has no display hint, the
+// hint is malformed, or data is empty.
+func (o *Object) FormatOctets(data []byte, hexCase HexCase) (string, bool) {
+	if o.hint == "" {
+		return "", false
+	}
+	return FormatOctets(o.hint, data, hexCase)
+}
+
 // EffectiveSizes returns size constraints resolved through the type chain.
 func (o *Object) EffectiveSizes() []Range { return slices.Clone(o.sizes) }
 

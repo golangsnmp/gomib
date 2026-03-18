@@ -1835,98 +1835,6 @@ func checkOpaqueSMIv2(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 }
 
-// validateDisplayHintInteger checks an integer-type DISPLAY-HINT per RFC 2579
-// section 3.1. Valid forms: "x", "o", "b", "d", or "d-N" where N is one or
-// more decimal digits specifying the implied decimal point position.
-func validateDisplayHintInteger(hint string) bool {
-	if hint == "" {
-		return false
-	}
-	switch hint[0] {
-	case 'x', 'o', 'b':
-		return len(hint) == 1
-	case 'd':
-		if len(hint) == 1 {
-			return true
-		}
-		if hint[1] != '-' || len(hint) < 3 {
-			return false
-		}
-		for i := 2; i < len(hint); i++ {
-			if hint[i] < '0' || hint[i] > '9' {
-				return false
-			}
-		}
-		return true
-	default:
-		return false
-	}
-}
-
-// validateDisplayHintOctetString checks an octet-string-type DISPLAY-HINT per
-// RFC 2579 section 3.1. The hint consists of one or more octet-format specs,
-// each with five parts: optional repeat indicator (*), required octet count
-// (decimal digits), required format char (x/d/o/a/t), optional separator char,
-// and optional repeat terminator char.
-func validateDisplayHintOctetString(hint string) bool {
-	if hint == "" {
-		return false
-	}
-	p := 0
-	// Track whether the last spec consumes data. The last spec is implicitly
-	// repeated until all data is exhausted, so it must consume at least one
-	// byte to avoid infinite loops.
-	lastSpecConsumes := false
-	for p < len(hint) {
-		// Part 1: optional repeat indicator
-		repeat := false
-		if hint[p] == '*' {
-			repeat = true
-			p++
-		}
-
-		// Part 2: required octet count (one or more digits)
-		n := 0
-		take := 0
-		for p < len(hint) && hint[p] >= '0' && hint[p] <= '9' {
-			take = take*10 + int(hint[p]-'0')
-			p++
-			n++
-		}
-		if n == 0 {
-			return false
-		}
-
-		// Part 3: required format character
-		if p >= len(hint) {
-			return false
-		}
-		switch hint[p] {
-		case 'x', 'd', 'o', 'a', 't':
-			p++
-		default:
-			return false
-		}
-
-		// Part 4: optional separator character (not a digit, not *)
-		if p < len(hint) && hint[p] != '*' && (hint[p] < '0' || hint[p] > '9') {
-			p++
-
-			// Part 5: optional repeat terminator (only if repeat and separator present)
-			if repeat && p < len(hint) && hint[p] != '*' && (hint[p] < '0' || hint[p] > '9') {
-				p++
-			}
-		}
-
-		// A spec consumes data if take > 0, or if it has a repeat indicator
-		// (which consumes the count byte).
-		lastSpecConsumes = take > 0 || repeat
-	}
-	// The last spec is implicitly repeated. If it consumes zero bytes,
-	// applying the hint would loop forever.
-	return lastSpecConsumes
-}
-
 // checkFormatHints validates DISPLAY-HINT usage on textual conventions.
 // It combines two checks:
 //   - DiagInvalidFormat: format string is syntactically invalid for the base
@@ -1954,9 +1862,9 @@ func checkFormatHints(ctx *resolverContext) {
 				var valid bool
 				switch base {
 				case BaseInteger32, BaseUnsigned32, BaseGauge32, BaseTimeTicks:
-					valid = validateDisplayHintInteger(td.DisplayHint)
+					valid = IsValidIntegerHint(td.DisplayHint)
 				case BaseOctetString, BaseOpaque:
-					valid = validateDisplayHintOctetString(td.DisplayHint)
+					valid = IsValidOctetStringHint(td.DisplayHint)
 				default:
 					// DISPLAY-HINT is not applicable to this basetype.
 					valid = false
