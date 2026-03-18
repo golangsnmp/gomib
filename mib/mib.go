@@ -219,6 +219,28 @@ func (l OidLookup) Node() *Node { return l.node }
 // the matched node's OID. Empty when the input OID exactly matches a tree node.
 func (l OidLookup) Suffix() OID { return l.suffix }
 
+// DecodeIndexes decodes the instance suffix into typed index values.
+//
+// Uses the matched node's row INDEX clause to interpret the suffix arcs
+// per RFC 2578 section 7.7. Returns nil if the node has no associated
+// object, is not part of a table, or the row has no index definitions.
+//
+// See [DecodeSuffix] for the standalone function and encoding details.
+func (l OidLookup) DecodeIndexes() []DecodedIndex {
+	if l.node == nil {
+		return nil
+	}
+	obj := l.node.Object()
+	if obj == nil {
+		return nil
+	}
+	row := obj.Row()
+	if row == nil {
+		return nil
+	}
+	return DecodeSuffix(row.EffectiveIndexes(), l.suffix)
+}
+
 // LookupInstance looks up a numeric OID and returns both the matched node
 // and the instance suffix. This is the standard pattern for processing SNMP
 // varbinds, where you need the base node (for metadata, type info, formatting)
