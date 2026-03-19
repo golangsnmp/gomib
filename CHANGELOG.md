@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-03-19
+
+### Added
+
+- Add inspect subcommand for deep-dive symbol inspection (type chains, import provenance, group membership, scoped diagnostics)
+- Add NodesByName for multi-result name lookup
+- Add Type.EffectiveTC to walk type chain for nearest textual convention
+- Add IndexEntry.FixedSize for fixed-width encoding queries
+- Add index suffix decoding for table instance OIDs (DecodeSuffix, IndexValue, DecodedIndex types)
+- Extend Object.EffectiveIndexes to delegate to parent row on columns
+- Add global fallbacks to linkObjectIndexes in permissive mode (INDEX and AUGMENTS resolution)
+- Add tests for global fallback code paths and corpus test helpers
+
+### Changed
+
+- Simplify Node.Module to return OID-phase owner directly, removing entity-cascading priority chain
+- Move module list out of newResolverContext, making registerModules the single owner of ctx.modules
+- Deduplicate find command search loops with findFilter struct and collectMatches helper
+- Clean up minor CLI and resolver duplication (reportOpt helper, oidComponentNameAndModule extraction)
+- Document intentional moduleOid drop in lowering for MODULE-COMPLIANCE and AGENT-CAPABILITIES
+
+### Fixed
+
+- Fix scanModuleNames skipping files with comments before DEFINITIONS
+- Fix dump command exit code for hard load failure (return exitError instead of exitIssue)
+- Fix silent test degradation in corpus helpers (fatal on failure instead of returning empty)
+- Fix exit codes for fs.Parse errors in list, paths, dump commands
+
 ## [0.9.0] - 2026-03-18
 
 ### Added
@@ -58,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix path traversal in normalize output path
 - Fix godoc link to mib.DiagnosticConfig
 
-[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/golangsnmp/gomib/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/golangsnmp/gomib/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/golangsnmp/gomib/compare/v0.7.1...v0.8.0
