@@ -146,6 +146,22 @@ gomib find --format json -m IF-MIB '*Entry'
 
 Flags: `-m MODULE` (repeatable), `--kind` (scalar/table/row/column/notification/node/group/compliance/capability/module-identity/object-identity), `--type` (base type filter for objects), `--count` (print count only), `--format` (text/json), `--strict`, `--permissive`.
 
+### inspect
+
+Deep-dive inspection of a MIB symbol. Shows type chain, import provenance, group membership, scoped diagnostics, and full detail for any symbol type (objects, types, notifications, groups, compliances, capabilities, bare nodes). Also accepts type names that don't have OID nodes (e.g. `DisplayString`).
+
+Uses permissive resolver with verbose diagnostics by default to maximize resolution while collecting all diagnostics for display.
+
+```
+gomib inspect ifDescr
+gomib inspect -m IF-MIB ifEntry
+gomib inspect IF-MIB::ifIndex
+gomib inspect DisplayString
+gomib inspect 1.3.6.1.2.1.2.2.1.2
+```
+
+Flags: `-m MODULE` (repeatable), `--strict`, `--permissive`.
+
 ### trace
 
 Trace symbol resolution for debugging. Shows where a symbol is defined, how it resolves, and any related issues. Modules selected via -m flag, defaults to all.

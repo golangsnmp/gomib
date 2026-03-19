@@ -486,6 +486,7 @@ The `cmd/gomib` tool provides a command-line interface for MIB operations:
 gomib load IF-MIB                    # load and show statistics
 gomib get -m IF-MIB ifIndex          # query by name
 gomib get -m IF-MIB 1.3.6.1.2.1.2   # query by OID
+gomib inspect ifDescr                # deep-dive with type chain, provenance, diagnostics
 gomib dump IF-MIB                    # JSON output
 gomib lint IF-MIB                    # check for issues
 gomib find -p testdata/corpus/primary 'if*'        # search by pattern
