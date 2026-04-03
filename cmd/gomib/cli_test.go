@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -530,6 +531,15 @@ func runCLI(t *testing.T, args ...string) (int, string, string) {
 		t.Fatalf("stderr pipe: %v", err)
 	}
 
+	// Drain pipes concurrently to avoid blocking on Windows where
+	// OS pipe buffers are small (~4KB). Without this, commands that
+	// produce large output (e.g. dump) deadlock waiting for a reader.
+	var stdoutBuf, stderrBuf bytes.Buffer
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); _, _ = stdoutBuf.ReadFrom(stdoutR) }()
+	go func() { defer wg.Done(); _, _ = stderrBuf.ReadFrom(stderrR) }()
+
 	os.Args = append([]string{"gomib"}, args...)
 	os.Stdout = stdoutW
 	os.Stderr = stderrW
@@ -542,10 +552,7 @@ func runCLI(t *testing.T, args ...string) (int, string, string) {
 	os.Stdout = oldStdout
 	os.Stderr = oldStderr
 
-	var stdoutBuf bytes.Buffer
-	var stderrBuf bytes.Buffer
-	_, _ = stdoutBuf.ReadFrom(stdoutR)
-	_, _ = stderrBuf.ReadFrom(stderrR)
+	wg.Wait()
 	_ = stdoutR.Close()
 	_ = stderrR.Close()
 
