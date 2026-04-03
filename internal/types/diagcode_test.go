@@ -74,4 +74,13 @@ func TestAllDiagnosticCodesComplete(t *testing.T) {
 			t.Errorf("AllDiagnosticCodes contains %q which has no corresponding Diag* constant", info.Code)
 		}
 	}
+
+	// No two Diag* constants should share the same string value.
+	valueToName := make(map[string]string)
+	for name, code := range sourceConstants {
+		if prev, ok := valueToName[code]; ok {
+			t.Errorf("duplicate diagnostic code value %q: used by both %s and %s", code, prev, name)
+		}
+		valueToName[code] = name
+	}
 }

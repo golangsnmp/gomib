@@ -420,6 +420,9 @@ func init() {
 	codeSeverity = make(map[string]Severity)
 	for _, phase := range diagPhases {
 		for _, entry := range phase.codes {
+			if _, exists := codeSeverity[entry.code]; exists {
+				panic("duplicate diagnostic code: " + entry.code)
+			}
 			codeSeverity[entry.code] = entry.severity
 		}
 	}

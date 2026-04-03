@@ -410,7 +410,10 @@ func appendSuffix(base OID, suffix string) (OID, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid instance suffix %q: %w", suffix, err)
 	}
-	return append(base, extra...), nil
+	result := make(OID, len(base)+len(extra))
+	copy(result, base)
+	copy(result[len(base):], extra)
+	return result, nil
 }
 
 // Module returns the module with the given name, or nil if not found.

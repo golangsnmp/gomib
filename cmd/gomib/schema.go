@@ -1128,12 +1128,12 @@ func buildExportCompliance(comp *mib.Compliance, m *mib.Mib) ExportCompliance {
 		}
 
 		for _, grpName := range cm.MandatoryGroups {
-			ref := resolveGroupRef(m, effectiveModName, grpName)
+			ref := resolveNamedRef(m, effectiveModName, grpName)
 			vcm.MandatoryGroups = append(vcm.MandatoryGroups, ref)
 		}
 
 		for _, cg := range cm.Groups {
-			ref := resolveGroupRef(m, effectiveModName, cg.Group)
+			ref := resolveNamedRef(m, effectiveModName, cg.Group)
 			vcg := ExportComplianceGroup{
 				Group:       ref,
 				Description: strPtr(cg.Description),
@@ -1142,7 +1142,7 @@ func buildExportCompliance(comp *mib.Compliance, m *mib.Mib) ExportCompliance {
 		}
 
 		for _, co := range cm.Objects {
-			ref := resolveObjRefByName(m, effectiveModName, co.Object)
+			ref := resolveNamedRef(m, effectiveModName, co.Object)
 			vco := ExportComplianceObject{
 				Object:      ref,
 				Syntax:      exportSyntaxConstraints(co.Syntax),
@@ -1194,13 +1194,13 @@ func buildExportCapability(cap *mib.Capability, m *mib.Mib) ExportCapability {
 		}
 
 		for _, grpName := range s.Includes {
-			ref := resolveGroupRef(m, s.ModuleName, grpName)
+			ref := resolveNamedRef(m, s.ModuleName, grpName)
 			vs.Includes = append(vs.Includes, ref)
 		}
 
 		for i := range s.ObjectVariations {
 			ov := &s.ObjectVariations[i]
-			ref := resolveObjRefByName(m, s.ModuleName, ov.Object)
+			ref := resolveNamedRef(m, s.ModuleName, ov.Object)
 			vov := ExportObjectVariation{
 				Object:           ref,
 				Syntax:           exportSyntaxConstraints(ov.Syntax),
@@ -1214,14 +1214,14 @@ func buildExportCapability(cap *mib.Capability, m *mib.Mib) ExportCapability {
 				vov.Access = &a
 			}
 			for _, cr := range ov.CreationRequires {
-				crRef := resolveObjRefByName(m, s.ModuleName, cr)
+				crRef := resolveNamedRef(m, s.ModuleName, cr)
 				vov.CreationRequires = append(vov.CreationRequires, crRef)
 			}
 			vs.ObjectVariations = append(vs.ObjectVariations, vov)
 		}
 
 		for _, nv := range s.NotificationVariations {
-			ref := resolveNotifRefByName(m, s.ModuleName, nv.Notification)
+			ref := resolveNamedRef(m, s.ModuleName, nv.Notification)
 			vnv := ExportNotificationVariation{
 				Notification: ref,
 				Description:  strPtr(nv.Description),
@@ -1251,43 +1251,17 @@ func buildExportDiagnostic(d mib.Diagnostic) ExportDiagnostic {
 	}
 }
 
-// resolveGroupRef looks up a group by name and returns an ObjRef.
-func resolveGroupRef(m *mib.Mib, moduleName, groupName string) ExportObjRef {
-	qualified := moduleName + "::" + groupName
+// resolveNamedRef looks up a node by name (qualified then unqualified) and returns an ObjRef.
+func resolveNamedRef(m *mib.Mib, moduleName, name string) ExportObjRef {
+	qualified := moduleName + "::" + name
 	node := m.Resolve(qualified)
 	if node == nil {
-		node = m.Resolve(groupName)
+		node = m.Resolve(name)
 	}
 	if node != nil {
 		return exportNodeRef(node)
 	}
-	return ExportObjRef{Name: groupName, Module: moduleName}
-}
-
-// resolveObjRefByName looks up an object by name and returns an ObjRef.
-func resolveObjRefByName(m *mib.Mib, moduleName, objName string) ExportObjRef {
-	qualified := moduleName + "::" + objName
-	node := m.Resolve(qualified)
-	if node == nil {
-		node = m.Resolve(objName)
-	}
-	if node != nil {
-		return exportNodeRef(node)
-	}
-	return ExportObjRef{Name: objName, Module: moduleName}
-}
-
-// resolveNotifRefByName looks up a notification by name and returns an ObjRef.
-func resolveNotifRefByName(m *mib.Mib, moduleName, notifName string) ExportObjRef {
-	qualified := moduleName + "::" + notifName
-	node := m.Resolve(qualified)
-	if node == nil {
-		node = m.Resolve(notifName)
-	}
-	if node != nil {
-		return exportNodeRef(node)
-	}
-	return ExportObjRef{Name: notifName, Module: moduleName}
+	return ExportObjRef{Name: name, Module: moduleName}
 }
 
 func sortObjRefs(refs []ExportObjRef) {
