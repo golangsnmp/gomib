@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"maps"
 	"os"
 	posixpath "path"
@@ -323,11 +322,6 @@ func isIdentChar(b byte) bool {
 	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '-' || b == '_'
 }
 
-// buildTreeIndex walks a file tree and builds a module name -> path index.
-// Module names are derived from file content (scanning for DEFINITIONS headers),
-// not from filenames. Multiple module names from one file each get their own
-// index entry pointing to the same path. First match wins for duplicate names.
-// The readFn parameter provides file content for scanning.
 // File creates a Source from a single MIB file on disk.
 // The module name is extracted from the file content by scanning for
 // "DEFINITIONS ::=" headers, just like [Dir] does for directory trees.
@@ -388,7 +382,6 @@ func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error, read
 
 	err := walkFn(func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			slog.Debug("buildTreeIndex: skipping entry", "path", path, "error", err)
 			if d != nil && d.IsDir() {
 				return fs.SkipDir
 			}
@@ -403,7 +396,6 @@ func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error, read
 
 		content, readErr := readFn(path)
 		if readErr != nil {
-			slog.Debug("buildTreeIndex: cannot read file", "path", path, "error", readErr)
 			return nil
 		}
 
