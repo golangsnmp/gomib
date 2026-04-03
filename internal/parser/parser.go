@@ -2675,7 +2675,7 @@ func (p *Parser) recoverToDefinition() {
 		next := p.peekNth(1).Kind
 
 		if (current.IsIdentifier() && next.IsMacroKeyword()) ||
-			(current == lexer.TokUppercaseIdent && next == lexer.TokColonColonEqual) ||
+			(current.IsIdentifier() && next == lexer.TokColonColonEqual) ||
 			(current == lexer.TokUppercaseIdent && next == lexer.TokKwTextualConvention) ||
 			(current == lexer.TokUppercaseIdent && next == lexer.TokKwMacro) ||
 			(current.IsIdentifier() && next == lexer.TokKwObject &&
