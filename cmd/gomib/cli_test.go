@@ -197,6 +197,312 @@ func TestVersionFlagShowsVersion(t *testing.T) {
 	}
 }
 
+// --- list command ---
+
+func TestListShowsModuleName(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "list")
+	if code != exitOK {
+		t.Fatalf("list exited %d, stderr=%q", code, stderr)
+	}
+	if !strings.Contains(stdout, "TEST-MIB") {
+		t.Fatalf("expected TEST-MIB in list output, got %q", stdout)
+	}
+}
+
+func TestListCount(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "list", "--count")
+	if code != exitOK {
+		t.Fatalf("list --count exited %d, stderr=%q", code, stderr)
+	}
+	if strings.TrimSpace(stdout) != "1" {
+		t.Fatalf("expected count 1, got %q", stdout)
+	}
+}
+
+func TestListFormatJSON(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "list", "--format", "json")
+	if code != exitOK {
+		t.Fatalf("list --format json exited %d, stderr=%q", code, stderr)
+	}
+	if !strings.Contains(stdout, `"TEST-MIB"`) {
+		t.Fatalf("expected JSON with TEST-MIB, got %q", stdout)
+	}
+}
+
+// --- dump command ---
+
+func TestDumpBasicJSON(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "dump", "TEST-MIB")
+	if code != exitOK {
+		t.Fatalf("dump exited %d, stderr=%q", code, stderr)
+	}
+	for _, field := range []string{`"modules"`, `"objects"`, `"nodes"`, `"testScalar"`} {
+		if !strings.Contains(stdout, field) {
+			t.Fatalf("expected %s in dump output, got %q", field, stdout)
+		}
+	}
+}
+
+func TestDumpCompact(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "dump", "--compact", "TEST-MIB")
+	if code != exitOK {
+		t.Fatalf("dump --compact exited %d, stderr=%q", code, stderr)
+	}
+	// Compact output should not have indented lines
+	for line := range strings.SplitSeq(stdout, "\n") {
+		if strings.HasPrefix(line, "  ") {
+			t.Fatalf("compact output should not be indented, got line: %q", line)
+		}
+	}
+}
+
+func TestDumpNoDescriptions(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "dump", "--no-descriptions", "TEST-MIB")
+	if code != exitOK {
+		t.Fatalf("dump --no-descriptions exited %d, stderr=%q", code, stderr)
+	}
+	if strings.Contains(stdout, "A test scalar") {
+		t.Fatalf("--no-descriptions should omit description text, got %q", stdout)
+	}
+}
+
+func TestDumpOIDFilter(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "dump", "-o", "1.3.6.1.4.1.99999.1", "TEST-MIB")
+	if code != exitOK {
+		t.Fatalf("dump -o exited %d, stderr=%q", code, stderr)
+	}
+	if !strings.Contains(stdout, "testScalar") {
+		t.Fatalf("OID filter should include testScalar, got %q", stdout)
+	}
+}
+
+// --- lint command ---
+
+func TestLintBasicText(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, _ := runCLI(t, "-p", dir, "lint", "TEST-MIB")
+	// Exit 0 or 1 are both valid (depends on whether test MIB has issues)
+	if code == exitError {
+		t.Fatalf("lint returned operational error %d", code)
+	}
+	// Should mention module count
+	if !strings.Contains(stdout, "module") {
+		t.Fatalf("expected module reference in lint output, got %q", stdout)
+	}
+}
+
+func TestLintFormatJSON(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, _ := runCLI(t, "-p", dir, "lint", "--format", "json", "TEST-MIB")
+	if code == exitError {
+		t.Fatalf("lint --format json returned operational error %d", code)
+	}
+	if !strings.Contains(stdout, `"summary"`) {
+		t.Fatalf("expected JSON summary field, got %q", stdout)
+	}
+}
+
+func TestLintFormatSARIF(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, _ := runCLI(t, "-p", dir, "lint", "--format", "sarif", "TEST-MIB")
+	if code == exitError {
+		t.Fatalf("lint --format sarif returned operational error %d", code)
+	}
+	if !strings.Contains(stdout, `"version"`) || !strings.Contains(stdout, `"runs"`) {
+		t.Fatalf("expected SARIF structure, got %q", stdout)
+	}
+}
+
+func TestLintFormatCompact(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, _, _ := runCLI(t, "-p", dir, "lint", "--format", "compact", "TEST-MIB")
+	if code == exitError {
+		t.Fatalf("lint --format compact returned operational error %d", code)
+	}
+}
+
+func TestLintSummary(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, _ := runCLI(t, "-p", dir, "lint", "--summary", "TEST-MIB")
+	if code == exitError {
+		t.Fatalf("lint --summary returned operational error %d", code)
+	}
+	if !strings.Contains(stdout, "Checked") {
+		t.Fatalf("expected summary header, got %q", stdout)
+	}
+}
+
+func TestLintListCodes(t *testing.T) {
+	code, stdout, stderr := runCLI(t, "lint", "--list-codes")
+	if code != exitOK {
+		t.Fatalf("lint --list-codes exited %d, stderr=%q", code, stderr)
+	}
+	// Should list at least some diagnostic codes
+	if !strings.Contains(stdout, "import") && !strings.Contains(stdout, "type") {
+		t.Fatalf("expected diagnostic code listing, got %q", stdout)
+	}
+}
+
+func TestLintQuiet(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, _ := runCLI(t, "-p", dir, "lint", "--quiet", "TEST-MIB")
+	if code == exitError {
+		t.Fatalf("lint --quiet returned operational error %d", code)
+	}
+	if stdout != "" {
+		t.Fatalf("--quiet should produce no stdout, got %q", stdout)
+	}
+}
+
+func TestLintGroupBy(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	for _, groupBy := range []string{"module", "code", "severity"} {
+		t.Run(groupBy, func(t *testing.T) {
+			code, _, _ := runCLI(t, "-p", dir, "lint", "--group-by", groupBy, "TEST-MIB")
+			if code == exitError {
+				t.Fatalf("lint --group-by %s returned operational error", groupBy)
+			}
+		})
+	}
+}
+
+// --- inspect command ---
+
+func TestInspectObject(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "inspect", "-m", "TEST-MIB", "testScalar")
+	if code != exitOK {
+		t.Fatalf("inspect exited %d, stderr=%q", code, stderr)
+	}
+	for _, field := range []string{"testScalar", "TEST-MIB", "Integer32"} {
+		if !strings.Contains(stdout, field) {
+			t.Fatalf("expected %q in inspect output, got %q", field, stdout)
+		}
+	}
+}
+
+func TestInspectNotFound(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, _, _ := runCLI(t, "-p", dir, "inspect", "-m", "TEST-MIB", "nonExistentSymbol")
+	if code != exitIssue {
+		t.Fatalf("expected exit %d for not found, got %d", exitIssue, code)
+	}
+}
+
+func TestInspectRequiresArgument(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, _, _ := runCLI(t, "-p", dir, "inspect", "-m", "TEST-MIB")
+	if code != exitError {
+		t.Fatalf("expected exit %d for missing argument, got %d", exitError, code)
+	}
+}
+
+// --- trace command ---
+
+func TestTraceObject(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "trace", "-m", "TEST-MIB", "testScalar")
+	if code != exitOK {
+		t.Fatalf("trace exited %d, stderr=%q", code, stderr)
+	}
+	if !strings.Contains(stdout, "testScalar") {
+		t.Fatalf("expected testScalar in trace output, got %q", stdout)
+	}
+}
+
+func TestTraceNotFound(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	// trace always exits 0 - it reports whatever it finds, including "(none found)"
+	code, stdout, stderr := runCLI(t, "-p", dir, "trace", "-m", "TEST-MIB", "nonExistentSymbol")
+	if code != exitOK {
+		t.Fatalf("trace exited %d, stderr=%q", code, stderr)
+	}
+	if !strings.Contains(stdout, "(none found)") {
+		t.Fatalf("expected '(none found)' for missing symbol, got %q", stdout)
+	}
+}
+
+func TestTraceRequiresArgument(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, _, _ := runCLI(t, "-p", dir, "trace", "-m", "TEST-MIB")
+	if code != exitError {
+		t.Fatalf("expected exit %d for missing argument, got %d", exitError, code)
+	}
+}
+
+// --- normalize command ---
+
+func TestNormalizeBasic(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "normalize", "TEST-MIB")
+	if code != exitOK {
+		t.Fatalf("normalize exited %d, stderr=%q", code, stderr)
+	}
+	for _, keyword := range []string{"DEFINITIONS", "BEGIN", "END", "testScalar"} {
+		if !strings.Contains(stdout, keyword) {
+			t.Fatalf("expected %q in normalize output, got %q", keyword, stdout)
+		}
+	}
+}
+
+func TestNormalizeNoDescriptions(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "normalize", "--no-descriptions", "TEST-MIB")
+	if code != exitOK {
+		t.Fatalf("normalize --no-descriptions exited %d, stderr=%q", code, stderr)
+	}
+	if strings.Contains(stdout, "A test scalar") {
+		t.Fatalf("--no-descriptions should omit description text, got %q", stdout)
+	}
+}
+
+func TestNormalizeToDir(t *testing.T) {
+	dir := writeTestMIB(t)
+	outDir := t.TempDir()
+
+	code, _, stderr := runCLI(t, "-p", dir, "normalize", "-o", outDir, "TEST-MIB")
+	if code != exitOK {
+		t.Fatalf("normalize -o exited %d, stderr=%q", code, stderr)
+	}
+
+	entries, err := os.ReadDir(outDir)
+	if err != nil {
+		t.Fatalf("reading output dir: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected output file in directory")
+	}
+}
+
 func writeTestMIB(t *testing.T) string {
 	t.Helper()
 

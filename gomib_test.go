@@ -135,14 +135,24 @@ func TestWithSystemPaths(t *testing.T) {
 
 	m, err := gomib.Load(ctx, gomib.WithSystemPaths())
 	if err != nil {
-		if !errors.Is(err, gomib.ErrNoSources) && !errors.Is(err, gomib.ErrDiagnosticThreshold) {
+		if errors.Is(err, gomib.ErrNoSources) {
+			t.Skip("no system MIB paths found on this host")
+		}
+		if !errors.Is(err, gomib.ErrDiagnosticThreshold) {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		return
+		// ErrDiagnosticThreshold is acceptable (vendor MIBs may have issues),
+		// but the Mib should still be returned with resolved data.
 	}
 
 	if m == nil {
-		t.Fatal("Mib should not be nil when Load succeeds")
+		t.Fatal("Mib should not be nil")
+	}
+	if m.NodeCount() == 0 {
+		t.Error("system paths should yield at least some resolved nodes")
+	}
+	if len(m.Modules()) == 0 {
+		t.Error("system paths should yield at least one loaded module")
 	}
 }
 
