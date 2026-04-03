@@ -3,6 +3,7 @@ package mib
 import (
 	"fmt"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -83,7 +84,7 @@ func (v IndexValue) IP() net.IP {
 // Bytes returns the octet string value and true, or (nil, false).
 func (v IndexValue) Bytes() ([]byte, bool) {
 	if v.kind == IndexValueOctetString {
-		return v.value.([]byte), true
+		return slices.Clone(v.value.([]byte)), true
 	}
 	return nil, false
 }
@@ -91,7 +92,7 @@ func (v IndexValue) Bytes() ([]byte, bool) {
 // OID returns the object identifier arcs and true, or (nil, false).
 func (v IndexValue) OID() (OID, bool) {
 	if v.kind == IndexValueObjectIdentifier {
-		return v.value.(OID), true
+		return slices.Clone(v.value.(OID)), true
 	}
 	return nil, false
 }

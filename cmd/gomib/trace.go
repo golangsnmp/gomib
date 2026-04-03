@@ -84,7 +84,7 @@ func (c *cli) cmdTrace(args []string) int {
 	}
 
 	m, err := c.loadMibWithOpts(mods, strictnessOpts(*strict, *permissive)...)
-	if err != nil {
+	if err != nil && m == nil {
 		printError("failed to load: %v", err)
 		return exitError
 	}

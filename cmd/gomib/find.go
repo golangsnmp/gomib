@@ -107,7 +107,7 @@ func (c *cli) cmdFind(args []string) int {
 	}
 
 	m, err := c.loadMibWithOpts(mods, opts...)
-	if err != nil {
+	if err != nil && m == nil {
 		printError("failed to load: %v", err)
 		return exitError
 	}
