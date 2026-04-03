@@ -305,7 +305,7 @@ func exportSeverity(s mib.Severity) string {
 	case mib.SeverityFatal, mib.SeveritySevere, mib.SeverityError:
 		return "error"
 	case mib.SeverityMinor:
-		return "warning"
+		return "minor"
 	case mib.SeverityStyle:
 		return "style"
 	case mib.SeverityWarning:

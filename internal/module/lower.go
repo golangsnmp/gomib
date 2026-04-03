@@ -374,6 +374,7 @@ func lowerModuleIdentity(def *ast.ModuleIdentityDef, ctx *LoweringContext) *Modu
 			Description: r.Description.Value,
 			Span:        r.Span,
 		}
+		checkEmptyRequiredString(ctx, r.Description.Value, r.Span, def.Name.Name, "REVISION DESCRIPTION", types.DiagEmptyDescription)
 	}
 
 	name := def.Name.Name

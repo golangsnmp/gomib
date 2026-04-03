@@ -64,16 +64,16 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 
 	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "oids"))
 	resolveOids(ctx)
+	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "oids"))
+
+	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "semantics"))
+	resolveSemantics(ctx)
 	nodeCount := 0
 	for range ctx.mib.Nodes() {
 		nodeCount++
 	}
-	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "oids"),
+	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "semantics"),
 		slog.Int("nodes", nodeCount))
-
-	r.Log(slog.LevelDebug, "starting phase", slog.String("phase", "semantics"))
-	resolveSemantics(ctx)
-	r.Log(slog.LevelDebug, "phase complete", slog.String("phase", "semantics"))
 
 	checkUnusedImports(ctx)
 	checkObsoleteImports(ctx)
