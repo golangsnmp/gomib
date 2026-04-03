@@ -288,7 +288,7 @@ func printLintText(result *lintResult, cfg *lintConfig) {
 
 func printLintFlat(result *lintResult) {
 	for i := range result.Diagnostics {
-		printLintDiagLine(&result.Diagnostics[i])
+		printLintDiag(&result.Diagnostics[i], true)
 	}
 }
 
@@ -312,7 +312,7 @@ func printLintByModule(result *lintResult) {
 		fmt.Printf("\n%s:\n", mod)
 		for i := range byMod[mod] {
 			fmt.Printf("  ")
-			printLintDiagLine(&byMod[mod][i])
+			printLintDiag(&byMod[mod][i], true)
 		}
 	}
 }
@@ -368,30 +368,17 @@ func printLintBySeverity(result *lintResult) {
 			fmt.Printf("\n%s (%d):\n", diags[0].Severity, len(diags))
 			for i := range diags {
 				fmt.Printf("  ")
-				printLintDiagLineNoSeverity(&diags[i])
+				printLintDiag(&diags[i], false)
 			}
 		}
 	}
 }
 
-func printLintDiagLine(d *lintDiagnostic) {
-	parts := []string{d.Severity + ":"}
-	if d.Code != "" {
-		parts = append(parts, "["+d.Code+"]")
+func printLintDiag(d *lintDiagnostic, includeSeverity bool) {
+	var parts []string
+	if includeSeverity {
+		parts = append(parts, d.Severity+":")
 	}
-	if d.Module != "" {
-		if d.Line > 0 {
-			parts = append(parts, fmt.Sprintf("%s:%d:", d.Module, d.Line))
-		} else {
-			parts = append(parts, d.Module+":")
-		}
-	}
-	parts = append(parts, d.Message)
-	fmt.Println(strings.Join(parts, " "))
-}
-
-func printLintDiagLineNoSeverity(d *lintDiagnostic) {
-	parts := []string{}
 	if d.Code != "" {
 		parts = append(parts, "["+d.Code+"]")
 	}

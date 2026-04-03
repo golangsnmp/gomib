@@ -487,15 +487,21 @@ func createResolvedNotifications(ctx *resolverContext) {
 		}
 
 		for _, objName := range notif.Objects {
-			// Use module-scoped object lookup to get the object from the
-			// correct module, not whichever module won node preference.
-			if obj := ctx.lookupObjectInModuleScope(ref.mod, objName); obj != nil {
+			// addNotifObject adds an object to the notification, checking
+			// not-accessible and emitting a diagnostic if needed.
+			addNotifObject := func(obj *Object) {
 				resolved.addObject(obj)
 				if obj.Access() == AccessNotAccessible {
 					ctx.EmitDiagnostic(types.DiagNotifObjectAccess,
 						ref.mod, notif.Span,
 						fmt.Sprintf("notification %q references %q which is not-accessible", notif.Name, objName))
 				}
+			}
+
+			// Use module-scoped object lookup to get the object from the
+			// correct module, not whichever module won node preference.
+			if obj := ctx.lookupObjectInModuleScope(ref.mod, objName); obj != nil {
+				addNotifObject(obj)
 				continue
 			}
 
@@ -509,12 +515,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 							slog.String("notification", notif.Name))
 					}
 					if objNode.Object() != nil {
-						resolved.addObject(objNode.Object())
-						if objNode.Object().Access() == AccessNotAccessible {
-							ctx.EmitDiagnostic(types.DiagNotifObjectAccess,
-								ref.mod, notif.Span,
-								fmt.Sprintf("notification %q references %q which is not-accessible", notif.Name, objName))
-						}
+						addNotifObject(objNode.Object())
 						continue
 					}
 					// Node exists but has no object definition.
@@ -535,12 +536,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 			default:
 				// Node has an object but it belongs to a different module
 				// (not in our import scope). Still add it since we found it.
-				resolved.addObject(objNode.Object())
-				if objNode.Object().Access() == AccessNotAccessible {
-					ctx.EmitDiagnostic(types.DiagNotifObjectAccess,
-						ref.mod, notif.Span,
-						fmt.Sprintf("notification %q references %q which is not-accessible", notif.Name, objName))
-				}
+				addNotifObject(objNode.Object())
 			}
 		}
 

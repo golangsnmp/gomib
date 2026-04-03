@@ -483,7 +483,7 @@ func exportSyntaxConstraints(sc *mib.SyntaxConstraints) *ExportEffectiveSyntax {
 	}
 	syn := &ExportEffectiveSyntax{
 		Base:        "Unknown",
-		Constraints: exportConstraints(sc.Sizes, sc.Ranges, exportSCEnums(sc.Enums), exportSCBits(sc.Bits)),
+		Constraints: exportConstraints(sc.Sizes, sc.Ranges, sc.Enums, sc.Bits),
 	}
 	if sc.Type != nil {
 		syn.Base = exportBaseType(sc.Type.EffectiveBase())
@@ -499,12 +499,6 @@ func exportSyntaxConstraints(sc *mib.SyntaxConstraints) *ExportEffectiveSyntax {
 	}
 	return syn
 }
-
-// exportSCEnums converts NamedValue slice to the types expected by exportConstraints.
-func exportSCEnums(nv []mib.NamedValue) []mib.NamedValue { return nv }
-
-// exportSCBits converts NamedValue slice to the types expected by exportConstraints.
-func exportSCBits(nv []mib.NamedValue) []mib.NamedValue { return nv }
 
 func exportDefaultValue(dv mib.DefVal) *ExportDefaultValue {
 	if dv.IsZero() {
