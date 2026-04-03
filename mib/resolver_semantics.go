@@ -1033,25 +1033,7 @@ func lookupPrimitiveType(ctx *resolverContext, mod *module.Module, span types.Sp
 // in the module or its imports. Used to suppress spurious unresolved type
 // diagnostics for row OBJECT-TYPE SYNTAX references (e.g., SYNTAX IfEntry).
 func isSequenceTypeDef(ctx *resolverContext, mod *module.Module, name string) bool {
-	if hasSequenceTypeDef(mod, name) {
-		return true
-	}
-	if imports := ctx.moduleImports[mod]; imports != nil {
-		if srcMod := imports[name]; srcMod != nil {
-			return hasSequenceTypeDef(srcMod, name)
-		}
-	}
-	return false
-}
-
-func hasSequenceTypeDef(mod *module.Module, name string) bool {
-	for _, def := range mod.Definitions {
-		if td, ok := def.(*module.TypeDef); ok && td.Name == name {
-			_, isSeq := td.Syntax.(*module.TypeSyntaxSequence)
-			return isSeq
-		}
-	}
-	return false
+	return findSequenceTypeDef(ctx, mod, name) != nil
 }
 
 func emitDefvalUnresolved(ctx *resolverContext, mod *module.Module, span types.Span, message string) {

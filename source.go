@@ -394,9 +394,9 @@ func buildTreeIndex(extensions []string, walkFn func(fs.WalkDirFunc) error, read
 			return nil
 		}
 
-		content, readErr := readFn(path)
-		if readErr != nil {
-			return nil
+		content, err := readFn(path)
+		if err != nil {
+			return nil //nolint:nilerr // skip unreadable files without aborting the walk
 		}
 
 		names := scanModuleNames(content)

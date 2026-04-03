@@ -118,11 +118,18 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 			})
 			// Send only this goroutine's module to avoid N^2 sends
 			// for multi-module files. The consumer deduplicates by name.
+			found := false
 			for _, mod := range cd.mods {
 				if mod.Name == sm.name {
 					results <- mod
+					found = true
 					break
 				}
+			}
+			if !found {
+				slog.Debug("module not found in decoded file",
+					slog.String("module", sm.name),
+					slog.String("path", result.Path))
 			}
 		}(sm)
 	}

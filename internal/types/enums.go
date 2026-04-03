@@ -266,3 +266,9 @@ const (
 	AccessKeywordMaxAccess                      // SMIv2: MAX-ACCESS
 	AccessKeywordMinAccess                      // SMIv2: MIN-ACCESS (compliance)
 )
+
+var accessKeywordNames = [...]string{
+	"ACCESS", "MAX-ACCESS", "MIN-ACCESS",
+}
+
+func (k AccessKeyword) String() string { return enumString(k, accessKeywordNames[:], "AccessKeyword") }
