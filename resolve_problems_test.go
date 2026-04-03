@@ -62,8 +62,8 @@ func TestProblemHexStrings(t *testing.T) {
 		// Odd-length hex: '0'H → pad to "00" → 1 byte → 0
 		{"problemOddHex1", "0"},
 		// Long hex: 128 chars / 64 bytes → >8 bytes → gomib: "0x..." format
-		// net-snmp: "0" (truncates leading zeros). Known divergence.
-		{"problemLongHex", ""},
+		// net-snmp: "0" (truncates leading zeros). Known divergence, pin gomib output.
+		{"problemLongHex", "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000FF"},
 		// Empty hex: ''H → 0 bytes → "0"
 		{"problemEmptyHex", "0"},
 		// Binary: '11110000'B → 1 byte → 0xF0 → 240
@@ -84,12 +84,6 @@ func TestProblemHexStrings(t *testing.T) {
 
 			dv := obj.DefaultValue()
 			testutil.True(t, !dv.IsZero(), "object %s should have a DEFVAL", tt.name)
-
-			if tt.wantDefval == "" {
-				// Known divergence case (long hex) - just verify it parses
-				t.Logf("%s: gomib=%q (net-snmp diverges)", tt.name, dv.String())
-				return
-			}
 
 			got := dv.String()
 			if !defvalEquivalent(got, tt.wantDefval) {
@@ -232,23 +226,10 @@ func TestProblemNotifications(t *testing.T) {
 		notif := requireNotification(t, m, "problemNotifWithUndefined")
 
 		varbinds := normalizeVarbinds(notif.Objects())
-		// gomib excludes unresolved references, so we expect only problemNotifStatus
-		// (or possibly neither if the entire notification fails).
-		// This is a known divergence from net-snmp which preserves the string.
-		hasStatus := false
-		for _, v := range varbinds {
-			if v == "problemNotifStatus" {
-				hasStatus = true
-			}
-		}
-		testutil.True(t, hasStatus,
-			"problemNotifStatus should be in varbinds (resolved object)")
-		for _, v := range varbinds {
-			if v == "problemUndefinedVarbind" {
-				t.Errorf("problemUndefinedVarbind should not appear in resolved varbinds")
-			}
-		}
-		t.Logf("divergence: net-snmp includes undefined varbind, gomib excludes it (varbinds=%v)", varbinds)
+		// gomib excludes unresolved references, keeping only problemNotifStatus.
+		wantVarbinds := []string{"problemNotifStatus"}
+		testutil.SliceEqual(t, wantVarbinds, varbinds,
+			"gomib should exclude unresolved varbinds (diverges from net-snmp)")
 	})
 }
 
@@ -1527,4 +1508,91 @@ func TestProblemGroupMembership(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestProblemCorpusNormalStrictness verifies that a subset of problem MIBs
+// resolve correctly at normal (non-permissive) strictness. This catches
+// regressions that permissive-only tests would mask via tier-3 fallback.
+func TestProblemCorpusNormalStrictness(t *testing.T) {
+	t.Run("PROBLEM-HEXSTRINGS-MIB", func(t *testing.T) {
+		m := loadAtStrictness(t, "PROBLEM-HEXSTRINGS-MIB", mib.ResolverNormal)
+
+		// All hex/binary objects should resolve without permissive fallback.
+		for _, name := range []string{
+			"problemOddHex7", "problemOddHex3", "problemOddHex1",
+			"problemLongHex", "problemEmptyHex",
+			"problemBinary8", "problemBinary5", "problemBinary12",
+			"problemLowerHex", "problemAllZeros",
+		} {
+			obj := m.Object(name)
+			testutil.NotNil(t, obj, "Object(%s) at normal strictness", name)
+			if obj != nil {
+				testutil.True(t, !obj.DefaultValue().IsZero(),
+					"%s should have DEFVAL at normal strictness", name)
+			}
+		}
+	})
+
+	t.Run("PROBLEM-KEYWORDS-MIB", func(t *testing.T) {
+		m := loadAtStrictness(t, "PROBLEM-KEYWORDS-MIB", mib.ResolverNormal)
+
+		for _, name := range []string{
+			"problemDefvalMandatory", "problemDefvalOptional",
+			"problemDefvalCurrent", "problemDefvalDeprecated",
+			"problemDefvalObsolete", "problemDefvalTrue", "problemDefvalFalse",
+		} {
+			obj := m.Object(name)
+			testutil.NotNil(t, obj, "Object(%s) at normal strictness", name)
+			if obj != nil {
+				testutil.True(t, !obj.DefaultValue().IsZero(),
+					"%s should have DEFVAL at normal strictness", name)
+			}
+		}
+	})
+
+	t.Run("PROBLEM-IMPORTS-MIB", func(t *testing.T) {
+		m := loadAtStrictness(t, "PROBLEM-IMPORTS-MIB", mib.ResolverNormal)
+
+		// SMI base types should resolve via proper imports, not permissive fallback.
+		for _, tt := range []struct {
+			name     string
+			wantType string
+		}{
+			{"problemMissingCounter64", "Counter64"},
+			{"problemMissingGauge32", "Gauge32"},
+			{"problemMissingUnsigned32", "Unsigned32"},
+			{"problemMissingTimeTicks", "TimeTicks"},
+		} {
+			obj := m.Object(tt.name)
+			testutil.NotNil(t, obj, "Object(%s) at normal strictness", tt.name)
+			if obj != nil {
+				testutil.Equal(t, tt.wantType, normalizeType(obj.Type()),
+					"type for %s at normal strictness", tt.name)
+			}
+		}
+	})
+
+	t.Run("PROBLEM-CASEFOLDING-MIB", func(t *testing.T) {
+		m := loadAtStrictness(t, "PROBLEM-CASEFOLDING-MIB", mib.ResolverNormal)
+
+		obj := m.Object("problemCasefoldInteger")
+		testutil.NotNil(t, obj, "Object(problemCasefoldInteger) at normal strictness")
+		if obj != nil {
+			testutil.Equal(t, mib.BaseInteger32, obj.Type().EffectiveBase(),
+				"Integer should resolve to BaseInteger32 at normal strictness")
+		}
+
+		tbl := m.Object("problemCasefoldTable")
+		testutil.NotNil(t, tbl, "Object(problemCasefoldTable) at normal strictness")
+	})
+
+	t.Run("PROBLEM-NOTIFICATIONS-MIB", func(t *testing.T) {
+		m := loadAtStrictness(t, "PROBLEM-NOTIFICATIONS-MIB", mib.ResolverNormal)
+
+		notif := requireNotification(t, m, "problemNotifNormal")
+		varbinds := normalizeVarbinds(notif.Objects())
+		testutil.SliceEqual(t,
+			[]string{"problemNotifStatus", "problemNotifDescription"},
+			varbinds, "normal notification varbinds at normal strictness")
+	})
 }

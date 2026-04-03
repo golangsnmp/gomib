@@ -167,7 +167,10 @@ func TestLookups(t *testing.T) {
 		}
 		testutil.True(t, found, "should find IF-MIB in modules list")
 
-		testutil.Equal(t, len(m.Objects()), len(m.Objects()), "Objects() should be consistent")
+		objects1 := m.Objects()
+		objects2 := m.Objects()
+		testutil.Equal(t, len(objects1), len(objects2), "Objects() should be deterministic across calls")
+		testutil.Greater(t, len(objects1), 0, "should have objects")
 		testutil.Greater(t, len(m.Tables()), 0, "should have tables")
 		testutil.Greater(t, len(m.Scalars()), 0, "should have scalars")
 	})
