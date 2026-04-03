@@ -87,6 +87,14 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 		}
 	}
 
+	// Cache LAST-UPDATED for efficient access during resolution.
+	for _, def := range module.Definitions {
+		if mi, ok := def.(*ModuleIdentity); ok && strings.TrimSpace(mi.LastUpdated) != "" {
+			module.LastUpdated = mi.LastUpdated
+			break
+		}
+	}
+
 	ctx.Log(slog.LevelDebug, "lowering complete",
 		slog.String("module", module.Name),
 		slog.Int("definitions", len(module.Definitions)))

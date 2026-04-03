@@ -179,35 +179,10 @@ func inspectObject(m *mib.Mib, obj *mib.Object) {
 	}
 
 	// Index / augments.
-	if len(obj.Index()) > 0 {
-		fmt.Printf("Index:   [%s]\n", formatIndexList(obj.Index()))
-	}
-	if obj.Augments() != nil {
-		fmt.Printf("Augments: %s\n", obj.Augments().Name())
-	}
-	if augBy := obj.AugmentedBy(); len(augBy) > 0 {
-		names := make([]string, len(augBy))
-		for i, a := range augBy {
-			names[i] = a.Name()
-		}
-		fmt.Printf("AugmentedBy: %s\n", strings.Join(names, ", "))
-	}
-	if obj.Augments() != nil {
-		if effIdx := obj.EffectiveIndexes(); len(effIdx) > 0 {
-			fmt.Printf("EffectiveIndex: [%s]\n", formatIndexList(effIdx))
-		}
-	}
+	printObjectIndexAugments(obj)
 
 	// Column context.
-	if obj.Kind() == mib.KindColumn {
-		fmt.Printf("IsIndex: %v\n", obj.IsIndex())
-		if row := obj.Row(); row != nil {
-			fmt.Printf("Row:     %s\n", row.Name())
-		}
-		if tbl := obj.Table(); tbl != nil {
-			fmt.Printf("Table:   %s\n", tbl.Name())
-		}
-	}
+	printObjectColumnContext(obj)
 
 	// Type chain.
 	if obj.Type() != nil {
@@ -215,29 +190,10 @@ func inspectObject(m *mib.Mib, obj *mib.Object) {
 	}
 
 	// Enum/BITS.
-	enums := obj.EffectiveEnums()
-	bits := obj.EffectiveBits()
-	if len(enums) > 0 && len(bits) == 0 {
-		fmt.Println("\nValues:")
-		for _, v := range enums {
-			fmt.Printf("  %s(%d)\n", v.Label, v.Value)
-		}
-	}
-	if len(bits) > 0 {
-		fmt.Println("\nBits:")
-		for _, b := range bits {
-			fmt.Printf("  %s(%d)\n", b.Label, b.Value)
-		}
-	}
+	printObjectEnumsBits(obj)
 
 	// Column table for tables and rows.
-	if obj.Kind() == mib.KindTable || obj.Kind() == mib.KindRow {
-		cols := obj.Columns()
-		if len(cols) > 0 {
-			fmt.Println("\nColumns:")
-			printColumnTable(cols)
-		}
-	}
+	printObjectColumns(obj)
 
 	// Provenance.
 	printProvenance(obj.Name(), obj.Module(), obj.Type())

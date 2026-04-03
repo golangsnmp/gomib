@@ -89,7 +89,8 @@ func TestNormalizeTimestamp(t *testing.T) {
 func TestExtractLastUpdated(t *testing.T) {
 	t.Run("module with ModuleIdentity", func(t *testing.T) {
 		mod := &module.Module{
-			Name: "TEST-MIB",
+			Name:        "TEST-MIB",
+			LastUpdated: "0210180000Z",
 			Definitions: []module.Definition{
 				&module.ModuleIdentity{
 					DefBase:     module.DefBase{Name: "testMIB"},
@@ -188,7 +189,8 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 		ctx := newTestContext()
 
 		modOld := &module.Module{
-			Name: "MOD-OLD",
+			Name:        "MOD-OLD",
+			LastUpdated: "9901010000Z",
 			Definitions: []module.Definition{
 				&module.ModuleIdentity{
 					DefBase:     module.DefBase{Name: "modOld"},
@@ -202,7 +204,8 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 		}
 
 		modNew := &module.Module{
-			Name: "MOD-NEW",
+			Name:        "MOD-NEW",
+			LastUpdated: "200501010000Z",
 			Definitions: []module.Definition{
 				&module.ModuleIdentity{
 					DefBase:     module.DefBase{Name: "modNew"},

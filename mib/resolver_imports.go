@@ -314,14 +314,10 @@ func bestCandidate(candidates []*module.Module) *module.Module {
 }
 
 func extractLastUpdated(mod *module.Module) string {
-	for _, def := range mod.Definitions {
-		if mi, ok := def.(*module.ModuleIdentity); ok {
-			if strings.TrimSpace(mi.LastUpdated) != "" {
-				return normalizeTimestamp(mi.LastUpdated)
-			}
-		}
+	if mod.LastUpdated == "" {
+		return ""
 	}
-	return ""
+	return normalizeTimestamp(mod.LastUpdated)
 }
 
 // normalizeTimestamp converts SMI LAST-UPDATED timestamps to a sortable form.

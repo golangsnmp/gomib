@@ -409,6 +409,62 @@ func TestBinStringMul8(t *testing.T) {
 	}
 }
 
+func TestHexStringInvalidChar(t *testing.T) {
+	tests := []struct {
+		source   string
+		wantDiag bool
+	}{
+		{"'ZZZZ'H", true},      // non-hex chars
+		{"'GHIJ'H", true},      // letters above F
+		{"'0123'H", false},     // valid hex digits
+		{"'aAbBcC'H", false},   // valid mixed case hex
+		{"'deadbeef'H", false}, // valid lowercase hex
+		{"'DEADBEEF'H", false}, // valid uppercase hex
+		{"''H", false},         // empty, no content to validate
+	}
+	cfg := types.VerboseConfig()
+	for _, tt := range tests {
+		lexer := New([]byte(tt.source), nil, cfg)
+		tokens, diagnostics := lexer.Tokenize()
+		testutil.Equal(t, TokHexString, tokens[0].Kind, "token kind for %s", tt.source)
+		hasDiag := false
+		for _, d := range diagnostics {
+			if d.Code == types.DiagHexStringInvalidChar {
+				hasDiag = true
+			}
+		}
+		testutil.Equal(t, tt.wantDiag, hasDiag, "hex-string-invalid-char diagnostic for %s", tt.source)
+	}
+}
+
+func TestBinStringInvalidChar(t *testing.T) {
+	tests := []struct {
+		source   string
+		wantDiag bool
+	}{
+		{"'0102'B", true},      // '2' is not a binary digit
+		{"'01234567'B", true},  // digits above 1
+		{"'0000AAAA'B", true},  // letters in binary string
+		{"'01010101'B", false}, // valid binary
+		{"'00000000'B", false}, // valid binary (all zeros)
+		{"'11111111'B", false}, // valid binary (all ones)
+		{"''B", false},         // empty, no content to validate
+	}
+	cfg := types.VerboseConfig()
+	for _, tt := range tests {
+		lexer := New([]byte(tt.source), nil, cfg)
+		tokens, diagnostics := lexer.Tokenize()
+		testutil.Equal(t, TokBinString, tokens[0].Kind, "token kind for %s", tt.source)
+		hasDiag := false
+		for _, d := range diagnostics {
+			if d.Code == types.DiagBinStringInvalidChar {
+				hasDiag = true
+			}
+		}
+		testutil.Equal(t, tt.wantDiag, hasDiag, "bin-string-invalid-char diagnostic for %s", tt.source)
+	}
+}
+
 func TestUnknownCharacter(t *testing.T) {
 	// The lexer skips to end-of-line on unknown characters, so TYPE
 	// on the next line should still be found.

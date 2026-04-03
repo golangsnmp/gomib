@@ -10,6 +10,8 @@ const (
 	DiagUnterminatedString    = "unterminated-string"
 	DiagUnterminatedHexBinStr = "unterminated-hex-bin-string"
 	DiagMissingHexBinSuffix   = "missing-hex-bin-suffix"
+	DiagHexStringInvalidChar  = "hex-string-invalid-char"
+	DiagBinStringInvalidChar  = "bin-string-invalid-char"
 	DiagHexStringMul2         = "hex-string-mul2"
 	DiagBinStringMul8         = "bin-string-mul8"
 )
@@ -213,6 +215,8 @@ var lexerDiagCodes = []codeEntry{
 	{DiagUnterminatedString, SeverityError},
 	{DiagUnterminatedHexBinStr, SeverityError},
 	{DiagMissingHexBinSuffix, SeverityError},
+	{DiagHexStringInvalidChar, SeverityWarning},
+	{DiagBinStringInvalidChar, SeverityWarning},
 	{DiagHexStringMul2, SeverityWarning},
 	{DiagBinStringMul8, SeverityWarning},
 }

@@ -37,6 +37,11 @@ type Module struct {
 	// Empty for synthetic base modules.
 	SourcePath string
 
+	// LastUpdated is the LAST-UPDATED value from MODULE-IDENTITY, if present.
+	// Set during lowering to avoid repeated definition scans during resolution.
+	// Whitespace-only values are not cached.
+	LastUpdated string
+
 	// LineTable maps line numbers to byte offsets of line starts.
 	// Entry i holds the byte offset where line i+1 begins (0-indexed).
 	// Used by the resolver to convert spans to line/column numbers

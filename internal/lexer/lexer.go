@@ -543,6 +543,8 @@ func (l *Lexer) scanHexOrBinString() Token {
 	l.advance() // consume opening quote
 
 	contentLen := 0
+	hasNonHex := false
+	hasNonBin := false
 	for {
 		b, ok := l.peek()
 		if !ok || b == '\'' {
@@ -550,6 +552,12 @@ func (l *Lexer) scanHexOrBinString() Token {
 		}
 		if b != ' ' && b != '\t' && b != '\n' && b != '\r' {
 			contentLen++
+			if !isHexDigit(b) {
+				hasNonHex = true
+			}
+			if b != '0' && b != '1' {
+				hasNonBin = true
+			}
 		}
 		l.advance()
 	}
@@ -573,6 +581,11 @@ func (l *Lexer) scanHexOrBinString() Token {
 	case 'H', 'h':
 		l.advance()
 		kind = TokHexString
+		if hasNonHex && contentLen > 0 {
+			span := l.spanFrom(start)
+			l.emitDiagnostic(types.DiagHexStringInvalidChar, span,
+				"hex string contains non-hexadecimal characters")
+		}
 		if contentLen > 0 && contentLen%2 != 0 {
 			span := l.spanFrom(start)
 			l.emitDiagnostic(types.DiagHexStringMul2, span,
@@ -582,6 +595,11 @@ func (l *Lexer) scanHexOrBinString() Token {
 	case 'B', 'b':
 		l.advance()
 		kind = TokBinString
+		if hasNonBin && contentLen > 0 {
+			span := l.spanFrom(start)
+			l.emitDiagnostic(types.DiagBinStringInvalidChar, span,
+				"binary string contains non-binary characters")
+		}
 		if contentLen > 0 && contentLen%8 != 0 {
 			span := l.spanFrom(start)
 			l.emitDiagnostic(types.DiagBinStringMul8, span,
@@ -595,6 +613,10 @@ func (l *Lexer) scanHexOrBinString() Token {
 	}
 
 	return l.token(kind, start)
+}
+
+func isHexDigit(b byte) bool {
+	return (b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F')
 }
 
 func isDigit(b byte) bool {

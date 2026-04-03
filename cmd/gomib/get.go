@@ -285,28 +285,7 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 	fmt.Printf("Access:  %s\n", obj.Access().String())
 	fmt.Printf("Status:  %s\n", obj.Status().String())
 
-	if len(obj.Index()) > 0 {
-		fmt.Printf("Index:   [%s]\n", formatIndexList(obj.Index()))
-	}
-
-	if obj.Augments() != nil {
-		fmt.Printf("Augments: %s\n", obj.Augments().Name())
-	}
-
-	if augBy := obj.AugmentedBy(); len(augBy) > 0 {
-		names := make([]string, len(augBy))
-		for i, a := range augBy {
-			names[i] = a.Name()
-		}
-		fmt.Printf("AugmentedBy: %s\n", strings.Join(names, ", "))
-	}
-
-	if obj.Augments() != nil {
-		effIdx := obj.EffectiveIndexes()
-		if len(effIdx) > 0 {
-			fmt.Printf("EffectiveIndex: [%s]\n", formatIndexList(effIdx))
-		}
-	}
+	printObjectIndexAugments(obj)
 
 	if dv := obj.DefaultValue(); !dv.IsZero() {
 		fmt.Printf("DefVal:  %s\n", dv.String())
@@ -324,41 +303,13 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 		fmt.Printf("Ref:     %s\n", normalizeDescription(obj.Reference(), descLimit))
 	}
 
-	enums := obj.EffectiveEnums()
-	bits := obj.EffectiveBits()
-	if len(enums) > 0 && len(bits) == 0 {
-		fmt.Println("Values:")
-		for _, v := range enums {
-			fmt.Printf("  %s(%d)\n", v.Label, v.Value)
-		}
-	}
-
-	if len(bits) > 0 {
-		fmt.Println("Bits:")
-		for _, b := range bits {
-			fmt.Printf("  %s(%d)\n", b.Label, b.Value)
-		}
-	}
+	printObjectEnumsBits(obj)
 
 	// Column details: isIndex, row, table.
-	if obj.Kind() == mib.KindColumn {
-		fmt.Printf("IsIndex: %v\n", obj.IsIndex())
-		if row := obj.Row(); row != nil {
-			fmt.Printf("Row:     %s\n", row.Name())
-		}
-		if tbl := obj.Table(); tbl != nil {
-			fmt.Printf("Table:   %s\n", tbl.Name())
-		}
-	}
+	printObjectColumnContext(obj)
 
 	// Column table for tables and rows.
-	if obj.Kind() == mib.KindTable || obj.Kind() == mib.KindRow {
-		cols := obj.Columns()
-		if len(cols) > 0 {
-			fmt.Println("Columns:")
-			printColumnTable(cols)
-		}
-	}
+	printObjectColumns(obj)
 }
 
 func printNotificationDetails(notif *mib.Notification, descLimit int) {
@@ -433,48 +384,5 @@ func printNodeTreeRecursive(node *mib.Node, depth int, maxDepth depthFlag) {
 
 	for _, child := range node.Children() {
 		printNodeTreeRecursive(child, depth+1, maxDepth)
-	}
-}
-
-// formatIndexList formats a slice of index entries as a comma-separated
-// string with IMPLIED prefix and encoding suffix.
-func formatIndexList(indexes []mib.IndexEntry) string {
-	strs := make([]string, 0, len(indexes))
-	for _, idx := range indexes {
-		name := "(unknown)"
-		if idx.Object != nil {
-			name = idx.Object.Name()
-		}
-		if idx.Implied {
-			name = "IMPLIED " + name
-		}
-		if idx.Encoding != mib.IndexEncodingUnknown {
-			name += " [" + idx.Encoding.String() + "]"
-		}
-		strs = append(strs, name)
-	}
-	return strings.Join(strs, ", ")
-}
-
-func printColumnTable(cols []*mib.Object) {
-	fmt.Printf("  %-28s %-20s %-18s %-18s %s\n",
-		"COLUMN", "TYPE", "BASE", "ACCESS", "ROLE")
-	fmt.Printf("  %-28s %-20s %-18s %-18s %s\n",
-		"------", "----", "----", "------", "----")
-	for _, col := range cols {
-		typeName, base := "", ""
-		if t := col.Type(); t != nil {
-			typeName = t.Name()
-			if typeName == "" {
-				typeName = t.Base().String()
-			}
-			base = t.EffectiveBase().String()
-		}
-		role := "data"
-		if col.IsIndex() {
-			role = "index"
-		}
-		fmt.Printf("  %-28s %-20s %-18s %-18s %s\n",
-			col.Name(), typeName, base, col.Access(), role)
 	}
 }
