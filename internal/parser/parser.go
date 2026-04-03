@@ -211,8 +211,7 @@ func (p *Parser) parseOneModule() *ast.Module {
 // by combining new lexer diagnostics (since lexDiagsBefore) with parser
 // diagnostics accumulated for this module.
 func (p *Parser) collectModuleDiagnostics(lexDiagsBefore int) []types.SpanDiagnostic {
-	lexDiags := p.lex.Diagnostics()
-	newLexDiags := lexDiags[lexDiagsBefore:]
+	newLexDiags := p.lex.DiagnosticsFrom(lexDiagsBefore)
 	combined := make([]types.SpanDiagnostic, 0, len(newLexDiags)+len(p.diagnostics))
 	combined = append(combined, newLexDiags...)
 	combined = append(combined, p.diagnostics...)

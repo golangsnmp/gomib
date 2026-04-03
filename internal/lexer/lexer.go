@@ -59,6 +59,11 @@ func (l *Lexer) Diagnostics() []types.SpanDiagnostic {
 	return slices.Clone(l.diagnostics)
 }
 
+// DiagnosticsFrom returns a copy of diagnostics collected since index n.
+func (l *Lexer) DiagnosticsFrom(n int) []types.SpanDiagnostic {
+	return slices.Clone(l.diagnostics[n:])
+}
+
 func (l *Lexer) traceToken(tok Token) {
 	if l.TraceEnabled() {
 		l.Trace("token",
