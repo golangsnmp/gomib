@@ -201,20 +201,24 @@ func (*TypeSyntaxSequence) typeSyntax() {}
 func (s *TypeSyntaxSequence) SyntaxSpan() types.Span { return s.Span }
 
 // TypeSyntaxOctetString is an explicit OCTET STRING reference.
-type TypeSyntaxOctetString struct{}
+type TypeSyntaxOctetString struct {
+	Span types.Span
+}
 
 func (*TypeSyntaxOctetString) typeSyntax() {}
 
-// SyntaxSpan returns a zero span (keyword types have no stored span).
-func (s *TypeSyntaxOctetString) SyntaxSpan() types.Span { return types.Span{} }
+// SyntaxSpan returns the source span of this type syntax.
+func (s *TypeSyntaxOctetString) SyntaxSpan() types.Span { return s.Span }
 
 // TypeSyntaxObjectIdentifier is an explicit OBJECT IDENTIFIER reference.
-type TypeSyntaxObjectIdentifier struct{}
+type TypeSyntaxObjectIdentifier struct {
+	Span types.Span
+}
 
 func (*TypeSyntaxObjectIdentifier) typeSyntax() {}
 
-// SyntaxSpan returns a zero span (keyword types have no stored span).
-func (s *TypeSyntaxObjectIdentifier) SyntaxSpan() types.Span { return types.Span{} }
+// SyntaxSpan returns the source span of this type syntax.
+func (s *TypeSyntaxObjectIdentifier) SyntaxSpan() types.Span { return s.Span }
 
 // Constraint is a subtype constraint (SIZE or value range).
 type Constraint interface {

@@ -76,7 +76,13 @@ func TestNotificationTrapInfo(t *testing.T) {
 	ti := &TrapInfo{Enterprise: "enterprises", TrapNumber: 0}
 	n.setTrapInfo(ti)
 
-	testutil.Equal(t, ti, n.TrapInfo(), "TrapInfo() should return the set value")
+	got := n.TrapInfo()
+	testutil.Equal(t, ti.Enterprise, got.Enterprise, "TrapInfo().Enterprise should match")
+	testutil.Equal(t, ti.TrapNumber, got.TrapNumber, "TrapInfo().TrapNumber should match")
+
+	// Verify clone discipline: mutation of returned value must not affect internal state.
+	got.Enterprise = "mutated"
+	testutil.Equal(t, "enterprises", n.TrapInfo().Enterprise, "TrapInfo() should return a clone")
 }
 
 func TestNotificationObjectsClone(t *testing.T) {

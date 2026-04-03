@@ -813,10 +813,10 @@ func lowerTypeSyntax(syntax ast.TypeSyntax, ctx *LoweringContext) TypeSyntax {
 		return lowerTypeSyntax(s.Underlying, ctx)
 
 	case *ast.TypeSyntaxOctetString:
-		return &TypeSyntaxOctetString{}
+		return &TypeSyntaxOctetString{Span: s.Span}
 
 	case *ast.TypeSyntaxObjectIdentifier:
-		return &TypeSyntaxObjectIdentifier{}
+		return &TypeSyntaxObjectIdentifier{Span: s.Span}
 
 	default:
 		ctx.emitDiagnostic(types.DiagUnknownTypeSyntax, syntax.SyntaxSpan(),

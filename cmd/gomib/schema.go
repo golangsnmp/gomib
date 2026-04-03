@@ -280,6 +280,8 @@ func exportBaseType(b mib.BaseType) string {
 		return "Bits"
 	case mib.BaseOpaque:
 		return "Opaque"
+	case mib.BaseSequence:
+		return "Sequence"
 	default:
 		return "Unknown"
 	}
