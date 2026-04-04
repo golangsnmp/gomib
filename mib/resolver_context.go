@@ -319,6 +319,22 @@ func (c *resolverContext) lookupObjectInModuleScope(mod *module.Module, name str
 	return nil
 }
 
+// findScopedObject resolves a name to its Object, trying module-scoped
+// lookup first, then global fallback if strictness allows. Returns the
+// object and whether the name resolved to a node at all (needed for
+// diagnostic decisions when the object is nil).
+func (c *resolverContext) findScopedObject(mod *module.Module, name string) (obj *Object, nodeFound bool) {
+	if _, ok := c.LookupNodeForModule(mod, name); ok {
+		return c.lookupObjectInModuleScope(mod, name), true
+	}
+	if c.ResolverStrictness().AllowGlobalFallbacks() {
+		if node, ok := c.LookupNodeGlobal(name); ok {
+			return node.Object(), true
+		}
+	}
+	return nil, false
+}
+
 // markImportUsed records that an imported symbol was referenced during resolution.
 func (c *resolverContext) markImportUsed(mod *module.Module, name string) {
 	used := c.usedImports[mod]

@@ -334,76 +334,36 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 		if len(obj.Index) > 0 {
 			var indexEntries []IndexEntry
 			for _, item := range obj.Index {
-				if _, ok := ctx.LookupNodeForModule(ref.mod, item.Object); ok {
-					// Use the module-scoped object lookup to get the correct
-					// module's object, not the shared node's object which may
-					// belong to a different module.
-					if idxObj := ctx.lookupObjectInModuleScope(ref.mod, item.Object); idxObj != nil {
-						indexEntries = append(indexEntries, IndexEntry{
-							Object:   idxObj,
-							Implied:  item.Implied,
-							Encoding: classifyIndexEncoding(idxObj, item.Implied),
-							Span:     item.Span,
-						})
-					} else if !isBareTypeIndex(item.Object) {
-						ctx.EmitDiagnostic(types.DiagIndexNotObject,
-							ref.mod, obj.Span,
-							fmt.Sprintf("INDEX %q of %q resolves to a node without an object definition", item.Object, obj.Name))
-					}
-				} else if ctx.ResolverStrictness().AllowGlobalFallbacks() {
-					if idxNode, ok := ctx.LookupNodeGlobal(item.Object); ok {
-						if idxNode.Object() != nil {
-							indexEntries = append(indexEntries, IndexEntry{
-								Object:   idxNode.Object(),
-								Implied:  item.Implied,
-								Encoding: classifyIndexEncoding(idxNode.Object(), item.Implied),
-								Span:     item.Span,
-							})
-						} else if !isBareTypeIndex(item.Object) {
-							ctx.EmitDiagnostic(types.DiagIndexNotObject,
-								ref.mod, obj.Span,
-								fmt.Sprintf("INDEX %q of %q resolves to a node without an object definition", item.Object, obj.Name))
-						}
-					} else if isBareTypeIndex(item.Object) {
-						indexEntries = append(indexEntries, IndexEntry{
-							TypeName: item.Object,
-							Implied:  item.Implied,
-							Span:     item.Span,
-						})
-					}
+				if idxObj, nodeFound := ctx.findScopedObject(ref.mod, item.Object); idxObj != nil {
+					indexEntries = append(indexEntries, IndexEntry{
+						Object:   idxObj,
+						Implied:  item.Implied,
+						Encoding: classifyIndexEncoding(idxObj, item.Implied),
+						Span:     item.Span,
+					})
 				} else if isBareTypeIndex(item.Object) {
 					indexEntries = append(indexEntries, IndexEntry{
 						TypeName: item.Object,
 						Implied:  item.Implied,
 						Span:     item.Span,
 					})
+				} else if nodeFound {
+					ctx.EmitDiagnostic(types.DiagIndexNotObject,
+						ref.mod, obj.Span,
+						fmt.Sprintf("INDEX %q of %q resolves to a node without an object definition", item.Object, obj.Name))
 				}
 			}
 			resolvedObj.setIndex(indexEntries)
 		}
 
 		if obj.Augments != "" {
-			if _, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); ok {
-				// Use module-scoped lookup to get the correct module's object.
-				if target := ctx.lookupObjectInModuleScope(ref.mod, obj.Augments); target != nil {
-					resolvedObj.setAugments(target)
-					target.addAugmentedBy(resolvedObj)
-				} else {
-					ctx.EmitDiagnostic(types.DiagAugmentsNotObject,
-						ref.mod, obj.Span,
-						fmt.Sprintf("AUGMENTS target %q of %q resolves to a node without an object definition", obj.Augments, obj.Name))
-				}
-			} else if ctx.ResolverStrictness().AllowGlobalFallbacks() {
-				if targetNode, ok := ctx.LookupNodeGlobal(obj.Augments); ok {
-					if targetNode.Object() != nil {
-						resolvedObj.setAugments(targetNode.Object())
-						targetNode.Object().addAugmentedBy(resolvedObj)
-					} else {
-						ctx.EmitDiagnostic(types.DiagAugmentsNotObject,
-							ref.mod, obj.Span,
-							fmt.Sprintf("AUGMENTS target %q of %q resolves to a node without an object definition", obj.Augments, obj.Name))
-					}
-				}
+			if target, nodeFound := ctx.findScopedObject(ref.mod, obj.Augments); target != nil {
+				resolvedObj.setAugments(target)
+				target.addAugmentedBy(resolvedObj)
+			} else if nodeFound {
+				ctx.EmitDiagnostic(types.DiagAugmentsNotObject,
+					ref.mod, obj.Span,
+					fmt.Sprintf("AUGMENTS target %q of %q resolves to a node without an object definition", obj.Augments, obj.Name))
 			}
 		}
 	}

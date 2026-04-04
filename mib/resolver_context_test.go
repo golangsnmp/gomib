@@ -295,6 +295,84 @@ func TestLookupObjectInModuleScope(t *testing.T) {
 	})
 }
 
+func TestFindScopedObject(t *testing.T) {
+	modA := &module.Module{Name: "A"}
+	modB := &module.Module{Name: "B"}
+
+	t.Run("returns object from module scope", func(t *testing.T) {
+		ctx := newTestContext()
+		resolvedA := newModule("A")
+		ctx.moduleToResolved[modA] = resolvedA
+		nodeX := newTestNode("x")
+		ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
+
+		obj := newObject("x")
+		resolvedA.addObject(obj)
+
+		got, nodeFound := ctx.findScopedObject(modA, "x")
+		testutil.Equal(t, obj, got, "should return module-scoped object")
+		testutil.True(t, nodeFound, "nodeFound should be true")
+	})
+
+	t.Run("returns nodeFound true with nil object when node has no object", func(t *testing.T) {
+		ctx := newTestContext()
+		resolvedA := newModule("A")
+		ctx.moduleToResolved[modA] = resolvedA
+		nodeX := newTestNode("x")
+		ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
+
+		got, nodeFound := ctx.findScopedObject(modA, "x")
+		testutil.Nil(t, got, "should return nil when node has no object")
+		testutil.True(t, nodeFound, "nodeFound should be true when node exists")
+	})
+
+	t.Run("falls back to global lookup when permissive", func(t *testing.T) {
+		ctx := newResolverContext(nil, ResolverPermissive, DefaultConfig())
+		resolvedA := newModule("A")
+		resolvedB := newModule("B")
+		ctx.moduleToResolved[modA] = resolvedA
+		ctx.moduleToResolved[modB] = resolvedB
+		ctx.modules = []*module.Module{modA, modB}
+
+		nodeY := newTestNode("y")
+		obj := newObject("y")
+		nodeY.setObject(obj)
+		ctx.moduleSymbolToNode[modB] = map[string]*Node{"y": nodeY}
+
+		got, nodeFound := ctx.findScopedObject(modA, "y")
+		testutil.Equal(t, obj, got, "should return object via global fallback")
+		testutil.True(t, nodeFound, "nodeFound should be true")
+	})
+
+	t.Run("does not use global fallback when normal strictness", func(t *testing.T) {
+		ctx := newTestContext() // ResolverNormal
+		resolvedA := newModule("A")
+		resolvedB := newModule("B")
+		ctx.moduleToResolved[modA] = resolvedA
+		ctx.moduleToResolved[modB] = resolvedB
+		ctx.modules = []*module.Module{modA, modB}
+
+		nodeY := newTestNode("y")
+		obj := newObject("y")
+		nodeY.setObject(obj)
+		ctx.moduleSymbolToNode[modB] = map[string]*Node{"y": nodeY}
+
+		got, nodeFound := ctx.findScopedObject(modA, "y")
+		testutil.Nil(t, got, "should not find object without global fallback")
+		testutil.False(t, nodeFound, "nodeFound should be false")
+	})
+
+	t.Run("returns false for completely unknown name", func(t *testing.T) {
+		ctx := newTestContext()
+		resolvedA := newModule("A")
+		ctx.moduleToResolved[modA] = resolvedA
+
+		got, nodeFound := ctx.findScopedObject(modA, "nonexistent")
+		testutil.Nil(t, got, "should return nil for unknown name")
+		testutil.False(t, nodeFound, "nodeFound should be false for unknown name")
+	})
+}
+
 func TestLookupNodeInModule(t *testing.T) {
 	ctx := newTestContext()
 	modA := &module.Module{Name: "MY-MIB"}
