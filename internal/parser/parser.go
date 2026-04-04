@@ -23,13 +23,12 @@ import (
 
 // Parser converts a token stream into an AST module with diagnostics.
 type Parser struct {
-	source      []byte
-	lex         *lexer.Lexer
-	buf         [3]lexer.Token   // lookahead buffer: buf[0]=current, buf[1]=peek(1), buf[2]=peek(2)
-	lastEnd     types.ByteOffset // end position of last consumed token
-	diagnostics []types.SpanDiagnostic
-	diagConfig  types.DiagnosticConfig
-	eofToken    lexer.Token
+	source   []byte
+	lex      *lexer.Lexer
+	buf      [3]lexer.Token   // lookahead buffer: buf[0]=current, buf[1]=peek(1), buf[2]=peek(2)
+	lastEnd  types.ByteOffset // end position of last consumed token
+	eofToken lexer.Token
+	types.SpanDiagnosticCollector
 	types.Logger
 }
 
@@ -45,11 +44,11 @@ func New(source []byte, logger *slog.Logger, diagConfig types.DiagnosticConfig) 
 	eofSpan := types.NewSpan(types.ByteOffset(len(source)), types.ByteOffset(len(source)))
 	eofToken := lexer.Token{Kind: lexer.TokEOF, Span: eofSpan}
 	p := &Parser{
-		source:     source,
-		lex:        lex,
-		diagConfig: diagConfig,
-		eofToken:   eofToken,
-		Logger:     types.Logger{L: logger},
+		source:                  source,
+		lex:                     lex,
+		eofToken:                eofToken,
+		SpanDiagnosticCollector: types.NewSpanDiagnosticCollector(diagConfig),
+		Logger:                  types.Logger{L: logger},
 	}
 	p.buf[0] = p.nextNonComment()
 	p.buf[1] = p.nextNonComment()
@@ -68,38 +67,24 @@ func (p *Parser) nextNonComment() lexer.Token {
 	}
 }
 
-// emitDiagnostic records a diagnostic if the current config reports it.
-func (p *Parser) emitDiagnostic(code string, span types.Span, message string) {
-	sev := types.SeverityForCode(code)
-	if !p.diagConfig.ShouldReport(code, sev) {
-		return
-	}
-	p.diagnostics = append(p.diagnostics, types.SpanDiagnostic{
-		Severity: sev,
-		Code:     code,
-		Span:     span,
-		Message:  message,
-	})
-}
-
 // validateIdentifier checks for RFC 2578 identifier violations
 // (underscores, trailing hyphens, length limits).
 func (p *Parser) validateIdentifier(name string, span types.Span) {
 	if strings.Contains(name, "_") {
-		p.emitDiagnostic(types.DiagIdentifierUnderscore, span,
+		p.EmitDiagnostic(types.DiagIdentifierUnderscore, span,
 			fmt.Sprintf("identifier %q contains underscore (RFC violation)", name))
 	}
 
 	if strings.HasSuffix(name, "-") {
-		p.emitDiagnostic(types.DiagIdentifierHyphenEnd, span,
+		p.EmitDiagnostic(types.DiagIdentifierHyphenEnd, span,
 			fmt.Sprintf("identifier %q ends with hyphen", name))
 	}
 
 	if len(name) > 64 {
-		p.emitDiagnostic(types.DiagIdentifierLength64, span,
+		p.EmitDiagnostic(types.DiagIdentifierLength64, span,
 			fmt.Sprintf("identifier %q exceeds 64 character limit (%d chars)", name, len(name)))
 	} else if len(name) > 32 {
-		p.emitDiagnostic(types.DiagIdentifierLength32, span,
+		p.EmitDiagnostic(types.DiagIdentifierLength32, span,
 			fmt.Sprintf("identifier %q exceeds 32 character recommendation (%d chars)", name, len(name)))
 	}
 }
@@ -108,7 +93,7 @@ func (p *Parser) validateIdentifier(name string, span types.Span) {
 // Per RFC 2578, value references (used in OID assignments) should start with lowercase.
 func (p *Parser) validateValueReference(name string, span types.Span) {
 	if name != "" && name[0] >= 'A' && name[0] <= 'Z' {
-		p.emitDiagnostic(types.DiagBadIdentifierCase, span,
+		p.EmitDiagnostic(types.DiagBadIdentifierCase, span,
 			fmt.Sprintf("%q should start with a lowercase letter", name))
 	}
 }
@@ -139,8 +124,8 @@ func (p *Parser) ParseModule() []*ast.Module {
 // parseOneModule parses a single DEFINITIONS ::= BEGIN ... END block.
 func (p *Parser) parseOneModule() *ast.Module {
 	// Snapshot lexer diagnostic count so we only attach new ones to this module.
-	lexDiagsBefore := len(p.lex.Diagnostics())
-	p.diagnostics = p.diagnostics[:0]
+	lexDiagsBefore := p.lex.DiagnosticCount()
+	p.ResetDiagnostics()
 
 	start := p.currentSpan().Start
 
@@ -202,7 +187,7 @@ func (p *Parser) parseOneModule() *ast.Module {
 	p.Log(slog.LevelDebug, "parsing complete",
 		slog.String("module", name.Name),
 		slog.Int("definitions", len(module.Body)),
-		slog.Int("diagnostics", len(p.diagnostics)))
+		slog.Int("diagnostics", p.DiagnosticCount()))
 
 	return module
 }
@@ -212,9 +197,10 @@ func (p *Parser) parseOneModule() *ast.Module {
 // diagnostics accumulated for this module.
 func (p *Parser) collectModuleDiagnostics(lexDiagsBefore int) []types.SpanDiagnostic {
 	newLexDiags := p.lex.DiagnosticsFrom(lexDiagsBefore)
-	combined := make([]types.SpanDiagnostic, 0, len(newLexDiags)+len(p.diagnostics))
+	parserDiags := p.Diagnostics()
+	combined := make([]types.SpanDiagnostic, 0, len(newLexDiags)+len(parserDiags))
 	combined = append(combined, newLexDiags...)
-	combined = append(combined, p.diagnostics...)
+	combined = append(combined, parserDiags...)
 	return combined
 }
 
@@ -278,7 +264,7 @@ func (p *Parser) makeIdentWithValidation(token lexer.Token) ast.Ident {
 // Parse errors bypass ShouldReport() filtering because they indicate
 // a syntax problem that must be reported at any strictness level.
 func (p *Parser) recordParseError(diag types.SpanDiagnostic) {
-	p.diagnostics = append(p.diagnostics, diag)
+	p.RecordDiagnostic(diag)
 }
 
 func (p *Parser) makeError(message string) types.SpanDiagnostic {
@@ -294,7 +280,7 @@ func (p *Parser) parseU32(span types.Span, context string) uint32 {
 	text := p.text(span)
 	v, err := strconv.ParseUint(text, 10, 32)
 	if err != nil {
-		p.emitDiagnostic(types.DiagInvalidU32, span,
+		p.EmitDiagnostic(types.DiagInvalidU32, span,
 			fmt.Sprintf("invalid %s (not a valid u32)", context))
 		return 0
 	}
@@ -305,7 +291,7 @@ func (p *Parser) parseI64(span types.Span, context string) int64 {
 	text := p.text(span)
 	v, err := strconv.ParseInt(text, 10, 64)
 	if err != nil {
-		p.emitDiagnostic(types.DiagInvalidI64, span,
+		p.EmitDiagnostic(types.DiagInvalidI64, span,
 			fmt.Sprintf("invalid %s (not a valid integer)", context))
 		return 0
 	}
@@ -352,7 +338,7 @@ func (p *Parser) expectIdentifier() (lexer.Token, *types.SpanDiagnostic) {
 	if p.check(lexer.TokForbiddenKeyword) {
 		token := p.advance()
 		name := p.text(token.Span)
-		p.emitDiagnostic(types.DiagKeywordReserved, token.Span,
+		p.EmitDiagnostic(types.DiagKeywordReserved, token.Span,
 			fmt.Sprintf("identifier %q is a reserved ASN.1 keyword", name))
 		return token, nil
 	}
@@ -514,7 +500,7 @@ func (p *Parser) parseDefinition() (ast.Definition, *types.SpanDiagnostic) {
 		}
 		if first == lexer.TokLowercaseIdent {
 			name := p.text(p.peek().Span)
-			p.emitDiagnostic(types.DiagBadIdentifierCase, p.peek().Span,
+			p.EmitDiagnostic(types.DiagBadIdentifierCase, p.peek().Span,
 				fmt.Sprintf("type assignment %q should start with an uppercase letter", name))
 		}
 		return p.parseTypeAssignment()
@@ -935,7 +921,7 @@ func (p *Parser) parseTypeSyntax() (ast.TypeSyntax, *types.SpanDiagnostic) {
 		token := p.advance()
 		name := p.text(token.Span)
 		if token.Kind == lexer.TokLowercaseIdent {
-			p.emitDiagnostic(types.DiagBadIdentifierCase, token.Span,
+			p.EmitDiagnostic(types.DiagBadIdentifierCase, token.Span,
 				fmt.Sprintf("type reference %q should start with an uppercase letter", name))
 		}
 		ident := ast.Ident{Name: name, Span: token.Span}
@@ -1076,7 +1062,7 @@ func (p *Parser) parseNamedNumberList() ([]ast.NamedNumber, *types.SpanDiagnosti
 			p.advance()
 		} else if next := p.peek(); next.Kind.IsIdentifier() || next.Kind.IsKeyword() {
 			// Recovery: missing comma before another named number.
-			p.emitDiagnostic(types.DiagMissingComma, next.Span, "missing comma in named number list")
+			p.EmitDiagnostic(types.DiagMissingComma, next.Span, "missing comma in named number list")
 		} else {
 			break
 		}
@@ -1189,7 +1175,7 @@ func (p *Parser) parseRangeValue() (ast.RangeValue, *types.SpanDiagnostic) {
 		hexPart := stripQuotedLiteral(text)
 		value, err := strconv.ParseUint(hexPart, 16, 64)
 		if err != nil {
-			p.emitDiagnostic(types.DiagInvalidHexRange, token.Span, "invalid hex value in range")
+			p.EmitDiagnostic(types.DiagInvalidHexRange, token.Span, "invalid hex value in range")
 		}
 		return &ast.RangeValueUnsigned{Value: value}, nil
 	case p.check(lexer.TokUppercaseIdent) || p.check(lexer.TokForbiddenKeyword):

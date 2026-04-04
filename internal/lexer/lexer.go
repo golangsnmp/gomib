@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
-	"slices"
 
 	"github.com/golangsnmp/gomib/internal/types"
 )
@@ -37,31 +36,20 @@ type Lexer struct {
 	pos          int
 	state        lexerState
 	commentStart int // saved position of '--' when entering comment state
-	diagnostics  []types.SpanDiagnostic
-	diagConfig   types.DiagnosticConfig
+	types.SpanDiagnosticCollector
 	types.Logger
 }
 
 // New returns a Lexer that tokenizes the given source bytes.
 func New(source []byte, logger *slog.Logger, diagConfig types.DiagnosticConfig) *Lexer {
 	l := &Lexer{
-		source:     source,
-		state:      stateNormal, // stateNormal == 0, explicit for clarity
-		diagConfig: diagConfig,
-		Logger:     types.Logger{L: logger},
+		source:                  source,
+		state:                   stateNormal, // stateNormal == 0, explicit for clarity
+		SpanDiagnosticCollector: types.NewSpanDiagnosticCollector(diagConfig),
+		Logger:                  types.Logger{L: logger},
 	}
 	l.Log(slog.LevelDebug, "lexer initialized", slog.Int("bytes", len(source)))
 	return l
-}
-
-// Diagnostics returns a copy of all collected diagnostics.
-func (l *Lexer) Diagnostics() []types.SpanDiagnostic {
-	return slices.Clone(l.diagnostics)
-}
-
-// DiagnosticsFrom returns a copy of diagnostics collected since index n.
-func (l *Lexer) DiagnosticsFrom(n int) []types.SpanDiagnostic {
-	return slices.Clone(l.diagnostics[n:])
 }
 
 func (l *Lexer) traceToken(tok Token) {
@@ -87,8 +75,8 @@ func (l *Lexer) Tokenize() ([]Token, []types.SpanDiagnostic) {
 	}
 	l.Log(slog.LevelDebug, "tokenization complete",
 		slog.Int("tokens", len(tokens)),
-		slog.Int("diagnostics", len(l.diagnostics)))
-	return tokens, slices.Clone(l.diagnostics)
+		slog.Int("diagnostics", l.DiagnosticCount()))
+	return tokens, l.Diagnostics()
 }
 
 // NextToken advances the lexer and returns the next token.
@@ -178,19 +166,6 @@ func (l *Lexer) skipToEOL() {
 		}
 		l.advance()
 	}
-}
-
-func (l *Lexer) emitDiagnostic(code string, span types.Span, message string) {
-	sev := types.SeverityForCode(code)
-	if !l.diagConfig.ShouldReport(code, sev) {
-		return
-	}
-	l.diagnostics = append(l.diagnostics, types.SpanDiagnostic{
-		Code:     code,
-		Severity: sev,
-		Span:     span,
-		Message:  message,
-	})
 }
 
 func (l *Lexer) spanFrom(start int) types.Span {
@@ -283,7 +258,7 @@ func (l *Lexer) nextNormalToken() (Token, bool) {
 
 	l.advance()
 	span := l.spanFrom(start)
-	l.emitDiagnostic(types.DiagUnexpectedCharacter, span, fmt.Sprintf("unexpected character: 0x%02x", b))
+	l.EmitDiagnostic(types.DiagUnexpectedCharacter, span, fmt.Sprintf("unexpected character: 0x%02x", b))
 	l.skipToEOL()
 	return Token{}, true
 }
@@ -489,7 +464,7 @@ func (l *Lexer) scanNumber() Token {
 	tok := l.token(TokNumber, start)
 	// Check for leading zeros: more than one digit starting with '0'
 	if l.pos-start > 1 && l.source[start] == '0' {
-		l.emitDiagnostic(types.DiagNumberLeadingZero, l.spanFrom(start),
+		l.EmitDiagnostic(types.DiagNumberLeadingZero, l.spanFrom(start),
 			"leading zero(s) on a number")
 	}
 	return tok
@@ -503,7 +478,7 @@ func (l *Lexer) scanNegativeNumber() Token {
 	tok := l.token(TokNegativeNumber, start)
 	// Check for leading zeros in the digit portion
 	if l.pos-digitStart > 1 && l.source[digitStart] == '0' {
-		l.emitDiagnostic(types.DiagNumberLeadingZero, l.spanFrom(start),
+		l.EmitDiagnostic(types.DiagNumberLeadingZero, l.spanFrom(start),
 			"leading zero(s) on a number")
 	}
 	return tok
@@ -527,7 +502,7 @@ func (l *Lexer) scanQuotedString() Token {
 		b, ok := l.peek()
 		if !ok {
 			span := l.spanFrom(start)
-			l.emitDiagnostic(types.DiagUnterminatedString, span, "unterminated string literal")
+			l.EmitDiagnostic(types.DiagUnterminatedString, span, "unterminated string literal")
 			return l.token(TokQuotedString, start)
 		}
 		if b == '"' {
@@ -564,7 +539,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 
 	if b, ok := l.peek(); !ok || b != '\'' {
 		span := l.spanFrom(start)
-		l.emitDiagnostic(types.DiagUnterminatedHexBinStr, span, "unterminated hex/binary string")
+		l.EmitDiagnostic(types.DiagUnterminatedHexBinStr, span, "unterminated hex/binary string")
 		return l.token(TokError, start)
 	}
 	l.advance() // consume closing quote
@@ -572,7 +547,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 	suffix, ok := l.peek()
 	if !ok {
 		span := l.spanFrom(start)
-		l.emitDiagnostic(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
+		l.EmitDiagnostic(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
 		return l.token(TokError, start)
 	}
 
@@ -583,12 +558,12 @@ func (l *Lexer) scanHexOrBinString() Token {
 		kind = TokHexString
 		if hasNonHex && contentLen > 0 {
 			span := l.spanFrom(start)
-			l.emitDiagnostic(types.DiagHexStringInvalidChar, span,
+			l.EmitDiagnostic(types.DiagHexStringInvalidChar, span,
 				"hex string contains non-hexadecimal characters")
 		}
 		if contentLen > 0 && contentLen%2 != 0 {
 			span := l.spanFrom(start)
-			l.emitDiagnostic(types.DiagHexStringMul2, span,
+			l.EmitDiagnostic(types.DiagHexStringMul2, span,
 				fmt.Sprintf("hex string length %d is not a multiple of 2", contentLen))
 		}
 
@@ -597,19 +572,19 @@ func (l *Lexer) scanHexOrBinString() Token {
 		kind = TokBinString
 		if hasNonBin && contentLen > 0 {
 			span := l.spanFrom(start)
-			l.emitDiagnostic(types.DiagBinStringInvalidChar, span,
+			l.EmitDiagnostic(types.DiagBinStringInvalidChar, span,
 				"binary string contains non-binary characters")
 		}
 		if contentLen > 0 && contentLen%8 != 0 {
 			span := l.spanFrom(start)
-			l.emitDiagnostic(types.DiagBinStringMul8, span,
+			l.EmitDiagnostic(types.DiagBinStringMul8, span,
 				fmt.Sprintf("binary string length %d is not a multiple of 8", contentLen))
 		}
 
 	default:
 		l.advance() // consume bad suffix so span includes it
 		span := l.spanFrom(start)
-		l.emitDiagnostic(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
+		l.EmitDiagnostic(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
 		kind = TokError
 	}
 
