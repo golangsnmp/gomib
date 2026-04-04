@@ -35,7 +35,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 	}
 
 	// Deduplicate module names across sources: first source wins, matching
-	// the precedence used by findModule() and Multi.Find().
+	// the precedence used by Multi.Find().
 	seen := make(map[string]struct{})
 	var allModules []sourceModule
 	for _, src := range sources {
@@ -241,10 +241,6 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 
 	m := mib.Resolve(mods, componentLogger(cfg.logger, "resolver"), &cfg.resolverStrictness, &cfg.diagConfig)
 	return m, checkLoadResult(m, cfg, names)
-}
-
-func findModule(sources []Source, name string) (FindResult, error) {
-	return Multi(sources...).Find(name)
 }
 
 // collectModules adds missing base modules to the map and returns the

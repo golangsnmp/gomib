@@ -5,9 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 
+	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -83,7 +84,7 @@ func (c *cli) cmdFind(args []string) int {
 	}
 	pattern := strings.ToLower(positional[0])
 
-	if _, err := filepath.Match(pattern, ""); err != nil {
+	if _, err := path.Match(pattern, ""); err != nil {
 		printError("invalid pattern: %v", err)
 		return exitError
 	}
@@ -203,11 +204,6 @@ func moduleName(mod *mib.Module) string {
 	return ""
 }
 
-func matchGlob(pattern, name string) bool {
-	ok, _ := filepath.Match(pattern, name)
-	return ok
-}
-
 func matchBaseType(obj *mib.Object, baseLower string) bool {
 	if obj.Type() == nil {
 		return false
@@ -226,7 +222,7 @@ type findFilter struct {
 }
 
 func (f *findFilter) matchName(name string) bool {
-	return matchGlob(f.pattern, strings.ToLower(name))
+	return types.MatchGlob(f.pattern, strings.ToLower(name))
 }
 
 // matchKind checks whether an entity kind passes the kind filter.

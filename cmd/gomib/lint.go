@@ -210,7 +210,7 @@ func (c *cli) runLint(modules []string, cfg *lintConfig) *lintResult {
 		result.Diagnostics = append(result.Diagnostics, lintDiagnostic{
 			Severity:    mib.SeverityFatal.String(),
 			SeverityNum: mib.SeverityFatal,
-			Code:        "parse-error",
+			Code:        types.DiagParseError,
 			Message:     err.Error(),
 		})
 		result.Summary.Total = 1

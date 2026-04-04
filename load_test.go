@@ -448,6 +448,11 @@ END
 	})
 }
 
+// findModule is a test helper that searches sources in order for the named module.
+func findModule(sources []Source, name string) (FindResult, error) {
+	return Multi(sources...).Find(name)
+}
+
 func TestFindModuleReturnsContent(t *testing.T) {
 	want := []byte("test content")
 	src := &fakeSource{modules: map[string]fakeModule{
