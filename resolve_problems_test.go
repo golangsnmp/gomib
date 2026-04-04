@@ -42,40 +42,36 @@ func loadProblemMIB(t testing.TB, name string) *mib.Mib {
 // TestProblemHexStrings verifies hex and binary string DEFVAL parsing.
 // Ground truth: net-snmp snmptranslate -Td output for PROBLEM-HEXSTRINGS-MIB.
 //
-// gomib converts hex/binary strings to []byte then formats:
-//   - empty → "0"
-//   - ≤8 bytes → decimal uint64
-//   - >8 bytes → "0x" + hex
-//
+// DefVal.String() always renders bytes as hex ("0x" + uppercase hex digits).
 // net-snmp converts to decimal integers and truncates leading-zero hex to "0".
+// defvalEquivalent handles the representation differences.
 func TestProblemHexStrings(t *testing.T) {
 	m := loadProblemMIB(t, "PROBLEM-HEXSTRINGS-MIB")
 
 	tests := []struct {
 		name       string
-		wantDefval string // net-snmp ground truth
+		wantDefval string
 	}{
-		// Odd-length hex: 'ABCDEF0'H → pad to "0ABCDEF0" → 4 bytes → 180150000
-		{"problemOddHex7", "180150000"},
-		// Odd-length hex: 'FFF'H → pad to "0FFF" → 2 bytes → 4095
-		{"problemOddHex3", "4095"},
-		// Odd-length hex: '0'H → pad to "00" → 1 byte → 0
-		{"problemOddHex1", "0"},
-		// Long hex: 128 chars / 64 bytes → >8 bytes → gomib: "0x..." format
-		// net-snmp: "0" (truncates leading zeros). Known divergence, pin gomib output.
+		// Odd-length hex: 'ABCDEF0'H -> pad to "0ABCDEF0" -> 4 bytes
+		{"problemOddHex7", "0x0ABCDEF0"},
+		// Odd-length hex: 'FFF'H -> pad to "0FFF" -> 2 bytes
+		{"problemOddHex3", "0x0FFF"},
+		// Odd-length hex: '0'H -> pad to "00" -> 1 byte
+		{"problemOddHex1", "0x00"},
+		// Long hex: 128 chars / 64 bytes
 		{"problemLongHex", "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000FF"},
-		// Empty hex: ''H → 0 bytes → "0"
-		{"problemEmptyHex", "0"},
-		// Binary: '11110000'B → 1 byte → 0xF0 → 240
-		{"problemBinary8", "240"},
-		// Binary: '10101'B → pad to "00010101" → 1 byte → 0x15 → 21
-		{"problemBinary5", "21"},
-		// Binary: '101010101010'B → pad to 16 bits → 2 bytes → 0x0AAA → 2730
-		{"problemBinary12", "2730"},
-		// Lowercase hex: 'deadbeef'H → 4 bytes → 3735928559
-		{"problemLowerHex", "3735928559"},
-		// All-zeros: '0000000000000000'H → 8 bytes → 0
-		{"problemAllZeros", "0"},
+		// Empty hex: ''H -> 0 bytes
+		{"problemEmptyHex", "0x"},
+		// Binary: '11110000'B -> 1 byte -> 0xF0
+		{"problemBinary8", "0xF0"},
+		// Binary: '10101'B -> pad to "00010101" -> 1 byte -> 0x15
+		{"problemBinary5", "0x15"},
+		// Binary: '101010101010'B -> pad to 16 bits -> 2 bytes -> 0x0AAA
+		{"problemBinary12", "0x0AAA"},
+		// Lowercase hex: 'deadbeef'H -> 4 bytes
+		{"problemLowerHex", "0xDEADBEEF"},
+		// All-zeros: '0000000000000000'H -> 8 bytes
+		{"problemAllZeros", "0x0000000000000000"},
 	}
 
 	for _, tt := range tests {
@@ -815,7 +811,6 @@ func TestProblemDefvalLargeHex(t *testing.T) {
 	testutil.Equal(t, mib.DefValKindBytes, dv.Kind(), "large hex defval kind")
 
 	got := dv.String()
-	// 16 bytes > 8, so DefVal.String() uses hex format instead of decimal
 	testutil.Equal(t, "0x00000000000000000000000000000000", got, "large hex defval string")
 
 	// Verify equivalence with net-snmp's representation ("0" for all-zero hex)
@@ -835,9 +830,9 @@ func TestProblemDefvalBinary(t *testing.T) {
 	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalBinary")
 
 	got := dv.String()
-	// '10101010'B = 0xAA = 170
-	if got != "170" {
-		t.Errorf("binary defval: got %q, want 170", got)
+	// '10101010'B = 0xAA
+	if got != "0xAA" {
+		t.Errorf("binary defval: got %q, want 0xAA", got)
 	}
 }
 
@@ -854,9 +849,9 @@ func TestProblemDefvalBinaryOdd(t *testing.T) {
 	testutil.True(t, !dv.IsZero(), "DefaultValue() for %s", "problemDefvalBinaryOdd")
 
 	got := dv.String()
-	// '101'B padded to '00000101'B = 0x05 = 5
-	if got != "5" {
-		t.Errorf("odd binary defval: got %q, want 5", got)
+	// '101'B padded to '00000101'B = 0x05
+	if got != "0x05" {
+		t.Errorf("odd binary defval: got %q, want 0x05", got)
 	}
 }
 

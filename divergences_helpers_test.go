@@ -5,6 +5,7 @@ package gomib
 
 import (
 	"cmp"
+	"math/big"
 	"slices"
 	"strings"
 
@@ -201,7 +202,29 @@ func defvalEquivalent(gomibDefval, fixtureDefval string) bool {
 	if isHexAllOnes(gNorm) && fNorm == "-1" || isHexAllOnes(fNorm) && gNorm == "-1" {
 		return true
 	}
+	// Compare hex vs decimal by numeric value (gomib renders bytes as hex,
+	// net-snmp renders them as decimal integers).
+	if gInt, ok := parseDefvalInt(gNorm); ok {
+		if fInt, ok := parseDefvalInt(fNorm); ok {
+			return gInt.Cmp(fInt) == 0
+		}
+	}
 	return false
+}
+
+// parseDefvalInt parses a decimal or "0x"-prefixed hex string as a big.Int.
+func parseDefvalInt(s string) (*big.Int, bool) {
+	n := new(big.Int)
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		hex := s[2:]
+		if hex == "" {
+			return n, true // "0x" = zero
+		}
+		_, ok := n.SetString(hex, 16)
+		return n, ok
+	}
+	_, ok := n.SetString(s, 10)
+	return n, ok
 }
 
 func isHexZeros(s string) bool {

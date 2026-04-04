@@ -207,18 +207,7 @@ func (d DefVal) String() string {
 	case DefValKindString:
 		return `"` + strings.ReplaceAll(d.value.(string), `"`, `\"`) + `"`
 	case DefValKindBytes:
-		b := d.value.([]byte)
-		if len(b) == 0 {
-			return "0"
-		}
-		if len(b) <= 8 {
-			var n uint64
-			for _, v := range b {
-				n = n<<8 | uint64(v)
-			}
-			return strconv.FormatUint(n, 10)
-		}
-		return "0x" + bytesToHex(b)
+		return "0x" + bytesToHex(d.value.([]byte))
 	case DefValKindEnum:
 		return d.value.(string)
 	case DefValKindBits:
