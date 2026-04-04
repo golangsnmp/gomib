@@ -203,4 +203,3 @@ type Variation struct {
 type MacroDefinitionDef struct {
 	DefBase
 }
-
