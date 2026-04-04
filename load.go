@@ -11,6 +11,7 @@ import (
 	"maps"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/golangsnmp/gomib/internal/module"
@@ -307,4 +308,33 @@ func looksLikeMIBContent(content []byte) bool {
 	}
 
 	return bytes.Contains(probe, sigDefinitions) && bytes.Contains(probe, sigAssign)
+}
+
+// checkLoadResult checks the resolved Mib for diagnostic threshold violations
+// and missing requested modules. Returns nil if no issues found.
+func checkLoadResult(m *mib.Mib, cfg *loadConfig, requestedModules []string) error {
+	var errs []error
+
+	// Check for missing requested modules
+	if len(requestedModules) > 0 {
+		var missing []string
+		for _, name := range requestedModules {
+			if m.Module(name) == nil {
+				missing = append(missing, name)
+			}
+		}
+		if len(missing) > 0 {
+			errs = append(errs, fmt.Errorf("%w: %s", ErrMissingModules, strings.Join(missing, ", ")))
+		}
+	}
+
+	// Check FailAt threshold
+	for _, d := range m.Diagnostics() {
+		if cfg.diagConfig.ShouldFail(d.Severity) {
+			errs = append(errs, fmt.Errorf("%w: %s", ErrDiagnosticThreshold, d))
+			break
+		}
+	}
+
+	return errors.Join(errs...)
 }
