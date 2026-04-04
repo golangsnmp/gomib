@@ -79,7 +79,7 @@ func createUserTypes(ctx *resolverContext) {
 
 			typ := newType(td.Name)
 			typ.setSpan(td.Span)
-			typ.setSyntaxSpan(td.SyntaxSpan)
+			typ.setSyntaxSpan(td.Spans.Syntax)
 			typ.setModule(resolved)
 			typ.setBase(base)
 			typ.setIsTC(td.IsTextualConvention)
@@ -181,7 +181,7 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 		if tryResolveTypeParent(ctx, entry) {
 			resolved++
 		} else if baseName := getTypeRefBaseName(entry.td.Syntax); baseName != "" {
-			ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.SyntaxSpan)
+			ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Spans.Syntax)
 		}
 	}
 
@@ -193,7 +193,7 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 			}
 			baseName := getTypeRefBaseName(entry.td.Syntax)
 			if baseName != "" {
-				ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.SyntaxSpan)
+				ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Spans.Syntax)
 			}
 		}
 	}

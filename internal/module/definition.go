@@ -22,6 +22,19 @@ type DefBase struct {
 func (d *DefBase) DefinitionName() string     { return d.Name }
 func (d *DefBase) DefinitionSpan() types.Span { return d.Span }
 
+// ObjectTypeSpans holds source byte ranges for each clause in an OBJECT-TYPE.
+type ObjectTypeSpans struct {
+	Syntax      types.Span
+	Access      types.Span
+	Status      types.Span
+	Description types.Span
+	Units       types.Span
+	Reference   types.Span
+	Index       types.Span
+	Augments    types.Span
+	DefVal      types.Span
+}
+
 // ObjectType is an OBJECT-TYPE definition.
 type ObjectType struct {
 	DefBase
@@ -37,16 +50,7 @@ type ObjectType struct {
 	Augments       string
 	DefVal         DefVal
 	Oid            OidAssignment
-
-	SyntaxSpan      types.Span
-	AccessSpan      types.Span
-	StatusSpan      types.Span
-	DescriptionSpan types.Span
-	UnitsSpan       types.Span
-	ReferenceSpan   types.Span
-	IndexSpan       types.Span
-	AugmentsSpan    types.Span
-	DefValSpan      types.Span
+	Spans          ObjectTypeSpans
 }
 
 func (d *ObjectType) DefinitionOid() *OidAssignment { return &d.Oid }
@@ -114,6 +118,15 @@ type TrapInfo struct {
 	TrapNumber uint32
 }
 
+// TypeDefSpans holds source byte ranges for each clause in a type definition.
+type TypeDefSpans struct {
+	Syntax      types.Span
+	Status      types.Span
+	Description types.Span
+	Reference   types.Span
+	DisplayHint types.Span
+}
+
 // TypeDef represents both TEXTUAL-CONVENTION and simple type assignments.
 type TypeDef struct {
 	DefBase
@@ -128,12 +141,7 @@ type TypeDef struct {
 	Description         string
 	Reference           string
 	IsTextualConvention bool
-
-	SyntaxSpan      types.Span
-	StatusSpan      types.Span
-	DescriptionSpan types.Span
-	ReferenceSpan   types.Span
-	DisplayHintSpan types.Span
+	Spans               TypeDefSpans
 }
 
 func (d *TypeDef) DefinitionOid() *OidAssignment { return nil }

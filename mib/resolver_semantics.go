@@ -194,7 +194,7 @@ func resolveTableSemantics(ctx *resolverContext, objRefs []objectTypeRef) {
 
 		if obj.Augments != "" {
 			if _, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); !ok {
-				ctx.RecordUnresolvedOid(ref.mod, obj.Name, obj.Augments, obj.AugmentsSpan)
+				ctx.RecordUnresolvedOid(ref.mod, obj.Name, obj.Augments, obj.Spans.Augments)
 			}
 		}
 	}
@@ -212,14 +212,14 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 
 		resolved := newObject(obj.Name)
 		resolved.setSpan(obj.Span)
-		resolved.setSyntaxSpan(obj.SyntaxSpan)
-		resolved.setAccessSpan(obj.AccessSpan)
-		resolved.setStatusSpan(obj.StatusSpan)
-		resolved.setDescriptionSpan(obj.DescriptionSpan)
-		resolved.setReferenceSpan(obj.ReferenceSpan)
-		resolved.setUnitsSpan(obj.UnitsSpan)
-		resolved.setAugmentsSpan(obj.AugmentsSpan)
-		resolved.setDefaultValueSpan(obj.DefValSpan)
+		resolved.setSyntaxSpan(obj.Spans.Syntax)
+		resolved.setAccessSpan(obj.Spans.Access)
+		resolved.setStatusSpan(obj.Spans.Status)
+		resolved.setDescriptionSpan(obj.Spans.Description)
+		resolved.setReferenceSpan(obj.Spans.Reference)
+		resolved.setUnitsSpan(obj.Spans.Units)
+		resolved.setAugmentsSpan(obj.Spans.Augments)
+		resolved.setDefaultValueSpan(obj.Spans.DefVal)
 		resolved.setOidRefs(extractOidRefs(obj.DefinitionOid()))
 		resolved.setNode(node)
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
@@ -231,7 +231,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 		resolved.setUnits(obj.Units)
 		resolved.setReference(obj.Reference)
 
-		if t, ok := resolveTypeSyntax(ctx, obj.Syntax, ref.mod, obj.Name, obj.SyntaxSpan); ok {
+		if t, ok := resolveTypeSyntax(ctx, obj.Syntax, ref.mod, obj.Name, obj.Spans.Syntax); ok {
 			resolved.setType(t)
 		}
 

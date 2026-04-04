@@ -335,28 +335,30 @@ func lowerObjectType(def *ast.ObjectTypeDef, ctx *LoweringContext) *ObjectType {
 	checkEmptyOptionalString(ctx, def.Units, def.Span, name, "UNITS", types.DiagEmptyUnits)
 
 	return &ObjectType{
-		DefBase:         DefBase{Name: def.Name.Name, Span: def.Span},
-		Syntax:          lowerTypeSyntax(def.Syntax.Syntax, ctx),
-		Units:           optionalString(def.Units),
-		Access:          def.Access.Value,
-		AccessKeyword:   def.Access.Keyword,
-		Status:          optionalStatus(def.Status, types.StatusCurrent),
-		Description:     optionalString(def.Description),
-		HasDescription:  def.Description != nil,
-		Reference:       optionalString(def.Reference),
-		Index:           lowerIndexClause(def.Index),
-		Augments:        augments,
-		DefVal:          lowerOptionalDefVal(def.DefVal, ctx),
-		Oid:             lowerOidAssignment(def.OidAssignment, ctx),
-		SyntaxSpan:      def.Syntax.Span,
-		AccessSpan:      def.Access.Span,
-		StatusSpan:      optionalStatusSpan(def.Status),
-		DescriptionSpan: optionalQuotedStringSpan(def.Description),
-		UnitsSpan:       optionalQuotedStringSpan(def.Units),
-		ReferenceSpan:   optionalQuotedStringSpan(def.Reference),
-		IndexSpan:       optionalIndexClauseSpan(def.Index),
-		AugmentsSpan:    optionalAugmentsSpan(def.Augments),
-		DefValSpan:      optionalDefValSpan(def.DefVal),
+		DefBase:        DefBase{Name: def.Name.Name, Span: def.Span},
+		Syntax:         lowerTypeSyntax(def.Syntax.Syntax, ctx),
+		Units:          optionalString(def.Units),
+		Access:         def.Access.Value,
+		AccessKeyword:  def.Access.Keyword,
+		Status:         optionalStatus(def.Status, types.StatusCurrent),
+		Description:    optionalString(def.Description),
+		HasDescription: def.Description != nil,
+		Reference:      optionalString(def.Reference),
+		Index:          lowerIndexClause(def.Index),
+		Augments:       augments,
+		DefVal:         lowerOptionalDefVal(def.DefVal, ctx),
+		Oid:            lowerOidAssignment(def.OidAssignment, ctx),
+		Spans: ObjectTypeSpans{
+			Syntax:      def.Syntax.Span,
+			Access:      def.Access.Span,
+			Status:      optionalStatusSpan(def.Status),
+			Description: optionalQuotedStringSpan(def.Description),
+			Units:       optionalQuotedStringSpan(def.Units),
+			Reference:   optionalQuotedStringSpan(def.Reference),
+			Index:       optionalIndexClauseSpan(def.Index),
+			Augments:    optionalAugmentsSpan(def.Augments),
+			DefVal:      optionalDefValSpan(def.DefVal),
+		},
 	}
 }
 
@@ -523,20 +525,22 @@ func lowerTextualConvention(def *ast.TextualConventionDef, ctx *LoweringContext)
 		Description:         def.Description.Value,
 		Reference:           optionalString(def.Reference),
 		IsTextualConvention: true,
-		SyntaxSpan:          def.Syntax.Span,
-		StatusSpan:          def.Status.Span,
-		DescriptionSpan:     def.Description.Span,
-		ReferenceSpan:       optionalQuotedStringSpan(def.Reference),
-		DisplayHintSpan:     optionalQuotedStringSpan(def.DisplayHint),
+		Spans: TypeDefSpans{
+			Syntax:      def.Syntax.Span,
+			Status:      def.Status.Span,
+			Description: def.Description.Span,
+			Reference:   optionalQuotedStringSpan(def.Reference),
+			DisplayHint: optionalQuotedStringSpan(def.DisplayHint),
+		},
 	}
 }
 
 func lowerTypeAssignment(def *ast.TypeAssignmentDef, ctx *LoweringContext) *TypeDef {
 	return &TypeDef{
-		DefBase:    DefBase{Name: def.Name.Name, Span: def.Span},
-		Syntax:     lowerTypeSyntax(def.Syntax, ctx),
-		Status:     types.StatusCurrent,
-		SyntaxSpan: def.Syntax.SyntaxSpan(),
+		DefBase: DefBase{Name: def.Name.Name, Span: def.Span},
+		Syntax:  lowerTypeSyntax(def.Syntax, ctx),
+		Status:  types.StatusCurrent,
+		Spans:   TypeDefSpans{Syntax: def.Syntax.SyntaxSpan()},
 	}
 }
 
