@@ -145,9 +145,22 @@ func (n *Node) sortedChildren() []*Node {
 }
 
 // Subtree returns an iterator over this node and all its descendants, depth-first.
+// To exclude the node itself, use [Node.Descendants].
 func (n *Node) Subtree() iter.Seq[*Node] {
 	return func(yield func(*Node) bool) {
 		n.yieldAll(yield)
+	}
+}
+
+// Descendants returns an iterator over all descendants of this node,
+// depth-first by arc. Unlike [Node.Subtree], does not include the node itself.
+func (n *Node) Descendants() iter.Seq[*Node] {
+	return func(yield func(*Node) bool) {
+		for _, child := range n.sortedChildren() {
+			if !child.yieldAll(yield) {
+				return
+			}
+		}
 	}
 }
 

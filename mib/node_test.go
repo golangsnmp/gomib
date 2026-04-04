@@ -85,6 +85,46 @@ func TestSubtreeEarlyStop(t *testing.T) {
 	testutil.SliceEqual(t, want, names, "got")
 }
 
+func TestDescendantsOrder(t *testing.T) {
+	root := buildTree()
+
+	var names []string
+	for nd := range root.Descendants() {
+		names = append(names, nd.name)
+	}
+
+	// Same as Subtree but without root itself.
+	want := []string{"a", "d", "c", "b", "e"}
+	testutil.SliceEqual(t, want, names, "got")
+}
+
+func TestDescendantsEarlyStop(t *testing.T) {
+	root := buildTree()
+
+	var names []string
+	for nd := range root.Descendants() {
+		names = append(names, nd.name)
+		if nd.name == "d" {
+			break
+		}
+	}
+
+	want := []string{"a", "d"}
+	testutil.SliceEqual(t, want, names, "got")
+}
+
+func TestDescendantsLeaf(t *testing.T) {
+	root := buildTree()
+
+	// Leaf node should have no descendants.
+	leaf := root.children[1].children[3] // node "c"
+	var count int
+	for range leaf.Descendants() {
+		count++
+	}
+	testutil.Equal(t, 0, count, "leaf descendants")
+}
+
 func TestWalkOID(t *testing.T) {
 	root := buildTree()
 

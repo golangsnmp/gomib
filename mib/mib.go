@@ -46,15 +46,10 @@ func newMib() *Mib {
 // Root returns the unnamed root node of the OID tree.
 func (m *Mib) Root() *Node { return m.root }
 
-// Nodes returns an iterator over all nodes in the tree, depth-first by arc.
+// Nodes returns an iterator over all nodes in the OID tree (excluding the
+// unnamed root), depth-first by arc. Equivalent to Root().Descendants().
 func (m *Mib) Nodes() iter.Seq[*Node] {
-	return func(yield func(*Node) bool) {
-		for _, child := range m.root.sortedChildren() {
-			if !child.yieldAll(yield) {
-				return
-			}
-		}
-	}
+	return m.root.Descendants()
 }
 
 // AllSymbols returns an iterator over all definitions across all loaded modules.
