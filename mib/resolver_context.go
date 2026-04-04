@@ -131,25 +131,20 @@ func newResolverContext(logger *slog.Logger, strictness ResolverStrictness, diag
 	}
 }
 
-// LookupNodeForModule resolves a node by name, traversing imports from mod.
-func (c *resolverContext) LookupNodeForModule(mod *module.Module, name string) (*Node, bool) {
-	return c.lookupNodeInModuleScope(mod, name)
-}
-
-// LookupNodeInModule resolves a node across all versions of a named module.
-func (c *resolverContext) LookupNodeInModule(moduleName, name string) (*Node, bool) {
+// lookupNodeByModuleName resolves a node across all versions of a named module.
+func (c *resolverContext) lookupNodeByModuleName(moduleName, name string) (*Node, bool) {
 	candidates := c.moduleIndex[moduleName]
 	for _, mod := range candidates {
-		if node, ok := c.LookupNodeForModule(mod, name); ok {
+		if node, ok := c.lookupNode(mod, name); ok {
 			return node, true
 		}
 	}
 	return nil, false
 }
 
-// LookupNodeGlobal searches all modules for a node with the given name.
+// lookupNodeGlobal searches all modules for a node with the given name.
 // Iterates in module-list order for deterministic results.
-func (c *resolverContext) LookupNodeGlobal(name string) (*Node, bool) {
+func (c *resolverContext) lookupNodeGlobal(name string) (*Node, bool) {
 	for _, mod := range c.modules {
 		if symbols := c.moduleSymbolToNode[mod]; symbols != nil {
 			if node, ok := symbols[name]; ok {
@@ -160,8 +155,8 @@ func (c *resolverContext) LookupNodeGlobal(name string) (*Node, bool) {
 	return nil, false
 }
 
-// lookupTypeInModule looks up a type directly in a module's symbol table.
-func (c *resolverContext) lookupTypeInModule(mod *module.Module, name string) (*Type, bool) {
+// lookupTypeDirect looks up a type directly in a module's symbol table.
+func (c *resolverContext) lookupTypeDirect(mod *module.Module, name string) (*Type, bool) {
 	if mod == nil {
 		return nil, false
 	}
@@ -206,15 +201,15 @@ func (c *resolverContext) findWellKnownModuleForType(name string) *module.Module
 // base modules (Normal+) for a type by name.
 func (c *resolverContext) tryWellKnownTypeFallbacks(name string) (*Type, bool) {
 	if m := c.findWellKnownModuleForType(name); m != nil {
-		return c.lookupTypeInModule(m, name)
+		return c.lookupTypeDirect(m, name)
 	}
 	return nil, false
 }
 
-// LookupType searches for a type by name, trying well-known modules first.
+// resolveType searches for a type by name, trying well-known modules first.
 // Beyond those deterministic/constrained sets, global search is only enabled
 // in permissive mode.
-func (c *resolverContext) LookupType(name string) (*Type, bool) {
+func (c *resolverContext) resolveType(name string) (*Type, bool) {
 	if t, ok := c.tryWellKnownTypeFallbacks(name); ok {
 		return t, true
 	}
@@ -234,20 +229,20 @@ func (c *resolverContext) LookupType(name string) (*Type, bool) {
 	return nil, false
 }
 
-// LookupTypeForModule resolves a type by name, traversing imports from mod.
+// resolveTypeForModule resolves a type by name, traversing imports from mod.
 // Falls back to well-known base modules when constrained fallbacks are enabled.
-func (c *resolverContext) LookupTypeForModule(mod *module.Module, name string) (*Type, bool) {
-	if t, ok := c.lookupTypeInModuleScope(mod, name); ok {
+func (c *resolverContext) resolveTypeForModule(mod *module.Module, name string) (*Type, bool) {
+	if t, ok := c.lookupType(mod, name); ok {
 		return t, true
 	}
 	return c.tryWellKnownTypeFallbacks(name)
 }
 
-// lookupInModuleScope looks up a symbol in the module's own symbols, then
+// lookupInScope looks up a symbol in the module's own symbols, then
 // follows a single import hop. ModuleImports entries are expected to already
 // be transitively resolved to the defining module by resolveTransitiveImports.
 // If onImportHit is non-nil, it is called when a symbol is resolved via import.
-func lookupInModuleScope[T any](
+func lookupInScope[T any](
 	mod *module.Module,
 	name string,
 	getSymbols func(*module.Module) map[string]T,
@@ -278,27 +273,28 @@ func lookupInModuleScope[T any](
 	return zero, false
 }
 
-func (c *resolverContext) lookupNodeInModuleScope(mod *module.Module, name string) (*Node, bool) {
-	return lookupInModuleScope(mod, name,
+// lookupNode resolves a node by name, traversing imports from mod.
+func (c *resolverContext) lookupNode(mod *module.Module, name string) (*Node, bool) {
+	return lookupInScope(mod, name,
 		func(m *module.Module) map[string]*Node { return c.moduleSymbolToNode[m] },
 		func(m *module.Module) map[string]*module.Module { return c.moduleImports[m] },
 		c.markImportUsed,
 	)
 }
 
-func (c *resolverContext) lookupTypeInModuleScope(mod *module.Module, name string) (*Type, bool) {
-	return lookupInModuleScope(mod, name,
+func (c *resolverContext) lookupType(mod *module.Module, name string) (*Type, bool) {
+	return lookupInScope(mod, name,
 		func(m *module.Module) map[string]*Type { return c.moduleSymbolToType[m] },
 		func(m *module.Module) map[string]*module.Module { return c.moduleImports[m] },
 		c.markImportUsed,
 	)
 }
 
-// lookupObjectInModuleScope finds the resolved Object for a name within a
+// lookupObject finds the resolved Object for a name within a
 // specific module's scope. During resolution, module-scoped lookups are the
 // correct approach since node.Object() returns the globally preferred object
 // which may belong to a different module.
-func (c *resolverContext) lookupObjectInModuleScope(mod *module.Module, name string) *Object {
+func (c *resolverContext) lookupObject(mod *module.Module, name string) *Object {
 	// Check the current module first.
 	if resolved := c.moduleToResolved[mod]; resolved != nil {
 		if obj := resolved.Object(name); obj != nil {
@@ -319,16 +315,16 @@ func (c *resolverContext) lookupObjectInModuleScope(mod *module.Module, name str
 	return nil
 }
 
-// findScopedObject resolves a name to its Object, trying module-scoped
+// resolveObject resolves a name to its Object, trying module-scoped
 // lookup first, then global fallback if strictness allows. Returns the
 // object and whether the name resolved to a node at all (needed for
 // diagnostic decisions when the object is nil).
-func (c *resolverContext) findScopedObject(mod *module.Module, name string) (obj *Object, nodeFound bool) {
-	if _, ok := c.LookupNodeForModule(mod, name); ok {
-		return c.lookupObjectInModuleScope(mod, name), true
+func (c *resolverContext) resolveObject(mod *module.Module, name string) (obj *Object, nodeFound bool) {
+	if _, ok := c.lookupNode(mod, name); ok {
+		return c.lookupObject(mod, name), true
 	}
 	if c.ResolverStrictness().AllowGlobalFallbacks() {
-		if node, ok := c.LookupNodeGlobal(name); ok {
+		if node, ok := c.lookupNodeGlobal(name); ok {
 			return node.Object(), true
 		}
 	}

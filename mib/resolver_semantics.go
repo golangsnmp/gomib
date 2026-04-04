@@ -69,7 +69,7 @@ func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 
 	for _, ref := range objRefs {
 		obj := ref.obj
-		node, ok := ctx.LookupNodeForModule(ref.mod, obj.Name)
+		node, ok := ctx.lookupNode(ref.mod, obj.Name)
 		if !ok {
 			continue
 		}
@@ -183,7 +183,7 @@ func resolveTableSemantics(ctx *resolverContext, objRefs []objectTypeRef) {
 
 		if len(obj.Index) > 0 {
 			for _, item := range obj.Index {
-				if _, ok := ctx.LookupNodeForModule(ref.mod, item.Object); !ok {
+				if _, ok := ctx.lookupNode(ref.mod, item.Object); !ok {
 					if isBareTypeIndex(item.Object) {
 						continue
 					}
@@ -193,7 +193,7 @@ func resolveTableSemantics(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 
 		if obj.Augments != "" {
-			if _, ok := ctx.LookupNodeForModule(ref.mod, obj.Augments); !ok {
+			if _, ok := ctx.lookupNode(ref.mod, obj.Augments); !ok {
 				ctx.RecordUnresolvedOid(ref.mod, obj.Name, obj.Augments, obj.Spans.Augments)
 			}
 		}
@@ -205,7 +205,7 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 	for _, ref := range objRefs {
 		obj := ref.obj
 
-		node, ok := ctx.LookupNodeForModule(ref.mod, obj.Name)
+		node, ok := ctx.lookupNode(ref.mod, obj.Name)
 		if !ok {
 			continue
 		}
@@ -334,7 +334,7 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 		if len(obj.Index) > 0 {
 			var indexEntries []IndexEntry
 			for _, item := range obj.Index {
-				if idxObj, nodeFound := ctx.findScopedObject(ref.mod, item.Object); idxObj != nil {
+				if idxObj, nodeFound := ctx.resolveObject(ref.mod, item.Object); idxObj != nil {
 					indexEntries = append(indexEntries, IndexEntry{
 						Object:   idxObj,
 						Implied:  item.Implied,
@@ -357,7 +357,7 @@ func linkObjectIndexes(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 
 		if obj.Augments != "" {
-			if target, nodeFound := ctx.findScopedObject(ref.mod, obj.Augments); target != nil {
+			if target, nodeFound := ctx.resolveObject(ref.mod, obj.Augments); target != nil {
 				resolvedObj.setAugments(target)
 				target.addAugmentedBy(resolvedObj)
 			} else if nodeFound {
@@ -378,7 +378,7 @@ func checkAugmentsNesting(ctx *resolverContext, objRefs []objectTypeRef) {
 		if obj.Augments == "" {
 			continue
 		}
-		resolvedObj := ctx.lookupObjectInModuleScope(ref.mod, obj.Name)
+		resolvedObj := ctx.lookupObject(ref.mod, obj.Name)
 		if resolvedObj == nil || resolvedObj.Augments() == nil {
 			continue
 		}
@@ -424,7 +424,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 	for _, ref := range collectNotificationRefs(ctx) {
 		notif := ref.notif
 
-		node, ok := ctx.LookupNodeForModule(ref.mod, notif.Name)
+		node, ok := ctx.lookupNode(ref.mod, notif.Name)
 		if !ok {
 			continue
 		}
@@ -460,7 +460,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 
 			// Use module-scoped object lookup to get the object from the
 			// correct module, not whichever module won node preference.
-			if obj := ctx.lookupObjectInModuleScope(ref.mod, objName); obj != nil {
+			if obj := ctx.lookupObject(ref.mod, objName); obj != nil {
 				addNotifObject(obj)
 				continue
 			}
@@ -468,7 +468,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 			// Permissive only: global lookup for objects not explicitly imported.
 			// No module scope available, so use the node-attached object.
 			if ctx.ResolverStrictness().AllowGlobalFallbacks() {
-				if objNode, ok := ctx.LookupNodeGlobal(objName); ok {
+				if objNode, ok := ctx.lookupNodeGlobal(objName); ok {
 					if ctx.TraceEnabled() {
 						ctx.Trace("permissive: resolved notification object via global lookup",
 							slog.String("object", objName),
@@ -486,7 +486,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 			}
 
 			// Try node lookup to distinguish "not found" from "not an object".
-			objNode, ok := ctx.LookupNodeForModule(ref.mod, objName)
+			objNode, ok := ctx.lookupNode(ref.mod, objName)
 			switch {
 			case !ok:
 				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
@@ -550,7 +550,7 @@ func createResolvedGroups(ctx *resolverContext) {
 	created := 0
 	for i := range groups {
 		gi := &groups[i]
-		node, ok := ctx.LookupNodeForModule(gi.mod, gi.name)
+		node, ok := ctx.lookupNode(gi.mod, gi.name)
 		if !ok {
 			continue
 		}
@@ -684,7 +684,7 @@ func createResolvedCompliances(ctx *resolverContext) {
 	created := 0
 	for _, ref := range collectComplianceRefs(ctx) {
 		comp := ref.comp
-		node, ok := ctx.LookupNodeForModule(ref.mod, comp.Name)
+		node, ok := ctx.lookupNode(ref.mod, comp.Name)
 		if !ok {
 			continue
 		}
@@ -758,7 +758,7 @@ func createResolvedCapabilities(ctx *resolverContext) {
 		return capabilitiesRef{}, false
 	}) {
 		ac := ref.cap
-		node, ok := ctx.LookupNodeForModule(ref.mod, ac.Name)
+		node, ok := ctx.lookupNode(ref.mod, ac.Name)
 		if !ok {
 			continue
 		}
@@ -843,16 +843,16 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 // DEFVAL are object variations.
 func isNotificationVariation(ctx *resolverContext, mod *module.Module, supportsModule string, v *module.Variation) bool {
 	// Try the SUPPORTS module first (most correct per RFC 2580).
-	if node, ok := ctx.LookupNodeInModule(supportsModule, v.Name); ok {
+	if node, ok := ctx.lookupNodeByModuleName(supportsModule, v.Name); ok {
 		return node.Kind() == KindNotification
 	}
 	// Try the defining module's import chain.
-	if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
+	if node, ok := ctx.lookupNode(mod, v.Name); ok {
 		return node.Kind() == KindNotification
 	}
 	// Permissive only: try global lookup.
 	if ctx.ResolverStrictness().AllowGlobalFallbacks() {
-		if node, ok := ctx.LookupNodeGlobal(v.Name); ok {
+		if node, ok := ctx.lookupNodeGlobal(v.Name); ok {
 			return node.Kind() == KindNotification
 		}
 	}
@@ -861,12 +861,12 @@ func isNotificationVariation(ctx *resolverContext, mod *module.Module, supportsM
 }
 
 func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*Node, bool) {
-	node, ok := ctx.LookupNodeForModule(mod, name)
+	node, ok := ctx.lookupNode(mod, name)
 	if ok {
 		return node, true
 	}
 	if ctx.ResolverStrictness().AllowGlobalFallbacks() {
-		node, ok = ctx.LookupNodeGlobal(name)
+		node, ok = ctx.lookupNodeGlobal(name)
 		if ok && ctx.TraceEnabled() {
 			ctx.Trace("permissive: resolved group member via global lookup",
 				slog.String("member", name),
@@ -935,7 +935,7 @@ func resolveSyntaxConstraints(ctx *resolverContext, syntax module.TypeSyntax, mo
 func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *module.Module, objectName string, span types.Span) (*Type, bool) {
 	switch s := syntax.(type) {
 	case *module.TypeSyntaxTypeRef:
-		if t, ok := ctx.LookupTypeForModule(mod, s.Name); ok {
+		if t, ok := ctx.resolveTypeForModule(mod, s.Name); ok {
 			return t, true
 		}
 		// Don't emit unresolved error for SEQUENCE type references (row SYNTAX).
@@ -950,14 +950,14 @@ func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *modu
 	case *module.TypeSyntaxIntegerEnum:
 		// Named base type (e.g., TPSPRateType { kbps(1) })
 		if s.Base != "" {
-			if t, ok := ctx.LookupTypeForModule(mod, s.Base); ok {
+			if t, ok := ctx.resolveTypeForModule(mod, s.Base); ok {
 				return t, true
 			}
 			ctx.RecordUnresolvedType(mod, objectName, s.Base, span)
 			return nil, false
 		}
 		// Bare INTEGER { ... } enum with no named base
-		if t, ok := ctx.LookupType("INTEGER"); ok {
+		if t, ok := ctx.resolveType("INTEGER"); ok {
 			return t, true
 		}
 		ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing,
@@ -977,7 +977,7 @@ func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *modu
 }
 
 func lookupPrimitiveType(ctx *resolverContext, mod *module.Module, span types.Span, objectName, typeName string) (*Type, bool) {
-	if t, ok := ctx.LookupType(typeName); ok {
+	if t, ok := ctx.resolveType(typeName); ok {
 		return t, true
 	}
 	ctx.EmitDiagnostic(types.DiagPrimitiveTypeMissing,
@@ -1034,7 +1034,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		// Parser emits bare names as DefValEnum, but for OID-typed objects
 		// the name is actually an OID reference.
 		if isOIDType(ctx, mod, syntax) {
-			if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
+			if node, ok := ctx.lookupNode(mod, v.Name); ok {
 				oid := node.OID()
 				dv := newDefValOID(oid, v.Name)
 				return &dv
@@ -1051,7 +1051,7 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		dv := newDefValBits(slices.Clone(v.Labels), raw)
 		return &dv
 	case *module.DefValOidRef:
-		if node, ok := ctx.LookupNodeForModule(mod, v.Name); ok {
+		if node, ok := ctx.lookupNode(mod, v.Name); ok {
 			oid := node.OID()
 			dv := newDefValOID(oid, v.Name)
 			return &dv
@@ -1071,9 +1071,9 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 		var node *Node
 		var ok bool
 		if qualModule != "" {
-			node, ok = ctx.LookupNodeInModule(qualModule, name)
+			node, ok = ctx.lookupNodeByModuleName(qualModule, name)
 		} else {
-			node, ok = ctx.LookupNodeForModule(mod, name)
+			node, ok = ctx.lookupNode(mod, name)
 		}
 		if !ok {
 			emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID root %q could not be resolved", name))
@@ -1175,7 +1175,7 @@ func isOIDType(ctx *resolverContext, mod *module.Module, syntax module.TypeSynta
 		if s.Name == "OBJECT IDENTIFIER" {
 			return true
 		}
-		if t, ok := ctx.LookupTypeForModule(mod, s.Name); ok {
+		if t, ok := ctx.resolveTypeForModule(mod, s.Name); ok {
 			return t.EffectiveBase() == BaseObjectIdentifier
 		}
 		return false

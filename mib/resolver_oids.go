@@ -355,7 +355,7 @@ func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *N
 }
 
 func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string, compSpan types.Span) (*Node, bool) {
-	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
+	if node, ok := ctx.lookupNode(def.mod, name); ok {
 		return node, true
 	}
 	// RFC-compliant: well-known roots (iso, ccitt, joint-iso-ccitt)
@@ -378,14 +378,14 @@ func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string, 
 }
 
 func resolveNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *Node, name string, number uint32, isLast bool) (*Node, bool) {
-	if node, ok := ctx.LookupNodeForModule(def.mod, name); ok {
+	if node, ok := ctx.lookupNode(def.mod, name); ok {
 		return node, true
 	}
 	return createNamedChild(ctx, def, currentNode, name, number, isLast)
 }
 
 func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, moduleName, name string, compSpan types.Span) (*Node, bool) {
-	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
+	if node, ok := ctx.lookupNodeByModuleName(moduleName, name); ok {
 		return node, true
 	}
 	ctx.RecordUnresolvedOid(def.mod, def.defName(), moduleName+"."+name, compSpan)
@@ -393,7 +393,7 @@ func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, modu
 }
 
 func resolveQualifiedNamedNumberComponent(ctx *resolverContext, def oidDefinition, currentNode *Node, moduleName, name string, number uint32, isLast bool) (*Node, bool) {
-	if node, ok := ctx.LookupNodeInModule(moduleName, name); ok {
+	if node, ok := ctx.lookupNodeByModuleName(moduleName, name); ok {
 		ctx.registerModuleNodeSymbol(def.mod, name, node)
 		return node, true
 	}
@@ -539,7 +539,7 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 		}
 		defName := def.defName()
 
-		enterpriseNode, found := ctx.LookupNodeForModule(def.mod, enterprise)
+		enterpriseNode, found := ctx.lookupNode(def.mod, enterprise)
 		// Normal+: SMI global OID roots as fallback
 		if !found && ctx.ResolverStrictness().AllowConstrainedFallbacks() {
 			if node, ok := lookupSmiGlobalOidRoot(ctx, enterprise); ok {
@@ -594,10 +594,10 @@ func lookupSmiGlobalOidRoot(ctx *resolverContext, name string) (*Node, bool) {
 	if _, ok := smiGlobalOidRoots[name]; !ok {
 		return nil, false
 	}
-	if node, ok := ctx.LookupNodeInModule(moduleSNMPv2SMI, name); ok {
+	if node, ok := ctx.lookupNodeByModuleName(moduleSNMPv2SMI, name); ok {
 		return node, true
 	}
-	if node, ok := ctx.LookupNodeInModule(moduleRFC1155SMI, name); ok {
+	if node, ok := ctx.lookupNodeByModuleName(moduleRFC1155SMI, name); ok {
 		return node, true
 	}
 	return nil, false

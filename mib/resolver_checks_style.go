@@ -88,7 +88,7 @@ func checkTextualConventionNested(ctx *resolverContext) {
 			if !ok || !td.IsTextualConvention {
 				continue
 			}
-			resolved, ok := ctx.LookupTypeForModule(mod, td.Name)
+			resolved, ok := ctx.resolveTypeForModule(mod, td.Name)
 			if !ok {
 				continue
 			}
@@ -135,7 +135,7 @@ func checkTableRowNaming(ctx *resolverContext, objRefs []objectTypeRef) {
 		if module.IsBaseModule(ref.mod.Name) {
 			continue
 		}
-		node, ok := ctx.LookupNodeForModule(ref.mod, ref.obj.Name)
+		node, ok := ctx.lookupNode(ref.mod, ref.obj.Name)
 		if !ok {
 			continue
 		}
@@ -269,7 +269,7 @@ func checkOpaqueSMIv2(ctx *resolverContext, objRefs []objectTypeRef) {
 		if ref.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(ref.mod.Name) {
 			continue
 		}
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		resolved := ctx.lookupObject(ref.mod, ref.obj.Name)
 		if resolved == nil {
 			continue
 		}
@@ -302,7 +302,7 @@ func checkFormatHints(ctx *resolverContext) {
 			if !ok || !td.IsTextualConvention {
 				continue
 			}
-			resolved, ok := ctx.LookupTypeForModule(mod, td.Name)
+			resolved, ok := ctx.resolveTypeForModule(mod, td.Name)
 			if !ok {
 				continue
 			}
@@ -646,7 +646,7 @@ func checkModuleIdentityRegistration(ctx *resolverContext) {
 			if !ok {
 				continue
 			}
-			node, ok := ctx.LookupNodeForModule(mod, mi.Name)
+			node, ok := ctx.lookupNode(mod, mi.Name)
 			if !ok {
 				continue
 			}
@@ -677,7 +677,7 @@ func checkIpAddressDeprecation(ctx *resolverContext, objRefs []objectTypeRef) {
 		if ref.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(ref.mod.Name) {
 			continue
 		}
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		resolved := ctx.lookupObject(ref.mod, ref.obj.Name)
 		if resolved == nil {
 			continue
 		}

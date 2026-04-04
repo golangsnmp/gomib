@@ -144,7 +144,7 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
 				continue
 			}
-			typ, ok := ctx.LookupTypeForModule(mod, td.Name)
+			typ, ok := ctx.resolveTypeForModule(mod, td.Name)
 			if !ok {
 				continue
 			}
@@ -232,7 +232,7 @@ func tryResolveTypeParent(ctx *resolverContext, entry typeResolutionEntry) bool 
 		return false
 	}
 
-	parent, ok := ctx.LookupTypeForModule(entry.mod, baseName)
+	parent, ok := ctx.resolveTypeForModule(entry.mod, baseName)
 	if !ok {
 		return false
 	}
@@ -281,11 +281,11 @@ func linkPrimitiveSyntaxParents(ctx *resolverContext) {
 				continue
 			}
 
-			typ, ok := ctx.LookupTypeForModule(mod, td.Name)
+			typ, ok := ctx.resolveTypeForModule(mod, td.Name)
 			if !ok {
 				continue
 			}
-			parent, ok := ctx.LookupType(primitiveName)
+			parent, ok := ctx.resolveType(primitiveName)
 			if !ok {
 				continue
 			}
@@ -313,11 +313,11 @@ func linkRFC1213TypesToTCs(ctx *resolverContext) {
 			continue
 		}
 
-		sourceType, ok := ctx.LookupTypeForModule(sourceMods[0], pair.typeName)
+		sourceType, ok := ctx.resolveTypeForModule(sourceMods[0], pair.typeName)
 		if !ok {
 			continue
 		}
-		targetType, ok := ctx.LookupTypeForModule(targetMods[0], pair.typeName)
+		targetType, ok := ctx.resolveTypeForModule(targetMods[0], pair.typeName)
 		if !ok {
 			continue
 		}

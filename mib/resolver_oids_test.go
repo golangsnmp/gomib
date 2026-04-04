@@ -913,11 +913,11 @@ func TestResolveOids(t *testing.T) {
 
 		resolveOids(ctx)
 
-		parentNode, ok := ctx.LookupNodeForModule(parentMod, "parentRoot")
+		parentNode, ok := ctx.lookupNode(parentMod, "parentRoot")
 		testutil.True(t, ok, "parentRoot should resolve")
 		testutil.True(t, parentNode.OID().Equal(OID{1, 3, 6, 1, 4, 1, 55555}), "parentRoot OID")
 
-		childNode, ok := ctx.LookupNodeForModule(childMod, "childNode")
+		childNode, ok := ctx.lookupNode(childMod, "childNode")
 		testutil.True(t, ok, "childNode should resolve")
 		testutil.True(t, childNode.OID().Equal(OID{1, 3, 6, 1, 4, 1, 55555, 7}), "childNode OID")
 		noDiag(t, ctx.Diagnostics(), types.DiagOidOrphan, types.DiagOidRecursive)
@@ -951,11 +951,11 @@ func TestResolveOids(t *testing.T) {
 
 		resolveOids(ctx)
 
-		enterpriseNode, ok := ctx.LookupNodeForModule(mod, "vendorEnterprise")
+		enterpriseNode, ok := ctx.lookupNode(mod, "vendorEnterprise")
 		testutil.True(t, ok, "vendorEnterprise should resolve")
 		testutil.True(t, enterpriseNode.OID().Equal(OID{1, 3, 6, 1, 4, 1, 424242}), "vendorEnterprise OID")
 
-		trapNode, ok := ctx.LookupNodeForModule(mod, "vendorTrap")
+		trapNode, ok := ctx.lookupNode(mod, "vendorTrap")
 		testutil.True(t, ok, "vendorTrap should resolve")
 		testutil.True(t, trapNode.OID().Equal(OID{1, 3, 6, 1, 4, 1, 424242, 0, 11}), "vendorTrap OID")
 		testutil.Equal(t, KindNotification, trapNode.Kind(), "vendorTrap kind")
@@ -989,9 +989,9 @@ func TestResolveOids(t *testing.T) {
 		resolveOids(ctx)
 
 		requireDiagCount(t, ctx.Diagnostics(), types.DiagOidRecursive, 2)
-		_, ok := ctx.LookupNodeForModule(mod, "nodeA")
+		_, ok := ctx.lookupNode(mod, "nodeA")
 		testutil.False(t, ok, "nodeA should remain unresolved")
-		_, ok = ctx.LookupNodeForModule(mod, "nodeB")
+		_, ok = ctx.lookupNode(mod, "nodeB")
 		testutil.False(t, ok, "nodeB should remain unresolved")
 	})
 }
@@ -1117,7 +1117,7 @@ func TestResolveTrapTypeDefinitions_GenericTraps(t *testing.T) {
 	resolveTrapTypeDefinitions(ctx, defs)
 
 	for _, tt := range genericTraps {
-		node, ok := ctx.LookupNodeForModule(srcMod, tt.name)
+		node, ok := ctx.lookupNode(srcMod, tt.name)
 		testutil.True(t, ok, "%s: not resolved", tt.name)
 		got := node.OID()
 		testutil.True(t, got.Equal(tt.wantOID), ": OID")
@@ -1149,7 +1149,7 @@ func TestResolveTrapTypeDefinitions_EnterpriseSpecific(t *testing.T) {
 
 	resolveTrapTypeDefinitions(ctx, defs)
 
-	node, ok := ctx.LookupNodeForModule(srcMod, "vendorTrap")
+	node, ok := ctx.lookupNode(srcMod, "vendorTrap")
 	testutil.True(t, ok, "vendorTrap: not resolved")
 	// enterprise.0.trapNumber = cisco.0.42
 	wantOID := OID{1, 3, 6, 1, 4, 1, 9, 0, 42}
@@ -1323,7 +1323,7 @@ func TestResolveQualifiedNamedNumberComponent(t *testing.T) {
 		testutil.Equal(t, entNode, got, "expected node from named module")
 
 		// Verify symbol was registered in defMod.
-		regNode, regOk := ctx.LookupNodeForModule(defMod, "enterprises")
+		regNode, regOk := ctx.lookupNode(defMod, "enterprises")
 		testutil.True(t, regOk, "expected symbol registered in defMod")
 		testutil.Equal(t, entNode, regNode, "registered node")
 	})
@@ -1378,7 +1378,7 @@ func TestCreateNamedChild(t *testing.T) {
 		testutil.Equal(t, KindNode, child.Kind(), "kind")
 
 		// Verify symbol registered in module scope.
-		regNode, regOk := ctx.LookupNodeForModule(mod, "org")
+		regNode, regOk := ctx.lookupNode(mod, "org")
 		testutil.True(t, regOk, "expected symbol registered")
 		testutil.Equal(t, child, regNode, "registered node")
 	})

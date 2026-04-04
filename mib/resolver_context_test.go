@@ -168,7 +168,7 @@ func TestIsSNMPv2TCType(t *testing.T) {
 	}
 }
 
-func TestLookupInModuleScope(t *testing.T) {
+func TestLookupInScope(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
 	nodeX := newTestNode("x")
@@ -210,7 +210,7 @@ func TestLookupInModuleScope(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := lookupInModuleScope(modA, "x",
+			got, ok := lookupInScope(modA, "x",
 				func(m *module.Module) map[string]*Node { return tt.symbols[m] },
 				func(m *module.Module) map[string]*module.Module { return tt.imports[m] },
 				nil,
@@ -223,7 +223,7 @@ func TestLookupInModuleScope(t *testing.T) {
 	}
 }
 
-func TestLookupNodeForModule(t *testing.T) {
+func TestLookupNode(t *testing.T) {
 	ctx := newTestContext()
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
@@ -233,15 +233,15 @@ func TestLookupNodeForModule(t *testing.T) {
 	ctx.moduleSymbolToNode[modB] = map[string]*Node{"x": nodeX}
 	ctx.moduleImports[modA] = map[string]*module.Module{"x": modB}
 
-	got, ok := ctx.LookupNodeForModule(modA, "x")
-	testutil.True(t, ok, "LookupNodeForModule: expected ok")
-	testutil.Equal(t, nodeX, got, "LookupNodeForModule: expected nodeX")
+	got, ok := ctx.lookupNode(modA, "x")
+	testutil.True(t, ok, "lookupNode: expected ok")
+	testutil.Equal(t, nodeX, got, "lookupNode: expected nodeX")
 
-	_, ok = ctx.LookupNodeForModule(modA, "y")
-	testutil.False(t, ok, "LookupNodeForModule: expected false for unknown symbol")
+	_, ok = ctx.lookupNode(modA, "y")
+	testutil.False(t, ok, "lookupNode: expected false for unknown symbol")
 }
 
-func TestLookupObjectInModuleScope(t *testing.T) {
+func TestLookupObject(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
 
@@ -258,7 +258,7 @@ func TestLookupObjectInModuleScope(t *testing.T) {
 		resolvedA.addObject(localObj)
 		resolvedB.addObject(importedObj)
 
-		got := ctx.lookupObjectInModuleScope(modA, "sharedObj")
+		got := ctx.lookupObject(modA, "sharedObj")
 		testutil.Equal(t, localObj, got, "lookup should prefer the current module object")
 		testutil.Nil(t, ctx.usedImports[modA], "local lookups should not mark imports used")
 	})
@@ -274,7 +274,7 @@ func TestLookupObjectInModuleScope(t *testing.T) {
 		importedObj := newObject("importedObj")
 		resolvedB.addObject(importedObj)
 
-		got := ctx.lookupObjectInModuleScope(modA, "importedObj")
+		got := ctx.lookupObject(modA, "importedObj")
 		testutil.Equal(t, importedObj, got, "lookup should return imported object")
 		testutil.True(t, ctx.usedImports[modA] != nil, "imported lookup should create usage tracking")
 		_, ok := ctx.usedImports[modA]["importedObj"]
@@ -289,13 +289,13 @@ func TestLookupObjectInModuleScope(t *testing.T) {
 		ctx.moduleToResolved[modB] = resolvedB
 		ctx.moduleImports[modA] = map[string]*module.Module{"missingObj": modB}
 
-		got := ctx.lookupObjectInModuleScope(modA, "missingObj")
+		got := ctx.lookupObject(modA, "missingObj")
 		testutil.Nil(t, got, "lookup should fail when the imported module has no object")
 		testutil.Nil(t, ctx.usedImports[modA], "failed imported lookups should not mark usage")
 	})
 }
 
-func TestFindScopedObject(t *testing.T) {
+func TestResolveObject(t *testing.T) {
 	modA := &module.Module{Name: "A"}
 	modB := &module.Module{Name: "B"}
 
@@ -309,7 +309,7 @@ func TestFindScopedObject(t *testing.T) {
 		obj := newObject("x")
 		resolvedA.addObject(obj)
 
-		got, nodeFound := ctx.findScopedObject(modA, "x")
+		got, nodeFound := ctx.resolveObject(modA, "x")
 		testutil.Equal(t, obj, got, "should return module-scoped object")
 		testutil.True(t, nodeFound, "nodeFound should be true")
 	})
@@ -321,7 +321,7 @@ func TestFindScopedObject(t *testing.T) {
 		nodeX := newTestNode("x")
 		ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
 
-		got, nodeFound := ctx.findScopedObject(modA, "x")
+		got, nodeFound := ctx.resolveObject(modA, "x")
 		testutil.Nil(t, got, "should return nil when node has no object")
 		testutil.True(t, nodeFound, "nodeFound should be true when node exists")
 	})
@@ -339,7 +339,7 @@ func TestFindScopedObject(t *testing.T) {
 		nodeY.setObject(obj)
 		ctx.moduleSymbolToNode[modB] = map[string]*Node{"y": nodeY}
 
-		got, nodeFound := ctx.findScopedObject(modA, "y")
+		got, nodeFound := ctx.resolveObject(modA, "y")
 		testutil.Equal(t, obj, got, "should return object via global fallback")
 		testutil.True(t, nodeFound, "nodeFound should be true")
 	})
@@ -357,7 +357,7 @@ func TestFindScopedObject(t *testing.T) {
 		nodeY.setObject(obj)
 		ctx.moduleSymbolToNode[modB] = map[string]*Node{"y": nodeY}
 
-		got, nodeFound := ctx.findScopedObject(modA, "y")
+		got, nodeFound := ctx.resolveObject(modA, "y")
 		testutil.Nil(t, got, "should not find object without global fallback")
 		testutil.False(t, nodeFound, "nodeFound should be false")
 	})
@@ -367,13 +367,13 @@ func TestFindScopedObject(t *testing.T) {
 		resolvedA := newModule("A")
 		ctx.moduleToResolved[modA] = resolvedA
 
-		got, nodeFound := ctx.findScopedObject(modA, "nonexistent")
+		got, nodeFound := ctx.resolveObject(modA, "nonexistent")
 		testutil.Nil(t, got, "should return nil for unknown name")
 		testutil.False(t, nodeFound, "nodeFound should be false for unknown name")
 	})
 }
 
-func TestLookupNodeInModule(t *testing.T) {
+func TestLookupNodeByModuleName(t *testing.T) {
 	ctx := newTestContext()
 	modA := &module.Module{Name: "MY-MIB"}
 	nodeX := newTestNode("x")
@@ -381,15 +381,15 @@ func TestLookupNodeInModule(t *testing.T) {
 	ctx.moduleIndex["MY-MIB"] = []*module.Module{modA}
 	ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
 
-	got, ok := ctx.LookupNodeInModule("MY-MIB", "x")
-	testutil.True(t, ok, "LookupNodeInModule: expected ok")
-	testutil.Equal(t, nodeX, got, "LookupNodeInModule: expected nodeX")
+	got, ok := ctx.lookupNodeByModuleName("MY-MIB", "x")
+	testutil.True(t, ok, "lookupNodeByModuleName: expected ok")
+	testutil.Equal(t, nodeX, got, "lookupNodeByModuleName: expected nodeX")
 
-	_, ok = ctx.LookupNodeInModule("OTHER-MIB", "x")
-	testutil.False(t, ok, "LookupNodeInModule: expected false for unknown module")
+	_, ok = ctx.lookupNodeByModuleName("OTHER-MIB", "x")
+	testutil.False(t, ok, "lookupNodeByModuleName: expected false for unknown module")
 }
 
-func TestLookupNodeInModule_MultipleVersions(t *testing.T) {
+func TestLookupNodeByModuleName_MultipleVersions(t *testing.T) {
 	ctx := newTestContext()
 	modV1 := &module.Module{Name: "MY-MIB"}
 	modV2 := &module.Module{Name: "MY-MIB"}
@@ -399,7 +399,7 @@ func TestLookupNodeInModule_MultipleVersions(t *testing.T) {
 	ctx.moduleIndex["MY-MIB"] = []*module.Module{modV1, modV2}
 	ctx.moduleSymbolToNode[modV2] = map[string]*Node{"x": nodeX}
 
-	got, ok := ctx.LookupNodeInModule("MY-MIB", "x")
+	got, ok := ctx.lookupNodeByModuleName("MY-MIB", "x")
 	testutil.True(t, ok, "expected to find nodeX in second version")
 	testutil.Equal(t, nodeX, got, "expected nodeX in second version")
 }
@@ -416,19 +416,19 @@ func TestLookupNodeGlobal(t *testing.T) {
 	ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
 	ctx.moduleSymbolToNode[modB] = map[string]*Node{"x": nodeXdup, "y": nodeY}
 
-	got, ok := ctx.LookupNodeGlobal("x")
-	testutil.True(t, ok, "LookupNodeGlobal(x): expected ok")
-	testutil.Equal(t, nodeX, got, "LookupNodeGlobal(x): first module should win")
+	got, ok := ctx.lookupNodeGlobal("x")
+	testutil.True(t, ok, "lookupNodeGlobal(x): expected ok")
+	testutil.Equal(t, nodeX, got, "lookupNodeGlobal(x): first module should win")
 
-	got, ok = ctx.LookupNodeGlobal("y")
-	testutil.True(t, ok, "LookupNodeGlobal(y): expected ok")
-	testutil.Equal(t, nodeY, got, "LookupNodeGlobal(y): expected nodeY")
+	got, ok = ctx.lookupNodeGlobal("y")
+	testutil.True(t, ok, "lookupNodeGlobal(y): expected ok")
+	testutil.Equal(t, nodeY, got, "lookupNodeGlobal(y): expected nodeY")
 
-	_, ok = ctx.LookupNodeGlobal("z")
-	testutil.False(t, ok, "LookupNodeGlobal(z): expected false")
+	_, ok = ctx.lookupNodeGlobal("z")
+	testutil.False(t, ok, "lookupNodeGlobal(z): expected false")
 }
 
-func TestLookupTypeForModule(t *testing.T) {
+func TestResolveTypeForModule(t *testing.T) {
 	// Test type lookup via import chain.
 	ctx := newTestContext()
 	modA := &module.Module{Name: "A"}
@@ -438,12 +438,12 @@ func TestLookupTypeForModule(t *testing.T) {
 	ctx.moduleSymbolToType[modB] = map[string]*Type{"MyType": typeX}
 	ctx.moduleImports[modA] = map[string]*module.Module{"MyType": modB}
 
-	got, ok := ctx.LookupTypeForModule(modA, "MyType")
-	testutil.True(t, ok, "LookupTypeForModule: expected ok")
-	testutil.Equal(t, typeX, got, "LookupTypeForModule: expected typeX")
+	got, ok := ctx.resolveTypeForModule(modA, "MyType")
+	testutil.True(t, ok, "resolveTypeForModule: expected ok")
+	testutil.Equal(t, typeX, got, "resolveTypeForModule: expected typeX")
 }
 
-func TestLookupTypeForModule_ASN1Fallback(t *testing.T) {
+func TestResolveTypeForModule_ASN1Fallback(t *testing.T) {
 	// ASN.1 primitives should resolve even without explicit import.
 	ctx := newTestContext()
 	modA := &module.Module{Name: "A"}
@@ -453,14 +453,14 @@ func TestLookupTypeForModule_ASN1Fallback(t *testing.T) {
 	ctx.snmpv2SMIModule = smiMod
 	ctx.moduleSymbolToType[smiMod] = map[string]*Type{"INTEGER": intType}
 
-	got, ok := ctx.LookupTypeForModule(modA, "INTEGER")
+	got, ok := ctx.resolveTypeForModule(modA, "INTEGER")
 	testutil.True(t, ok, "expected ASN.1 primitive fallback")
 	testutil.Equal(t, intType, got, "expected ASN.1 primitive fallback")
 }
 
 func TestTypeLookupFallbacks_Normal(t *testing.T) {
-	// In Normal mode, well-known types resolve via both LookupType and
-	// LookupTypeForModule without explicit imports.
+	// In Normal mode, well-known types resolve via both resolveType and
+	// resolveTypeForModule without explicit imports.
 	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 	modA := &module.Module{Name: "A"}
 
@@ -493,13 +493,13 @@ func TestTypeLookupFallbacks_Normal(t *testing.T) {
 		{"DisplayString", displayString},
 	}
 	for _, tt := range tests {
-		got, ok := ctx.LookupType(tt.name)
-		testutil.True(t, ok, "LookupType(%q): expected ok", tt.name)
-		testutil.Equal(t, tt.want, got, "LookupType(%q)", tt.name)
+		got, ok := ctx.resolveType(tt.name)
+		testutil.True(t, ok, "resolveType(%q): expected ok", tt.name)
+		testutil.Equal(t, tt.want, got, "resolveType(%q)", tt.name)
 
-		got, ok = ctx.LookupTypeForModule(modA, tt.name)
-		testutil.True(t, ok, "LookupTypeForModule(%q): expected ok", tt.name)
-		testutil.Equal(t, tt.want, got, "LookupTypeForModule(%q)", tt.name)
+		got, ok = ctx.resolveTypeForModule(modA, tt.name)
+		testutil.True(t, ok, "resolveTypeForModule(%q): expected ok", tt.name)
+		testutil.Equal(t, tt.want, got, "resolveTypeForModule(%q)", tt.name)
 	}
 }
 
@@ -519,24 +519,24 @@ func TestTypeLookupFallbacks_Strict(t *testing.T) {
 	}
 
 	// ASN.1 primitives resolve via both entry points.
-	got, ok := ctx.LookupType("INTEGER")
-	testutil.True(t, ok, "LookupType(INTEGER): expected ok in strict mode")
-	testutil.Equal(t, intType, got, "LookupType(INTEGER)")
+	got, ok := ctx.resolveType("INTEGER")
+	testutil.True(t, ok, "resolveType(INTEGER): expected ok in strict mode")
+	testutil.Equal(t, intType, got, "resolveType(INTEGER)")
 
-	got, ok = ctx.LookupTypeForModule(modA, "INTEGER")
-	testutil.True(t, ok, "LookupTypeForModule(INTEGER): expected ok in strict mode")
-	testutil.Equal(t, intType, got, "LookupTypeForModule(INTEGER)")
+	got, ok = ctx.resolveTypeForModule(modA, "INTEGER")
+	testutil.True(t, ok, "resolveTypeForModule(INTEGER): expected ok in strict mode")
+	testutil.Equal(t, intType, got, "resolveTypeForModule(INTEGER)")
 
 	// Non-primitives do not resolve via either entry point.
-	_, ok = ctx.LookupType("Counter32")
-	testutil.False(t, ok, "LookupType(Counter32): expected false in strict mode")
+	_, ok = ctx.resolveType("Counter32")
+	testutil.False(t, ok, "resolveType(Counter32): expected false in strict mode")
 
-	_, ok = ctx.LookupTypeForModule(modA, "Counter32")
-	testutil.False(t, ok, "LookupTypeForModule(Counter32): expected false in strict mode")
+	_, ok = ctx.resolveTypeForModule(modA, "Counter32")
+	testutil.False(t, ok, "resolveTypeForModule(Counter32): expected false in strict mode")
 }
 
-func TestLookupType_GlobalModuleScan(t *testing.T) {
-	// In permissive mode, LookupType scans all modules for unknown types.
+func TestResolveType_GlobalModuleScan(t *testing.T) {
+	// In permissive mode, resolveType scans all modules for unknown types.
 	modA := &module.Module{Name: "A"}
 	vendorType := newType("VendorSpecialType")
 
@@ -545,13 +545,13 @@ func TestLookupType_GlobalModuleScan(t *testing.T) {
 	ctx.snmpv2SMIModule = &module.Module{Name: "SNMPv2-SMI"}
 	ctx.moduleSymbolToType[modA] = map[string]*Type{"VendorSpecialType": vendorType}
 
-	got, ok := ctx.LookupType("VendorSpecialType")
+	got, ok := ctx.resolveType("VendorSpecialType")
 	testutil.True(t, ok, "expected global module scan to find vendor type in permissive mode")
 	testutil.Equal(t, vendorType, got, "expected global module scan to find vendor type in permissive mode")
 }
 
-func TestLookupType_GlobalModuleScan_StrictRejects(t *testing.T) {
-	// In strict mode, LookupType should NOT scan all modules for unknown types.
+func TestResolveType_GlobalModuleScan_StrictRejects(t *testing.T) {
+	// In strict mode, resolveType should NOT scan all modules for unknown types.
 	// A vendor type that exists in another module should not be discoverable.
 	modA := &module.Module{Name: "A"}
 	vendorType := newType("VendorSpecialType")
@@ -561,7 +561,7 @@ func TestLookupType_GlobalModuleScan_StrictRejects(t *testing.T) {
 	ctx.snmpv2SMIModule = &module.Module{Name: "SNMPv2-SMI"}
 	ctx.moduleSymbolToType[modA] = map[string]*Type{"VendorSpecialType": vendorType}
 
-	_, ok := ctx.LookupType("VendorSpecialType")
+	_, ok := ctx.resolveType("VendorSpecialType")
 	testutil.False(t, ok, "strict mode should not find vendor type via global module scan")
 }
 

@@ -547,11 +547,11 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 		createUserTypes(ctx)
 		resolveTypeRefParentsGraph(ctx)
 
-		baseText, ok := ctx.LookupTypeForModule(baseMod, "BaseText")
+		baseText, ok := ctx.resolveTypeForModule(baseMod, "BaseText")
 		testutil.True(t, ok, "BaseText should exist")
-		midText, ok := ctx.LookupTypeForModule(userMod, "MidText")
+		midText, ok := ctx.resolveTypeForModule(userMod, "MidText")
 		testutil.True(t, ok, "MidText should exist")
-		leafText, ok := ctx.LookupTypeForModule(userMod, "LeafText")
+		leafText, ok := ctx.resolveTypeForModule(userMod, "LeafText")
 		testutil.True(t, ok, "LeafText should exist")
 
 		testutil.Equal(t, integerType, baseText.Parent(), "BaseText parent")
@@ -606,7 +606,7 @@ func TestSeedPrimitiveTypes(t *testing.T) {
 			{"BITS", BaseBits},
 		}
 		for _, tt := range tests {
-			typ, ok := ctx.LookupTypeForModule(smiMod, tt.name)
+			typ, ok := ctx.resolveTypeForModule(smiMod, tt.name)
 			testutil.True(t, ok, "expected primitive type to be registered")
 			testutil.Equal(t, tt.base, typ.Base(), tt.name+" base")
 		}
@@ -729,9 +729,9 @@ func TestLinkPrimitiveSyntaxParents(t *testing.T) {
 		{"MyOid", "OBJECT IDENTIFIER"},
 	}
 	for _, tc := range cases {
-		typ, ok := ctx.LookupTypeForModule(userMod, tc.name)
+		typ, ok := ctx.resolveTypeForModule(userMod, tc.name)
 		testutil.True(t, ok, "expected type to exist")
-		parent, ok := ctx.LookupType(tc.parentName)
+		parent, ok := ctx.resolveType(tc.parentName)
 		testutil.True(t, ok, "expected primitive parent to exist")
 		testutil.Equal(t, parent, typ.Parent(), tc.name+" parent")
 	}
@@ -749,7 +749,7 @@ func TestLinkPrimitiveSyntaxParents(t *testing.T) {
 		seedPrimitiveTypes(ctx)
 		createUserTypes(ctx)
 
-		typ, _ := ctx.LookupTypeForModule(mod, "AlreadyLinked")
+		typ, _ := ctx.resolveTypeForModule(mod, "AlreadyLinked")
 		customParent := newType("CustomParent")
 		typ.setParent(customParent)
 
@@ -776,12 +776,12 @@ func TestLinkRFC1213TypesToTCs(t *testing.T) {
 
 	linkRFC1213TypesToTCs(ctx)
 
-	rfcDisplay, _ := ctx.LookupTypeForModule(rfc1213, "DisplayString")
-	tcDisplay, _ := ctx.LookupTypeForModule(snmpv2tc, "DisplayString")
+	rfcDisplay, _ := ctx.resolveTypeForModule(rfc1213, "DisplayString")
+	tcDisplay, _ := ctx.resolveTypeForModule(snmpv2tc, "DisplayString")
 	testutil.Equal(t, tcDisplay, rfcDisplay.Parent(), "DisplayString parent")
 
-	rfcPhys, _ := ctx.LookupTypeForModule(rfc1213, "PhysAddress")
-	tcPhys, _ := ctx.LookupTypeForModule(snmpv2tc, "PhysAddress")
+	rfcPhys, _ := ctx.resolveTypeForModule(rfc1213, "PhysAddress")
+	tcPhys, _ := ctx.resolveTypeForModule(snmpv2tc, "PhysAddress")
 	testutil.Equal(t, tcPhys, rfcPhys.Parent(), "PhysAddress parent")
 }
 

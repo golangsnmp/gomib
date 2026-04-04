@@ -58,7 +58,7 @@ func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 		}
 
 		// Cache pointers to base modules used by the type resolution
-		// fallback chain (LookupTypeForModule, LookupType). Many vendor
+		// fallback chain (resolveTypeForModule, resolveType). Many vendor
 		// MIBs use types from these modules without importing them, so
 		// Normal+ fallback paths need direct access.
 		switch mod.Name {

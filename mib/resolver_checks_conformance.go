@@ -56,7 +56,7 @@ func checkGroupMembership(ctx *resolverContext, objRefs []objectTypeRef) {
 		if info == nil || !info.hasObjectGroup {
 			continue
 		}
-		node, ok := ctx.LookupNodeForModule(ref.mod, ref.obj.Name)
+		node, ok := ctx.lookupNode(ref.mod, ref.obj.Name)
 		if !ok {
 			continue
 		}
@@ -80,7 +80,7 @@ func checkGroupMembership(ctx *resolverContext, objRefs []objectTypeRef) {
 		if info == nil || !info.hasNotificationGroup {
 			continue
 		}
-		node, ok := ctx.LookupNodeForModule(ref.mod, ref.notif.Name)
+		node, ok := ctx.lookupNode(ref.mod, ref.notif.Name)
 		if !ok {
 			continue
 		}
@@ -160,7 +160,7 @@ func checkComplianceObjectStatus(ctx *resolverContext, mod *module.Module, comp 
 // module; otherwise the compliance's own module is used.
 func lookupComplianceMember(ctx *resolverContext, compMod *module.Module, moduleName, name string) *Node {
 	if moduleName != "" {
-		node, ok := ctx.LookupNodeInModule(moduleName, name)
+		node, ok := ctx.lookupNodeByModuleName(moduleName, name)
 		if ok {
 			return node
 		}
@@ -355,7 +355,7 @@ func checkRowStatusDefaults(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 
 	for _, ref := range objRefs {
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		resolved := ctx.lookupObject(ref.mod, ref.obj.Name)
 		if resolved == nil {
 			continue
 		}
@@ -409,7 +409,7 @@ func checkStorageTypeDefaults(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 
 	for _, ref := range objRefs {
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		resolved := ctx.lookupObject(ref.mod, ref.obj.Name)
 		if resolved == nil {
 			continue
 		}
@@ -468,7 +468,7 @@ func checkTAddressTDomain(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 
 	for _, ref := range objRefs {
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		resolved := ctx.lookupObject(ref.mod, ref.obj.Name)
 		if resolved == nil || !resolved.IsColumn() {
 			continue
 		}
@@ -512,7 +512,7 @@ func lookupWellKnownTC(ctx *resolverContext, name string) *Type {
 	if ctx.snmpv2TCModule == nil {
 		return nil
 	}
-	t, _ := ctx.lookupTypeInModule(ctx.snmpv2TCModule, name)
+	t, _ := ctx.lookupTypeDirect(ctx.snmpv2TCModule, name)
 	return t
 }
 
@@ -523,7 +523,7 @@ func lookupTypeInNamedModule(ctx *resolverContext, moduleName, typeName string) 
 	if len(mods) == 0 {
 		return nil
 	}
-	t, _ := ctx.lookupTypeInModule(mods[0], typeName)
+	t, _ := ctx.lookupTypeDirect(mods[0], typeName)
 	return t
 }
 
@@ -606,7 +606,7 @@ func checkAddressTypePairing(ctx *resolverContext, objRefs []objectTypeRef, cfg 
 	}
 
 	for _, ref := range objRefs {
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		resolved := ctx.lookupObject(ref.mod, ref.obj.Name)
 		if resolved == nil || !resolved.IsColumn() {
 			continue
 		}

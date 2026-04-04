@@ -118,7 +118,7 @@ func checkNodeParentKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 	// Check OBJECT-TYPE definitions (table, row, column, scalar).
 	for _, ref := range objRefs {
 		obj := ref.obj
-		node, ok := ctx.LookupNodeForModule(ref.mod, obj.Name)
+		node, ok := ctx.lookupNode(ref.mod, obj.Name)
 		if !ok || node.Parent() == nil || node.Parent().IsRoot() {
 			continue
 		}
@@ -182,7 +182,7 @@ func checkNodeParentKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 			default:
 				continue
 			}
-			node, ok := ctx.LookupNodeForModule(mod, def.DefinitionName())
+			node, ok := ctx.lookupNode(mod, def.DefinitionName())
 			if !ok || node.Parent() == nil || node.Parent().IsRoot() {
 				continue
 			}
@@ -221,7 +221,7 @@ func checkEnumSubtypingSyntax(ctx *resolverContext, syntax module.TypeSyntax, na
 		return
 	}
 
-	parentType, ok := ctx.LookupTypeForModule(mod, enumSyntax.Base)
+	parentType, ok := ctx.resolveTypeForModule(mod, enumSyntax.Base)
 	if !ok {
 		return
 	}
@@ -272,7 +272,7 @@ func checkRangeConstraints(ctx *resolverContext) {
 				if _, isSeq := d.Syntax.(*module.TypeSyntaxSequence); isSeq {
 					continue
 				}
-				typ, ok := ctx.LookupTypeForModule(mod, d.Name)
+				typ, ok := ctx.resolveTypeForModule(mod, d.Name)
 				if !ok {
 					continue
 				}
@@ -286,7 +286,7 @@ func checkRangeConstraints(ctx *resolverContext) {
 				if len(sizes) == 0 && len(ranges) == 0 {
 					continue
 				}
-				resolved := ctx.lookupObjectInModuleScope(mod, d.Name)
+				resolved := ctx.lookupObject(mod, d.Name)
 				if resolved == nil || resolved.Type() == nil {
 					continue
 				}
@@ -496,7 +496,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			if isBareTypeIndex(item.Object) {
 				continue
 			}
-			idxObj := ctx.lookupObjectInModuleScope(ref.mod, item.Object)
+			idxObj := ctx.lookupObject(ref.mod, item.Object)
 			if idxObj == nil {
 				continue
 			}
@@ -603,7 +603,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 // 128 sub-identifier maximum from RFC 2578 section 3.5. The instance OID
 // is the row's OID plus one sub-identifier per index encoding.
 func checkIndexOIDLength(ctx *resolverContext, ref objectTypeRef) {
-	rowNode, ok := ctx.LookupNodeForModule(ref.mod, ref.obj.Name)
+	rowNode, ok := ctx.lookupNode(ref.mod, ref.obj.Name)
 	if !ok {
 		return
 	}
@@ -612,7 +612,7 @@ func checkIndexOIDLength(ctx *resolverContext, ref objectTypeRef) {
 		return
 	}
 
-	resolvedObj := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+	resolvedObj := ctx.lookupObject(ref.mod, ref.obj.Name)
 	if resolvedObj == nil {
 		return
 	}
@@ -643,7 +643,7 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			continue
 		}
 
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, obj.Name)
+		resolved := ctx.lookupObject(ref.mod, obj.Name)
 		if resolved == nil {
 			continue
 		}
@@ -841,7 +841,7 @@ func checkSequenceFields(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 
 		// Get the row node and its column children in OID order.
-		rowNode, ok := ctx.LookupNodeForModule(ref.mod, obj.Name)
+		rowNode, ok := ctx.lookupNode(ref.mod, obj.Name)
 		if !ok {
 			continue
 		}
@@ -1027,7 +1027,7 @@ func checkAccessAndStatus(ctx *resolverContext, objRefs []objectTypeRef) {
 			continue
 		}
 
-		node, ok := ctx.LookupNodeForModule(mod, obj.Name)
+		node, ok := ctx.lookupNode(mod, obj.Name)
 		if !ok {
 			continue
 		}
@@ -1124,7 +1124,7 @@ func checkCounterAccess(ctx *resolverContext, mod *module.Module, obj *module.Ob
 	if obj.Access == types.AccessReadOnly || obj.Access == types.AccessAccessibleForNotify {
 		return
 	}
-	resolved := ctx.lookupObjectInModuleScope(mod, obj.Name)
+	resolved := ctx.lookupObject(mod, obj.Name)
 	if resolved == nil {
 		return
 	}
@@ -1229,7 +1229,7 @@ func checkTypeStatusUsage(ctx *resolverContext, objRefs []objectTypeRef) {
 		if module.IsBaseModule(ref.mod.Name) {
 			continue
 		}
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
+		resolved := ctx.lookupObject(ref.mod, ref.obj.Name)
 		if resolved == nil {
 			continue
 		}
@@ -1261,7 +1261,7 @@ func checkNotificationReversibility(ctx *resolverContext) {
 			continue
 		}
 
-		node, ok := ctx.LookupNodeForModule(ref.mod, ref.notif.Name)
+		node, ok := ctx.lookupNode(ref.mod, ref.notif.Name)
 		if !ok || node.Parent() == nil {
 			continue
 		}
