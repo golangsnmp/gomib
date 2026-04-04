@@ -35,7 +35,7 @@ testObj OBJECT-TYPE
 END
 `
 		mod := lowerModule(t, src)
-		obj := findDef[*ObjectType](t, mod, "testObj")
+		obj := requireDef[*ObjectType](t, mod, "testObj")
 		ref, ok := obj.Syntax.(*TypeSyntaxTypeRef)
 		testutil.True(t, ok, "expected *TypeSyntaxTypeRef, got %T", obj.Syntax)
 		testutil.Equal(t, "DisplayString", ref.Name, "type ref name")
@@ -67,7 +67,7 @@ testObj OBJECT-TYPE
 END
 `
 		mod := lowerModule(t, src)
-		obj := findDef[*ObjectType](t, mod, "testObj")
+		obj := requireDef[*ObjectType](t, mod, "testObj")
 		ie, ok := obj.Syntax.(*TypeSyntaxIntegerEnum)
 		testutil.True(t, ok, "expected *TypeSyntaxIntegerEnum, got %T", obj.Syntax)
 		testutil.Equal(t, "", ie.Base, "bare INTEGER should have empty Base")
@@ -105,7 +105,7 @@ MyEnumType ::= INTEGER { val1(1), val2(2) }
 END
 `
 		mod := lowerModule(t, src)
-		td := findDef[*TypeDef](t, mod, "MyEnumType")
+		td := requireDef[*TypeDef](t, mod, "MyEnumType")
 		ie, ok := td.Syntax.(*TypeSyntaxIntegerEnum)
 		testutil.True(t, ok, "expected *TypeSyntaxIntegerEnum, got %T", td.Syntax)
 		testutil.Equal(t, "", ie.Base, "bare INTEGER type assignment should have empty Base")
@@ -142,7 +142,7 @@ testObj OBJECT-TYPE
 END
 `
 		mod := lowerModule(t, src)
-		obj := findDef[*ObjectType](t, mod, "testObj")
+		obj := requireDef[*ObjectType](t, mod, "testObj")
 		bits, ok := obj.Syntax.(*TypeSyntaxBits)
 		testutil.True(t, ok, "expected *TypeSyntaxBits, got %T", obj.Syntax)
 		testutil.Len(t, bits.NamedBits, 3, "named bit count")
@@ -183,7 +183,7 @@ testObj OBJECT-TYPE
 END
 `
 		mod := lowerModule(t, src)
-		obj := findDef[*ObjectType](t, mod, "testObj")
+		obj := requireDef[*ObjectType](t, mod, "testObj")
 		constrained, ok := obj.Syntax.(*TypeSyntaxConstrained)
 		testutil.True(t, ok, "expected *TypeSyntaxConstrained, got %T", obj.Syntax)
 
@@ -223,7 +223,7 @@ testTable OBJECT-TYPE
 END
 `
 		mod := lowerModule(t, src)
-		obj := findDef[*ObjectType](t, mod, "testTable")
+		obj := requireDef[*ObjectType](t, mod, "testTable")
 		seqOf, ok := obj.Syntax.(*TypeSyntaxSequenceOf)
 		testutil.True(t, ok, "expected *TypeSyntaxSequenceOf, got %T", obj.Syntax)
 		testutil.Equal(t, "TestEntry", seqOf.EntryType, "entry type name")
@@ -255,7 +255,7 @@ TestEntry ::= SEQUENCE {
 END
 `
 		mod := lowerModule(t, src)
-		td := findDef[*TypeDef](t, mod, "TestEntry")
+		td := requireDef[*TypeDef](t, mod, "TestEntry")
 		seq, ok := td.Syntax.(*TypeSyntaxSequence)
 		testutil.True(t, ok, "expected *TypeSyntaxSequence, got %T", td.Syntax)
 		testutil.Len(t, seq.Fields, 2, "field count")
@@ -299,7 +299,7 @@ testObj OBJECT-TYPE
 END
 `
 		mod := lowerModule(t, src)
-		obj := findDef[*ObjectType](t, mod, "testObj")
+		obj := requireDef[*ObjectType](t, mod, "testObj")
 		_, ok := obj.Syntax.(*TypeSyntaxOctetString)
 		testutil.True(t, ok, "expected *TypeSyntaxOctetString, got %T", obj.Syntax)
 	})
@@ -330,7 +330,7 @@ testObj OBJECT-TYPE
 END
 `
 		mod := lowerModule(t, src)
-		obj := findDef[*ObjectType](t, mod, "testObj")
+		obj := requireDef[*ObjectType](t, mod, "testObj")
 		_, ok := obj.Syntax.(*TypeSyntaxObjectIdentifier)
 		testutil.True(t, ok, "expected *TypeSyntaxObjectIdentifier, got %T", obj.Syntax)
 	})

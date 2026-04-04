@@ -11,7 +11,7 @@ import (
 )
 
 func TestLoadSingleMIB(t *testing.T) {
-	src := mustDir(t, testutil.PrimaryCorpusDir(t))
+	src := requireDir(t, testutil.PrimaryCorpusDir(t))
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB"))
@@ -35,7 +35,7 @@ func TestLoadAllCorpus(t *testing.T) {
 		t.Skip("skipping corpus load in short mode")
 	}
 
-	src := mustDir(t, testutil.PrimaryCorpusDir(t))
+	src := requireDir(t, testutil.PrimaryCorpusDir(t))
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src))
@@ -85,8 +85,8 @@ func TestDirSourceRecursive(t *testing.T) {
 }
 
 func TestMultiSource(t *testing.T) {
-	primary := mustDir(t, testutil.PrimaryCorpusDir(t))
-	problems := mustDir(t, testutil.ProblemsCorpusDir(t))
+	primary := requireDir(t, testutil.PrimaryCorpusDir(t))
+	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(primary, problems), WithModules("IF-MIB"))
@@ -97,7 +97,7 @@ func TestMultiSource(t *testing.T) {
 }
 
 func TestLoadNonexistentModule(t *testing.T) {
-	src := mustDir(t, testutil.PrimaryCorpusDir(t))
+	src := requireDir(t, testutil.PrimaryCorpusDir(t))
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST"))
@@ -110,7 +110,7 @@ func TestLoadNonexistentModule(t *testing.T) {
 }
 
 func TestLoadMissingModuleWithValidModule(t *testing.T) {
-	src := mustDir(t, testutil.PrimaryCorpusDir(t))
+	src := requireDir(t, testutil.PrimaryCorpusDir(t))
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB", "NONEXISTENT-MIB"))
@@ -186,8 +186,8 @@ func TestLookups(t *testing.T) {
 }
 
 func TestStrictMIBsPassAtStrictLevel(t *testing.T) {
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
-	strict := mustDir(t, testutil.TestdataDir(t, "strictness", "strict"))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
+	strict := requireDir(t, testutil.TestdataDir(t, "strictness", "strict"))
 
 	tests := []string{"STRICT-TEST-MIB", "STRICT-TABLE-MIB"}
 	for _, name := range tests {
@@ -235,8 +235,8 @@ func TestLongIdentifierViolationEmitsDiagnostic(t *testing.T) {
 }
 
 func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
-	problems := mustDir(t, testutil.ProblemsCorpusDir(t))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
+	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 
 	ctx := context.Background()
 	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
@@ -327,8 +327,8 @@ func TestMissingImportWorksInNormalMode(t *testing.T) {
 }
 
 func TestDiagnosticThresholdEnforced(t *testing.T) {
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
-	violations := mustDir(t, testutil.TestdataDir(t, "strictness", "violations"))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
+	violations := requireDir(t, testutil.TestdataDir(t, "strictness", "violations"))
 
 	ctx := context.Background()
 
@@ -495,8 +495,8 @@ func TestFindModulePropagatesFindError(t *testing.T) {
 
 func loadInvalidMIB(t testing.TB, name string, level mib.ResolverStrictness) *mib.Mib {
 	t.Helper()
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
-	invalid := mustDir(t, testutil.TestdataDir(t, "strictness", "invalid"))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
+	invalid := requireDir(t, testutil.TestdataDir(t, "strictness", "invalid"))
 	ctx := context.Background()
 	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
 	m, err := Load(ctx,
@@ -597,8 +597,8 @@ func TestInvalidDuplicateOIDMIBBothObjectsLoad(t *testing.T) {
 func TestMultiModuleFileLoadAll(t *testing.T) {
 	// PROBLEM-MULTIMOD.mib contains PROBLEM-MULTIMOD-BASE-MIB and
 	// PROBLEM-MULTIMOD-MIB. Both should be discovered and loaded.
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
-	problems := mustDir(t, testutil.ProblemsCorpusDir(t))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
+	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(corpus, problems))
@@ -613,8 +613,8 @@ func TestMultiModuleFileLoadAll(t *testing.T) {
 func TestMultiModuleFileLoadByName(t *testing.T) {
 	// Loading the leaf module by name should also pick up the base module
 	// (it's in the same file, and the leaf imports from the base).
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
-	problems := mustDir(t, testutil.ProblemsCorpusDir(t))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
+	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(corpus, problems),
@@ -634,8 +634,8 @@ func TestMultiModuleFileLoadByName(t *testing.T) {
 func TestMultiModuleFileLoadBaseByName(t *testing.T) {
 	// Loading the base module by name should find it even though the
 	// filename doesn't match.
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
-	problems := mustDir(t, testutil.ProblemsCorpusDir(t))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
+	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 
 	ctx := context.Background()
 	m, err := Load(ctx, WithSource(corpus, problems),

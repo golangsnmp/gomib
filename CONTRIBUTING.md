@@ -28,6 +28,22 @@ The resolver uses two prefixes, distinguished by search scope:
 
 Scope qualifiers (`Direct`, `ByModuleName`, `Global`) are added only when deviating from the default module+imports lookup scope.
 
+### Test helper prefixes
+
+Test helpers follow a naming convention based on what they do and whether they fail the test:
+
+Assertive (call `t.Fatalf` on failure):
+
+- `require*` - lookup/assertion that fails the test if not found or invalid
+- `load*` - fixture/corpus loader that fails on I/O or parse error
+
+Non-assertive (no `t.Fatal`):
+
+- `new*` - simple constructor, returns a ready-to-use value
+- `build*` - multi-step fixture builder, assembles a complex test structure
+
+Generic assertions live in `internal/testutil/` (`Equal`, `NoError`, `NotNil`, etc.).
+
 ### Diagnostic codes
 
 All diagnostic codes are string constants in `internal/types/diagcode.go`. Never use string literals for diagnostic codes.

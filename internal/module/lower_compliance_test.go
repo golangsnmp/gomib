@@ -45,7 +45,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	mc := findDef[*ModuleCompliance](t, mod, "testCompliance")
+	mc := requireDef[*ModuleCompliance](t, mod, "testCompliance")
 	testutil.NotNil(t, mc, "expected testCompliance definition")
 
 	// Top-level fields
@@ -121,7 +121,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	mc := findDef[*ModuleCompliance](t, mod, "extCompliance")
+	mc := requireDef[*ModuleCompliance](t, mod, "extCompliance")
 	testutil.NotNil(t, mc, "expected extCompliance definition")
 
 	testutil.Len(t, mc.Modules, 1, "Modules")
@@ -170,7 +170,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	ac := findDef[*AgentCapabilities](t, mod, "testAgent")
+	ac := requireDef[*AgentCapabilities](t, mod, "testAgent")
 	testutil.NotNil(t, ac, "expected testAgent definition")
 
 	// Top-level fields

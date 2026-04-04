@@ -92,7 +92,7 @@ func TestLower_DefVal(t *testing.T) {
 	mod := lowerModule(t, defvalTestMIB)
 
 	t.Run("integer", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "intObj")
+		obj := requireDef[*ObjectType](t, mod, "intObj")
 		testutil.NotNil(t, obj.DefVal, "intObj should have a DEFVAL")
 		dv, ok := obj.DefVal.(*DefValInteger)
 		testutil.True(t, ok, "expected *DefValInteger, got %T", obj.DefVal)
@@ -100,7 +100,7 @@ func TestLower_DefVal(t *testing.T) {
 	})
 
 	t.Run("negative-integer", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "negIntObj")
+		obj := requireDef[*ObjectType](t, mod, "negIntObj")
 		testutil.NotNil(t, obj.DefVal, "negIntObj should have a DEFVAL")
 		dv, ok := obj.DefVal.(*DefValInteger)
 		testutil.True(t, ok, "expected *DefValInteger, got %T", obj.DefVal)
@@ -108,7 +108,7 @@ func TestLower_DefVal(t *testing.T) {
 	})
 
 	t.Run("string", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "strObj")
+		obj := requireDef[*ObjectType](t, mod, "strObj")
 		testutil.NotNil(t, obj.DefVal, "strObj should have a DEFVAL")
 		dv, ok := obj.DefVal.(*DefValString)
 		testutil.True(t, ok, "expected *DefValString, got %T", obj.DefVal)
@@ -116,7 +116,7 @@ func TestLower_DefVal(t *testing.T) {
 	})
 
 	t.Run("hex-string", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "hexObj")
+		obj := requireDef[*ObjectType](t, mod, "hexObj")
 		testutil.NotNil(t, obj.DefVal, "hexObj should have a DEFVAL")
 		dv, ok := obj.DefVal.(*DefValHexString)
 		testutil.True(t, ok, "expected *DefValHexString, got %T", obj.DefVal)
@@ -124,7 +124,7 @@ func TestLower_DefVal(t *testing.T) {
 	})
 
 	t.Run("enum", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "enumObj")
+		obj := requireDef[*ObjectType](t, mod, "enumObj")
 		testutil.NotNil(t, obj.DefVal, "enumObj should have a DEFVAL")
 		dv, ok := obj.DefVal.(*DefValEnum)
 		testutil.True(t, ok, "expected *DefValEnum, got %T", obj.DefVal)
@@ -132,7 +132,7 @@ func TestLower_DefVal(t *testing.T) {
 	})
 
 	t.Run("bits", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "bitsObj")
+		obj := requireDef[*ObjectType](t, mod, "bitsObj")
 		testutil.NotNil(t, obj.DefVal, "bitsObj should have a DEFVAL")
 		dv, ok := obj.DefVal.(*DefValBits)
 		testutil.True(t, ok, "expected *DefValBits, got %T", obj.DefVal)
@@ -142,7 +142,7 @@ func TestLower_DefVal(t *testing.T) {
 	})
 
 	t.Run("oid", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "oidObj")
+		obj := requireDef[*ObjectType](t, mod, "oidObj")
 		testutil.NotNil(t, obj.DefVal, "oidObj should have a DEFVAL")
 		dv, ok := obj.DefVal.(*DefValOidValue)
 		testutil.True(t, ok, "expected *DefValOidValue, got %T", obj.DefVal)
@@ -157,7 +157,7 @@ func TestLower_DefVal(t *testing.T) {
 	})
 
 	t.Run("absent", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "noDefvalObj")
+		obj := requireDef[*ObjectType](t, mod, "noDefvalObj")
 		testutil.Nil(t, obj.DefVal, "noDefvalObj should not have a DEFVAL")
 	})
 }

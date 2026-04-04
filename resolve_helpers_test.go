@@ -141,8 +141,8 @@ func requireGroup(t testing.TB, m *mib.Mib, name string) *mib.Group {
 	return group
 }
 
-// mustDir calls Dir and fails the test on error.
-func mustDir(t testing.TB, path string) Source {
+// requireDir calls Dir and fails the test on error.
+func requireDir(t testing.TB, path string) Source {
 	t.Helper()
 	src, err := Dir(path)
 	if err != nil {
@@ -341,7 +341,7 @@ func unresolvedSymbols(m *mib.Mib, module string, kind mib.UnresolvedKind) map[s
 // not the synthetic problem corpus.
 func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
 	t.Helper()
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
 	allOpts := append([]LoadOption{WithSource(corpus), WithModules(name)}, opts...)
 	m, err := Load(context.Background(), allOpts...)
 	if err != nil {
@@ -354,8 +354,8 @@ func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
 // problems directory at a specific strictness level.
 func loadAtStrictness(t testing.TB, name string, level mib.ResolverStrictness) *mib.Mib {
 	t.Helper()
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
-	problems := mustDir(t, testutil.ProblemsCorpusDir(t))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
+	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
 	m, err := Load(context.Background(),
 		WithSource(corpus, problems),
@@ -373,8 +373,8 @@ func loadAtStrictness(t testing.TB, name string, level mib.ResolverStrictness) *
 // violations directory at a specific strictness level.
 func loadViolationMIB(t testing.TB, name string, level mib.ResolverStrictness) *mib.Mib {
 	t.Helper()
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
-	violations := mustDir(t, testutil.TestdataDir(t, "strictness", "violations"))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
+	violations := requireDir(t, testutil.TestdataDir(t, "strictness", "violations"))
 	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
 	m, err := Load(context.Background(),
 		WithSource(corpus, violations),

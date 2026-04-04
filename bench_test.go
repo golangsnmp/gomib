@@ -8,7 +8,7 @@ import (
 )
 
 func BenchmarkLoadAllCorpus(b *testing.B) {
-	src := mustDir(b, testutil.PrimaryCorpusDir(b))
+	src := requireDir(b, testutil.PrimaryCorpusDir(b))
 
 	ctx := context.Background()
 
@@ -23,7 +23,7 @@ func BenchmarkLoadAllCorpus(b *testing.B) {
 }
 
 func BenchmarkLoadSingleMIB(b *testing.B) {
-	src := mustDir(b, testutil.PrimaryCorpusDir(b))
+	src := requireDir(b, testutil.PrimaryCorpusDir(b))
 
 	ctx := context.Background()
 

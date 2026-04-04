@@ -20,9 +20,9 @@ func lowerModule(t *testing.T, source string) *Module {
 	return mod
 }
 
-// findDef finds the first definition of the given type with the given name.
+// requireDef finds the first definition of the given type with the given name.
 // Fails the test if not found or wrong type.
-func findDef[T Definition](t *testing.T, mod *Module, name string) T {
+func requireDef[T Definition](t *testing.T, mod *Module, name string) T {
 	t.Helper()
 	for _, d := range mod.Definitions {
 		if d.DefinitionName() == name {

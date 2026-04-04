@@ -71,7 +71,7 @@ func TestLower_Constraints(t *testing.T) {
 	mod := lowerModule(t, constraintTestSource)
 
 	t.Run("size-range", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "sizeRangeObj")
+		obj := requireDef[*ObjectType](t, mod, "sizeRangeObj")
 		constrained, ok := obj.Syntax.(*TypeSyntaxConstrained)
 		testutil.True(t, ok, "expected *TypeSyntaxConstrained, got %T", obj.Syntax)
 
@@ -91,7 +91,7 @@ func TestLower_Constraints(t *testing.T) {
 	})
 
 	t.Run("size-single-value", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "sizeSingleObj")
+		obj := requireDef[*ObjectType](t, mod, "sizeSingleObj")
 		constrained, ok := obj.Syntax.(*TypeSyntaxConstrained)
 		testutil.True(t, ok, "expected *TypeSyntaxConstrained, got %T", obj.Syntax)
 
@@ -109,7 +109,7 @@ func TestLower_Constraints(t *testing.T) {
 	})
 
 	t.Run("value-range", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "valueRangeObj")
+		obj := requireDef[*ObjectType](t, mod, "valueRangeObj")
 		constrained, ok := obj.Syntax.(*TypeSyntaxConstrained)
 		testutil.True(t, ok, "expected *TypeSyntaxConstrained, got %T", obj.Syntax)
 
@@ -126,7 +126,7 @@ func TestLower_Constraints(t *testing.T) {
 	})
 
 	t.Run("min-max", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "minMaxObj")
+		obj := requireDef[*ObjectType](t, mod, "minMaxObj")
 		constrained, ok := obj.Syntax.(*TypeSyntaxConstrained)
 		testutil.True(t, ok, "expected *TypeSyntaxConstrained, got %T", obj.Syntax)
 
@@ -144,7 +144,7 @@ func TestLower_Constraints(t *testing.T) {
 	})
 
 	t.Run("multiple-ranges", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "multiRangeObj")
+		obj := requireDef[*ObjectType](t, mod, "multiRangeObj")
 		constrained, ok := obj.Syntax.(*TypeSyntaxConstrained)
 		testutil.True(t, ok, "expected *TypeSyntaxConstrained, got %T", obj.Syntax)
 
@@ -166,7 +166,7 @@ func TestLower_Constraints(t *testing.T) {
 	})
 
 	t.Run("negative-range", func(t *testing.T) {
-		obj := findDef[*ObjectType](t, mod, "negativeRangeObj")
+		obj := requireDef[*ObjectType](t, mod, "negativeRangeObj")
 		constrained, ok := obj.Syntax.(*TypeSyntaxConstrained)
 		testutil.True(t, ok, "expected *TypeSyntaxConstrained, got %T", obj.Syntax)
 

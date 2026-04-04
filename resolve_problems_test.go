@@ -20,8 +20,8 @@ import (
 // (for dependencies like SNMPv2-SMI, SNMPv2-TC) and the problems directory.
 func loadProblemMIB(t testing.TB, name string) *mib.Mib {
 	t.Helper()
-	corpus := mustDir(t, testutil.PrimaryCorpusDir(t))
-	problems := mustDir(t, testutil.ProblemsCorpusDir(t))
+	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
+	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 	diag := mib.DiagnosticConfig{
 		Reporting: mib.ReportingVerbose,
 		FailAt:    mib.SeverityFatal,

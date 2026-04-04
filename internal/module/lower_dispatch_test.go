@@ -33,7 +33,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	oi := findDef[*ObjectIdentity](t, mod, "testIdentity")
+	oi := requireDef[*ObjectIdentity](t, mod, "testIdentity")
 
 	testutil.Equal(t, "testIdentity", oi.Name, "Name")
 	testutil.Equal(t, types.StatusCurrent, oi.Status, "Status")
@@ -84,7 +84,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	notif := findDef[*Notification](t, mod, "testNotification")
+	notif := requireDef[*Notification](t, mod, "testNotification")
 
 	testutil.Equal(t, "testNotification", notif.Name, "Name")
 	testutil.SliceEqual(t, []string{"testObj"}, notif.Objects, "Objects")
@@ -114,7 +114,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	notif := findDef[*Notification](t, mod, "testTrap")
+	notif := requireDef[*Notification](t, mod, "testTrap")
 
 	testutil.Equal(t, "testTrap", notif.Name, "Name")
 	testutil.Equal(t, types.StatusCurrent, notif.Status, "Status (TRAP-TYPE defaults to current)")
@@ -155,7 +155,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	td := findDef[*TypeDef](t, mod, "MyString")
+	td := requireDef[*TypeDef](t, mod, "MyString")
 
 	testutil.Equal(t, "MyString", td.Name, "Name")
 	testutil.True(t, td.IsTextualConvention, "IsTextualConvention")
@@ -178,7 +178,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	td := findDef[*TypeDef](t, mod, "MyInt")
+	td := requireDef[*TypeDef](t, mod, "MyInt")
 
 	testutil.Equal(t, "MyInt", td.Name, "Name")
 	testutil.False(t, td.IsTextualConvention, "IsTextualConvention")
@@ -204,7 +204,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	va := findDef[*ValueAssignment](t, mod, "testOid")
+	va := requireDef[*ValueAssignment](t, mod, "testOid")
 
 	testutil.Equal(t, "testOid", va.Name, "Name")
 	testutil.Len(t, va.Oid.Components, 2, "Oid component count")
@@ -247,7 +247,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	og := findDef[*ObjectGroup](t, mod, "testGroup")
+	og := requireDef[*ObjectGroup](t, mod, "testGroup")
 
 	testutil.Equal(t, "testGroup", og.Name, "Name")
 	testutil.SliceEqual(t, []string{"obj1", "obj2", "obj3"}, og.Objects, "Objects")
@@ -284,7 +284,7 @@ END
 `
 
 	mod := lowerModule(t, source)
-	ng := findDef[*NotificationGroup](t, mod, "testNotifGroup")
+	ng := requireDef[*NotificationGroup](t, mod, "testNotifGroup")
 
 	testutil.Equal(t, "testNotifGroup", ng.Name, "Name")
 	testutil.SliceEqual(t, []string{"notif1", "notif2"}, ng.Notifications, "Notifications")
