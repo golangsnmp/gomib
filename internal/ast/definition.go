@@ -204,10 +204,3 @@ type MacroDefinitionDef struct {
 	DefBase
 }
 
-// ErrorDef records a parse error from which the parser recovered.
-type ErrorDef struct {
-	DefBase
-	Message string
-}
-
-func (d *ErrorDef) DefinitionName() *Ident { return nil }

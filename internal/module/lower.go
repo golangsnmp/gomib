@@ -314,8 +314,6 @@ func lowerDefinition(def ast.Definition, ctx *LoweringContext) Definition {
 				fmt.Sprintf("MACRO definition %q not allowed outside base modules", def.DefinitionName()))
 		}
 		return nil
-	case *ast.ErrorDef:
-		return nil
 	default:
 		ctx.emitDiagnostic(types.DiagUnknownDefinitionType, def.DefinitionSpan(),
 			fmt.Sprintf("unknown definition type %T", def))
