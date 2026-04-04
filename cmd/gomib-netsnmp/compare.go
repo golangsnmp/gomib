@@ -267,7 +267,7 @@ func compareNodes(netsnmp, gomib map[string]*NormalizedNode) *ComparisonResult {
 		}
 		if len(nsNode.BitValues) > 0 {
 			result.compareCollectionField(&result.Summary.Bits, oid, "bits",
-				bitsString(gNode.BitValues), bitsString(nsNode.BitValues),
+				formatEnums(gNode.BitValues), formatEnums(nsNode.BitValues),
 				maps.Equal(nsNode.BitValues, gNode.BitValues), gNode, nsNode)
 		}
 		if len(nsNode.Varbinds) > 0 {

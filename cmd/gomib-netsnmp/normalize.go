@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -85,22 +84,6 @@ func rangesString(ranges []RangeInfo) string {
 	return "(" + strings.Join(parts, " | ") + ")"
 }
 
-func bitsString(bits map[int]string) string {
-	if len(bits) == 0 {
-		return "{}"
-	}
-	var keys []int
-	for k := range bits {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	var parts []string
-	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf("%s(%d)", bits[k], k))
-	}
-	return "{ " + strings.Join(parts, ", ") + " }"
-}
-
 func varbindsString(varbinds []string) string {
 	if len(varbinds) == 0 {
 		return ""
@@ -172,89 +155,103 @@ func loadGomibNodes(mibPaths, modules []string) (map[string]*NormalizedNode, err
 	}
 
 	nodes := make(map[string]*NormalizedNode)
-
 	for node := range m.Nodes() {
-		oid := node.OID().String()
-		if oid == "" {
-			continue
+		if n := normalizeGomibNode(node); n != nil {
+			nodes[n.OID] = n
 		}
+	}
+	return nodes, nil
+}
 
-		n := &NormalizedNode{
-			OID:        oid,
-			Name:       node.Name(),
-			EnumValues: make(map[int]string),
-			BitValues:  make(map[int]string),
-		}
-
-		if mod := node.Module(); mod != nil {
-			n.Module = mod.Name()
-		}
-
-		if obj := node.Object(); obj != nil {
-			n.Type = normalizeGomibType(obj.Type())
-			n.Access = obj.Access().String()
-			n.Status = obj.Status().String()
-			n.Units = obj.Units()
-			n.Hint = obj.EffectiveDisplayHint()
-			n.NodeType = "OBJECT-TYPE"
-			n.Kind = normalizeGomibKind(obj.Kind())
-			n.Reference = obj.Reference()
-
-			if t := obj.Type(); t != nil && t.IsTextualConvention() {
-				n.TCName = t.Name()
-			}
-
-			for _, ev := range obj.EffectiveEnums() {
-				n.EnumValues[int(ev.Value)] = ev.Label
-			}
-
-			for _, bv := range obj.EffectiveBits() {
-				n.BitValues[int(bv.Value)] = bv.Label
-			}
-
-			for _, r := range obj.EffectiveRanges() {
-				n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
-			}
-			for _, r := range obj.EffectiveSizes() {
-				n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
-			}
-
-			if dv := obj.DefaultValue(); !dv.IsZero() {
-				n.DefaultValue = dv.String()
-			}
-
-			for _, idx := range obj.Index() {
-				if idx.Object != nil {
-					n.Indexes = append(n.Indexes, IndexInfo{
-						Name:    idx.Object.Name(),
-						Implied: idx.Implied,
-					})
-				} else if idx.TypeName != "" {
-					n.Indexes = append(n.Indexes, IndexInfo{
-						Name:    idx.TypeName,
-						Implied: idx.Implied,
-					})
-				}
-			}
-
-			if aug := obj.Augments(); aug != nil {
-				n.Augments = aug.Name()
-			}
-		}
-
-		if notif := node.Notification(); notif != nil {
-			n.Status = notif.Status().String()
-			n.Reference = notif.Reference()
-			n.NodeType = "NOTIFICATION-TYPE"
-			for _, vb := range notif.Objects() {
-				n.Varbinds = append(n.Varbinds, vb.Name())
-			}
-		}
-
-		nodes[oid] = n
+// normalizeGomibNode converts a single resolved mib.Node into a NormalizedNode.
+// Returns nil for nodes with no OID.
+func normalizeGomibNode(node *mib.Node) *NormalizedNode {
+	oid := node.OID().String()
+	if oid == "" {
+		return nil
 	}
 
-	return nodes, nil
+	n := &NormalizedNode{
+		OID:        oid,
+		Name:       node.Name(),
+		EnumValues: make(map[int]string),
+		BitValues:  make(map[int]string),
+	}
+
+	if mod := node.Module(); mod != nil {
+		n.Module = mod.Name()
+	}
+
+	if obj := node.Object(); obj != nil {
+		normalizeGomibObject(n, obj)
+	}
+
+	if notif := node.Notification(); notif != nil {
+		normalizeGomibNotification(n, notif)
+	}
+
+	return n
+}
+
+func normalizeGomibObject(n *NormalizedNode, obj *mib.Object) {
+	n.Type = normalizeGomibType(obj.Type())
+	n.Access = obj.Access().String()
+	n.Status = obj.Status().String()
+	n.Units = obj.Units()
+	n.Hint = obj.EffectiveDisplayHint()
+	n.NodeType = "OBJECT-TYPE"
+	n.Kind = normalizeGomibKind(obj.Kind())
+	n.Reference = obj.Reference()
+
+	if t := obj.Type(); t != nil && t.IsTextualConvention() {
+		n.TCName = t.Name()
+	}
+
+	for _, ev := range obj.EffectiveEnums() {
+		n.EnumValues[int(ev.Value)] = ev.Label
+	}
+
+	for _, bv := range obj.EffectiveBits() {
+		n.BitValues[int(bv.Value)] = bv.Label
+	}
+
+	for _, r := range obj.EffectiveRanges() {
+		n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
+	}
+	for _, r := range obj.EffectiveSizes() {
+		n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
+	}
+
+	if dv := obj.DefaultValue(); !dv.IsZero() {
+		n.DefaultValue = dv.String()
+	}
+
+	for _, idx := range obj.Index() {
+		if idx.Object != nil {
+			n.Indexes = append(n.Indexes, IndexInfo{
+				Name:    idx.Object.Name(),
+				Implied: idx.Implied,
+			})
+		} else if idx.TypeName != "" {
+			n.Indexes = append(n.Indexes, IndexInfo{
+				Name:    idx.TypeName,
+				Implied: idx.Implied,
+			})
+		}
+	}
+
+	if aug := obj.Augments(); aug != nil {
+		n.Augments = aug.Name()
+	}
+}
+
+func normalizeGomibNotification(n *NormalizedNode, notif *mib.Notification) {
+	n.Status = notif.Status().String()
+	n.Reference = notif.Reference()
+	n.NodeType = "NOTIFICATION-TYPE"
+	for _, vb := range notif.Objects() {
+		n.Varbinds = append(n.Varbinds, vb.Name())
+	}
 }
 
 func normalizeGomibType(t *mib.Type) string {

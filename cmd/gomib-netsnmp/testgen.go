@@ -339,7 +339,7 @@ func generateBitsTests(w io.Writer, nodes map[string]*NormalizedNode, _ []string
 		fmt.Fprintf(w, "\t{Name: %q, Module: %q, OID: %q,\n",
 			e.node.Name, e.node.Module, e.oid)
 		fmt.Fprintf(w, "\t\tBitValues: map[int]string{%s},\n", strings.Join(bitParts, ", "))
-		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", bitsString(e.node.BitValues))
+		fmt.Fprintf(w, "\t\tNetSnmp: %q},\n", formatEnums(e.node.BitValues))
 	}
 	fmt.Fprintln(w, "}")
 
