@@ -103,7 +103,6 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 
 	if module.Language == types.LanguageSMIv2 && !IsBaseModule(module.Name) {
 		var moduleIdentities []*ModuleIdentity
-		var firstASTDef *ast.ModuleIdentityDef
 		firstIndex := -1
 		for i, def := range module.Definitions {
 			if mi, ok := def.(*ModuleIdentity); ok {
@@ -113,24 +112,11 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 				moduleIdentities = append(moduleIdentities, mi)
 			}
 		}
-		// Find the first AST MODULE-IDENTITY for span-accurate date checks.
-		for _, def := range astModule.Body {
-			if astMI, ok := def.(*ast.ModuleIdentityDef); ok {
-				firstASTDef = astMI
-				break
-			}
-		}
 
 		if len(moduleIdentities) == 0 {
 			ctx.emitDiagnostic(types.DiagMissingModuleIdentity, module.Span,
 				fmt.Sprintf("SMIv2 module %s lacks MODULE-IDENTITY", module.Name))
 		} else {
-			checkRevisionLastUpdated(ctx, moduleIdentities[0])
-
-			if firstASTDef != nil {
-				checkModuleIdentityDates(ctx, firstASTDef)
-			}
-
 			if firstIndex > 0 {
 				ctx.emitDiagnostic(types.DiagModuleIdentityNotFirst, moduleIdentities[0].Span,
 					"MODULE-IDENTITY should be the first definition in "+module.Name)
@@ -142,7 +128,7 @@ func Lower(astModule *ast.Module, source []byte, logger *slog.Logger, diagConfig
 			}
 		}
 
-		checkMacroImports(ctx, astModule, module)
+		checkMacroImports(ctx, module)
 	}
 
 	for _, d := range astModule.Diagnostics {
@@ -390,7 +376,7 @@ func lowerModuleIdentity(def *ast.ModuleIdentityDef, ctx *LoweringContext) *Modu
 	checkEmptyRequiredString(ctx, def.Organization.Value, def.Span, name, "ORGANIZATION", types.DiagEmptyOrganization)
 	checkEmptyRequiredString(ctx, def.ContactInfo.Value, def.Span, name, "CONTACT-INFO", types.DiagEmptyContact)
 
-	return &ModuleIdentity{
+	mi := &ModuleIdentity{
 		DefBase:      DefBase{Name: def.Name.Name, Span: def.Span},
 		LastUpdated:  def.LastUpdated.Value,
 		Organization: def.Organization.Value,
@@ -399,6 +385,11 @@ func lowerModuleIdentity(def *ast.ModuleIdentityDef, ctx *LoweringContext) *Modu
 		Revisions:    revisions,
 		Oid:          lowerOidAssignment(def.OidAssignment, ctx),
 	}
+
+	checkModuleIdentityDates(ctx, def)
+	checkRevisionLastUpdated(ctx, mi)
+
+	return mi
 }
 
 // checkRevisionLastUpdated warns if LAST-UPDATED has no matching REVISION.
@@ -416,17 +407,15 @@ func checkRevisionLastUpdated(ctx *LoweringContext, mi *ModuleIdentity) {
 }
 
 // checkMacroImports warns when SMIv2 macro keywords are used without being imported.
-func checkMacroImports(ctx *LoweringContext, astMod *ast.Module, mod *Module) {
+func checkMacroImports(ctx *LoweringContext, mod *Module) {
 	// Collect imported macro names.
 	importedMacros := make(map[string]struct{})
-	for _, clause := range astMod.Imports {
-		for _, sym := range clause.Symbols {
-			switch sym.Name {
-			case "MODULE-IDENTITY", "OBJECT-IDENTITY", "OBJECT-TYPE",
-				"NOTIFICATION-TYPE", "TEXTUAL-CONVENTION", "OBJECT-GROUP",
-				"NOTIFICATION-GROUP", "MODULE-COMPLIANCE", "AGENT-CAPABILITIES":
-				importedMacros[sym.Name] = struct{}{}
-			}
+	for _, imp := range mod.Imports {
+		switch imp.Symbol {
+		case "MODULE-IDENTITY", "OBJECT-IDENTITY", "OBJECT-TYPE",
+			"NOTIFICATION-TYPE", "TEXTUAL-CONVENTION", "OBJECT-GROUP",
+			"NOTIFICATION-GROUP", "MODULE-COMPLIANCE", "AGENT-CAPABILITIES":
+			importedMacros[imp.Symbol] = struct{}{}
 		}
 	}
 
