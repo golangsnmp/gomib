@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"path"
@@ -178,9 +177,7 @@ func (c *cli) cmdFind(args []string) int {
 		if matches == nil {
 			matches = []findMatch{}
 		}
-		enc := json.NewEncoder(c.stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(matches); err != nil {
+		if err := writeJSON(c.stdout, matches, true); err != nil {
 			c.printError("encoding JSON: %v", err)
 			return exitError
 		}
