@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 
@@ -40,7 +39,7 @@ Examples:
 
 func (c *cli) cmdTrace(args []string) int {
 	fs := flag.NewFlagSet("trace", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, traceUsage) }
+	fs.Usage = func() { fmt.Fprint(c.stderr, traceUsage) }
 
 	modules := addModuleFlag(fs)
 	strict, permissive := addStrictnessFlags(fs)
@@ -54,19 +53,19 @@ func (c *cli) cmdTrace(args []string) int {
 		return exitOK
 	}
 
-	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+	if code, failed := c.validateStrictnessFlags(*strict, *permissive); failed {
 		return code
 	}
 
 	positional := fs.Args()
 	if len(positional) == 0 {
-		printError("no symbol specified")
-		fmt.Fprint(os.Stderr, traceUsage)
+		c.printError("no symbol specified")
+		fmt.Fprint(c.stderr, traceUsage)
 		return exitError
 	}
 	if len(positional) > 1 {
-		printError("too many arguments (use -m for module selection)")
-		fmt.Fprint(os.Stderr, traceUsage)
+		c.printError("too many arguments (use -m for module selection)")
+		fmt.Fprint(c.stderr, traceUsage)
 		return exitError
 	}
 	symbol := positional[0]
@@ -85,12 +84,12 @@ func (c *cli) cmdTrace(args []string) int {
 
 	m, err := c.loadMibWithOpts(mods, strictnessOpts(*strict, *permissive)...)
 	if err != nil && m == nil {
-		printError("failed to load: %v", err)
+		c.printError("failed to load: %v", err)
 		return exitError
 	}
 
-	fmt.Printf("Load mode: %s\n", loadMode)
-	fmt.Printf("Loaded: %d modules, %d objects, %d types\n\n",
+	fmt.Fprintf(c.stdout, "Load mode: %s\n", loadMode)
+	fmt.Fprintf(c.stdout, "Loaded: %d modules, %d objects, %d types\n\n",
 		len(m.Modules()), len(m.Objects()), len(m.Types()))
 
 	c.traceSymbol(m, symbol)
@@ -99,7 +98,7 @@ func (c *cli) cmdTrace(args []string) int {
 }
 
 func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
-	fmt.Printf("=== Tracing symbol: %s ===\n\n", symbol)
+	fmt.Fprintf(c.stdout, "=== Tracing symbol: %s ===\n\n", symbol)
 
 	var definingModules []string
 	for _, mod := range m.Modules() {
@@ -112,9 +111,9 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 	obj := m.Object(symbol)
 	typ := m.Type(symbol)
 
-	fmt.Println("DEFINITIONS:")
+	fmt.Fprintln(c.stdout, "DEFINITIONS:")
 	if len(definingModules) == 0 {
-		fmt.Println("  (none found)")
+		fmt.Fprintln(c.stdout, "  (none found)")
 	} else {
 		slices.Sort(definingModules)
 		for _, modName := range definingModules {
@@ -129,23 +128,23 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 			if mod.Node(symbol) != nil && mod.Object(symbol) == nil {
 				kinds = append(kinds, "Node")
 			}
-			fmt.Printf("  %s: %s\n", modName, strings.Join(kinds, ", "))
+			fmt.Fprintf(c.stdout, "  %s: %s\n", modName, strings.Join(kinds, ", "))
 		}
 	}
-	fmt.Println()
+	fmt.Fprintln(c.stdout)
 
-	fmt.Println("GLOBAL LOOKUPS (unqualified):")
+	fmt.Fprintln(c.stdout, "GLOBAL LOOKUPS (unqualified):")
 	if node != nil {
 		modName := "(no module)"
 		if node.Module() != nil {
 			modName = node.Module().Name()
 		}
-		fmt.Printf("  Node:        %s::%s  OID=%s  Kind=%s\n",
+		fmt.Fprintf(c.stdout, "  Node:        %s::%s  OID=%s  Kind=%s\n",
 			modName, node.Name(), node.OID(), node.Kind())
-		fmt.Printf("               Object attached: %v\n", node.Object() != nil)
-		fmt.Printf("               Notification attached: %v\n", node.Notification() != nil)
+		fmt.Fprintf(c.stdout, "               Object attached: %v\n", node.Object() != nil)
+		fmt.Fprintf(c.stdout, "               Notification attached: %v\n", node.Notification() != nil)
 	} else {
-		fmt.Println("  Node:        (not found)")
+		fmt.Fprintln(c.stdout, "  Node:        (not found)")
 	}
 
 	if obj != nil {
@@ -153,10 +152,10 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 		if obj.Module() != nil {
 			modName = obj.Module().Name()
 		}
-		fmt.Printf("  Object:      %s::%s  OID=%s  Kind=%s\n",
+		fmt.Fprintf(c.stdout, "  Object:      %s::%s  OID=%s  Kind=%s\n",
 			modName, obj.Name(), obj.OID(), obj.Kind())
 	} else {
-		fmt.Println("  Object:      (not found)")
+		fmt.Fprintln(c.stdout, "  Object:      (not found)")
 	}
 
 	if typ != nil {
@@ -164,23 +163,23 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 		if typ.Module() != nil {
 			modName = typ.Module().Name()
 		}
-		fmt.Printf("  Type:        %s::%s  Base=%s\n",
+		fmt.Fprintf(c.stdout, "  Type:        %s::%s  Base=%s\n",
 			modName, typ.Name(), typ.Base())
 	} else {
-		fmt.Println("  Type:        (not found)")
+		fmt.Fprintln(c.stdout, "  Type:        (not found)")
 	}
-	fmt.Println()
+	fmt.Fprintln(c.stdout)
 
 	if len(definingModules) > 1 {
-		fmt.Println("PER-MODULE LOOKUPS:")
+		fmt.Fprintln(c.stdout, "PER-MODULE LOOKUPS:")
 		for _, modName := range definingModules {
 			mod := m.Module(modName)
 			modObj := mod.Object(symbol)
 			if modObj != nil {
-				fmt.Printf("  %s::%s:\n", modName, symbol)
-				fmt.Printf("    OID=%s  Kind=%s\n", modObj.OID(), modObj.Kind())
+				fmt.Fprintf(c.stdout, "  %s::%s:\n", modName, symbol)
+				fmt.Fprintf(c.stdout, "    OID=%s  Kind=%s\n", modObj.OID(), modObj.Kind())
 				if modObj.Kind() == mib.KindRow {
-					fmt.Printf("    Index count: %d\n", len(modObj.Index()))
+					fmt.Fprintf(c.stdout, "    Index count: %d\n", len(modObj.Index()))
 					for i, idx := range modObj.Index() {
 						name := "(nil!)"
 						if idx.Object != nil {
@@ -190,51 +189,51 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 						if idx.Encoding != mib.IndexEncodingUnknown {
 							enc = fmt.Sprintf("  encoding=%s", idx.Encoding)
 						}
-						fmt.Printf("      [%d] %s%s\n", i, name, enc)
+						fmt.Fprintf(c.stdout, "      [%d] %s%s\n", i, name, enc)
 					}
 				}
 			}
 		}
-		fmt.Println()
+		fmt.Fprintln(c.stdout)
 	}
 
 	if obj != nil && obj.Kind() == mib.KindRow {
-		fmt.Println("INDEX RESOLUTION (row object):")
+		fmt.Fprintln(c.stdout, "INDEX RESOLUTION (row object):")
 		directIndex := obj.Index()
 		effectiveIndex := obj.EffectiveIndexes()
 
 		if len(directIndex) == 0 && obj.Augments() == nil {
-			fmt.Println("  WARNING: No INDEX clause resolved!")
-			fmt.Println("  This row has no index entries, which may indicate a resolution failure.")
+			fmt.Fprintln(c.stdout, "  WARNING: No INDEX clause resolved!")
+			fmt.Fprintln(c.stdout, "  This row has no index entries, which may indicate a resolution failure.")
 		} else if len(directIndex) == 0 && obj.Augments() != nil {
-			fmt.Printf("  AUGMENTS: %s\n", obj.Augments().Name())
+			fmt.Fprintf(c.stdout, "  AUGMENTS: %s\n", obj.Augments().Name())
 		}
 
 		if len(directIndex) > 0 {
-			fmt.Printf("  Direct INDEX (%d entries):\n", len(directIndex))
-			printIndexDetails(directIndex)
+			fmt.Fprintf(c.stdout, "  Direct INDEX (%d entries):\n", len(directIndex))
+			c.printIndexDetails(directIndex)
 		}
 
 		if len(effectiveIndex) > 0 && len(effectiveIndex) != len(directIndex) {
-			fmt.Printf("  Effective INDEX (%d entries, via AUGMENTS chain):\n", len(effectiveIndex))
-			printIndexDetails(effectiveIndex)
+			fmt.Fprintf(c.stdout, "  Effective INDEX (%d entries, via AUGMENTS chain):\n", len(effectiveIndex))
+			c.printIndexDetails(effectiveIndex)
 		}
-		fmt.Println()
+		fmt.Fprintln(c.stdout)
 	}
 
 	if obj != nil && obj.Kind() == mib.KindTable {
-		fmt.Println("TABLE STRUCTURE:")
+		fmt.Fprintln(c.stdout, "TABLE STRUCTURE:")
 		if obj.Entry() != nil {
 			entry := obj.Entry()
-			fmt.Printf("  Row entry: %s\n", entry.Name())
-			fmt.Printf("  Row INDEX count: %d\n", len(entry.Index()))
+			fmt.Fprintf(c.stdout, "  Row entry: %s\n", entry.Name())
+			fmt.Fprintf(c.stdout, "  Row INDEX count: %d\n", len(entry.Index()))
 			if len(entry.Index()) == 0 && entry.Augments() == nil {
-				fmt.Println("  WARNING: Row has no INDEX resolved!")
+				fmt.Fprintln(c.stdout, "  WARNING: Row has no INDEX resolved!")
 			}
 
 			effIdx := entry.EffectiveIndexes()
 			if len(effIdx) > 0 {
-				fmt.Printf("  Effective indexes (%d):\n", len(effIdx))
+				fmt.Fprintf(c.stdout, "  Effective indexes (%d):\n", len(effIdx))
 				for i, idx := range effIdx {
 					name := "(nil!)"
 					if idx.Object != nil {
@@ -248,7 +247,7 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 					if idx.Implied {
 						implied = " (IMPLIED)"
 					}
-					fmt.Printf("    [%d] %s%s%s\n", i, name, implied, enc)
+					fmt.Fprintf(c.stdout, "    [%d] %s%s%s\n", i, name, implied, enc)
 				}
 			}
 
@@ -257,18 +256,18 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 				for i, a := range augBy {
 					names[i] = a.Name()
 				}
-				fmt.Printf("  Augmented by: %s\n", strings.Join(names, ", "))
+				fmt.Fprintf(c.stdout, "  Augmented by: %s\n", strings.Join(names, ", "))
 			}
 
 			cols := entry.Columns()
 			if len(cols) > 0 {
-				fmt.Println("  Columns:")
-				printColumnTable(cols)
+				fmt.Fprintln(c.stdout, "  Columns:")
+				c.printColumnTable(cols)
 			}
 		} else {
-			fmt.Println("  WARNING: No row entry found!")
+			fmt.Fprintln(c.stdout, "  WARNING: No row entry found!")
 		}
-		fmt.Println()
+		fmt.Fprintln(c.stdout)
 	}
 
 	unresolved := m.Unresolved()
@@ -280,17 +279,17 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 	}
 
 	if len(related) > 0 {
-		fmt.Println("RELATED UNRESOLVED REFERENCES:")
+		fmt.Fprintln(c.stdout, "RELATED UNRESOLVED REFERENCES:")
 		for _, u := range related {
-			fmt.Printf("  [%s] %s in module %s\n", u.Kind, u.Symbol, u.Module)
+			fmt.Fprintf(c.stdout, "  [%s] %s in module %s\n", u.Kind, u.Symbol, u.Module)
 		}
-		fmt.Println()
+		fmt.Fprintln(c.stdout)
 	}
 
 	if len(definingModules) > 1 {
-		fmt.Println("WARNING: Multiple modules define this symbol!")
-		fmt.Println("  This can cause resolution ambiguity depending on load order.")
-		fmt.Println("  Modules:", strings.Join(definingModules, ", "))
+		fmt.Fprintln(c.stdout, "WARNING: Multiple modules define this symbol!")
+		fmt.Fprintln(c.stdout, "  This can cause resolution ambiguity depending on load order.")
+		fmt.Fprintln(c.stdout, "  Modules:", strings.Join(definingModules, ", "))
 
 		var nodes []*mib.Node
 		var nodeInfo []string
@@ -304,23 +303,23 @@ func (c *cli) traceSymbol(m *mib.Mib, symbol string) {
 		}
 		if len(nodes) > 1 {
 			same := nodes[0].OID().String() == nodes[1].OID().String()
-			fmt.Printf("  Objects share same OID node: %v\n", same)
+			fmt.Fprintf(c.stdout, "  Objects share same OID node: %v\n", same)
 			for _, info := range nodeInfo {
-				fmt.Printf("    %s\n", info)
+				fmt.Fprintf(c.stdout, "    %s\n", info)
 			}
 		}
-		fmt.Println()
+		fmt.Fprintln(c.stdout)
 	}
 
 	if c.verbose > 0 && len(unresolved) > 0 {
-		fmt.Printf("ALL UNRESOLVED REFERENCES (%d total):\n", len(unresolved))
+		fmt.Fprintf(c.stdout, "ALL UNRESOLVED REFERENCES (%d total):\n", len(unresolved))
 		for _, u := range unresolved {
-			fmt.Printf("  [%s] %s in module %s\n", u.Kind, u.Symbol, u.Module)
+			fmt.Fprintf(c.stdout, "  [%s] %s in module %s\n", u.Kind, u.Symbol, u.Module)
 		}
 	}
 }
 
-func printIndexDetails(indexes []mib.IndexEntry) {
+func (c *cli) printIndexDetails(indexes []mib.IndexEntry) {
 	for i, idx := range indexes {
 		name := "(nil object!)"
 		oid := ""
@@ -336,6 +335,6 @@ func printIndexDetails(indexes []mib.IndexEntry) {
 		if idx.Encoding != mib.IndexEncodingUnknown {
 			enc = fmt.Sprintf("  encoding=%s", idx.Encoding)
 		}
-		fmt.Printf("    [%d] %s  OID=%s%s%s\n", i, name, oid, implied, enc)
+		fmt.Fprintf(c.stdout, "    [%d] %s  OID=%s%s%s\n", i, name, oid, implied, enc)
 	}
 }

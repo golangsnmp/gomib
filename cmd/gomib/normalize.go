@@ -34,7 +34,7 @@ Examples:
 
 func (c *cli) cmdNormalize(args []string) int {
 	fs := flag.NewFlagSet("normalize", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, normalizeUsage) }
+	fs.Usage = func() { fmt.Fprint(c.stderr, normalizeUsage) }
 
 	outputDir := fs.String("o", "", "write each module to a file in DIR")
 	fs.StringVar(outputDir, "output", "", "write each module to a file in DIR")
@@ -52,7 +52,7 @@ func (c *cli) cmdNormalize(args []string) int {
 		return exitOK
 	}
 
-	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+	if code, failed := c.validateStrictnessFlags(*strict, *permissive); failed {
 		return code
 	}
 
@@ -65,7 +65,7 @@ func (c *cli) cmdNormalize(args []string) int {
 	}
 	m, loadErr := c.loadMibWithOpts(loadModules, strictnessOpts(*strict, *permissive)...)
 	if loadErr != nil && m == nil {
-		printError("failed to load: %v", loadErr)
+		c.printError("failed to load: %v", loadErr)
 		return exitError
 	}
 
@@ -92,29 +92,29 @@ func (c *cli) cmdNormalize(args []string) int {
 	if *outputDir != "" {
 		cleanDir := filepath.Clean(*outputDir)
 		if err := os.MkdirAll(cleanDir, 0o750); err != nil {
-			printError("failed to create output directory: %v", err)
+			c.printError("failed to create output directory: %v", err)
 			return exitError
 		}
 		for _, name := range modules {
 			path := filepath.Join(cleanDir, filepath.Base(name))
 			f, err := os.Create(path) // #nosec G304,G703 -- outputDir is a user-provided CLI flag
 			if err != nil {
-				printError("failed to create %s: %v", path, err)
+				c.printError("failed to create %s: %v", path, err)
 				return exitError
 			}
 			if err := smiwrite.Write(f, m, name, opts...); err != nil {
 				_ = f.Close()
-				printError("failed to write %s: %v", name, err)
+				c.printError("failed to write %s: %v", name, err)
 				return exitError
 			}
 			if err := f.Close(); err != nil {
-				printError("failed to close %s: %v", path, err)
+				c.printError("failed to close %s: %v", path, err)
 				return exitError
 			}
 		}
 	} else {
-		if err := smiwrite.WriteAll(os.Stdout, m, modules, opts...); err != nil {
-			printError("failed to write: %v", err)
+		if err := smiwrite.WriteAll(c.stdout, m, modules, opts...); err != nil {
+			c.printError("failed to write: %v", err)
 			return exitError
 		}
 	}

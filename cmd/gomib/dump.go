@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -32,7 +31,7 @@ Examples:
 
 func (c *cli) cmdDump(args []string) int {
 	fs := flag.NewFlagSet("dump", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, dumpUsage) }
+	fs.Usage = func() { fmt.Fprint(c.stderr, dumpUsage) }
 
 	oidFilter := fs.String("o", "", "filter to subtree starting at OID")
 	fs.StringVar(oidFilter, "oid", "", "filter to subtree starting at OID")
@@ -50,7 +49,7 @@ func (c *cli) cmdDump(args []string) int {
 		return exitOK
 	}
 
-	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+	if code, failed := c.validateStrictnessFlags(*strict, *permissive); failed {
 		return code
 	}
 
@@ -60,7 +59,7 @@ func (c *cli) cmdDump(args []string) int {
 	}
 
 	opts := strictnessOpts(*strict, *permissive)
-	reportOption, ok := reportOpt(*report)
+	reportOption, ok := c.reportOpt(*report)
 	if !ok {
 		return exitError
 	}
@@ -68,17 +67,17 @@ func (c *cli) cmdDump(args []string) int {
 
 	m, err := c.loadMibWithOpts(modules, opts...)
 	if err != nil && m == nil {
-		printError("failed to load: %v", err)
+		c.printError("failed to load: %v", err)
 		return exitError
 	}
 
 	// Print diagnostics to stderr
 	diags := m.Diagnostics()
 	if len(diags) > 0 {
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Diagnostics:")
+		fmt.Fprintln(c.stderr)
+		fmt.Fprintln(c.stderr, "Diagnostics:")
 		for _, d := range diags {
-			printDiagnostic(d)
+			c.printDiagnostic(d)
 		}
 	}
 
@@ -93,7 +92,7 @@ func (c *cli) cmdDump(args []string) int {
 	if *oidFilter != "" {
 		node := m.Resolve(*oidFilter)
 		if node == nil {
-			printError("OID not found: %s", *oidFilter)
+			c.printError("OID not found: %s", *oidFilter)
 			return exitIssue
 		}
 		filterByOID(export, node.OID().String())
@@ -103,8 +102,8 @@ func (c *cli) cmdDump(args []string) int {
 		stripDescriptions(export)
 	}
 
-	if err := writeJSON(os.Stdout, export, !*compact); err != nil {
-		printError("failed to marshal JSON: %v", err)
+	if err := writeJSON(c.stdout, export, !*compact); err != nil {
+		c.printError("failed to marshal JSON: %v", err)
 		return exitIssue
 	}
 	return exitOK

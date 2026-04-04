@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -76,7 +75,7 @@ func (f *depthFlag) Set(value string) error {
 
 func (c *cli) cmdGet(args []string) int {
 	fs := flag.NewFlagSet("get", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, getUsage) }
+	fs.Usage = func() { fmt.Fprint(c.stderr, getUsage) }
 
 	modules := addModuleFlag(fs)
 	tree := fs.Bool("t", false, "show subtree")
@@ -96,19 +95,19 @@ func (c *cli) cmdGet(args []string) int {
 		return exitOK
 	}
 
-	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+	if code, failed := c.validateStrictnessFlags(*strict, *permissive); failed {
 		return code
 	}
 
 	positional := fs.Args()
 	if len(positional) == 0 {
-		printError("no query specified")
-		fmt.Fprint(os.Stderr, getUsage)
+		c.printError("no query specified")
+		fmt.Fprint(c.stderr, getUsage)
 		return exitError
 	}
 	if len(positional) > 1 {
-		printError("too many arguments (use -m for module selection)")
-		fmt.Fprint(os.Stderr, getUsage)
+		c.printError("too many arguments (use -m for module selection)")
+		fmt.Fprint(c.stderr, getUsage)
 		return exitError
 	}
 	query := positional[0]
@@ -126,13 +125,13 @@ func (c *cli) cmdGet(args []string) int {
 
 	m, err := c.loadMibWithOpts(mods, opts...)
 	if err != nil && m == nil {
-		printError("failed to load: %v", err)
+		c.printError("failed to load: %v", err)
 		return exitError
 	}
 
 	node := m.Resolve(query)
 	if node == nil {
-		printError("not found: %s", query)
+		c.printError("not found: %s", query)
 		return exitIssue
 	}
 
@@ -143,29 +142,29 @@ func (c *cli) cmdGet(args []string) int {
 
 	switch *format {
 	case formatJSON:
-		return printNodeJSON(node, *tree || maxDepth.set, maxDepth)
+		return c.printNodeJSON(node, *tree || maxDepth.set, maxDepth)
 	case formatText, "":
 		if *tree || maxDepth.set {
-			printNodeTree(node, maxDepth)
+			c.printNodeTree(node, maxDepth)
 		} else {
-			printNode(node, descLimit)
+			c.printNode(node, descLimit)
 		}
 		return exitOK
 	default:
-		printError("unknown format: %s", *format)
+		c.printError("unknown format: %s", *format)
 		return exitError
 	}
 }
 
-func printNodeJSON(node *mib.Node, tree bool, maxDepth depthFlag) int {
+func (c *cli) printNodeJSON(node *mib.Node, tree bool, maxDepth depthFlag) int {
 	opts := JSONOptions{IncludeDescr: true}
 	if tree {
 		output := buildTreeJSON(node, opts)
 		if maxDepth.set {
 			trimTreeDepth(output, 0, maxDepth.value)
 		}
-		if err := writeJSON(os.Stdout, output, true); err != nil {
-			printError("encoding JSON: %v", err)
+		if err := writeJSON(c.stdout, output, true); err != nil {
+			c.printError("encoding JSON: %v", err)
 			return exitError
 		}
 		return exitOK
@@ -198,8 +197,8 @@ func printNodeJSON(node *mib.Node, tree bool, maxDepth depthFlag) int {
 		out.Notification = &notif
 	}
 
-	if err := writeJSON(os.Stdout, out, true); err != nil {
-		printError("encoding JSON: %v", err)
+	if err := writeJSON(c.stdout, out, true); err != nil {
+		c.printError("encoding JSON: %v", err)
 		return exitError
 	}
 	return exitOK
@@ -215,7 +214,7 @@ func trimTreeDepth(node *TreeNodeJSON, depth, maxDepth int) {
 	}
 }
 
-func printNode(node *mib.Node, descLimit int) {
+func (c *cli) printNode(node *mib.Node, descLimit int) {
 	label := node.Name()
 	if label == "" {
 		label = fmt.Sprintf("(%d)", node.Arc())
@@ -226,23 +225,23 @@ func printNode(node *mib.Node, descLimit int) {
 		moduleName = node.Module().Name()
 	}
 
-	fmt.Printf("Name:    %s\n", label)
+	fmt.Fprintf(c.stdout, "Name:    %s\n", label)
 	if moduleName != "" {
-		fmt.Printf("Module:  %s\n", moduleName)
+		fmt.Fprintf(c.stdout, "Module:  %s\n", moduleName)
 	}
-	fmt.Printf("OID:     %s\n", node.OID().String())
-	fmt.Printf("Kind:    %s\n", node.Kind().String())
+	fmt.Fprintf(c.stdout, "OID:     %s\n", node.OID().String())
+	fmt.Fprintf(c.stdout, "Kind:    %s\n", node.Kind().String())
 
 	if node.Object() != nil {
-		printObjectDetails(node.Object(), descLimit)
+		c.printObjectDetails(node.Object(), descLimit)
 	}
 
 	if node.Notification() != nil {
-		printNotificationDetails(node.Notification(), descLimit)
+		c.printNotificationDetails(node.Notification(), descLimit)
 	}
 }
 
-func printObjectDetails(obj *mib.Object, descLimit int) {
+func (c *cli) printObjectDetails(obj *mib.Object, descLimit int) {
 	if obj.Type() != nil {
 		typ := obj.Type()
 		typeName := typ.Name()
@@ -271,63 +270,63 @@ func printObjectDetails(obj *mib.Object, descLimit int) {
 				typeDesc += fmt.Sprintf(" (SIZE(%d..%d))", sr.Min, sr.Max)
 			}
 		}
-		fmt.Printf("Type:    %s\n", typeDesc)
+		fmt.Fprintf(c.stdout, "Type:    %s\n", typeDesc)
 	} else {
 		enums := obj.EffectiveEnums()
 		bits := obj.EffectiveBits()
 		if len(bits) > 0 {
-			fmt.Printf("Type:    BITS\n")
+			fmt.Fprintf(c.stdout, "Type:    BITS\n")
 		} else if len(enums) > 0 {
-			fmt.Printf("Type:    INTEGER (enum)\n")
+			fmt.Fprintf(c.stdout, "Type:    INTEGER (enum)\n")
 		}
 	}
 
-	fmt.Printf("Access:  %s\n", obj.Access().String())
-	fmt.Printf("Status:  %s\n", obj.Status().String())
+	fmt.Fprintf(c.stdout, "Access:  %s\n", obj.Access().String())
+	fmt.Fprintf(c.stdout, "Status:  %s\n", obj.Status().String())
 
-	printObjectIndexAugments(obj)
+	c.printObjectIndexAugments(obj)
 
 	if dv := obj.DefaultValue(); !dv.IsZero() {
-		fmt.Printf("DefVal:  %s\n", dv.String())
+		fmt.Fprintf(c.stdout, "DefVal:  %s\n", dv.String())
 	}
 
 	if obj.Units() != "" {
-		fmt.Printf("Units:   %s\n", obj.Units())
+		fmt.Fprintf(c.stdout, "Units:   %s\n", obj.Units())
 	}
 
 	if obj.Description() != "" {
-		fmt.Printf("Descr:   %s\n", normalizeDescription(obj.Description(), descLimit))
+		fmt.Fprintf(c.stdout, "Descr:   %s\n", normalizeDescription(obj.Description(), descLimit))
 	}
 
 	if obj.Reference() != "" {
-		fmt.Printf("Ref:     %s\n", normalizeDescription(obj.Reference(), descLimit))
+		fmt.Fprintf(c.stdout, "Ref:     %s\n", normalizeDescription(obj.Reference(), descLimit))
 	}
 
-	printObjectEnumsBits(obj)
+	c.printObjectEnumsBits(obj)
 
 	// Column details: isIndex, row, table.
-	printObjectColumnContext(obj)
+	c.printObjectColumnContext(obj)
 
 	// Column table for tables and rows.
-	printObjectColumns(obj)
+	c.printObjectColumns(obj)
 }
 
-func printNotificationDetails(notif *mib.Notification, descLimit int) {
-	fmt.Printf("Status:  %s\n", notif.Status().String())
+func (c *cli) printNotificationDetails(notif *mib.Notification, descLimit int) {
+	fmt.Fprintf(c.stdout, "Status:  %s\n", notif.Status().String())
 
 	if len(notif.Objects()) > 0 {
-		fmt.Println("Objects:")
+		fmt.Fprintln(c.stdout, "Objects:")
 		for _, obj := range notif.Objects() {
-			fmt.Printf("  %s\n", obj.Name())
+			fmt.Fprintf(c.stdout, "  %s\n", obj.Name())
 		}
 	}
 
 	if notif.Description() != "" {
-		fmt.Printf("Descr:   %s\n", normalizeDescription(notif.Description(), descLimit))
+		fmt.Fprintf(c.stdout, "Descr:   %s\n", normalizeDescription(notif.Description(), descLimit))
 	}
 
 	if notif.Reference() != "" {
-		fmt.Printf("Ref:     %s\n", normalizeDescription(notif.Reference(), descLimit))
+		fmt.Fprintf(c.stdout, "Ref:     %s\n", normalizeDescription(notif.Reference(), descLimit))
 	}
 }
 
@@ -339,11 +338,11 @@ func normalizeDescription(s string, maxLen int) string {
 	return s
 }
 
-func printNodeTree(node *mib.Node, maxDepth depthFlag) {
-	printNodeTreeRecursive(node, 0, maxDepth)
+func (c *cli) printNodeTree(node *mib.Node, maxDepth depthFlag) {
+	c.printNodeTreeRecursive(node, 0, maxDepth)
 }
 
-func printNodeTreeRecursive(node *mib.Node, depth int, maxDepth depthFlag) {
+func (c *cli) printNodeTreeRecursive(node *mib.Node, depth int, maxDepth depthFlag) {
 	if maxDepth.set && depth > maxDepth.value {
 		return
 	}
@@ -377,12 +376,12 @@ func printNodeTreeRecursive(node *mib.Node, depth int, maxDepth depthFlag) {
 	}
 
 	if moduleName != "" {
-		fmt.Printf("%s%s  %s::%s  %s  %s%s\n", indent, label, moduleName, label, oid, kind, extra)
+		fmt.Fprintf(c.stdout, "%s%s  %s::%s  %s  %s%s\n", indent, label, moduleName, label, oid, kind, extra)
 	} else {
-		fmt.Printf("%s%s  %s  %s%s\n", indent, label, oid, kind, extra)
+		fmt.Fprintf(c.stdout, "%s%s  %s  %s%s\n", indent, label, oid, kind, extra)
 	}
 
 	for _, child := range node.Children() {
-		printNodeTreeRecursive(child, depth+1, maxDepth)
+		c.printNodeTreeRecursive(child, depth+1, maxDepth)
 	}
 }

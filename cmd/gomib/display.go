@@ -8,68 +8,68 @@ import (
 )
 
 // printObjectIndexAugments prints Index, Augments, AugmentedBy, and EffectiveIndex.
-func printObjectIndexAugments(obj *mib.Object) {
+func (c *cli) printObjectIndexAugments(obj *mib.Object) {
 	if len(obj.Index()) > 0 {
-		fmt.Printf("Index:   [%s]\n", formatIndexList(obj.Index()))
+		fmt.Fprintf(c.stdout, "Index:   [%s]\n", formatIndexList(obj.Index()))
 	}
 	if obj.Augments() != nil {
-		fmt.Printf("Augments: %s\n", obj.Augments().Name())
+		fmt.Fprintf(c.stdout, "Augments: %s\n", obj.Augments().Name())
 	}
 	if augBy := obj.AugmentedBy(); len(augBy) > 0 {
 		names := make([]string, len(augBy))
 		for i, a := range augBy {
 			names[i] = a.Name()
 		}
-		fmt.Printf("AugmentedBy: %s\n", strings.Join(names, ", "))
+		fmt.Fprintf(c.stdout, "AugmentedBy: %s\n", strings.Join(names, ", "))
 	}
 	if obj.Augments() != nil {
 		if effIdx := obj.EffectiveIndexes(); len(effIdx) > 0 {
-			fmt.Printf("EffectiveIndex: [%s]\n", formatIndexList(effIdx))
+			fmt.Fprintf(c.stdout, "EffectiveIndex: [%s]\n", formatIndexList(effIdx))
 		}
 	}
 }
 
 // printObjectEnumsBits prints enum values or BITS for an object.
-func printObjectEnumsBits(obj *mib.Object) {
+func (c *cli) printObjectEnumsBits(obj *mib.Object) {
 	enums := obj.EffectiveEnums()
 	bits := obj.EffectiveBits()
 	if len(enums) > 0 && len(bits) == 0 {
-		fmt.Println("Values:")
+		fmt.Fprintln(c.stdout, "Values:")
 		for _, v := range enums {
-			fmt.Printf("  %s(%d)\n", v.Label, v.Value)
+			fmt.Fprintf(c.stdout, "  %s(%d)\n", v.Label, v.Value)
 		}
 	}
 	if len(bits) > 0 {
-		fmt.Println("Bits:")
+		fmt.Fprintln(c.stdout, "Bits:")
 		for _, b := range bits {
-			fmt.Printf("  %s(%d)\n", b.Label, b.Value)
+			fmt.Fprintf(c.stdout, "  %s(%d)\n", b.Label, b.Value)
 		}
 	}
 }
 
 // printObjectColumnContext prints IsIndex, Row, and Table for column objects.
-func printObjectColumnContext(obj *mib.Object) {
+func (c *cli) printObjectColumnContext(obj *mib.Object) {
 	if obj.Kind() != mib.KindColumn {
 		return
 	}
-	fmt.Printf("IsIndex: %v\n", obj.IsIndex())
+	fmt.Fprintf(c.stdout, "IsIndex: %v\n", obj.IsIndex())
 	if row := obj.Row(); row != nil {
-		fmt.Printf("Row:     %s\n", row.Name())
+		fmt.Fprintf(c.stdout, "Row:     %s\n", row.Name())
 	}
 	if tbl := obj.Table(); tbl != nil {
-		fmt.Printf("Table:   %s\n", tbl.Name())
+		fmt.Fprintf(c.stdout, "Table:   %s\n", tbl.Name())
 	}
 }
 
 // printObjectColumns prints the column table for table or row objects.
-func printObjectColumns(obj *mib.Object) {
+func (c *cli) printObjectColumns(obj *mib.Object) {
 	if obj.Kind() != mib.KindTable && obj.Kind() != mib.KindRow {
 		return
 	}
 	cols := obj.Columns()
 	if len(cols) > 0 {
-		fmt.Println("Columns:")
-		printColumnTable(cols)
+		fmt.Fprintln(c.stdout, "Columns:")
+		c.printColumnTable(cols)
 	}
 }
 
@@ -94,10 +94,10 @@ func formatIndexList(indexes []mib.IndexEntry) string {
 }
 
 // printColumnTable prints a formatted table of columns for a table/row object.
-func printColumnTable(cols []*mib.Object) {
-	fmt.Printf("  %-28s %-20s %-18s %-18s %s\n",
+func (c *cli) printColumnTable(cols []*mib.Object) {
+	fmt.Fprintf(c.stdout, "  %-28s %-20s %-18s %-18s %s\n",
 		"COLUMN", "TYPE", "BASE", "ACCESS", "ROLE")
-	fmt.Printf("  %-28s %-20s %-18s %-18s %s\n",
+	fmt.Fprintf(c.stdout, "  %-28s %-20s %-18s %-18s %s\n",
 		"------", "----", "----", "------", "----")
 	for _, col := range cols {
 		typeName, base := "", ""
@@ -112,7 +112,7 @@ func printColumnTable(cols []*mib.Object) {
 		if col.IsIndex() {
 			role = "index"
 		}
-		fmt.Printf("  %-28s %-20s %-18s %-18s %s\n",
+		fmt.Fprintf(c.stdout, "  %-28s %-20s %-18s %-18s %s\n",
 			col.Name(), typeName, base, col.Access(), role)
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 )
 
@@ -158,11 +157,7 @@ func TestFindExpandedKinds(t *testing.T) {
 }
 
 func TestPathsReturnsErrorWhenNoPathsFound(t *testing.T) {
-	orig := discoverSystemPaths
-	discoverSystemPaths = func() []string { return nil }
-	t.Cleanup(func() { discoverSystemPaths = orig })
-
-	code, _, stderr := runCLI(t, "paths")
+	code, _, stderr := runCLIWithSystemPaths(t, func() []string { return nil }, "paths")
 	if code != exitIssue {
 		t.Fatalf("expected exit %d, got %d", exitIssue, code)
 	}
@@ -172,11 +167,7 @@ func TestPathsReturnsErrorWhenNoPathsFound(t *testing.T) {
 }
 
 func TestPathsShowsBothCustomAndSystem(t *testing.T) {
-	orig := discoverSystemPaths
-	discoverSystemPaths = func() []string { return []string{"/sys/path"} }
-	t.Cleanup(func() { discoverSystemPaths = orig })
-
-	code, stdout, stderr := runCLI(t, "-p", "/custom/path", "paths")
+	code, stdout, stderr := runCLIWithSystemPaths(t, func() []string { return []string{"/sys/path"} }, "-p", "/custom/path", "paths")
 	if code != exitOK {
 		t.Fatalf("paths exited %d, stderr=%q", code, stderr)
 	}
@@ -518,43 +509,44 @@ func writeTestMIB(t *testing.T) string {
 func runCLI(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
 
-	oldArgs := os.Args
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
+	var stdout, stderr bytes.Buffer
+	code := run(args, &stdout, &stderr)
+	return code, stdout.String(), stderr.String()
+}
 
-	stdoutR, stdoutW, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("stdout pipe: %v", err)
+func runCLIWithSystemPaths(t *testing.T, discover func() []string, args ...string) (int, string, string) {
+	t.Helper()
+
+	var stdout, stderr bytes.Buffer
+	c := cli{
+		stdout:              &stdout,
+		stderr:              &stderr,
+		discoverSystemPaths: discover,
 	}
-	stderrR, stderrW, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("stderr pipe: %v", err)
+
+	var cmdArgs []string
+	var cmd string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "-p", "--path":
+			i++
+			c.paths = append(c.paths, args[i])
+		default:
+			if cmd == "" {
+				cmd = arg
+			} else {
+				cmdArgs = append(cmdArgs, arg)
+			}
+		}
 	}
 
-	// Drain pipes concurrently to avoid blocking on Windows where
-	// OS pipe buffers are small (~4KB). Without this, commands that
-	// produce large output (e.g. dump) deadlock waiting for a reader.
-	var stdoutBuf, stderrBuf bytes.Buffer
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() { defer wg.Done(); _, _ = stdoutBuf.ReadFrom(stdoutR) }()
-	go func() { defer wg.Done(); _, _ = stderrBuf.ReadFrom(stderrR) }()
-
-	os.Args = append([]string{"gomib"}, args...)
-	os.Stdout = stdoutW
-	os.Stderr = stderrW
-
-	code := run()
-
-	_ = stdoutW.Close()
-	_ = stderrW.Close()
-	os.Args = oldArgs
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
-
-	wg.Wait()
-	_ = stdoutR.Close()
-	_ = stderrR.Close()
-
-	return code, stdoutBuf.String(), stderrBuf.String()
+	var code int
+	switch cmd {
+	case "paths":
+		code = c.cmdPaths(cmdArgs)
+	default:
+		t.Fatalf("runCLIWithSystemPaths: unsupported command %q", cmd)
+	}
+	return code, stdout.String(), stderr.String()
 }

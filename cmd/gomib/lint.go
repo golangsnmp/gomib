@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"flag"
 	"fmt"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -106,7 +105,7 @@ type lintSummary struct {
 
 func (c *cli) cmdLint(args []string) int {
 	fs := flag.NewFlagSet("lint", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, lintUsage) }
+	fs.Usage = func() { fmt.Fprint(c.stderr, lintUsage) }
 
 	cfg := lintConfig{
 		level:  mib.SeverityMinor,
@@ -140,7 +139,7 @@ func (c *cli) cmdLint(args []string) int {
 	}
 
 	if *listCodes {
-		printDiagnosticCodes()
+		c.printDiagnosticCodes()
 		return exitOK
 	}
 
@@ -153,7 +152,7 @@ func (c *cli) cmdLint(args []string) int {
 	case "text", "json", "sarif", "compact":
 		// ok
 	default:
-		printError("unknown format: %s", cfg.format)
+		c.printError("unknown format: %s", cfg.format)
 		return exitError
 	}
 
@@ -161,7 +160,7 @@ func (c *cli) cmdLint(args []string) int {
 	case "", "module", "code", "severity":
 		// ok
 	default:
-		printError("unknown group-by: %s", cfg.groupBy)
+		c.printError("unknown group-by: %s", cfg.groupBy)
 		return exitError
 	}
 
@@ -171,16 +170,16 @@ func (c *cli) cmdLint(args []string) int {
 		var err error
 		switch cfg.format {
 		case "json":
-			err = printLintJSON(result)
+			err = c.printLintJSON(result)
 		case "sarif":
-			err = printLintSARIF(result)
+			err = c.printLintSARIF(result)
 		case "compact":
-			printLintCompact(result, &cfg)
+			c.printLintCompact(result, &cfg)
 		default:
-			printLintText(result, &cfg)
+			c.printLintText(result, &cfg)
 		}
 		if err != nil {
-			printError("output encoding failed: %v", err)
+			c.printError("output encoding failed: %v", err)
 			return exitError
 		}
 	}
@@ -261,38 +260,38 @@ func matchesAny(code string, patterns []string) bool {
 	return false
 }
 
-func printLintText(result *lintResult, cfg *lintConfig) {
+func (c *cli) printLintText(result *lintResult, cfg *lintConfig) {
 	if cfg.summary {
-		printLintSummary(result)
+		c.printLintSummary(result)
 		return
 	}
 
 	switch cfg.groupBy {
 	case "module":
-		printLintByModule(result)
+		c.printLintByModule(result)
 	case "code":
-		printLintByCode(result)
+		c.printLintByCode(result)
 	case "severity":
-		printLintBySeverity(result)
+		c.printLintBySeverity(result)
 	default:
-		printLintFlat(result)
+		c.printLintFlat(result)
 	}
 
 	if result.Summary.Total > 0 {
-		fmt.Println()
-		printLintSummary(result)
+		fmt.Fprintln(c.stdout)
+		c.printLintSummary(result)
 	} else {
-		fmt.Printf("No issues found in %d modules\n", result.Summary.Modules)
+		fmt.Fprintf(c.stdout, "No issues found in %d modules\n", result.Summary.Modules)
 	}
 }
 
-func printLintFlat(result *lintResult) {
+func (c *cli) printLintFlat(result *lintResult) {
 	for i := range result.Diagnostics {
-		printLintDiag(&result.Diagnostics[i], true)
+		c.printLintDiag(&result.Diagnostics[i], true)
 	}
 }
 
-func printLintByModule(result *lintResult) {
+func (c *cli) printLintByModule(result *lintResult) {
 	byMod := make(map[string][]lintDiagnostic)
 	for _, d := range result.Diagnostics {
 		mod := d.Module
@@ -309,15 +308,15 @@ func printLintByModule(result *lintResult) {
 	slices.Sort(mods)
 
 	for _, mod := range mods {
-		fmt.Printf("\n%s:\n", mod)
+		fmt.Fprintf(c.stdout, "\n%s:\n", mod)
 		for i := range byMod[mod] {
-			fmt.Printf("  ")
-			printLintDiag(&byMod[mod][i], true)
+			fmt.Fprintf(c.stdout, "  ")
+			c.printLintDiag(&byMod[mod][i], true)
 		}
 	}
 }
 
-func printLintByCode(result *lintResult) {
+func (c *cli) printLintByCode(result *lintResult) {
 	byCode := make(map[string][]lintDiagnostic)
 	for _, d := range result.Diagnostics {
 		code := d.Code
@@ -328,29 +327,29 @@ func printLintByCode(result *lintResult) {
 	}
 
 	codes := make([]string, 0, len(byCode))
-	for c := range byCode {
-		codes = append(codes, c)
+	for cd := range byCode {
+		codes = append(codes, cd)
 	}
 	slices.Sort(codes)
 
 	for _, code := range codes {
 		diags := byCode[code]
-		fmt.Printf("\n%s (%d):\n", code, len(diags))
+		fmt.Fprintf(c.stdout, "\n%s (%d):\n", code, len(diags))
 		for _, d := range diags {
 			if d.Module != "" {
 				if d.Line > 0 {
-					fmt.Printf("  %s:%d: %s\n", d.Module, d.Line, d.Message)
+					fmt.Fprintf(c.stdout, "  %s:%d: %s\n", d.Module, d.Line, d.Message)
 				} else {
-					fmt.Printf("  %s: %s\n", d.Module, d.Message)
+					fmt.Fprintf(c.stdout, "  %s: %s\n", d.Module, d.Message)
 				}
 			} else {
-				fmt.Printf("  %s\n", d.Message)
+				fmt.Fprintf(c.stdout, "  %s\n", d.Message)
 			}
 		}
 	}
 }
 
-func printLintBySeverity(result *lintResult) {
+func (c *cli) printLintBySeverity(result *lintResult) {
 	bySev := make(map[mib.Severity][]lintDiagnostic)
 	for _, d := range result.Diagnostics {
 		bySev[d.SeverityNum] = append(bySev[d.SeverityNum], d)
@@ -365,16 +364,16 @@ func printLintBySeverity(result *lintResult) {
 	for _, sev := range sevs {
 		diags := bySev[sev]
 		if len(diags) > 0 {
-			fmt.Printf("\n%s (%d):\n", diags[0].Severity, len(diags))
+			fmt.Fprintf(c.stdout, "\n%s (%d):\n", diags[0].Severity, len(diags))
 			for i := range diags {
-				fmt.Printf("  ")
-				printLintDiag(&diags[i], false)
+				fmt.Fprintf(c.stdout, "  ")
+				c.printLintDiag(&diags[i], false)
 			}
 		}
 	}
 }
 
-func printLintDiag(d *lintDiagnostic, includeSeverity bool) {
+func (c *cli) printLintDiag(d *lintDiagnostic, includeSeverity bool) {
 	var parts []string
 	if includeSeverity {
 		parts = append(parts, d.Severity+":")
@@ -390,37 +389,37 @@ func printLintDiag(d *lintDiagnostic, includeSeverity bool) {
 		}
 	}
 	parts = append(parts, d.Message)
-	fmt.Println(strings.Join(parts, " "))
+	fmt.Fprintln(c.stdout, strings.Join(parts, " "))
 }
 
-func printLintSummary(result *lintResult) {
-	fmt.Printf("Checked %d modules, found %d issues:\n", result.Summary.Modules, result.Summary.Total)
+func (c *cli) printLintSummary(result *lintResult) {
+	fmt.Fprintf(c.stdout, "Checked %d modules, found %d issues:\n", result.Summary.Modules, result.Summary.Total)
 
 	sevOrder := mib.SeverityNames()
 	for _, sev := range sevOrder {
 		if count := result.Summary.BySeverity[sev]; count > 0 {
-			fmt.Printf("  %-8s %d\n", sev+":", count)
+			fmt.Fprintf(c.stdout, "  %-8s %d\n", sev+":", count)
 		}
 	}
 }
 
-func printLintCompact(result *lintResult, cfg *lintConfig) {
+func (c *cli) printLintCompact(result *lintResult, cfg *lintConfig) {
 	if cfg.summary {
-		fmt.Printf("%d issues", result.Summary.Total)
+		fmt.Fprintf(c.stdout, "%d issues", result.Summary.Total)
 		parts := []string{}
-		if c := result.Summary.BySeverity["error"]; c > 0 {
-			parts = append(parts, fmt.Sprintf("%d errors", c))
+		if n := result.Summary.BySeverity["error"]; n > 0 {
+			parts = append(parts, fmt.Sprintf("%d errors", n))
 		}
-		if c := result.Summary.BySeverity["minor"]; c > 0 {
-			parts = append(parts, fmt.Sprintf("%d minor", c))
+		if n := result.Summary.BySeverity["minor"]; n > 0 {
+			parts = append(parts, fmt.Sprintf("%d minor", n))
 		}
-		if c := result.Summary.BySeverity["style"]; c > 0 {
-			parts = append(parts, fmt.Sprintf("%d style", c))
+		if n := result.Summary.BySeverity["style"]; n > 0 {
+			parts = append(parts, fmt.Sprintf("%d style", n))
 		}
 		if len(parts) > 0 {
-			fmt.Printf(" (%s)", strings.Join(parts, ", "))
+			fmt.Fprintf(c.stdout, " (%s)", strings.Join(parts, ", "))
 		}
-		fmt.Println()
+		fmt.Fprintln(c.stdout)
 		return
 	}
 
@@ -432,17 +431,17 @@ func printLintCompact(result *lintResult, cfg *lintConfig) {
 				loc = fmt.Sprintf("%s:%d:%d", d.Module, d.Line, d.Column)
 			}
 		}
-		fmt.Printf("%s: %s [%s] %s\n", loc, d.Severity, d.Code, d.Message)
+		fmt.Fprintf(c.stdout, "%s: %s [%s] %s\n", loc, d.Severity, d.Code, d.Message)
 	}
 }
 
-func printLintJSON(result *lintResult) error {
-	return writeJSON(os.Stdout, result, true)
+func (c *cli) printLintJSON(result *lintResult) error {
+	return writeJSON(c.stdout, result, true)
 }
 
 // SARIF (Static Analysis Results Interchange Format) output
 // https://sarifweb.azurewebsites.net/
-func printLintSARIF(result *lintResult) error {
+func (c *cli) printLintSARIF(result *lintResult) error {
 	sarif := sarifOutput{
 		Schema:  "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
 		Version: "2.1.0",
@@ -458,7 +457,7 @@ func printLintSARIF(result *lintResult) error {
 		}},
 	}
 
-	return writeJSON(os.Stdout, sarif, true)
+	return writeJSON(c.stdout, sarif, true)
 }
 
 type sarifOutput struct {
@@ -585,16 +584,16 @@ func severityToSARIF(sev mib.Severity) string {
 	}
 }
 
-func printDiagnosticCodes() {
+func (c *cli) printDiagnosticCodes() {
 	currentPhase := ""
 	for _, info := range types.AllDiagnosticCodes() {
 		if info.Phase != currentPhase {
 			if currentPhase != "" {
-				fmt.Println()
+				fmt.Fprintln(c.stdout)
 			}
-			fmt.Printf("%s:\n", info.Phase)
+			fmt.Fprintf(c.stdout, "%s:\n", info.Phase)
 			currentPhase = info.Phase
 		}
-		fmt.Printf("  %-36s %s\n", info.Code, info.Severity)
+		fmt.Fprintf(c.stdout, "  %-36s %s\n", info.Code, info.Severity)
 	}
 }

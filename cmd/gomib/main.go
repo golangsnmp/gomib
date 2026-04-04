@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"runtime/debug"
@@ -60,17 +61,25 @@ type cli struct {
 	verbose  int
 	paths    []string
 	helpFlag bool
+	stdout   io.Writer
+	stderr   io.Writer
+
+	// discoverSystemPaths returns system MIB search paths. Defaults to
+	// gomib.DiscoverSystemPaths; overridable for testing.
+	discoverSystemPaths func() []string
 }
 
 func main() {
-	os.Exit(run())
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-func run() int {
-	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+func run(args []string, stdout, stderr io.Writer) int {
+	c := cli{
+		stdout:              stdout,
+		stderr:              stderr,
+		discoverSystemPaths: gomib.DiscoverSystemPaths,
+	}
 
-	var c cli
-	args := os.Args[1:]
 	var cmdArgs []string
 	var cmd string
 	versionFlag := false
@@ -90,7 +99,7 @@ func run() int {
 			c.verbose = 2
 		case arg == "-p" || arg == "--path":
 			if i+1 >= len(args) {
-				printError("%s requires a value", arg)
+				c.printError("%s requires a value", arg)
 				return exitError
 			}
 			i++
@@ -111,16 +120,16 @@ func run() int {
 	}
 
 	if c.helpFlag && cmd == "" {
-		_, _ = fmt.Fprint(os.Stdout, usage)
+		_, _ = fmt.Fprint(c.stdout, usage)
 		return exitOK
 	}
 	if versionFlag && cmd == "" {
-		printVersion()
+		c.printVersion()
 		return exitOK
 	}
 
 	if cmd == "" {
-		_, _ = fmt.Fprint(os.Stderr, usage)
+		_, _ = fmt.Fprint(c.stderr, usage)
 		return exitError
 	}
 
@@ -146,14 +155,14 @@ func run() int {
 	case "find":
 		return c.cmdFind(cmdArgs)
 	case "version":
-		printVersion()
+		c.printVersion()
 		return exitOK
 	case "help":
-		_, _ = fmt.Fprint(os.Stdout, usage)
+		_, _ = fmt.Fprint(c.stdout, usage)
 		return exitOK
 	default:
-		_, _ = fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", cmd)
-		_, _ = fmt.Fprint(os.Stderr, usage)
+		_, _ = fmt.Fprintf(c.stderr, "unknown command: %s\n\n", cmd)
+		_, _ = fmt.Fprint(c.stderr, usage)
 		return exitError
 	}
 }
@@ -166,7 +175,7 @@ func (c *cli) setupLogger() *slog.Logger {
 	if c.verbose >= 2 {
 		level = gomib.LevelTrace
 	}
-	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+	return slog.New(slog.NewTextHandler(c.stderr, &slog.HandlerOptions{
 		Level: level,
 	}))
 }
@@ -209,16 +218,16 @@ func (c *cli) loadMibWithOpts(modules []string, extraOpts ...gomib.LoadOption) (
 	return gomib.Load(context.Background(), opts...)
 }
 
-func printVersion() {
+func (c *cli) printVersion() {
 	version := "(devel)"
 	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" {
 		version = info.Main.Version
 	}
-	fmt.Printf("gomib %s\n", version)
+	fmt.Fprintf(c.stdout, "gomib %s\n", version)
 }
 
-func printError(format string, args ...any) {
-	cliutil.PrintError(format, args...)
+func (c *cli) printError(format string, args ...any) {
+	fmt.Fprintf(c.stderr, "error: "+format+"\n", args...)
 }
 
 // addHelpFlag registers -h and --help on the given FlagSet.
@@ -239,7 +248,7 @@ func addModuleFlag(fs *flag.FlagSet) *moduleList {
 // checkHelp prints usage and returns true if help was requested.
 func (c *cli) checkHelp(help *bool, usageText string) bool {
 	if *help || c.helpFlag {
-		_, _ = fmt.Fprint(os.Stdout, usageText)
+		_, _ = fmt.Fprint(c.stdout, usageText)
 		return true
 	}
 	return false
@@ -251,9 +260,9 @@ func addStrictnessFlags(fs *flag.FlagSet) (strict, permissive *bool) {
 		fs.Bool("permissive", false, "use permissive mode for vendor MIBs")
 }
 
-func validateStrictnessFlags(strict, permissive bool) (int, bool) {
+func (c *cli) validateStrictnessFlags(strict, permissive bool) (int, bool) {
 	if strict && permissive {
-		printError("--strict and --permissive are mutually exclusive")
+		c.printError("--strict and --permissive are mutually exclusive")
 		return exitError, true
 	}
 	return exitOK, false
@@ -281,7 +290,7 @@ func strictnessOpts(strict, permissive bool) []gomib.LoadOption {
 
 // reportOpt returns the LoadOption for the given --report flag value.
 // Returns false if the value is invalid (after printing an error).
-func reportOpt(report string) (gomib.LoadOption, bool) {
+func (c *cli) reportOpt(report string) (gomib.LoadOption, bool) {
 	switch report {
 	case "silent":
 		return gomib.WithDiagnosticConfig(mib.SilentConfig()), true
@@ -292,7 +301,7 @@ func reportOpt(report string) (gomib.LoadOption, bool) {
 	case "verbose":
 		return gomib.WithDiagnosticConfig(mib.VerboseConfig()), true
 	default:
-		printError("invalid --report value %q (use silent|quiet|default|verbose)", report)
+		c.printError("invalid --report value %q (use silent|quiet|default|verbose)", report)
 		return nil, false
 	}
 }

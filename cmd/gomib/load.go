@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -35,7 +34,7 @@ Examples:
 
 func (c *cli) cmdLoad(args []string) int {
 	fs := flag.NewFlagSet("load", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, loadUsage) }
+	fs.Usage = func() { fmt.Fprint(c.stderr, loadUsage) }
 
 	strict, permissive := addStrictnessFlags(fs)
 	report := fs.String("report", "default", "diagnostic reporting: silent|quiet|default|verbose")
@@ -50,7 +49,7 @@ func (c *cli) cmdLoad(args []string) int {
 		return exitOK
 	}
 
-	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+	if code, failed := c.validateStrictnessFlags(*strict, *permissive); failed {
 		return code
 	}
 
@@ -60,7 +59,7 @@ func (c *cli) cmdLoad(args []string) int {
 	}
 
 	opts := strictnessOpts(*strict, *permissive)
-	reportOption, ok := reportOpt(*report)
+	reportOption, ok := c.reportOpt(*report)
 	if !ok {
 		return exitError
 	}
@@ -68,14 +67,14 @@ func (c *cli) cmdLoad(args []string) int {
 
 	m, loadErr := c.loadMibWithOpts(modules, opts...)
 	if loadErr != nil && m == nil {
-		printError("failed to load: %v", loadErr)
+		c.printError("failed to load: %v", loadErr)
 		return exitError
 	}
 
 	if *stats {
-		printDetailedStats(m)
+		c.printDetailedStats(m)
 	} else {
-		fmt.Printf("Loaded %d modules (%d types, %d objects, %d notifications)\n",
+		fmt.Fprintf(c.stdout, "Loaded %d modules (%d types, %d objects, %d notifications)\n",
 			len(m.Modules()), len(m.Types()), len(m.Objects()), len(m.Notifications()))
 	}
 
@@ -89,17 +88,17 @@ func (c *cli) cmdLoad(args []string) int {
 	}
 
 	if len(diags) > 0 {
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Diagnostics:")
+		fmt.Fprintln(c.stderr)
+		fmt.Fprintln(c.stderr, "Diagnostics:")
 		for _, d := range diags {
-			printDiagnostic(d)
+			c.printDiagnostic(d)
 		}
 	}
 
 	unresolved := m.Unresolved()
 	if len(unresolved) > 0 {
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Unresolved references:")
+		fmt.Fprintln(c.stderr)
+		fmt.Fprintln(c.stderr, "Unresolved references:")
 		importCount := 0
 		typeCount := 0
 		objectCount := 0
@@ -114,18 +113,18 @@ func (c *cli) cmdLoad(args []string) int {
 			}
 		}
 		if importCount > 0 {
-			fmt.Fprintf(os.Stderr, "  %d imports\n", importCount)
+			fmt.Fprintf(c.stderr, "  %d imports\n", importCount)
 		}
 		if typeCount > 0 {
-			fmt.Fprintf(os.Stderr, "  %d types\n", typeCount)
+			fmt.Fprintf(c.stderr, "  %d types\n", typeCount)
 		}
 		if objectCount > 0 {
-			fmt.Fprintf(os.Stderr, "  %d objects\n", objectCount)
+			fmt.Fprintf(c.stderr, "  %d objects\n", objectCount)
 		}
 	}
 
 	if loadErr != nil {
-		printError("%v", loadErr)
+		c.printError("%v", loadErr)
 		return exitError
 	}
 	if hasErrors {
@@ -137,41 +136,41 @@ func (c *cli) cmdLoad(args []string) int {
 	return exitOK
 }
 
-func printDiagnostic(d mib.Diagnostic) {
+func (c *cli) printDiagnostic(d mib.Diagnostic) {
 	prefix := "  " + d.Severity.String() + ": "
 	if d.Code != "" {
 		prefix += "[" + d.Code + "] "
 	}
 	if d.Module != "" {
 		if d.Line > 0 {
-			fmt.Fprintf(os.Stderr, "%s%s:%d: %s\n", prefix, d.Module, d.Line, d.Message)
+			fmt.Fprintf(c.stderr, "%s%s:%d: %s\n", prefix, d.Module, d.Line, d.Message)
 		} else {
-			fmt.Fprintf(os.Stderr, "%s%s: %s\n", prefix, d.Module, d.Message)
+			fmt.Fprintf(c.stderr, "%s%s: %s\n", prefix, d.Module, d.Message)
 		}
 	} else {
-		fmt.Fprintf(os.Stderr, "%s%s\n", prefix, d.Message)
+		fmt.Fprintf(c.stderr, "%s%s\n", prefix, d.Message)
 	}
 }
 
-func printDetailedStats(m *mib.Mib) {
-	fmt.Println("Statistics:")
-	fmt.Printf("  Modules:        %d\n", len(m.Modules()))
-	fmt.Printf("  Types:          %d\n", len(m.Types()))
-	fmt.Printf("  Objects:        %d\n", len(m.Objects()))
-	fmt.Printf("  Notifications:  %d\n", len(m.Notifications()))
-	fmt.Printf("  OID nodes:      %d\n", m.NodeCount())
-	fmt.Printf("  Diagnostics:    %d\n", len(m.Diagnostics()))
+func (c *cli) printDetailedStats(m *mib.Mib) {
+	fmt.Fprintln(c.stdout, "Statistics:")
+	fmt.Fprintf(c.stdout, "  Modules:        %d\n", len(m.Modules()))
+	fmt.Fprintf(c.stdout, "  Types:          %d\n", len(m.Types()))
+	fmt.Fprintf(c.stdout, "  Objects:        %d\n", len(m.Objects()))
+	fmt.Fprintf(c.stdout, "  Notifications:  %d\n", len(m.Notifications()))
+	fmt.Fprintf(c.stdout, "  OID nodes:      %d\n", m.NodeCount())
+	fmt.Fprintf(c.stdout, "  Diagnostics:    %d\n", len(m.Diagnostics()))
 
 	kindCounts := make(map[mib.Kind]int)
 	for node := range m.Nodes() {
 		kindCounts[node.Kind()]++
 	}
 
-	fmt.Println()
-	fmt.Println("Nodes by kind:")
+	fmt.Fprintln(c.stdout)
+	fmt.Fprintln(c.stdout, "Nodes by kind:")
 	for kind := mib.KindInternal; kind <= mib.KindCapability; kind++ {
 		if count := kindCounts[kind]; count > 0 {
-			fmt.Printf("  %-15s %d\n", kind.String()+":", count)
+			fmt.Fprintf(c.stdout, "  %-15s %d\n", kind.String()+":", count)
 		}
 	}
 }

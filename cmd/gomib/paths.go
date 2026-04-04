@@ -3,12 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-
-	"github.com/golangsnmp/gomib"
 )
-
-var discoverSystemPaths = gomib.DiscoverSystemPaths
 
 const pathsUsage = `gomib paths - Show MIB search paths
 
@@ -28,7 +23,7 @@ Examples:
 
 func (c *cli) cmdPaths(args []string) int {
 	fs := flag.NewFlagSet("paths", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, pathsUsage) }
+	fs.Usage = func() { fmt.Fprint(c.stderr, pathsUsage) }
 
 	help := addHelpFlag(fs)
 
@@ -40,25 +35,25 @@ func (c *cli) cmdPaths(args []string) int {
 		return exitOK
 	}
 
-	systemPaths := discoverSystemPaths()
+	systemPaths := c.discoverSystemPaths()
 	hasOutput := false
 
 	if len(c.paths) > 0 {
 		for _, p := range c.paths {
-			fmt.Printf("%s (custom)\n", p)
+			fmt.Fprintf(c.stdout, "%s (custom)\n", p)
 		}
 		hasOutput = true
 	}
 
 	if len(systemPaths) > 0 {
 		for _, p := range systemPaths {
-			fmt.Printf("%s (system)\n", p)
+			fmt.Fprintf(c.stdout, "%s (system)\n", p)
 		}
 		hasOutput = true
 	}
 
 	if !hasOutput {
-		fmt.Fprintln(os.Stderr, "no search paths found")
+		fmt.Fprintln(c.stderr, "no search paths found")
 		return exitIssue
 	}
 

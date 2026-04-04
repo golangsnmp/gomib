@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
 	"path"
 	"strings"
 
@@ -49,7 +48,7 @@ type findMatch struct {
 
 func (c *cli) cmdFind(args []string) int {
 	fs := flag.NewFlagSet("find", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, findUsage) }
+	fs.Usage = func() { fmt.Fprint(c.stderr, findUsage) }
 
 	modules := addModuleFlag(fs)
 	kindFilter := fs.String("kind", "", "filter by node kind")
@@ -67,32 +66,32 @@ func (c *cli) cmdFind(args []string) int {
 		return exitOK
 	}
 
-	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+	if code, failed := c.validateStrictnessFlags(*strict, *permissive); failed {
 		return code
 	}
 
 	positional := fs.Args()
 	if len(positional) == 0 {
-		printError("no pattern specified")
-		fmt.Fprint(os.Stderr, findUsage)
+		c.printError("no pattern specified")
+		fmt.Fprint(c.stderr, findUsage)
 		return exitError
 	}
 	if len(positional) > 1 {
-		printError("too many arguments (use -m for module selection)")
-		fmt.Fprint(os.Stderr, findUsage)
+		c.printError("too many arguments (use -m for module selection)")
+		fmt.Fprint(c.stderr, findUsage)
 		return exitError
 	}
 	pattern := strings.ToLower(positional[0])
 
 	if _, err := path.Match(pattern, ""); err != nil {
-		printError("invalid pattern: %v", err)
+		c.printError("invalid pattern: %v", err)
 		return exitError
 	}
 
 	switch *format {
 	case "text", "json":
 	default:
-		printError("unknown format: %s", *format)
+		c.printError("unknown format: %s", *format)
 		return exitError
 	}
 
@@ -109,7 +108,7 @@ func (c *cli) cmdFind(args []string) int {
 
 	m, err := c.loadMibWithOpts(mods, opts...)
 	if err != nil && m == nil {
-		printError("failed to load: %v", err)
+		c.printError("failed to load: %v", err)
 		return exitError
 	}
 
@@ -119,7 +118,7 @@ func (c *cli) cmdFind(args []string) int {
 		var ok bool
 		kind, kindIsModIdent, kindIsObjIdent, ok = parseKindFilter(*kindFilter)
 		if !ok {
-			printError("unknown kind: %s (valid: scalar, table, row, column, notification, node, group, compliance, capability, module-identity, object-identity)", *kindFilter)
+			c.printError("unknown kind: %s (valid: scalar, table, row, column, notification, node, group, compliance, capability, module-identity, object-identity)", *kindFilter)
 			return exitError
 		}
 	}
@@ -174,20 +173,20 @@ func (c *cli) cmdFind(args []string) int {
 
 	switch {
 	case *count:
-		fmt.Println(len(matches))
+		fmt.Fprintln(c.stdout, len(matches))
 	case *format == "json":
 		if matches == nil {
 			matches = []findMatch{}
 		}
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(c.stdout)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(matches); err != nil {
-			printError("encoding JSON: %v", err)
+			c.printError("encoding JSON: %v", err)
 			return exitError
 		}
 	default:
 		for _, match := range matches {
-			fmt.Printf("%s::%s  %s  %s\n", match.Module, match.Name, match.OID, match.Kind)
+			fmt.Fprintf(c.stdout, "%s::%s  %s  %s\n", match.Module, match.Name, match.OID, match.Kind)
 		}
 	}
 

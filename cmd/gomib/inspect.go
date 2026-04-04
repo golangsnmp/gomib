@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 
@@ -40,7 +39,7 @@ Examples:
 
 func (c *cli) cmdInspect(args []string) int {
 	fs := flag.NewFlagSet("inspect", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, inspectUsage) }
+	fs.Usage = func() { fmt.Fprint(c.stderr, inspectUsage) }
 
 	modules := addModuleFlag(fs)
 	strict, permissive := addStrictnessFlags(fs)
@@ -54,19 +53,19 @@ func (c *cli) cmdInspect(args []string) int {
 		return exitOK
 	}
 
-	if code, failed := validateStrictnessFlags(*strict, *permissive); failed {
+	if code, failed := c.validateStrictnessFlags(*strict, *permissive); failed {
 		return code
 	}
 
 	positional := fs.Args()
 	if len(positional) == 0 {
-		printError("no query specified")
-		fmt.Fprint(os.Stderr, inspectUsage)
+		c.printError("no query specified")
+		fmt.Fprint(c.stderr, inspectUsage)
 		return exitError
 	}
 	if len(positional) > 1 {
-		printError("too many arguments (use -m for module selection)")
-		fmt.Fprint(os.Stderr, inspectUsage)
+		c.printError("too many arguments (use -m for module selection)")
+		fmt.Fprint(c.stderr, inspectUsage)
 		return exitError
 	}
 	query := positional[0]
@@ -88,14 +87,14 @@ func (c *cli) cmdInspect(args []string) int {
 
 	m, err := c.loadMibWithOpts(mods, opts...)
 	if err != nil && m == nil {
-		printError("failed to load: %v", err)
+		c.printError("failed to load: %v", err)
 		return exitError
 	}
 
 	// Try node resolution first, then fall back to type lookup.
 	node := m.Resolve(query)
 	if node != nil {
-		inspectNode(m, node)
+		c.inspectNode(m, node)
 		return exitOK
 	}
 
@@ -105,62 +104,62 @@ func (c *cli) cmdInspect(args []string) int {
 		mod := m.Module(modName)
 		if mod != nil {
 			if typ := mod.Type(name); typ != nil {
-				inspectStandaloneType(m, typ)
+				c.inspectStandaloneType(m, typ)
 				return exitOK
 			}
 		}
 	} else if typ := m.Type(typName); typ != nil {
-		inspectStandaloneType(m, typ)
+		c.inspectStandaloneType(m, typ)
 		return exitOK
 	}
 
-	printError("not found: %s", query)
+	c.printError("not found: %s", query)
 	return exitIssue
 }
 
-func inspectNode(m *mib.Mib, node *mib.Node) {
-	printIdentity(node)
+func (c *cli) inspectNode(m *mib.Mib, node *mib.Node) {
+	c.printIdentity(node)
 
 	switch {
 	case node.Object() != nil:
-		inspectObject(m, node.Object())
+		c.inspectObject(m, node.Object())
 	case node.Notification() != nil:
-		inspectNotification(m, node.Notification())
+		c.inspectNotification(m, node.Notification())
 	case node.Group() != nil:
-		inspectGroup(m, node.Group())
+		c.inspectGroup(m, node.Group())
 	case node.Compliance() != nil:
-		inspectCompliance(m, node.Compliance())
+		c.inspectCompliance(m, node.Compliance())
 	case node.Capability() != nil:
-		inspectCapability(m, node.Capability())
+		c.inspectCapability(m, node.Capability())
 	default:
-		inspectBareNode(m, node)
+		c.inspectBareNode(m, node)
 	}
 }
 
-func printIdentity(node *mib.Node) {
+func (c *cli) printIdentity(node *mib.Node) {
 	label := node.Name()
 	if label == "" {
 		label = fmt.Sprintf("(%d)", node.Arc())
 	}
-	fmt.Printf("Name:    %s\n", label)
+	fmt.Fprintf(c.stdout, "Name:    %s\n", label)
 	if node.Module() != nil {
-		fmt.Printf("Module:  %s\n", node.Module().Name())
+		fmt.Fprintf(c.stdout, "Module:  %s\n", node.Module().Name())
 	}
-	fmt.Printf("OID:     %s\n", node.OID().String())
-	fmt.Printf("Kind:    %s\n", node.Kind().String())
+	fmt.Fprintf(c.stdout, "OID:     %s\n", node.OID().String())
+	fmt.Fprintf(c.stdout, "Kind:    %s\n", node.Kind().String())
 }
 
 // inspectObject prints full detail for an OBJECT-TYPE.
-func inspectObject(m *mib.Mib, obj *mib.Object) {
-	fmt.Printf("Status:  %s\n", obj.Status().String())
-	fmt.Printf("Access:  %s\n", obj.Access().String())
+func (c *cli) inspectObject(m *mib.Mib, obj *mib.Object) {
+	fmt.Fprintf(c.stdout, "Status:  %s\n", obj.Status().String())
+	fmt.Fprintf(c.stdout, "Access:  %s\n", obj.Access().String())
 
 	if obj.Units() != "" {
-		fmt.Printf("Units:   %s\n", obj.Units())
+		fmt.Fprintf(c.stdout, "Units:   %s\n", obj.Units())
 	}
 
 	if dv := obj.DefaultValue(); !dv.IsZero() {
-		fmt.Printf("DefVal:  %s\n", dv.String())
+		fmt.Fprintf(c.stdout, "DefVal:  %s\n", dv.String())
 	}
 
 	// Type summary line (like get).
@@ -172,226 +171,226 @@ func inspectObject(m *mib.Mib, obj *mib.Object) {
 		}
 		base := typ.EffectiveBase().String()
 		if typeName != base {
-			fmt.Printf("Type:    %s (%s)\n", typeName, base)
+			fmt.Fprintf(c.stdout, "Type:    %s (%s)\n", typeName, base)
 		} else {
-			fmt.Printf("Type:    %s\n", typeName)
+			fmt.Fprintf(c.stdout, "Type:    %s\n", typeName)
 		}
 	}
 
 	// Index / augments.
-	printObjectIndexAugments(obj)
+	c.printObjectIndexAugments(obj)
 
 	// Column context.
-	printObjectColumnContext(obj)
+	c.printObjectColumnContext(obj)
 
 	// Type chain.
 	if obj.Type() != nil {
-		printTypeChain(obj.Type())
+		c.printTypeChain(obj.Type())
 	}
 
 	// Enum/BITS.
-	printObjectEnumsBits(obj)
+	c.printObjectEnumsBits(obj)
 
 	// Column table for tables and rows.
-	printObjectColumns(obj)
+	c.printObjectColumns(obj)
 
 	// Provenance.
-	printProvenance(obj.Name(), obj.Module(), obj.Type())
+	c.printProvenance(obj.Name(), obj.Module(), obj.Type())
 
 	// Group membership.
 	if obj.Node() != nil {
-		printGroupMembership(m, obj.Node())
+		c.printGroupMembership(m, obj.Node())
 	}
 
 	// Diagnostics.
-	printScopedDiagnostics(m, obj.Module(), obj.Span())
-	printRelatedUnresolved(m, obj.Name())
+	c.printScopedDiagnostics(m, obj.Module(), obj.Span())
+	c.printRelatedUnresolved(m, obj.Name())
 
 	// Description / Reference.
-	printDescriptionReference(obj.Description(), obj.Reference())
+	c.printDescriptionReference(obj.Description(), obj.Reference())
 }
 
 // inspectNotification prints full detail for a NOTIFICATION-TYPE or TRAP-TYPE.
-func inspectNotification(m *mib.Mib, notif *mib.Notification) {
-	fmt.Printf("Status:  %s\n", notif.Status().String())
+func (c *cli) inspectNotification(m *mib.Mib, notif *mib.Notification) {
+	fmt.Fprintf(c.stdout, "Status:  %s\n", notif.Status().String())
 
 	if ti := notif.TrapInfo(); ti != nil {
-		fmt.Printf("Enterprise: %s\n", ti.Enterprise)
-		fmt.Printf("TrapNumber: %d\n", ti.TrapNumber)
+		fmt.Fprintf(c.stdout, "Enterprise: %s\n", ti.Enterprise)
+		fmt.Fprintf(c.stdout, "TrapNumber: %d\n", ti.TrapNumber)
 	}
 
 	if objs := notif.Objects(); len(objs) > 0 {
-		fmt.Println("\nObjects:")
+		fmt.Fprintln(c.stdout, "\nObjects:")
 		for _, obj := range objs {
 			modName := ""
 			if obj.Module() != nil {
 				modName = obj.Module().Name() + "::"
 			}
-			fmt.Printf("  %s%s  %s\n", modName, obj.Name(), obj.OID())
+			fmt.Fprintf(c.stdout, "  %s%s  %s\n", modName, obj.Name(), obj.OID())
 		}
 	}
 
 	// Group membership.
 	if notif.Node() != nil {
-		printGroupMembership(m, notif.Node())
+		c.printGroupMembership(m, notif.Node())
 	}
 
 	// Diagnostics.
-	printScopedDiagnostics(m, notif.Module(), notif.Span())
-	printRelatedUnresolved(m, notif.Name())
+	c.printScopedDiagnostics(m, notif.Module(), notif.Span())
+	c.printRelatedUnresolved(m, notif.Name())
 
-	printDescriptionReference(notif.Description(), notif.Reference())
+	c.printDescriptionReference(notif.Description(), notif.Reference())
 }
 
 // inspectGroup prints full detail for an OBJECT-GROUP or NOTIFICATION-GROUP.
-func inspectGroup(m *mib.Mib, g *mib.Group) {
-	fmt.Printf("Status:  %s\n", g.Status().String())
+func (c *cli) inspectGroup(m *mib.Mib, g *mib.Group) {
+	fmt.Fprintf(c.stdout, "Status:  %s\n", g.Status().String())
 	if g.IsNotificationGroup() {
-		fmt.Printf("Type:    notification-group\n")
+		fmt.Fprintf(c.stdout, "Type:    notification-group\n")
 	} else {
-		fmt.Printf("Type:    object-group\n")
+		fmt.Fprintf(c.stdout, "Type:    object-group\n")
 	}
 
 	if members := g.Members(); len(members) > 0 {
-		fmt.Println("\nMembers:")
+		fmt.Fprintln(c.stdout, "\nMembers:")
 		for _, nd := range members {
 			modName := ""
 			if nd.Module() != nil {
 				modName = nd.Module().Name() + "::"
 			}
-			fmt.Printf("  %s%s  %s  %s\n", modName, nd.Name(), nd.OID(), nd.Kind())
+			fmt.Fprintf(c.stdout, "  %s%s  %s  %s\n", modName, nd.Name(), nd.OID(), nd.Kind())
 		}
 	}
 
 	// Which compliances reference this group.
-	printComplianceReferences(m, g.Name())
+	c.printComplianceReferences(m, g.Name())
 
 	// Diagnostics.
-	printScopedDiagnostics(m, g.Module(), g.Span())
-	printRelatedUnresolved(m, g.Name())
+	c.printScopedDiagnostics(m, g.Module(), g.Span())
+	c.printRelatedUnresolved(m, g.Name())
 
-	printDescriptionReference(g.Description(), g.Reference())
+	c.printDescriptionReference(g.Description(), g.Reference())
 }
 
 // inspectCompliance prints full detail for a MODULE-COMPLIANCE.
-func inspectCompliance(m *mib.Mib, c *mib.Compliance) {
-	fmt.Printf("Status:  %s\n", c.Status().String())
+func (c *cli) inspectCompliance(m *mib.Mib, comp *mib.Compliance) {
+	fmt.Fprintf(c.stdout, "Status:  %s\n", comp.Status().String())
 
-	for _, cm := range c.Modules() {
+	for _, cm := range comp.Modules() {
 		modName := cm.ModuleName
 		if modName == "" {
 			modName = "(this module)"
 		}
-		fmt.Printf("\nModule: %s\n", modName)
+		fmt.Fprintf(c.stdout, "\nModule: %s\n", modName)
 		if len(cm.MandatoryGroups) > 0 {
-			fmt.Printf("  Mandatory groups: %s\n", strings.Join(cm.MandatoryGroups, ", "))
+			fmt.Fprintf(c.stdout, "  Mandatory groups: %s\n", strings.Join(cm.MandatoryGroups, ", "))
 		}
 		for _, cg := range cm.Groups {
-			fmt.Printf("  Group: %s\n", cg.Group)
+			fmt.Fprintf(c.stdout, "  Group: %s\n", cg.Group)
 			if cg.Description != "" {
-				fmt.Printf("    %s\n", normalizeDescription(cg.Description, 200))
+				fmt.Fprintf(c.stdout, "    %s\n", normalizeDescription(cg.Description, 200))
 			}
 		}
 		for _, co := range cm.Objects {
-			fmt.Printf("  Object: %s\n", co.Object)
+			fmt.Fprintf(c.stdout, "  Object: %s\n", co.Object)
 			if co.MinAccess != nil {
-				fmt.Printf("    MIN-ACCESS: %s\n", co.MinAccess.String())
+				fmt.Fprintf(c.stdout, "    MIN-ACCESS: %s\n", co.MinAccess.String())
 			}
 			if co.Description != "" {
-				fmt.Printf("    %s\n", normalizeDescription(co.Description, 200))
+				fmt.Fprintf(c.stdout, "    %s\n", normalizeDescription(co.Description, 200))
 			}
 		}
 	}
 
 	// Diagnostics.
-	printScopedDiagnostics(m, c.Module(), c.Span())
-	printRelatedUnresolved(m, c.Name())
+	c.printScopedDiagnostics(m, comp.Module(), comp.Span())
+	c.printRelatedUnresolved(m, comp.Name())
 
-	printDescriptionReference(c.Description(), c.Reference())
+	c.printDescriptionReference(comp.Description(), comp.Reference())
 }
 
 // inspectCapability prints full detail for an AGENT-CAPABILITIES.
-func inspectCapability(m *mib.Mib, cap *mib.Capability) {
-	fmt.Printf("Status:  %s\n", cap.Status().String())
+func (c *cli) inspectCapability(m *mib.Mib, cap *mib.Capability) {
+	fmt.Fprintf(c.stdout, "Status:  %s\n", cap.Status().String())
 
 	if cap.ProductRelease() != "" {
-		fmt.Printf("Product: %s\n", cap.ProductRelease())
+		fmt.Fprintf(c.stdout, "Product: %s\n", cap.ProductRelease())
 	}
 
 	for _, sm := range cap.Supports() {
-		fmt.Printf("\nSupports: %s\n", sm.ModuleName)
+		fmt.Fprintf(c.stdout, "\nSupports: %s\n", sm.ModuleName)
 		if len(sm.Includes) > 0 {
-			fmt.Printf("  Includes: %s\n", strings.Join(sm.Includes, ", "))
+			fmt.Fprintf(c.stdout, "  Includes: %s\n", strings.Join(sm.Includes, ", "))
 		}
 		for i := range sm.ObjectVariations {
 			ov := &sm.ObjectVariations[i]
-			fmt.Printf("  Variation: %s\n", ov.Object)
+			fmt.Fprintf(c.stdout, "  Variation: %s\n", ov.Object)
 			if ov.Access != nil {
-				fmt.Printf("    ACCESS: %s\n", ov.Access.String())
+				fmt.Fprintf(c.stdout, "    ACCESS: %s\n", ov.Access.String())
 			}
 			if ov.Description != "" {
-				fmt.Printf("    %s\n", normalizeDescription(ov.Description, 200))
+				fmt.Fprintf(c.stdout, "    %s\n", normalizeDescription(ov.Description, 200))
 			}
 		}
 		for _, nv := range sm.NotificationVariations {
-			fmt.Printf("  Variation: %s\n", nv.Notification)
+			fmt.Fprintf(c.stdout, "  Variation: %s\n", nv.Notification)
 			if nv.Access != nil {
-				fmt.Printf("    ACCESS: %s\n", nv.Access.String())
+				fmt.Fprintf(c.stdout, "    ACCESS: %s\n", nv.Access.String())
 			}
 			if nv.Description != "" {
-				fmt.Printf("    %s\n", normalizeDescription(nv.Description, 200))
+				fmt.Fprintf(c.stdout, "    %s\n", normalizeDescription(nv.Description, 200))
 			}
 		}
 	}
 
 	// Diagnostics.
-	printScopedDiagnostics(m, cap.Module(), cap.Span())
-	printRelatedUnresolved(m, cap.Name())
+	c.printScopedDiagnostics(m, cap.Module(), cap.Span())
+	c.printRelatedUnresolved(m, cap.Name())
 
-	printDescriptionReference(cap.Description(), cap.Reference())
+	c.printDescriptionReference(cap.Description(), cap.Reference())
 }
 
 // inspectBareNode prints detail for a node with no entity attachment.
-func inspectBareNode(m *mib.Mib, node *mib.Node) {
+func (c *cli) inspectBareNode(m *mib.Mib, node *mib.Node) {
 	if node.IsObjectIdentity() {
 		if s, ok := node.ObjectIdentityStatus(); ok {
-			fmt.Printf("Status:  %s\n", s.String())
+			fmt.Fprintf(c.stdout, "Status:  %s\n", s.String())
 		}
-		fmt.Println("Macro:   OBJECT-IDENTITY")
+		fmt.Fprintln(c.stdout, "Macro:   OBJECT-IDENTITY")
 	}
 
-	printScopedDiagnostics(m, node.Module(), node.Span())
-	printRelatedUnresolved(m, node.Name())
+	c.printScopedDiagnostics(m, node.Module(), node.Span())
+	c.printRelatedUnresolved(m, node.Name())
 
-	printDescriptionReference(node.Description(), node.Reference())
+	c.printDescriptionReference(node.Description(), node.Reference())
 }
 
 // inspectStandaloneType prints detail for a type not attached to a node.
-func inspectStandaloneType(m *mib.Mib, typ *mib.Type) {
-	fmt.Printf("Name:    %s\n", typ.Name())
+func (c *cli) inspectStandaloneType(m *mib.Mib, typ *mib.Type) {
+	fmt.Fprintf(c.stdout, "Name:    %s\n", typ.Name())
 	if typ.Module() != nil {
-		fmt.Printf("Module:  %s\n", typ.Module().Name())
+		fmt.Fprintf(c.stdout, "Module:  %s\n", typ.Module().Name())
 	}
-	fmt.Printf("Kind:    type\n")
+	fmt.Fprintf(c.stdout, "Kind:    type\n")
 	if typ.Status() != 0 {
-		fmt.Printf("Status:  %s\n", typ.Status().String())
+		fmt.Fprintf(c.stdout, "Status:  %s\n", typ.Status().String())
 	}
 	if typ.IsTextualConvention() {
-		fmt.Printf("Macro:   TEXTUAL-CONVENTION\n")
+		fmt.Fprintf(c.stdout, "Macro:   TEXTUAL-CONVENTION\n")
 	}
-	fmt.Printf("Base:    %s\n", typ.EffectiveBase().String())
+	fmt.Fprintf(c.stdout, "Base:    %s\n", typ.EffectiveBase().String())
 
-	printTypeChain(typ)
+	c.printTypeChain(typ)
 
-	printScopedDiagnostics(m, typ.Module(), typ.Span())
-	printRelatedUnresolved(m, typ.Name())
+	c.printScopedDiagnostics(m, typ.Module(), typ.Span())
+	c.printRelatedUnresolved(m, typ.Name())
 
-	printDescriptionReference(typ.Description(), typ.Reference())
+	c.printDescriptionReference(typ.Description(), typ.Reference())
 }
 
 // printTypeChain walks the type parent chain showing each level's constraints.
-func printTypeChain(typ *mib.Type) {
-	fmt.Println("\nType chain:")
+func (c *cli) printTypeChain(typ *mib.Type) {
+	fmt.Fprintln(c.stdout, "\nType chain:")
 	depth := 0
 	for cur := typ; cur != nil && depth < 100; cur, depth = cur.Parent(), depth+1 {
 		name := cur.Name()
@@ -419,34 +418,34 @@ func printTypeChain(typ *mib.Type) {
 		}
 
 		if modName != "" {
-			fmt.Printf("  %-28s %s%s\n", name, modName, tagStr)
+			fmt.Fprintf(c.stdout, "  %-28s %s%s\n", name, modName, tagStr)
 		} else {
-			fmt.Printf("  %s%s\n", name, tagStr)
+			fmt.Fprintf(c.stdout, "  %s%s\n", name, tagStr)
 		}
 
 		// Constraints declared at this level.
 		if h := cur.DisplayHint(); h != "" {
-			fmt.Printf("    DISPLAY-HINT %q\n", h)
+			fmt.Fprintf(c.stdout, "    DISPLAY-HINT %q\n", h)
 		}
 		if sizes := cur.Sizes(); len(sizes) > 0 {
-			fmt.Printf("    SIZE (%s)\n", formatRangeList(sizes))
+			fmt.Fprintf(c.stdout, "    SIZE (%s)\n", formatRangeList(sizes))
 		}
 		if ranges := cur.Ranges(); len(ranges) > 0 {
-			fmt.Printf("    RANGE (%s)\n", formatRangeList(ranges))
+			fmt.Fprintf(c.stdout, "    RANGE (%s)\n", formatRangeList(ranges))
 		}
 		if enums := cur.Enums(); len(enums) > 0 {
 			labels := make([]string, len(enums))
 			for i, e := range enums {
 				labels[i] = fmt.Sprintf("%s(%d)", e.Label, e.Value)
 			}
-			fmt.Printf("    VALUES: %s\n", strings.Join(labels, ", "))
+			fmt.Fprintf(c.stdout, "    VALUES: %s\n", strings.Join(labels, ", "))
 		}
 		if bits := cur.Bits(); len(bits) > 0 {
 			labels := make([]string, len(bits))
 			for i, b := range bits {
 				labels[i] = fmt.Sprintf("%s(%d)", b.Label, b.Value)
 			}
-			fmt.Printf("    BITS: %s\n", strings.Join(labels, ", "))
+			fmt.Fprintf(c.stdout, "    BITS: %s\n", strings.Join(labels, ", "))
 		}
 	}
 }
@@ -461,10 +460,10 @@ func formatRangeList(ranges []mib.Range) string {
 }
 
 // printProvenance shows where the object and its type were defined/imported.
-func printProvenance(name string, mod *mib.Module, typ *mib.Type) {
-	fmt.Println("\nProvenance:")
+func (c *cli) printProvenance(name string, mod *mib.Module, typ *mib.Type) {
+	fmt.Fprintln(c.stdout, "\nProvenance:")
 	if mod != nil {
-		fmt.Printf("  %-24s defined in %s\n", name, mod.Name())
+		fmt.Fprintf(c.stdout, "  %-24s defined in %s\n", name, mod.Name())
 	}
 
 	if typ == nil {
@@ -505,12 +504,12 @@ func printProvenance(name string, mod *mib.Module, typ *mib.Type) {
 		if cur.IsTextualConvention() {
 			label = "TC " + tName
 		}
-		fmt.Printf("  %-24s%s\n", label, source)
+		fmt.Fprintf(c.stdout, "  %-24s%s\n", label, source)
 	}
 }
 
 // printGroupMembership finds and prints groups that include the given node.
-func printGroupMembership(m *mib.Mib, node *mib.Node) {
+func (c *cli) printGroupMembership(m *mib.Mib, node *mib.Node) {
 	var groups []string
 	for _, g := range m.Groups() {
 		if !slices.Contains(g.Members(), node) {
@@ -527,46 +526,46 @@ func printGroupMembership(m *mib.Mib, node *mib.Node) {
 		groups = append(groups, fmt.Sprintf("  %s  (%s, %s)", g.Name(), modName, kind))
 	}
 	if len(groups) > 0 {
-		fmt.Println("\nGroup membership:")
+		fmt.Fprintln(c.stdout, "\nGroup membership:")
 		for _, g := range groups {
-			fmt.Println(g)
+			fmt.Fprintln(c.stdout, g)
 		}
 	}
 }
 
 // printComplianceReferences finds compliances that reference the given group name.
-func printComplianceReferences(m *mib.Mib, groupName string) {
+func (c *cli) printComplianceReferences(m *mib.Mib, groupName string) {
 	var refs []string
-	for _, c := range m.Compliances() {
-		for _, cm := range c.Modules() {
+	for _, comp := range m.Compliances() {
+		for _, cm := range comp.Modules() {
 			if slices.Contains(cm.MandatoryGroups, groupName) {
 				modName := ""
-				if c.Module() != nil {
-					modName = c.Module().Name()
+				if comp.Module() != nil {
+					modName = comp.Module().Name()
 				}
-				refs = append(refs, fmt.Sprintf("  %s  (%s, mandatory)", c.Name(), modName))
+				refs = append(refs, fmt.Sprintf("  %s  (%s, mandatory)", comp.Name(), modName))
 			}
 			for _, cg := range cm.Groups {
 				if cg.Group == groupName {
 					modName := ""
-					if c.Module() != nil {
-						modName = c.Module().Name()
+					if comp.Module() != nil {
+						modName = comp.Module().Name()
 					}
-					refs = append(refs, fmt.Sprintf("  %s  (%s, conditional)", c.Name(), modName))
+					refs = append(refs, fmt.Sprintf("  %s  (%s, conditional)", comp.Name(), modName))
 				}
 			}
 		}
 	}
 	if len(refs) > 0 {
-		fmt.Println("\nReferenced by compliances:")
+		fmt.Fprintln(c.stdout, "\nReferenced by compliances:")
 		for _, r := range refs {
-			fmt.Println(r)
+			fmt.Fprintln(c.stdout, r)
 		}
 	}
 }
 
 // printScopedDiagnostics filters diagnostics to those within the entity's source span.
-func printScopedDiagnostics(m *mib.Mib, mod *mib.Module, span mib.Span) {
+func (c *cli) printScopedDiagnostics(m *mib.Mib, mod *mib.Module, span mib.Span) {
 	if mod == nil || span == (mib.Span{}) {
 		return
 	}
@@ -589,15 +588,15 @@ func printScopedDiagnostics(m *mib.Mib, mod *mib.Module, span mib.Span) {
 	}
 
 	if len(scoped) > 0 {
-		fmt.Println("\nDiagnostics:")
+		fmt.Fprintln(c.stdout, "\nDiagnostics:")
 		for _, d := range scoped {
-			fmt.Printf("  [%s] %s: %s\n", d.Severity, d.Code, d.Message)
+			fmt.Fprintf(c.stdout, "  [%s] %s: %s\n", d.Severity, d.Code, d.Message)
 		}
 	}
 }
 
 // printRelatedUnresolved shows unresolved references that mention the symbol.
-func printRelatedUnresolved(m *mib.Mib, name string) {
+func (c *cli) printRelatedUnresolved(m *mib.Mib, name string) {
 	var related []mib.UnresolvedRef
 	for _, u := range m.Unresolved() {
 		if u.Symbol == name {
@@ -605,23 +604,23 @@ func printRelatedUnresolved(m *mib.Mib, name string) {
 		}
 	}
 	if len(related) > 0 {
-		fmt.Println("\nUnresolved references:")
+		fmt.Fprintln(c.stdout, "\nUnresolved references:")
 		for _, u := range related {
 			entry := fmt.Sprintf("  [%s] %s in %s", u.Kind, u.Symbol, u.Module)
 			if u.Reason != "" {
 				entry += ": " + u.Reason
 			}
-			fmt.Println(entry)
+			fmt.Fprintln(c.stdout, entry)
 		}
 	}
 }
 
 // printDescriptionReference prints description and reference in full.
-func printDescriptionReference(desc, ref string) {
+func (c *cli) printDescriptionReference(desc, ref string) {
 	if desc != "" {
-		fmt.Printf("\nDescription:\n  %s\n", strings.Join(strings.Fields(desc), " "))
+		fmt.Fprintf(c.stdout, "\nDescription:\n  %s\n", strings.Join(strings.Fields(desc), " "))
 	}
 	if ref != "" {
-		fmt.Printf("\nReference:\n  %s\n", strings.Join(strings.Fields(ref), " "))
+		fmt.Fprintf(c.stdout, "\nReference:\n  %s\n", strings.Join(strings.Fields(ref), " "))
 	}
 }

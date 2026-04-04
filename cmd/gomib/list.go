@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"slices"
 
 	"github.com/golangsnmp/gomib"
@@ -30,7 +29,7 @@ Examples:
 
 func (c *cli) cmdList(args []string) int {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprint(os.Stderr, listUsage) }
+	fs.Usage = func() { fmt.Fprint(c.stderr, listUsage) }
 
 	count := fs.Bool("count", false, "print only module count")
 	format := fs.String("format", "text", "output format: text, json")
@@ -46,7 +45,7 @@ func (c *cli) cmdList(args []string) int {
 
 	sources, useSystem, err := c.buildSources()
 	if err != nil {
-		printError("%v", err)
+		c.printError("%v", err)
 		return exitIssue
 	}
 	if useSystem {
@@ -54,36 +53,36 @@ func (c *cli) cmdList(args []string) int {
 	}
 
 	if len(sources) == 0 {
-		printError("no sources available")
+		c.printError("no sources available")
 		return exitIssue
 	}
 
 	src := gomib.Multi(sources...)
 	names, err := src.ListModules()
 	if err != nil {
-		printError("listing modules: %v", err)
+		c.printError("listing modules: %v", err)
 		return exitIssue
 	}
 
 	slices.Sort(names)
 
 	if *count {
-		fmt.Println(len(names))
+		fmt.Fprintln(c.stdout, len(names))
 		return exitOK
 	}
 
 	switch *format {
 	case "json":
-		if err := writeJSON(os.Stdout, names, true); err != nil {
-			printError("encoding JSON: %v", err)
+		if err := writeJSON(c.stdout, names, true); err != nil {
+			c.printError("encoding JSON: %v", err)
 			return exitIssue
 		}
 	case "text", "":
 		for _, name := range names {
-			fmt.Println(name)
+			fmt.Fprintln(c.stdout, name)
 		}
 	default:
-		printError("unknown format: %s", *format)
+		c.printError("unknown format: %s", *format)
 		return exitIssue
 	}
 	return exitOK
