@@ -232,6 +232,11 @@ func (p *Parser) check(kind lexer.TokenKind) bool {
 	return p.peek().Kind == kind
 }
 
+// Naming convention for parser methods:
+//   - expect*: consume a single token matching a condition, return lexer.Token
+//   - parse*:  consume tokens and build a typed AST fragment
+//   - skip*:   discard tokens without producing a value
+//   - convert*: transform already-consumed span text into a Go value
 func (p *Parser) expect(kind lexer.TokenKind) (lexer.Token, *types.SpanDiagnostic) {
 	if p.check(kind) {
 		return p.advance(), nil
@@ -276,7 +281,7 @@ func (p *Parser) makeError(message string) types.SpanDiagnostic {
 	}
 }
 
-func (p *Parser) parseU32(span types.Span, context string) uint32 {
+func (p *Parser) convertU32(span types.Span, context string) uint32 {
 	text := p.text(span)
 	v, err := strconv.ParseUint(text, 10, 32)
 	if err != nil {
@@ -287,7 +292,7 @@ func (p *Parser) parseU32(span types.Span, context string) uint32 {
 	return uint32(v)
 }
 
-func (p *Parser) parseI64(span types.Span, context string) int64 {
+func (p *Parser) convertI64(span types.Span, context string) int64 {
 	text := p.text(span)
 	v, err := strconv.ParseInt(text, 10, 64)
 	if err != nil {
@@ -592,7 +597,7 @@ func (p *Parser) parseOidAssignment() (ast.OidAssignment, *types.SpanDiagnostic)
 func (p *Parser) parseOidComponent(compStart types.ByteOffset) (ast.OidComponent, *types.SpanDiagnostic) {
 	if p.check(lexer.TokNumber) {
 		token := p.advance()
-		value := p.parseU32(token.Span, "OID component")
+		value := p.convertU32(token.Span, "OID component")
 		return &ast.OidComponentNumber{Value: value, Span: token.Span}, nil
 	}
 
@@ -616,7 +621,7 @@ func (p *Parser) parseOidComponent(compStart types.ByteOffset) (ast.OidComponent
 			if err != nil {
 				return nil, err
 			}
-			number := p.parseU32(numToken.Span, "OID component")
+			number := p.convertU32(numToken.Span, "OID component")
 			endToken, err := p.expect(lexer.TokRParen)
 			if err != nil {
 				return nil, err
@@ -643,7 +648,7 @@ func (p *Parser) parseOidComponent(compStart types.ByteOffset) (ast.OidComponent
 		if err != nil {
 			return nil, err
 		}
-		number := p.parseU32(numToken.Span, "OID component")
+		number := p.convertU32(numToken.Span, "OID component")
 		endToken, err := p.expect(lexer.TokRParen)
 		if err != nil {
 			return nil, err
@@ -1048,7 +1053,7 @@ func (p *Parser) parseNamedNumberList() ([]ast.NamedNumber, *types.SpanDiagnosti
 				return nil, err
 			}
 		}
-		value := p.parseI64(numToken.Span, "named number value")
+		value := p.convertI64(numToken.Span, "named number value")
 
 		endToken, err := p.expect(lexer.TokRParen)
 		if err != nil {
@@ -1162,11 +1167,11 @@ func (p *Parser) parseRangeValue() (ast.RangeValue, *types.SpanDiagnostic) {
 			return &ast.RangeValueUnsigned{Value: value}, nil
 		}
 		// Fallback to signed
-		value := p.parseI64(token.Span, "range value")
+		value := p.convertI64(token.Span, "range value")
 		return &ast.RangeValueSigned{Value: value}, nil
 	case p.check(lexer.TokNegativeNumber):
 		token := p.advance()
-		value := p.parseI64(token.Span, "range value")
+		value := p.convertI64(token.Span, "range value")
 		return &ast.RangeValueSigned{Value: value}, nil
 	case p.check(lexer.TokHexString):
 		token := p.advance()
@@ -1452,7 +1457,7 @@ func (p *Parser) parseDefVal() (ast.DefVal, *types.SpanDiagnostic) {
 func (p *Parser) parseDefValNumber() (ast.DefVal, *types.SpanDiagnostic) {
 	token := p.advance()
 	if token.Kind == lexer.TokNegativeNumber {
-		value := p.parseI64(token.Span, "DEFVAL integer")
+		value := p.convertI64(token.Span, "DEFVAL integer")
 		return &ast.DefValContentInteger{Value: value}, nil
 	}
 
@@ -1463,7 +1468,7 @@ func (p *Parser) parseDefValNumber() (ast.DefVal, *types.SpanDiagnostic) {
 	if value, err := strconv.ParseUint(text, 10, 64); err == nil {
 		return &ast.DefValContentUnsigned{Value: value}, nil
 	}
-	value := p.parseI64(token.Span, "DEFVAL integer")
+	value := p.convertI64(token.Span, "DEFVAL integer")
 	return &ast.DefValContentInteger{Value: value}, nil
 }
 
@@ -1573,7 +1578,7 @@ func (p *Parser) parseDefValOidWithFirstIdent(ident ast.Ident, identToken lexer.
 		if err != nil {
 			return nil, err
 		}
-		number := p.parseU32(numToken.Span, "OID component")
+		number := p.convertU32(numToken.Span, "OID component")
 		endParen, err := p.expect(lexer.TokRParen)
 		if err != nil {
 			return nil, err
@@ -1956,7 +1961,7 @@ func (p *Parser) parseTrapType() (ast.Definition, *types.SpanDiagnostic) {
 	if err != nil {
 		return nil, err
 	}
-	trapNumber := p.parseU32(numToken.Span, "trap number")
+	trapNumber := p.convertU32(numToken.Span, "trap number")
 
 	span := types.NewSpan(start, numToken.Span.End)
 	return &ast.TrapTypeDef{
