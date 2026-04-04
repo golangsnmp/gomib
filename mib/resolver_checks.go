@@ -5,96 +5,97 @@ package mib
 // These checks validate that the MIB structure conforms to SMI rules:
 // violations here generally mean the MIB is broken or non-conformant.
 //
-// Check index (see also resolver_checks_conformance.go, resolver_checks_style.go):
+// Check index (see also resolver_checks_conformance.go, resolver_checks_style.go).
+// Severity abbreviations: E=error, S=severe, W=warning, M=minor, Y=style.
 //
 // Structural (this file):
-//   checkNodeParentKinds           DiagParent*                  parent node kind constraints
-//   checkEnumSubtyping             DiagSubtypeEnumIllegal       enum/BITS subtype validity
-//                                  DiagSubtypeBitsIllegal
-//   checkRangeConstraints          DiagSizeIllegal              range/SIZE constraint correctness
-//                                  DiagRangeIllegal
-//                                  DiagCounterRangeIllegal
-//                                  DiagTimeticksRangeIllegal
-//                                  DiagRangeExchanged
-//                                  DiagRangeBounds
-//                                  DiagRangeOverlap
-//                                  DiagRangeAscending
-//   checkIndexConstraints          DiagIndexAccessible          INDEX element constraints
-//                                  DiagIndexNotAccessible
-//                                  DiagIndexDefval
-//                                  DiagIndexCounterIllegal
-//                                  DiagIndexIllegalBasetype
-//                                  DiagIndexElementNoSize
-//                                  DiagIndexIntegerNoRange
-//                                  DiagIndexNegativeRange
-//                                  DiagIndexExceedsTooLarge
-//   checkDefvalConstraints         DiagCounterDefvalIllegal     DEFVAL validation
-//                                  DiagDefvalBasetype
-//                                  DiagDefvalRange
-//                                  DiagDefvalEnum
-//                                  DiagDefvalBits
-//   checkSequenceFields            DiagSequenceNoColumn         SEQUENCE/row consistency
-//                                  DiagSequenceMissingColumn
-//                                  DiagSequenceOrder
-//                                  DiagSequenceTypeMismatch
-//   checkAccessAndStatus           DiagAccessInvalidSMIv1       access/status rules
-//                                  DiagAccessWriteOnlySMIv1
-//                                  DiagAccessWriteOnlySMIv2
-//                                  DiagMaxAccessInSMIv1
-//                                  DiagAccessInSMIv2
-//                                  DiagAccessTableIllegal
-//                                  DiagAccessRowIllegal
-//                                  DiagScalarNotCreatable
-//                                  DiagAccessCounterIllegal
-//                                  DiagStatusInvalidSMIv1
-//                                  DiagStatusInvalidSMIv2
-//                                  DiagStatusInvalidCapabilities
-//                                  DiagTypeStatusDeprecated
-//                                  DiagTypeStatusObsolete
-//   checkNotificationReversibility DiagNotifIdTooLarge          notification OID structure
-//                                  DiagNotifNotReversible
+//   checkNodeParentKinds           DiagParent*                  [E]  parent node kind constraints
+//   checkEnumSubtyping             DiagSubtypeEnumIllegal       [E]  enum/BITS subtype validity
+//                                  DiagSubtypeBitsIllegal       [E]
+//   checkRangeConstraints          DiagSizeIllegal              [E]  range/SIZE constraint correctness
+//                                  DiagRangeIllegal             [E]
+//                                  DiagCounterRangeIllegal      [E]
+//                                  DiagTimeticksRangeIllegal    [E]
+//                                  DiagRangeExchanged           [E]
+//                                  DiagRangeBounds              [E]
+//                                  DiagRangeOverlap             [E]
+//                                  DiagRangeAscending           [W]
+//   checkIndexConstraints          DiagIndexAccessible          [M]  INDEX element constraints
+//                                  DiagIndexNotAccessible       [M]
+//                                  DiagIndexDefval              [W]
+//                                  DiagIndexCounterIllegal      [W]
+//                                  DiagIndexIllegalBasetype     [S]
+//                                  DiagIndexElementNoSize       [M]
+//                                  DiagIndexIntegerNoRange      [E]
+//                                  DiagIndexNegativeRange       [E]
+//                                  DiagIndexExceedsTooLarge     [W]
+//   checkDefvalConstraints         DiagCounterDefvalIllegal     [W]  DEFVAL validation
+//                                  DiagDefvalBasetype           [W]
+//                                  DiagDefvalRange              [W]
+//                                  DiagDefvalEnum               [W]
+//                                  DiagDefvalBits               [W]
+//   checkSequenceFields            DiagSequenceNoColumn         [M]  SEQUENCE/row consistency
+//                                  DiagSequenceMissingColumn    [M]
+//                                  DiagSequenceOrder            [W]
+//                                  DiagSequenceTypeMismatch     [E]
+//   checkAccessAndStatus           DiagAccessInvalidSMIv1       [E]  access/status rules
+//                                  DiagAccessWriteOnlySMIv1     [Y]
+//                                  DiagAccessWriteOnlySMIv2     [E]
+//                                  DiagMaxAccessInSMIv1         [E]
+//                                  DiagAccessInSMIv2            [E]
+//                                  DiagAccessTableIllegal       [M]
+//                                  DiagAccessRowIllegal         [M]
+//                                  DiagScalarNotCreatable       [M]
+//                                  DiagAccessCounterIllegal     [Y]
+//                                  DiagStatusInvalidSMIv1       [E]
+//                                  DiagStatusInvalidSMIv2       [E]
+//                                  DiagStatusInvalidCapabilities [E]
+//                                  DiagTypeStatusDeprecated     [W]
+//                                  DiagTypeStatusObsolete       [W]
+//   checkNotificationReversibility DiagNotifIdTooLarge          [W]  notification OID structure
+//                                  DiagNotifNotReversible       [W]
 //
 // Conformance (resolver_checks_conformance.go):
-//   checkGroupMembership           DiagGroupMembership          group membership completeness
-//   checkComplianceStatus          DiagComplianceGroupStatus    compliance status ordering
-//                                  DiagComplianceObjectStatus
-//   checkComplianceStructure       DiagComplianceGroupInvalid   compliance structural rules
-//                                  DiagOptionalGroupExists
-//                                  DiagRefinementExists
-//                                  DiagRefinementNotListed
-//   checkGroupMemberLocality       DiagComplianceMemberNotLocal group member locality
-//   checkGroupUnreferenced         DiagGroupUnreferenced        unreferenced groups
-//   checkRowStatusDefaults         DiagRowStatusDefault         RowStatus DEFVAL/access
-//                                  DiagRowStatusAccess
-//   checkStorageTypeDefaults       DiagStorageTypeDefault       StorageType DEFVAL
-//   checkTAddressTDomain           DiagTAddressTDomain          TAddress/TDomain pairing
-//   checkInetAddressPairing        DiagInetAddressPairing       InetAddress pairing
-//                                  DiagInetAddressTypeSubtyped
-//                                  DiagInetAddressSpecific
-//   checkTransportAddressPairing   DiagTransportAddressPairing  TransportAddress pairing
-//                                  DiagTransportAddressTypeSubtyped
-//                                  DiagTransportAddressSpecific
+//   checkGroupMembership           DiagGroupMembership          [M]  group membership completeness
+//   checkComplianceStatus          DiagComplianceGroupStatus    [W]  compliance status ordering
+//                                  DiagComplianceObjectStatus   [W]
+//   checkComplianceStructure       DiagComplianceGroupInvalid   [W]  compliance structural rules
+//                                  DiagOptionalGroupExists      [W]
+//                                  DiagRefinementExists         [W]
+//                                  DiagRefinementNotListed      [W]
+//   checkGroupMemberLocality       DiagComplianceMemberNotLocal [W]  group member locality
+//   checkGroupUnreferenced         DiagGroupUnreferenced        [Y]  unreferenced groups
+//   checkRowStatusDefaults         DiagRowStatusDefault          [Y]  RowStatus DEFVAL/access
+//                                  DiagRowStatusAccess          [Y]
+//   checkStorageTypeDefaults       DiagStorageTypeDefault       [Y]  StorageType DEFVAL
+//   checkTAddressTDomain           DiagTAddressTDomain          [W]  TAddress/TDomain pairing
+//   checkInetAddressPairing        DiagInetAddressPairing       [W]  InetAddress pairing
+//                                  DiagInetAddressTypeSubtyped  [W]
+//                                  DiagInetAddressSpecific      [Y]
+//   checkTransportAddressPairing   DiagTransportAddressPairing  [W]  TransportAddress pairing
+//                                  DiagTransportAddressTypeSubtyped [W]
+//                                  DiagTransportAddressSpecific [Y]
 //
 // Style (resolver_checks_style.go):
-//   checkIntegerMisuse             DiagIntegerInSMIv2           bare INTEGER in SMIv2
-//   checkDescriptionMissing        DiagDescriptionMissing       missing DESCRIPTION
-//   checkTextualConventionNested   DiagTCNested                 TC derived from TC
-//   checkTypeAssignmentSMIv2       DiagTypeAssignmentSMIv2      plain type assignment in v2
-//   checkTableRowNaming            DiagTableNameTable           table/row naming conventions
-//                                  DiagRowNameEntry
-//                                  DiagRowNameTableName
-//   checkNamedNumberOrdering       DiagNamedNumbersAscending    enum/BITS value ordering
-//   checkHyphenInLabel             DiagHyphenInLabel            hyphens in named values
-//   checkOpaqueSMIv2               DiagOpaqueSMIv2              Opaque in SMIv2
-//   checkFormatHints               DiagInvalidFormat            DISPLAY-HINT validation
-//                                  DiagTypeWithoutFormat
-//   checkTypeUnreferenced          DiagTypeUnreferenced         unreferenced types
-//   checkIdentifierCaseMatch       DiagIdentifierCaseMatch      case-only name collisions
-//   checkTrapInSMIv2               DiagTrapInSMIv2              TRAP-TYPE in SMIv2
-//   checkBasetypeImports           DiagBasetypeNotImported      missing basetype imports
-//   checkNodeImplicit              DiagNodeImplicit             implicit OID nodes
-//   checkModuleIdentityRegistration DiagModuleIdentityReg       MODULE-IDENTITY OID checks
-//   checkIpAddressDeprecation      DiagIpAddressInSyntax        deprecated IpAddress usage
+//   checkIntegerMisuse             DiagIntegerInSMIv2           [W]  bare INTEGER in SMIv2
+//   checkDescriptionMissing        DiagDescriptionMissing       [M]  missing DESCRIPTION
+//   checkTextualConventionNested   DiagTCNested                 [Y]  TC derived from TC
+//   checkTypeAssignmentSMIv2       DiagTypeAssignmentSMIv2      [Y]  plain type assignment in v2
+//   checkTableRowNaming            DiagTableNameTable           [Y]  table/row naming conventions
+//                                  DiagRowNameEntry             [Y]
+//                                  DiagRowNameTableName         [Y]
+//   checkNamedNumberOrdering       DiagNamedNumbersAscending    [Y]  enum/BITS value ordering
+//   checkHyphenInLabel             DiagHyphenInLabel            [Y]  hyphens in named values
+//   checkOpaqueSMIv2               DiagOpaqueSMIv2              [W]  Opaque in SMIv2
+//   checkFormatHints               DiagInvalidFormat            [E]  DISPLAY-HINT validation
+//                                  DiagTypeWithoutFormat        [Y]
+//   checkTypeUnreferenced          DiagTypeUnreferenced         [Y]  unreferenced types
+//   checkIdentifierCaseMatch       DiagIdentifierCaseMatch      [Y]  case-only name collisions
+//   checkTrapInSMIv2               DiagTrapInSMIv2              [W]  TRAP-TYPE in SMIv2
+//   checkBasetypeImports           DiagBasetypeNotImported      [M]  missing basetype imports
+//   checkNodeImplicit              DiagNodeImplicit             [Y]  implicit OID nodes
+//   checkModuleIdentityRegistration DiagModuleIdentityReg       [W]  MODULE-IDENTITY OID checks
+//   checkIpAddressDeprecation      DiagIpAddressInSyntax        [Y]  deprecated IpAddress usage
 
 import (
 	"fmt"
