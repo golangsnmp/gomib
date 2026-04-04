@@ -86,17 +86,16 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	for _, u := range ctx.mib.Unresolved() {
 		unresolvedCounts[u.Kind]++
 	}
-	if n := unresolvedCounts[UnresolvedImport]; n > 0 {
-		r.Log(slog.LevelWarn, "unresolved imports", slog.Int("count", n))
-	}
-	if n := unresolvedCounts[UnresolvedType]; n > 0 {
-		r.Log(slog.LevelWarn, "unresolved types", slog.Int("count", n))
-	}
-	if n := unresolvedCounts[UnresolvedOID]; n > 0 {
-		r.Log(slog.LevelWarn, "unresolved OIDs", slog.Int("count", n))
-	}
-	if n := unresolvedCounts[UnresolvedIndex]; n > 0 {
-		r.Log(slog.LevelWarn, "unresolved indexes", slog.Int("count", n))
+	for _, kind := range []UnresolvedKind{
+		UnresolvedImport,
+		UnresolvedType,
+		UnresolvedOID,
+		UnresolvedIndex,
+		UnresolvedNotificationObject,
+	} {
+		if n := unresolvedCounts[kind]; n > 0 {
+			r.Log(slog.LevelWarn, "unresolved "+kind.String(), slog.Int("count", n))
+		}
 	}
 
 	ctx.mib.setNodeCount(nodeCount)

@@ -24,7 +24,7 @@ func newTestNode(name string) *Node {
 }
 
 func TestRecordUnresolvedSeverityConsistency(t *testing.T) {
-	// All RecordUnresolved* methods should emit diagnostics at SeverityError.
+	// All recordUnresolved calls should emit diagnostics at SeverityError.
 	// Unresolved references represent failed symbol resolution regardless of
 	// category, so the severity should be uniform.
 
@@ -40,42 +40,54 @@ func TestRecordUnresolvedSeverityConsistency(t *testing.T) {
 			name: "import",
 			code: "import-not-found",
 			emit: func(c *resolverContext) {
-				c.RecordUnresolvedImport(mod, "OTHER-MIB", "someSymbol", "not found", span)
+				c.recordUnresolved(types.DiagImportNotFound, mod, span,
+					"unresolved import: \"someSymbol\" from \"OTHER-MIB\" (not found)",
+					UnresolvedRef{Kind: UnresolvedImport, Symbol: "someSymbol", Module: "TEST-MIB", Reason: "not found"})
 			},
 		},
 		{
 			name: "import module not found",
 			code: "import-module-not-found",
 			emit: func(c *resolverContext) {
-				c.RecordUnresolvedImport(mod, "MISSING-MIB", "someSymbol", "module_not_found", span)
+				c.recordUnresolved(types.DiagImportModuleNotFound, mod, span,
+					"unresolved import: \"someSymbol\" from \"MISSING-MIB\" (module_not_found)",
+					UnresolvedRef{Kind: UnresolvedImport, Symbol: "someSymbol", Module: "TEST-MIB", Reason: reasonModuleNotFound})
 			},
 		},
 		{
 			name: "type",
 			code: "type-unknown",
 			emit: func(c *resolverContext) {
-				c.RecordUnresolvedType(mod, "myType", "UnknownType", span)
+				c.recordUnresolved(types.DiagTypeUnknown, mod, span,
+					"unresolved type: \"myType\" references unknown type \"UnknownType\"",
+					UnresolvedRef{Kind: UnresolvedType, Symbol: "UnknownType", Module: "TEST-MIB", Reason: reasonUnknownType})
 			},
 		},
 		{
 			name: "oid",
 			code: "oid-orphan",
 			emit: func(c *resolverContext) {
-				c.RecordUnresolvedOid(mod, "myObject", "unknownParent", span)
+				c.recordUnresolved(types.DiagOidOrphan, mod, span,
+					"unresolved OID: \"myObject\" references unknown parent \"unknownParent\"",
+					UnresolvedRef{Kind: UnresolvedOID, Symbol: "unknownParent", Module: "TEST-MIB", Reason: reasonUnknownParent})
 			},
 		},
 		{
 			name: "index",
 			code: "index-unresolved",
 			emit: func(c *resolverContext) {
-				c.RecordUnresolvedIndex(mod, "myRow", "missingIndex", span)
+				c.recordUnresolved(types.DiagIndexUnresolved, mod, span,
+					"unresolved INDEX: \"myRow\" references unknown object \"missingIndex\"",
+					UnresolvedRef{Kind: UnresolvedIndex, Symbol: "missingIndex", Module: "TEST-MIB", Reason: reasonUnknownIndex})
 			},
 		},
 		{
 			name: "notification object",
 			code: "objects-unresolved",
 			emit: func(c *resolverContext) {
-				c.RecordUnresolvedNotificationObject(mod, "myNotif", "missingObject", span)
+				c.recordUnresolved(types.DiagObjectsUnresolved, mod, span,
+					"unresolved OBJECTS: \"myNotif\" references unknown object \"missingObject\"",
+					UnresolvedRef{Kind: UnresolvedNotificationObject, Symbol: "missingObject", Module: "TEST-MIB", Reason: reasonUnknownObject})
 			},
 		},
 	}
@@ -255,11 +267,16 @@ func TestRecordUnresolved_WritesToMib(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 	span := types.Span{}
 
-	ctx.RecordUnresolvedImport(mod, "OTHER", "sym1", "module_not_found", span)
-	ctx.RecordUnresolvedType(mod, "ref1", "UnknownType", span)
-	ctx.RecordUnresolvedOid(mod, "obj1", "parent1", span)
-	ctx.RecordUnresolvedIndex(mod, "row1", "idx1", span)
-	ctx.RecordUnresolvedNotificationObject(mod, "notif1", "obj2", span)
+	ctx.recordUnresolved(types.DiagImportModuleNotFound, mod, span, "import msg",
+		UnresolvedRef{Kind: UnresolvedImport, Symbol: "sym1", Module: "TEST-MIB", Reason: reasonModuleNotFound})
+	ctx.recordUnresolved(types.DiagTypeUnknown, mod, span, "type msg",
+		UnresolvedRef{Kind: UnresolvedType, Symbol: "UnknownType", Module: "TEST-MIB", Reason: reasonUnknownType})
+	ctx.recordUnresolved(types.DiagOidOrphan, mod, span, "oid msg",
+		UnresolvedRef{Kind: UnresolvedOID, Symbol: "parent1", Module: "TEST-MIB", Reason: reasonUnknownParent})
+	ctx.recordUnresolved(types.DiagIndexUnresolved, mod, span, "index msg",
+		UnresolvedRef{Kind: UnresolvedIndex, Symbol: "idx1", Module: "TEST-MIB", Reason: reasonUnknownIndex})
+	ctx.recordUnresolved(types.DiagObjectsUnresolved, mod, span, "notif msg",
+		UnresolvedRef{Kind: UnresolvedNotificationObject, Symbol: "obj2", Module: "TEST-MIB", Reason: reasonUnknownObject})
 
 	unresolved := ctx.mib.Unresolved()
 	testutil.Len(t, unresolved, 5, "expected 5 unresolved refs")
@@ -277,11 +294,11 @@ func TestRecordUnresolved_WritesToMib(t *testing.T) {
 		testutil.Equal(t, 1, kindCounts[k], "count for kind")
 	}
 
-	testutil.Equal(t, "module_not_found", reasonByKind[UnresolvedImport], "import reason")
-	testutil.Equal(t, "unknown_type", reasonByKind[UnresolvedType], "type reason")
-	testutil.Equal(t, "unknown_parent", reasonByKind[UnresolvedOID], "oid reason")
-	testutil.Equal(t, "unknown_index_object", reasonByKind[UnresolvedIndex], "index reason")
-	testutil.Equal(t, "unknown_object", reasonByKind[UnresolvedNotificationObject], "notif object reason")
+	testutil.Equal(t, reasonModuleNotFound, reasonByKind[UnresolvedImport], "import reason")
+	testutil.Equal(t, reasonUnknownType, reasonByKind[UnresolvedType], "type reason")
+	testutil.Equal(t, reasonUnknownParent, reasonByKind[UnresolvedOID], "oid reason")
+	testutil.Equal(t, reasonUnknownIndex, reasonByKind[UnresolvedIndex], "index reason")
+	testutil.Equal(t, reasonUnknownObject, reasonByKind[UnresolvedNotificationObject], "notif object reason")
 
 	testutil.Len(t, ctx.Diagnostics(), 5, "expected 5 diagnostics")
 }
@@ -290,11 +307,16 @@ func TestRecordUnresolved_NilModule(t *testing.T) {
 	ctx := newTestContext()
 	span := types.Span{}
 
-	ctx.RecordUnresolvedImport(nil, "OTHER", "sym1", "module_not_found", span)
-	ctx.RecordUnresolvedType(nil, "ref1", "UnknownType", span)
-	ctx.RecordUnresolvedOid(nil, "obj1", "parent1", span)
-	ctx.RecordUnresolvedIndex(nil, "row1", "idx1", span)
-	ctx.RecordUnresolvedNotificationObject(nil, "notif1", "obj2", span)
+	ctx.recordUnresolved(types.DiagImportModuleNotFound, nil, span, "import msg",
+		UnresolvedRef{Kind: UnresolvedImport, Symbol: "sym1", Module: "", Reason: reasonModuleNotFound})
+	ctx.recordUnresolved(types.DiagTypeUnknown, nil, span, "type msg",
+		UnresolvedRef{Kind: UnresolvedType, Symbol: "UnknownType", Module: "", Reason: reasonUnknownType})
+	ctx.recordUnresolved(types.DiagOidOrphan, nil, span, "oid msg",
+		UnresolvedRef{Kind: UnresolvedOID, Symbol: "parent1", Module: "", Reason: reasonUnknownParent})
+	ctx.recordUnresolved(types.DiagIndexUnresolved, nil, span, "index msg",
+		UnresolvedRef{Kind: UnresolvedIndex, Symbol: "idx1", Module: "", Reason: reasonUnknownIndex})
+	ctx.recordUnresolved(types.DiagObjectsUnresolved, nil, span, "notif msg",
+		UnresolvedRef{Kind: UnresolvedNotificationObject, Symbol: "obj2", Module: "", Reason: reasonUnknownObject})
 
 	for _, u := range ctx.mib.Unresolved() {
 		testutil.Equal(t, "", u.Module, "module should be empty for nil")

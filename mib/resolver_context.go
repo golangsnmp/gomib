@@ -1,7 +1,6 @@
 package mib
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/golangsnmp/gomib/internal/graph"
@@ -9,10 +8,15 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// Import failure reason strings, shared between imports.go and context.go.
+// Unresolved reference reason strings used by recordUnresolved call sites.
 const (
 	reasonModuleNotFound    = "module_not_found"
 	reasonSymbolNotExported = "symbol_not_exported"
+	reasonUnknownType       = "unknown_type"
+	reasonUnknownParent     = "unknown_parent"
+	reasonRecursiveOid      = "recursive_oid"
+	reasonUnknownIndex      = "unknown_index_object"
+	reasonUnknownObject     = "unknown_object"
 )
 
 // resolverContext holds indices and working state for all resolution phases.
@@ -194,68 +198,13 @@ func modName(mod *module.Module) string {
 	return mod.Name
 }
 
-// RecordUnresolvedImport tracks a symbol that could not be resolved from its source module.
-func (c *resolverContext) RecordUnresolvedImport(importingModule *module.Module, fromModule, symbol, reason string, span types.Span) {
-	code := types.DiagImportNotFound
-	if reason == reasonModuleNotFound {
-		code = types.DiagImportModuleNotFound
-	}
-	c.EmitDiagnostic(code, importingModule, span,
-		fmt.Sprintf("unresolved import: %q from %q (%s)", symbol, fromModule, reason))
-	c.mib.addUnresolved(UnresolvedRef{
-		Kind:   UnresolvedImport,
-		Symbol: symbol,
-		Module: modName(importingModule),
-		Reason: reason,
-	})
-}
-
-// RecordUnresolvedType tracks a type definition whose parent type could not be found.
-func (c *resolverContext) RecordUnresolvedType(mod *module.Module, referrer, referenced string, span types.Span) {
-	c.EmitDiagnostic(types.DiagTypeUnknown, mod, span,
-		fmt.Sprintf("unresolved type: %q references unknown type %q", referrer, referenced))
-	c.mib.addUnresolved(UnresolvedRef{
-		Kind:   UnresolvedType,
-		Symbol: referenced,
-		Module: modName(mod),
-		Reason: "unknown_type",
-	})
-}
-
-// RecordUnresolvedOid tracks an OID definition whose parent component could not be resolved.
-func (c *resolverContext) RecordUnresolvedOid(mod *module.Module, defName, component string, span types.Span) {
-	c.EmitDiagnostic(types.DiagOidOrphan, mod, span,
-		fmt.Sprintf("unresolved OID: %q references unknown parent %q", defName, component))
-	c.mib.addUnresolved(UnresolvedRef{
-		Kind:   UnresolvedOID,
-		Symbol: component,
-		Module: modName(mod),
-		Reason: "unknown_parent",
-	})
-}
-
-// RecordUnresolvedIndex tracks a row's INDEX entry that references a missing object.
-func (c *resolverContext) RecordUnresolvedIndex(mod *module.Module, row, indexObject string, span types.Span) {
-	c.EmitDiagnostic(types.DiagIndexUnresolved, mod, span,
-		fmt.Sprintf("unresolved INDEX: %q references unknown object %q", row, indexObject))
-	c.mib.addUnresolved(UnresolvedRef{
-		Kind:   UnresolvedIndex,
-		Symbol: indexObject,
-		Module: modName(mod),
-		Reason: "unknown_index_object",
-	})
-}
-
-// RecordUnresolvedNotificationObject tracks a notification's OBJECTS entry that references a missing object.
-func (c *resolverContext) RecordUnresolvedNotificationObject(mod *module.Module, notification, object string, span types.Span) {
-	c.EmitDiagnostic(types.DiagObjectsUnresolved, mod, span,
-		fmt.Sprintf("unresolved OBJECTS: %q references unknown object %q", notification, object))
-	c.mib.addUnresolved(UnresolvedRef{
-		Kind:   UnresolvedNotificationObject,
-		Symbol: object,
-		Module: modName(mod),
-		Reason: "unknown_object",
-	})
+// recordUnresolved emits a diagnostic and tracks an unresolved reference.
+// All resolution failures that should appear in Mib.Unresolved() go through
+// this single method to keep the two stores (diagnostics + unresolved list)
+// in sync.
+func (c *resolverContext) recordUnresolved(code string, mod *module.Module, span types.Span, message string, ref UnresolvedRef) {
+	c.EmitDiagnostic(code, mod, span, message)
+	c.mib.addUnresolved(ref)
 }
 
 // FinalizeDiagnostics copies collected diagnostics into the Mib.

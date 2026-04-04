@@ -1,11 +1,13 @@
 package mib
 
 import (
+	"fmt"
 	"log/slog"
 	"math"
 
 	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/module"
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 // resolveTypes is the type resolution phase entry point.
@@ -181,7 +183,9 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 		if tryResolveTypeParent(ctx, entry) {
 			resolved++
 		} else if baseName := getTypeRefBaseName(entry.td.Syntax); baseName != "" {
-			ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Spans.Syntax)
+			ctx.recordUnresolved(types.DiagTypeUnknown, entry.mod, entry.td.Spans.Syntax,
+				fmt.Sprintf("unresolved type: %q references unknown type %q", entry.td.Name, baseName),
+				UnresolvedRef{Kind: UnresolvedType, Symbol: baseName, Module: modName(entry.mod), Reason: reasonUnknownType})
 		}
 	}
 
@@ -193,7 +197,9 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 			}
 			baseName := getTypeRefBaseName(entry.td.Syntax)
 			if baseName != "" {
-				ctx.RecordUnresolvedType(entry.mod, entry.td.Name, baseName, entry.td.Spans.Syntax)
+				ctx.recordUnresolved(types.DiagTypeUnknown, entry.mod, entry.td.Spans.Syntax,
+					fmt.Sprintf("unresolved type: %q references unknown type %q", entry.td.Name, baseName),
+					UnresolvedRef{Kind: UnresolvedType, Symbol: baseName, Module: modName(entry.mod), Reason: reasonUnknownType})
 			}
 		}
 	}

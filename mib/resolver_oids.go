@@ -181,12 +181,8 @@ func recordRecursiveOid(ctx *resolverContext, def oidDefinition, scc []graph.Sym
 		msg = fmt.Sprintf("recursive OID: %s is in a cycle with %s", defName, strings.Join(others, ", "))
 	}
 
-	ctx.EmitDiagnostic(types.DiagOidRecursive, def.mod, span, msg)
-	ctx.mib.addUnresolved(UnresolvedRef{
-		Kind:   UnresolvedOID,
-		Module: def.mod.Name,
-		Reason: "recursive_oid",
-	})
+	ctx.recordUnresolved(types.DiagOidRecursive, def.mod, span, msg,
+		UnresolvedRef{Kind: UnresolvedOID, Module: def.mod.Name, Reason: reasonRecursiveOid})
 }
 
 // checkSmiv2IdentifierHyphens emits a diagnostic for OID definition names
@@ -348,7 +344,9 @@ func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *N
 	case *module.OidComponentQualifiedNamedNumber:
 		return resolveQualifiedNamedNumberComponent(ctx, def, currentNode, c.ModuleValue, c.NameValue, c.NumberValue, isLast)
 	default:
-		ctx.RecordUnresolvedOid(def.mod, def.defName(), "", component.ComponentSpan())
+		ctx.recordUnresolved(types.DiagOidOrphan, def.mod, component.ComponentSpan(),
+			fmt.Sprintf("unresolved OID: %q references unknown parent %q", def.defName(), ""),
+			UnresolvedRef{Kind: UnresolvedOID, Module: modName(def.mod), Reason: reasonUnknownParent})
 		return nil, false
 	}
 }
@@ -372,7 +370,9 @@ func resolveNameComponent(ctx *resolverContext, def oidDefinition, name string, 
 			return node, true
 		}
 	}
-	ctx.RecordUnresolvedOid(def.mod, def.defName(), name, compSpan)
+	ctx.recordUnresolved(types.DiagOidOrphan, def.mod, compSpan,
+		fmt.Sprintf("unresolved OID: %q references unknown parent %q", def.defName(), name),
+		UnresolvedRef{Kind: UnresolvedOID, Symbol: name, Module: modName(def.mod), Reason: reasonUnknownParent})
 	return nil, false
 }
 
@@ -387,7 +387,9 @@ func resolveQualifiedNameComponent(ctx *resolverContext, def oidDefinition, modu
 	if node, ok := ctx.lookupNodeByModuleName(moduleName, name); ok {
 		return node, true
 	}
-	ctx.RecordUnresolvedOid(def.mod, def.defName(), moduleName+"."+name, compSpan)
+	ctx.recordUnresolved(types.DiagOidOrphan, def.mod, compSpan,
+		fmt.Sprintf("unresolved OID: %q references unknown parent %q", def.defName(), moduleName+"."+name),
+		UnresolvedRef{Kind: UnresolvedOID, Symbol: moduleName + "." + name, Module: modName(def.mod), Reason: reasonUnknownParent})
 	return nil, false
 }
 
@@ -547,7 +549,9 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 			}
 		}
 		if !found {
-			ctx.RecordUnresolvedOid(def.mod, defName, enterprise, span)
+			ctx.recordUnresolved(types.DiagOidOrphan, def.mod, span,
+				fmt.Sprintf("unresolved OID: %q references unknown parent %q", defName, enterprise),
+				UnresolvedRef{Kind: UnresolvedOID, Symbol: enterprise, Module: modName(def.mod), Reason: reasonUnknownParent})
 			continue
 		}
 

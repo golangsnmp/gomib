@@ -187,14 +187,18 @@ func resolveTableSemantics(ctx *resolverContext, objRefs []objectTypeRef) {
 					if isBareTypeIndex(item.Object) {
 						continue
 					}
-					ctx.RecordUnresolvedIndex(ref.mod, obj.Name, item.Object, item.Span)
+					ctx.recordUnresolved(types.DiagIndexUnresolved, ref.mod, item.Span,
+						fmt.Sprintf("unresolved INDEX: %q references unknown object %q", obj.Name, item.Object),
+						UnresolvedRef{Kind: UnresolvedIndex, Symbol: item.Object, Module: modName(ref.mod), Reason: reasonUnknownIndex})
 				}
 			}
 		}
 
 		if obj.Augments != "" {
 			if _, ok := ctx.lookupNode(ref.mod, obj.Augments); !ok {
-				ctx.RecordUnresolvedOid(ref.mod, obj.Name, obj.Augments, obj.Spans.Augments)
+				ctx.recordUnresolved(types.DiagOidOrphan, ref.mod, obj.Spans.Augments,
+					fmt.Sprintf("unresolved OID: %q references unknown parent %q", obj.Name, obj.Augments),
+					UnresolvedRef{Kind: UnresolvedOID, Symbol: obj.Augments, Module: modName(ref.mod), Reason: reasonUnknownParent})
 			}
 		}
 	}
@@ -489,7 +493,9 @@ func createResolvedNotifications(ctx *resolverContext) {
 			objNode, ok := ctx.lookupNode(ref.mod, objName)
 			switch {
 			case !ok:
-				ctx.RecordUnresolvedNotificationObject(ref.mod, notif.Name, objName, notif.Span)
+				ctx.recordUnresolved(types.DiagObjectsUnresolved, ref.mod, notif.Span,
+					fmt.Sprintf("unresolved OBJECTS: %q references unknown object %q", notif.Name, objName),
+					UnresolvedRef{Kind: UnresolvedNotificationObject, Symbol: objName, Module: modName(ref.mod), Reason: reasonUnknownObject})
 			case objNode.Object() == nil:
 				ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, ref.mod, notif.Span,
 					fmt.Sprintf("notification %q references %q which is not an object definition", notif.Name, objName))
@@ -943,7 +949,9 @@ func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *modu
 		if isSequenceTypeDef(ctx, mod, s.Name) {
 			return nil, false
 		}
-		ctx.RecordUnresolvedType(mod, objectName, s.Name, span)
+		ctx.recordUnresolved(types.DiagTypeUnknown, mod, span,
+			fmt.Sprintf("unresolved type: %q references unknown type %q", objectName, s.Name),
+			UnresolvedRef{Kind: UnresolvedType, Symbol: s.Name, Module: modName(mod), Reason: reasonUnknownType})
 		return nil, false
 	case *module.TypeSyntaxConstrained:
 		return resolveTypeSyntax(ctx, s.Base, mod, objectName, span)
@@ -953,7 +961,9 @@ func resolveTypeSyntax(ctx *resolverContext, syntax module.TypeSyntax, mod *modu
 			if t, ok := ctx.resolveTypeForModule(mod, s.Base); ok {
 				return t, true
 			}
-			ctx.RecordUnresolvedType(mod, objectName, s.Base, span)
+			ctx.recordUnresolved(types.DiagTypeUnknown, mod, span,
+				fmt.Sprintf("unresolved type: %q references unknown type %q", objectName, s.Base),
+				UnresolvedRef{Kind: UnresolvedType, Symbol: s.Base, Module: modName(mod), Reason: reasonUnknownType})
 			return nil, false
 		}
 		// Bare INTEGER { ... } enum with no named base

@@ -140,7 +140,9 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 				slog.Int("unresolved", len(unresolved)))
 		}
 		for _, sym := range unresolved {
-			ctx.RecordUnresolvedImport(importingModule, fromModuleName, sym.name, reasonSymbolNotExported, sym.span)
+			ctx.recordUnresolved(types.DiagImportNotFound, importingModule, sym.span,
+				fmt.Sprintf("unresolved import: %q from %q (%s)", sym.name, fromModuleName, reasonSymbolNotExported),
+				UnresolvedRef{Kind: UnresolvedImport, Symbol: sym.name, Module: modName(importingModule), Reason: reasonSymbolNotExported})
 		}
 		return
 	}
@@ -153,7 +155,9 @@ func resolveImportsFromModule(ctx *resolverContext, importingModule *module.Modu
 	}
 
 	for _, sym := range userSymbols {
-		ctx.RecordUnresolvedImport(importingModule, fromModuleName, sym.name, reasonModuleNotFound, sym.span)
+		ctx.recordUnresolved(types.DiagImportModuleNotFound, importingModule, sym.span,
+			fmt.Sprintf("unresolved import: %q from %q (%s)", sym.name, fromModuleName, reasonModuleNotFound),
+			UnresolvedRef{Kind: UnresolvedImport, Symbol: sym.name, Module: modName(importingModule), Reason: reasonModuleNotFound})
 	}
 }
 
