@@ -184,11 +184,8 @@ func tryPartialResolution(ctx *resolverContext, candidates []*module.Module, sym
 
 func resolveImportedSymbol(ctx *resolverContext, candidates []*module.Module, symbol string) (*module.Module, bool) {
 	for _, candidate := range candidates {
-		defNames := ctx.moduleDefNames[candidate]
-		if defNames != nil {
-			if _, isDirect := defNames[symbol]; isDirect {
-				return candidate, true
-			}
+		if ctx.defNames.has(candidate, symbol) {
+			return candidate, true
 		}
 
 		for _, imp := range candidate.Imports {
@@ -208,7 +205,7 @@ func resolveImportedSymbol(ctx *resolverContext, candidates []*module.Module, sy
 
 func tryImportForwarding(ctx *resolverContext, candidates []*module.Module, symbols []importSymbol) []forwardedSymbol {
 	for _, candidate := range candidates {
-		defNames := ctx.moduleDefNames[candidate]
+		candidateDefs := ctx.defNames.forModule(candidate)
 		importMap := make(map[string]string)
 		for _, imp := range candidate.Imports {
 			importMap[imp.Symbol] = imp.Module
@@ -217,8 +214,8 @@ func tryImportForwarding(ctx *resolverContext, candidates []*module.Module, symb
 		forwarded := make([]forwardedSymbol, 0, len(symbols))
 		allFound := true
 		for _, sym := range symbols {
-			if defNames != nil {
-				if _, isDirect := defNames[sym.name]; isDirect {
+			if candidateDefs != nil {
+				if _, isDirect := candidateDefs[sym.name]; isDirect {
 					forwarded = append(forwarded, forwardedSymbol{
 						symbol: sym.name,
 						source: candidate,
@@ -264,14 +261,14 @@ func findCandidateWithAllSymbols(ctx *resolverContext, candidates []*module.Modu
 	totalSymbols := len(symbols)
 
 	for _, candidate := range candidates {
-		defNames := ctx.moduleDefNames[candidate]
-		if defNames == nil {
+		candidateDefs := ctx.defNames.forModule(candidate)
+		if candidateDefs == nil {
 			continue
 		}
 
 		count := 0
 		for _, sym := range symbols {
-			if _, ok := defNames[sym.name]; ok {
+			if _, ok := candidateDefs[sym.name]; ok {
 				count++
 			}
 		}
@@ -358,7 +355,7 @@ func isMacroSymbol(name string) bool {
 // actually defines the symbol, collapsing re-export chains. After this,
 // ModuleImports[mod][symbol] points directly to the defining module.
 func resolveTransitiveImports(ctx *resolverContext) {
-	for _, imports := range ctx.moduleImports {
+	for _, imports := range ctx.importSources {
 		type update struct {
 			symbol  string
 			definer *module.Module
@@ -388,17 +385,13 @@ func resolveUltimateDefiner(ctx *resolverContext, mod *module.Module, symbol str
 		}
 		visited[current] = struct{}{}
 
-		if defNames := ctx.moduleDefNames[current]; defNames != nil {
-			if _, ok := defNames[symbol]; ok {
-				return current, true
-			}
+		if ctx.defNames.has(current, symbol) {
+			return current, true
 		}
 
-		if nextImports := ctx.moduleImports[current]; nextImports != nil {
-			if next, ok := nextImports[symbol]; ok {
-				current = next
-				continue
-			}
+		if next, ok := ctx.importSources.get(current, symbol); ok {
+			current = next
+			continue
 		}
 
 		return nil, false
@@ -412,8 +405,8 @@ func checkUnusedImports(ctx *resolverContext) {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		used := ctx.usedImports[mod]
-		imports := ctx.moduleImports[mod]
+		used := ctx.usedImports.forModule(mod)
+		imports := ctx.importSources.forModule(mod)
 		for _, imp := range mod.Imports {
 			if isMacroSymbol(imp.Symbol) {
 				continue
@@ -447,11 +440,11 @@ func copyUsedImportsToModules(ctx *resolverContext) {
 	}
 }
 
-// copyResolvedImportsToModules transfers the resolver's moduleImports data
+// copyResolvedImportsToModules transfers the resolver's importSources data
 // to each resolved Module so it's available via Module.ImportSource() and
 // Module.AvailableSymbols().
 func copyResolvedImportsToModules(ctx *resolverContext) {
-	for mod, imports := range ctx.moduleImports {
+	for mod, imports := range ctx.importSources {
 		resolved := ctx.moduleToResolved[mod]
 		if resolved == nil || len(imports) == 0 {
 			continue

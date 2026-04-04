@@ -80,23 +80,23 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	copyUsedImportsToModules(ctx)
 	copyResolvedImportsToModules(ctx)
 
-	ctx.FinalizeUnresolved()
+	ctx.FinalizeDiagnostics()
 
-	if len(ctx.unresolvedImports) > 0 {
-		r.Log(slog.LevelWarn, "unresolved imports",
-			slog.Int("count", len(ctx.unresolvedImports)))
+	unresolvedCounts := map[UnresolvedKind]int{}
+	for _, u := range ctx.mib.Unresolved() {
+		unresolvedCounts[u.Kind]++
 	}
-	if len(ctx.unresolvedTypes) > 0 {
-		r.Log(slog.LevelWarn, "unresolved types",
-			slog.Int("count", len(ctx.unresolvedTypes)))
+	if n := unresolvedCounts[UnresolvedImport]; n > 0 {
+		r.Log(slog.LevelWarn, "unresolved imports", slog.Int("count", n))
 	}
-	if len(ctx.unresolvedOids) > 0 {
-		r.Log(slog.LevelWarn, "unresolved OIDs",
-			slog.Int("count", len(ctx.unresolvedOids)))
+	if n := unresolvedCounts[UnresolvedType]; n > 0 {
+		r.Log(slog.LevelWarn, "unresolved types", slog.Int("count", n))
 	}
-	if len(ctx.unresolvedIndexes) > 0 {
-		r.Log(slog.LevelWarn, "unresolved indexes",
-			slog.Int("count", len(ctx.unresolvedIndexes)))
+	if n := unresolvedCounts[UnresolvedOID]; n > 0 {
+		r.Log(slog.LevelWarn, "unresolved OIDs", slog.Int("count", n))
+	}
+	if n := unresolvedCounts[UnresolvedIndex]; n > 0 {
+		r.Log(slog.LevelWarn, "unresolved indexes", slog.Int("count", n))
 	}
 
 	ctx.mib.setNodeCount(nodeCount)

@@ -936,10 +936,8 @@ func findSequenceTypeDef(ctx *resolverContext, mod *module.Module, name string) 
 	if td := getSequenceTypeDef(mod, name); td != nil {
 		return td
 	}
-	if imports := ctx.moduleImports[mod]; imports != nil {
-		if srcMod := imports[name]; srcMod != nil {
-			return getSequenceTypeDef(srcMod, name)
-		}
+	if srcMod, ok := ctx.importSources.get(mod, name); ok {
+		return getSequenceTypeDef(srcMod, name)
 	}
 	return nil
 }

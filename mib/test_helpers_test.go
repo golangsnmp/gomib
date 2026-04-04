@@ -45,12 +45,12 @@ func newTestContextForModulesWithPolicy(strictness ResolverStrictness, config Di
 	return ctx
 }
 
-// setTestModules sets ctx.modules and builds the moduleOidDefNames cache
+// setTestModules sets ctx.modules and builds the oidDefNames cache
 // for tests that don't go through registerModules.
 func setTestModules(ctx *resolverContext, mods []*module.Module) {
 	ctx.modules = mods
 	for _, mod := range mods {
-		if _, exists := ctx.moduleOidDefNames[mod]; exists {
+		if _, exists := ctx.oidDefNames[mod]; exists {
 			continue
 		}
 		oidDefs := make(map[string]struct{})
@@ -59,7 +59,7 @@ func setTestModules(ctx *resolverContext, mods []*module.Module) {
 				oidDefs[def.DefinitionName()] = struct{}{}
 			}
 		}
-		ctx.moduleOidDefNames[mod] = oidDefs
+		ctx.oidDefNames[mod] = oidDefs
 	}
 }
 
@@ -212,6 +212,16 @@ func testTableModule(extraImports []module.Import, columns ...module.Definition)
 		Imports:     imports,
 		Definitions: defs,
 	}
+}
+
+func unresolvedByKind(ctx *resolverContext, kind UnresolvedKind) []UnresolvedRef {
+	var result []UnresolvedRef
+	for _, u := range ctx.mib.Unresolved() {
+		if u.Kind == kind {
+			result = append(result, u)
+		}
+	}
+	return result
 }
 
 func registerNodeWithSymbol(ctx *resolverContext, mod *module.Module, root *Node, symbol string, arcs ...uint32) *Node {

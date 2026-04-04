@@ -195,7 +195,7 @@ func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 		}
 		testutil.NotNil(t, found, "MY-MIB not found in ctx.modules")
 
-		defNames := ctx.moduleDefNames[found]
+		defNames := ctx.defNames[found]
 		testutil.NotNil(t, defNames, "ModuleDefNames[MY-MIB] is nil")
 		_, hasFoo := defNames["fooObject"]
 		testutil.True(t, hasFoo, "fooObject not in ModuleDefNames")
@@ -219,7 +219,7 @@ func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 		}
 		testutil.NotNil(t, snmpv2smi, "SNMPv2-SMI not found")
 
-		defNames := ctx.moduleDefNames[snmpv2smi]
+		defNames := ctx.defNames[snmpv2smi]
 		testutil.NotNil(t, defNames, "ModuleDefNames[SNMPv2-SMI] is nil")
 		for _, name := range []string{"internet", "Integer32", "Counter32", "enterprises"} {
 			_, ok := defNames[name]

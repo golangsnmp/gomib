@@ -82,8 +82,8 @@ func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 				oidDefNames[name] = struct{}{}
 			}
 		}
-		ctx.moduleDefNames[mod] = defNames
-		ctx.moduleOidDefNames[mod] = oidDefNames
+		ctx.defNames[mod] = defNames
+		ctx.oidDefNames[mod] = oidDefNames
 
 		if ctx.TraceEnabled() {
 			ctx.Trace("registered module",

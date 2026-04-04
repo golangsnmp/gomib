@@ -530,11 +530,11 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 
 		ctx := newTestContextForModules(DefaultConfig(), baseMod, userMod)
 		ctx.snmpv2SMIModule = baseMod
-		ctx.moduleDefNames[baseMod] = map[string]struct{}{
+		ctx.defNames[baseMod] = map[string]struct{}{
 			"BaseText": {},
 			"INTEGER":  {},
 		}
-		ctx.moduleDefNames[userMod] = map[string]struct{}{
+		ctx.defNames[userMod] = map[string]struct{}{
 			"MidText":  {},
 			"LeafText": {},
 		}
@@ -557,7 +557,7 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 		testutil.Equal(t, integerType, baseText.Parent(), "BaseText parent")
 		testutil.Equal(t, baseText, midText.Parent(), "MidText parent")
 		testutil.Equal(t, midText, leafText.Parent(), "LeafText parent")
-		testutil.Len(t, ctx.unresolvedTypes, 0, "unresolved types")
+		testutil.Len(t, unresolvedByKind(ctx, UnresolvedType), 0, "unresolved types")
 	})
 
 	t.Run("records each cycle participant as unresolved", func(t *testing.T) {
@@ -568,7 +568,7 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 		}
 
 		ctx := newTestContextForModules(DefaultConfig(), mod)
-		ctx.moduleDefNames[mod] = map[string]struct{}{
+		ctx.defNames[mod] = map[string]struct{}{
 			"TypeA": {},
 			"TypeB": {},
 		}
@@ -576,15 +576,16 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 		createUserTypes(ctx)
 		resolveTypeRefParentsGraph(ctx)
 
-		testutil.Len(t, ctx.unresolvedTypes, 2, "unresolved types")
-		pairs := map[string]struct{}{}
-		for _, unresolved := range ctx.unresolvedTypes {
-			pairs[unresolved.referrer+"->"+unresolved.referenced] = struct{}{}
+		unresolvedTypes := unresolvedByKind(ctx, UnresolvedType)
+		testutil.Len(t, unresolvedTypes, 2, "unresolved types")
+		symbols := map[string]struct{}{}
+		for _, u := range unresolvedTypes {
+			symbols[u.Symbol] = struct{}{}
 		}
-		_, hasAB := pairs["TypeA->TypeB"]
-		_, hasBA := pairs["TypeB->TypeA"]
-		testutil.True(t, hasAB, "expected TypeA->TypeB unresolved pair")
-		testutil.True(t, hasBA, "expected TypeB->TypeA unresolved pair")
+		_, hasA := symbols["TypeA"]
+		_, hasB := symbols["TypeB"]
+		testutil.True(t, hasA, "expected TypeA as unresolved symbol")
+		testutil.True(t, hasB, "expected TypeB as unresolved symbol")
 	})
 }
 
@@ -627,7 +628,7 @@ func TestFindTypeDefiningModule(t *testing.T) {
 
 	ctx := newTestContextForModules(DefaultConfig(), localMod, sourceMod, smiMod)
 	ctx.snmpv2SMIModule = smiMod
-	ctx.moduleDefNames[localMod] = map[string]struct{}{"LocalType": {}}
+	ctx.defNames[localMod] = map[string]struct{}{"LocalType": {}}
 	ctx.registerImport(localMod, "ImportedType", sourceMod)
 
 	t.Run("prefers local definition", func(t *testing.T) {

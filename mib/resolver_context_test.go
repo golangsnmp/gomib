@@ -9,12 +9,6 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
-// Test-only helpers for wellKnownTypes classification.
-func isASN1Primitive(name string) bool   { return wellKnownTypes[name] == typeClassASN1Primitive }
-func isSmiGlobalType(name string) bool   { return wellKnownTypes[name] == typeClassSmiGlobal }
-func isSmiV1GlobalType(name string) bool { return wellKnownTypes[name] == typeClassSmiV1Global }
-func isSNMPv2TCType(name string) bool    { return wellKnownTypes[name] == typeClassSNMPv2TC }
-
 // testNodeArc is an atomic counter for creating unique test nodes.
 // Atomic to avoid races if tests run in parallel.
 var testNodeArc atomic.Uint32
@@ -99,472 +93,6 @@ func TestRecordUnresolvedSeverityConsistency(t *testing.T) {
 	}
 }
 
-func TestIsASN1Primitive(t *testing.T) {
-	positives := []string{"INTEGER", "OCTET STRING", "OBJECT IDENTIFIER", "BITS"}
-	for _, name := range positives {
-		testutil.True(t, isASN1Primitive(name), "isASN1Primitive() = false, want true")
-	}
-
-	negatives := []string{
-		"Integer32", "Counter32", "DisplayString", "integer",
-		"OCTETSTRING", "OBJECT-IDENTIFIER", "", "Counter",
-	}
-	for _, name := range negatives {
-		testutil.False(t, isASN1Primitive(name), "isASN1Primitive(%q) = true, want false", name)
-	}
-}
-
-func TestIsSmiGlobalType(t *testing.T) {
-	positives := []string{
-		"Integer32", "Counter32", "Counter64", "Gauge32",
-		"Unsigned32", "TimeTicks", "IpAddress", "Opaque",
-	}
-	for _, name := range positives {
-		testutil.True(t, isSmiGlobalType(name), "isSmiGlobalType() = false, want true")
-	}
-
-	negatives := []string{
-		"INTEGER", "Counter", "Gauge", "DisplayString",
-		"integer32", "NetworkAddress", "",
-	}
-	for _, name := range negatives {
-		testutil.False(t, isSmiGlobalType(name), "isSmiGlobalType(%q) = true, want false", name)
-	}
-}
-
-func TestIsSmiV1GlobalType(t *testing.T) {
-	positives := []string{"Counter", "Gauge", "NetworkAddress"}
-	for _, name := range positives {
-		testutil.True(t, isSmiV1GlobalType(name), "isSmiV1GlobalType() = false, want true")
-	}
-
-	negatives := []string{
-		"Counter32", "Gauge32", "IpAddress", "INTEGER",
-		"counter", "TimeTicks", "",
-	}
-	for _, name := range negatives {
-		testutil.False(t, isSmiV1GlobalType(name), "isSmiV1GlobalType(%q) = true, want false", name)
-	}
-}
-
-func TestIsSNMPv2TCType(t *testing.T) {
-	positives := []string{
-		"DisplayString", "TruthValue", "PhysAddress", "MacAddress",
-		"RowStatus", "TimeStamp", "TimeInterval", "DateAndTime",
-		"StorageType", "TestAndIncr", "AutonomousType",
-		"VariablePointer", "RowPointer", "InstancePointer",
-		"TDomain", "TAddress",
-	}
-	for _, name := range positives {
-		testutil.True(t, isSNMPv2TCType(name), "isSNMPv2TCType() = false, want true")
-	}
-
-	negatives := []string{
-		"INTEGER", "Counter32", "IpAddress", "displaystring",
-		"Counter", "Gauge32", "",
-	}
-	for _, name := range negatives {
-		testutil.False(t, isSNMPv2TCType(name), "isSNMPv2TCType(%q) = true, want false", name)
-	}
-}
-
-func TestLookupInScope(t *testing.T) {
-	modA := &module.Module{Name: "A"}
-	modB := &module.Module{Name: "B"}
-	nodeX := newTestNode("x")
-
-	tests := []struct {
-		name    string
-		symbols map[*module.Module]map[string]*Node
-		imports map[*module.Module]map[string]*module.Module
-		wantOK  bool
-		want    *Node
-	}{
-		{
-			name:    "direct",
-			symbols: map[*module.Module]map[string]*Node{modA: {"x": nodeX}},
-			imports: map[*module.Module]map[string]*module.Module{},
-			wantOK:  true,
-			want:    nodeX,
-		},
-		{
-			name:    "import chain",
-			symbols: map[*module.Module]map[string]*Node{modB: {"x": nodeX}},
-			imports: map[*module.Module]map[string]*module.Module{modA: {"x": modB}},
-			wantOK:  true,
-			want:    nodeX,
-		},
-		{
-			name:    "import target lacks symbol",
-			symbols: map[*module.Module]map[string]*Node{},
-			imports: map[*module.Module]map[string]*module.Module{modA: {"x": modB}},
-			wantOK:  false,
-		},
-		{
-			name:    "not found",
-			symbols: map[*module.Module]map[string]*Node{},
-			imports: map[*module.Module]map[string]*module.Module{},
-			wantOK:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, ok := lookupInScope(modA, "x",
-				func(m *module.Module) map[string]*Node { return tt.symbols[m] },
-				func(m *module.Module) map[string]*module.Module { return tt.imports[m] },
-				nil,
-			)
-			testutil.Equal(t, tt.wantOK, ok, "ok")
-			if tt.wantOK {
-				testutil.Equal(t, tt.want, got, "result")
-			}
-		})
-	}
-}
-
-func TestLookupNode(t *testing.T) {
-	ctx := newTestContext()
-	modA := &module.Module{Name: "A"}
-	modB := &module.Module{Name: "B"}
-	nodeX := newTestNode("x")
-
-	// Register node in B, import from A -> B.
-	ctx.moduleSymbolToNode[modB] = map[string]*Node{"x": nodeX}
-	ctx.moduleImports[modA] = map[string]*module.Module{"x": modB}
-
-	got, ok := ctx.lookupNode(modA, "x")
-	testutil.True(t, ok, "lookupNode: expected ok")
-	testutil.Equal(t, nodeX, got, "lookupNode: expected nodeX")
-
-	_, ok = ctx.lookupNode(modA, "y")
-	testutil.False(t, ok, "lookupNode: expected false for unknown symbol")
-}
-
-func TestLookupObject(t *testing.T) {
-	modA := &module.Module{Name: "A"}
-	modB := &module.Module{Name: "B"}
-
-	t.Run("prefers current module object", func(t *testing.T) {
-		ctx := newTestContext()
-		resolvedA := newModule("A")
-		resolvedB := newModule("B")
-		ctx.moduleToResolved[modA] = resolvedA
-		ctx.moduleToResolved[modB] = resolvedB
-		ctx.moduleImports[modA] = map[string]*module.Module{"sharedObj": modB}
-
-		localObj := newObject("sharedObj")
-		importedObj := newObject("sharedObj")
-		resolvedA.addObject(localObj)
-		resolvedB.addObject(importedObj)
-
-		got := ctx.lookupObject(modA, "sharedObj")
-		testutil.Equal(t, localObj, got, "lookup should prefer the current module object")
-		testutil.Nil(t, ctx.usedImports[modA], "local lookups should not mark imports used")
-	})
-
-	t.Run("resolves imported object and marks usage", func(t *testing.T) {
-		ctx := newTestContext()
-		resolvedA := newModule("A")
-		resolvedB := newModule("B")
-		ctx.moduleToResolved[modA] = resolvedA
-		ctx.moduleToResolved[modB] = resolvedB
-		ctx.moduleImports[modA] = map[string]*module.Module{"importedObj": modB}
-
-		importedObj := newObject("importedObj")
-		resolvedB.addObject(importedObj)
-
-		got := ctx.lookupObject(modA, "importedObj")
-		testutil.Equal(t, importedObj, got, "lookup should return imported object")
-		testutil.True(t, ctx.usedImports[modA] != nil, "imported lookup should create usage tracking")
-		_, ok := ctx.usedImports[modA]["importedObj"]
-		testutil.True(t, ok, "imported lookup should mark the symbol as used")
-	})
-
-	t.Run("returns nil when imported module lacks object", func(t *testing.T) {
-		ctx := newTestContext()
-		resolvedA := newModule("A")
-		resolvedB := newModule("B")
-		ctx.moduleToResolved[modA] = resolvedA
-		ctx.moduleToResolved[modB] = resolvedB
-		ctx.moduleImports[modA] = map[string]*module.Module{"missingObj": modB}
-
-		got := ctx.lookupObject(modA, "missingObj")
-		testutil.Nil(t, got, "lookup should fail when the imported module has no object")
-		testutil.Nil(t, ctx.usedImports[modA], "failed imported lookups should not mark usage")
-	})
-}
-
-func TestResolveObject(t *testing.T) {
-	modA := &module.Module{Name: "A"}
-	modB := &module.Module{Name: "B"}
-
-	t.Run("returns object from module scope", func(t *testing.T) {
-		ctx := newTestContext()
-		resolvedA := newModule("A")
-		ctx.moduleToResolved[modA] = resolvedA
-		nodeX := newTestNode("x")
-		ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
-
-		obj := newObject("x")
-		resolvedA.addObject(obj)
-
-		got, nodeFound := ctx.resolveObject(modA, "x")
-		testutil.Equal(t, obj, got, "should return module-scoped object")
-		testutil.True(t, nodeFound, "nodeFound should be true")
-	})
-
-	t.Run("returns nodeFound true with nil object when node has no object", func(t *testing.T) {
-		ctx := newTestContext()
-		resolvedA := newModule("A")
-		ctx.moduleToResolved[modA] = resolvedA
-		nodeX := newTestNode("x")
-		ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
-
-		got, nodeFound := ctx.resolveObject(modA, "x")
-		testutil.Nil(t, got, "should return nil when node has no object")
-		testutil.True(t, nodeFound, "nodeFound should be true when node exists")
-	})
-
-	t.Run("falls back to global lookup when permissive", func(t *testing.T) {
-		ctx := newResolverContext(nil, ResolverPermissive, DefaultConfig())
-		resolvedA := newModule("A")
-		resolvedB := newModule("B")
-		ctx.moduleToResolved[modA] = resolvedA
-		ctx.moduleToResolved[modB] = resolvedB
-		ctx.modules = []*module.Module{modA, modB}
-
-		nodeY := newTestNode("y")
-		obj := newObject("y")
-		nodeY.setObject(obj)
-		ctx.moduleSymbolToNode[modB] = map[string]*Node{"y": nodeY}
-
-		got, nodeFound := ctx.resolveObject(modA, "y")
-		testutil.Equal(t, obj, got, "should return object via global fallback")
-		testutil.True(t, nodeFound, "nodeFound should be true")
-	})
-
-	t.Run("does not use global fallback when normal strictness", func(t *testing.T) {
-		ctx := newTestContext() // ResolverNormal
-		resolvedA := newModule("A")
-		resolvedB := newModule("B")
-		ctx.moduleToResolved[modA] = resolvedA
-		ctx.moduleToResolved[modB] = resolvedB
-		ctx.modules = []*module.Module{modA, modB}
-
-		nodeY := newTestNode("y")
-		obj := newObject("y")
-		nodeY.setObject(obj)
-		ctx.moduleSymbolToNode[modB] = map[string]*Node{"y": nodeY}
-
-		got, nodeFound := ctx.resolveObject(modA, "y")
-		testutil.Nil(t, got, "should not find object without global fallback")
-		testutil.False(t, nodeFound, "nodeFound should be false")
-	})
-
-	t.Run("returns false for completely unknown name", func(t *testing.T) {
-		ctx := newTestContext()
-		resolvedA := newModule("A")
-		ctx.moduleToResolved[modA] = resolvedA
-
-		got, nodeFound := ctx.resolveObject(modA, "nonexistent")
-		testutil.Nil(t, got, "should return nil for unknown name")
-		testutil.False(t, nodeFound, "nodeFound should be false for unknown name")
-	})
-}
-
-func TestLookupNodeByModuleName(t *testing.T) {
-	ctx := newTestContext()
-	modA := &module.Module{Name: "MY-MIB"}
-	nodeX := newTestNode("x")
-
-	ctx.moduleIndex["MY-MIB"] = []*module.Module{modA}
-	ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
-
-	got, ok := ctx.lookupNodeByModuleName("MY-MIB", "x")
-	testutil.True(t, ok, "lookupNodeByModuleName: expected ok")
-	testutil.Equal(t, nodeX, got, "lookupNodeByModuleName: expected nodeX")
-
-	_, ok = ctx.lookupNodeByModuleName("OTHER-MIB", "x")
-	testutil.False(t, ok, "lookupNodeByModuleName: expected false for unknown module")
-}
-
-func TestLookupNodeByModuleName_MultipleVersions(t *testing.T) {
-	ctx := newTestContext()
-	modV1 := &module.Module{Name: "MY-MIB"}
-	modV2 := &module.Module{Name: "MY-MIB"}
-	nodeX := newTestNode("x")
-
-	// Only the second version has the symbol.
-	ctx.moduleIndex["MY-MIB"] = []*module.Module{modV1, modV2}
-	ctx.moduleSymbolToNode[modV2] = map[string]*Node{"x": nodeX}
-
-	got, ok := ctx.lookupNodeByModuleName("MY-MIB", "x")
-	testutil.True(t, ok, "expected to find nodeX in second version")
-	testutil.Equal(t, nodeX, got, "expected nodeX in second version")
-}
-
-func TestLookupNodeGlobal(t *testing.T) {
-	modA := &module.Module{Name: "A"}
-	modB := &module.Module{Name: "B"}
-	nodeX := newTestNode("x")
-	nodeY := newTestNode("y")
-	nodeXdup := newTestNode("x")
-
-	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
-	ctx.modules = []*module.Module{modA, modB}
-	ctx.moduleSymbolToNode[modA] = map[string]*Node{"x": nodeX}
-	ctx.moduleSymbolToNode[modB] = map[string]*Node{"x": nodeXdup, "y": nodeY}
-
-	got, ok := ctx.lookupNodeGlobal("x")
-	testutil.True(t, ok, "lookupNodeGlobal(x): expected ok")
-	testutil.Equal(t, nodeX, got, "lookupNodeGlobal(x): first module should win")
-
-	got, ok = ctx.lookupNodeGlobal("y")
-	testutil.True(t, ok, "lookupNodeGlobal(y): expected ok")
-	testutil.Equal(t, nodeY, got, "lookupNodeGlobal(y): expected nodeY")
-
-	_, ok = ctx.lookupNodeGlobal("z")
-	testutil.False(t, ok, "lookupNodeGlobal(z): expected false")
-}
-
-func TestResolveTypeForModule(t *testing.T) {
-	// Test type lookup via import chain.
-	ctx := newTestContext()
-	modA := &module.Module{Name: "A"}
-	modB := &module.Module{Name: "B"}
-	typeX := newType("MyType")
-
-	ctx.moduleSymbolToType[modB] = map[string]*Type{"MyType": typeX}
-	ctx.moduleImports[modA] = map[string]*module.Module{"MyType": modB}
-
-	got, ok := ctx.resolveTypeForModule(modA, "MyType")
-	testutil.True(t, ok, "resolveTypeForModule: expected ok")
-	testutil.Equal(t, typeX, got, "resolveTypeForModule: expected typeX")
-}
-
-func TestResolveTypeForModule_ASN1Fallback(t *testing.T) {
-	// ASN.1 primitives should resolve even without explicit import.
-	ctx := newTestContext()
-	modA := &module.Module{Name: "A"}
-	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	intType := newType("INTEGER")
-
-	ctx.snmpv2SMIModule = smiMod
-	ctx.moduleSymbolToType[smiMod] = map[string]*Type{"INTEGER": intType}
-
-	got, ok := ctx.resolveTypeForModule(modA, "INTEGER")
-	testutil.True(t, ok, "expected ASN.1 primitive fallback")
-	testutil.Equal(t, intType, got, "expected ASN.1 primitive fallback")
-}
-
-func TestTypeLookupFallbacks_Normal(t *testing.T) {
-	// In Normal mode, well-known types resolve via both resolveType and
-	// resolveTypeForModule without explicit imports.
-	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
-	modA := &module.Module{Name: "A"}
-
-	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	rfc1155Mod := &module.Module{Name: "RFC1155-SMI"}
-	tcMod := &module.Module{Name: "SNMPv2-TC"}
-
-	intType := newType("INTEGER")
-	counter32 := newType("Counter32")
-	counter := newType("Counter")
-	displayString := newType("DisplayString")
-
-	ctx.snmpv2SMIModule = smiMod
-	ctx.rfc1155SMIModule = rfc1155Mod
-	ctx.snmpv2TCModule = tcMod
-	ctx.moduleSymbolToType[smiMod] = map[string]*Type{
-		"INTEGER":   intType,
-		"Counter32": counter32,
-	}
-	ctx.moduleSymbolToType[rfc1155Mod] = map[string]*Type{"Counter": counter}
-	ctx.moduleSymbolToType[tcMod] = map[string]*Type{"DisplayString": displayString}
-
-	tests := []struct {
-		name string
-		want *Type
-	}{
-		{"INTEGER", intType},
-		{"Counter32", counter32},
-		{"Counter", counter},
-		{"DisplayString", displayString},
-	}
-	for _, tt := range tests {
-		got, ok := ctx.resolveType(tt.name)
-		testutil.True(t, ok, "resolveType(%q): expected ok", tt.name)
-		testutil.Equal(t, tt.want, got, "resolveType(%q)", tt.name)
-
-		got, ok = ctx.resolveTypeForModule(modA, tt.name)
-		testutil.True(t, ok, "resolveTypeForModule(%q): expected ok", tt.name)
-		testutil.Equal(t, tt.want, got, "resolveTypeForModule(%q)", tt.name)
-	}
-}
-
-func TestTypeLookupFallbacks_Strict(t *testing.T) {
-	// In Strict mode, only ASN.1 primitives resolve without import.
-	ctx := newResolverContext(nil, ResolverStrict, VerboseConfig())
-	modA := &module.Module{Name: "A"}
-
-	smiMod := &module.Module{Name: "SNMPv2-SMI"}
-	intType := newType("INTEGER")
-	counter32 := newType("Counter32")
-
-	ctx.snmpv2SMIModule = smiMod
-	ctx.moduleSymbolToType[smiMod] = map[string]*Type{
-		"INTEGER":   intType,
-		"Counter32": counter32,
-	}
-
-	// ASN.1 primitives resolve via both entry points.
-	got, ok := ctx.resolveType("INTEGER")
-	testutil.True(t, ok, "resolveType(INTEGER): expected ok in strict mode")
-	testutil.Equal(t, intType, got, "resolveType(INTEGER)")
-
-	got, ok = ctx.resolveTypeForModule(modA, "INTEGER")
-	testutil.True(t, ok, "resolveTypeForModule(INTEGER): expected ok in strict mode")
-	testutil.Equal(t, intType, got, "resolveTypeForModule(INTEGER)")
-
-	// Non-primitives do not resolve via either entry point.
-	_, ok = ctx.resolveType("Counter32")
-	testutil.False(t, ok, "resolveType(Counter32): expected false in strict mode")
-
-	_, ok = ctx.resolveTypeForModule(modA, "Counter32")
-	testutil.False(t, ok, "resolveTypeForModule(Counter32): expected false in strict mode")
-}
-
-func TestResolveType_GlobalModuleScan(t *testing.T) {
-	// In permissive mode, resolveType scans all modules for unknown types.
-	modA := &module.Module{Name: "A"}
-	vendorType := newType("VendorSpecialType")
-
-	ctx := newResolverContext(nil, ResolverPermissive, DefaultConfig())
-	ctx.modules = []*module.Module{modA}
-	ctx.snmpv2SMIModule = &module.Module{Name: "SNMPv2-SMI"}
-	ctx.moduleSymbolToType[modA] = map[string]*Type{"VendorSpecialType": vendorType}
-
-	got, ok := ctx.resolveType("VendorSpecialType")
-	testutil.True(t, ok, "expected global module scan to find vendor type in permissive mode")
-	testutil.Equal(t, vendorType, got, "expected global module scan to find vendor type in permissive mode")
-}
-
-func TestResolveType_GlobalModuleScan_StrictRejects(t *testing.T) {
-	// In strict mode, resolveType should NOT scan all modules for unknown types.
-	// A vendor type that exists in another module should not be discoverable.
-	modA := &module.Module{Name: "A"}
-	vendorType := newType("VendorSpecialType")
-
-	ctx := newResolverContext(nil, ResolverStrict, VerboseConfig())
-	ctx.modules = []*module.Module{modA}
-	ctx.snmpv2SMIModule = &module.Module{Name: "SNMPv2-SMI"}
-	ctx.moduleSymbolToType[modA] = map[string]*Type{"VendorSpecialType": vendorType}
-
-	_, ok := ctx.resolveType("VendorSpecialType")
-	testutil.False(t, ok, "strict mode should not find vendor type via global module scan")
-}
-
 func TestRegisterImport(t *testing.T) {
 	ctx := newTestContext()
 	modA := &module.Module{Name: "A"}
@@ -572,14 +100,14 @@ func TestRegisterImport(t *testing.T) {
 
 	ctx.registerImport(modA, "foo", modB)
 
-	imports := ctx.moduleImports[modA]
+	imports := ctx.importSources[modA]
 	testutil.NotNil(t, imports, "expected imports map to be created")
 	testutil.Equal(t, modB, imports["foo"], "expected import to point to modB")
 
 	// Register a second import in the same module.
 	modC := &module.Module{Name: "C"}
 	ctx.registerImport(modA, "bar", modC)
-	testutil.Equal(t, modC, ctx.moduleImports[modA]["bar"], "expected second import to point to modC")
+	testutil.Equal(t, modC, ctx.importSources[modA]["bar"], "expected second import to point to modC")
 }
 
 func TestRegisterModuleNodeSymbol(t *testing.T) {
@@ -589,14 +117,14 @@ func TestRegisterModuleNodeSymbol(t *testing.T) {
 
 	ctx.registerModuleNodeSymbol(mod, "sysDescr", node)
 
-	symbols := ctx.moduleSymbolToNode[mod]
+	symbols := ctx.nodeSymbols[mod]
 	testutil.NotNil(t, symbols, "expected symbol map to be created")
 	testutil.Equal(t, node, symbols["sysDescr"], "expected registered node")
 
 	// Overwrite should succeed.
 	node2 := newTestNode("sysDescr")
 	ctx.registerModuleNodeSymbol(mod, "sysDescr", node2)
-	testutil.Equal(t, node2, ctx.moduleSymbolToNode[mod]["sysDescr"], "expected overwritten node")
+	testutil.Equal(t, node2, ctx.nodeSymbols[mod]["sysDescr"], "expected overwritten node")
 }
 
 func TestRegisterModuleTypeSymbol(t *testing.T) {
@@ -606,7 +134,7 @@ func TestRegisterModuleTypeSymbol(t *testing.T) {
 
 	ctx.registerModuleTypeSymbol(mod, "MyType", typ)
 
-	symbols := ctx.moduleSymbolToType[mod]
+	symbols := ctx.typeSymbols[mod]
 	testutil.NotNil(t, symbols, "expected symbol map to be created")
 	testutil.Equal(t, typ, symbols["MyType"], "expected registered type")
 }
@@ -722,7 +250,7 @@ func TestEmitDiagnostic_Fields(t *testing.T) {
 	testutil.Equal(t, "something happened", d.Message, "Message")
 }
 
-func TestFinalizeUnresolved(t *testing.T) {
+func TestRecordUnresolved_WritesToMib(t *testing.T) {
 	ctx := newTestContext()
 	mod := &module.Module{Name: "TEST-MIB"}
 	span := types.Span{}
@@ -733,26 +261,20 @@ func TestFinalizeUnresolved(t *testing.T) {
 	ctx.RecordUnresolvedIndex(mod, "row1", "idx1", span)
 	ctx.RecordUnresolvedNotificationObject(mod, "notif1", "obj2", span)
 
-	ctx.FinalizeUnresolved()
+	unresolved := ctx.mib.Unresolved()
+	testutil.Len(t, unresolved, 5, "expected 5 unresolved refs")
 
-	result := ctx.mib
-	unresolved := result.Unresolved()
-
-	// We expect 5 unresolved refs.
-	testutil.Len(t, unresolved, 5, "expected 5 unresolved refs, got")
-
-	// Verify each kind is present with correct reason.
 	kindCounts := map[UnresolvedKind]int{}
 	reasonByKind := map[UnresolvedKind]string{}
 	for _, u := range unresolved {
 		kindCounts[u.Kind]++
 		reasonByKind[u.Kind] = u.Reason
-		testutil.Equal(t, "TEST-MIB", u.Module, "unresolved ref kind")
+		testutil.Equal(t, "TEST-MIB", u.Module, "module name")
 	}
 
 	expectedKinds := []UnresolvedKind{UnresolvedImport, UnresolvedType, UnresolvedOID, UnresolvedIndex, UnresolvedNotificationObject}
 	for _, k := range expectedKinds {
-		testutil.Equal(t, 1, kindCounts[k], "expected 1 unresolved ref of kind , got")
+		testutil.Equal(t, 1, kindCounts[k], "count for kind")
 	}
 
 	testutil.Equal(t, "module_not_found", reasonByKind[UnresolvedImport], "import reason")
@@ -761,12 +283,10 @@ func TestFinalizeUnresolved(t *testing.T) {
 	testutil.Equal(t, "unknown_index_object", reasonByKind[UnresolvedIndex], "index reason")
 	testutil.Equal(t, "unknown_object", reasonByKind[UnresolvedNotificationObject], "notif object reason")
 
-	// Diagnostics should also be copied.
-	diags := result.Diagnostics()
-	testutil.Len(t, diags, 5, "expected 5 diagnostics, got")
+	testutil.Len(t, ctx.Diagnostics(), 5, "expected 5 diagnostics")
 }
 
-func TestFinalizeUnresolved_NilModule(t *testing.T) {
+func TestRecordUnresolved_NilModule(t *testing.T) {
 	ctx := newTestContext()
 	span := types.Span{}
 
@@ -776,59 +296,19 @@ func TestFinalizeUnresolved_NilModule(t *testing.T) {
 	ctx.RecordUnresolvedIndex(nil, "row1", "idx1", span)
 	ctx.RecordUnresolvedNotificationObject(nil, "notif1", "obj2", span)
 
-	ctx.FinalizeUnresolved()
-
-	result := ctx.mib
-	for _, u := range result.Unresolved() {
-		testutil.Equal(t, "", u.Module, "unresolved ref kind")
-		// Reason should still be populated even with nil module.
+	for _, u := range ctx.mib.Unresolved() {
+		testutil.Equal(t, "", u.Module, "module should be empty for nil")
 		testutil.True(t, u.Reason != "", "expected non-empty reason for kind %s", u.Kind)
 	}
 }
 
-func TestCopyUsedImportsToModules_Direct(t *testing.T) {
-	importer := &module.Module{Name: "IMPORTER-MIB"}
-	source := &module.Module{Name: "SOURCE-MIB"}
-	ctx := newTestContextForModules(DefaultConfig(), importer, source)
+func TestFinalizeDiagnostics(t *testing.T) {
+	ctx := newTestContext()
+	mod := &module.Module{Name: "TEST-MIB"}
+	ctx.EmitDiagnostic(types.DiagParseError, mod, types.Span{}, "test error")
+	ctx.FinalizeDiagnostics()
 
-	ctx.usedImports[importer] = map[string]struct{}{
-		"usedOne": {},
-		"usedTwo": {},
-	}
-	ctx.usedImports[&module.Module{Name: "UNMAPPED-MIB"}] = map[string]struct{}{
-		"ignored": {},
-	}
-
-	copyUsedImportsToModules(ctx)
-
-	resolvedImporter := ctx.moduleToResolved[importer]
-	testutil.True(t, resolvedImporter.IsImportUsed("usedOne"), "usedOne should be copied to the resolved module")
-	testutil.True(t, resolvedImporter.IsImportUsed("usedTwo"), "usedTwo should be copied to the resolved module")
-	testutil.False(t, resolvedImporter.IsImportUsed("ignored"), "usage from unmapped modules should be ignored")
-}
-
-func TestCopyResolvedImportsToModules_Direct(t *testing.T) {
-	importer := &module.Module{Name: "IMPORTER-MIB"}
-	source := &module.Module{Name: "SOURCE-MIB"}
-	unmapped := &module.Module{Name: "UNMAPPED-MIB"}
-	ctx := newTestContextForModules(DefaultConfig(), importer, source)
-
-	ctx.moduleImports[importer] = map[string]*module.Module{
-		"goodImport": source,
-		"skipImport": unmapped,
-	}
-
-	copyResolvedImportsToModules(ctx)
-
-	resolvedImporter := ctx.moduleToResolved[importer]
-	resolvedSource := ctx.moduleToResolved[source]
-	testutil.Equal(t, resolvedSource, resolvedImporter.ImportSource("goodImport"), "resolved import source")
-	testutil.Nil(t, resolvedImporter.ImportSource("skipImport"), "imports without resolved module mappings should be skipped")
-}
-
-func TestDiagnosticConfig_Getter(t *testing.T) {
-	config := DefaultConfig()
-	ctx := newResolverContext(nil, ResolverNormal, config)
-	got := ctx.DiagnosticConfig()
-	testutil.Equal(t, config.Reporting, got.Reporting, "DiagnosticConfig().Reporting")
+	diags := ctx.mib.Diagnostics()
+	testutil.Len(t, diags, 1, "expected 1 diagnostic copied to mib")
+	testutil.Equal(t, "test error", diags[0].Message, "message")
 }

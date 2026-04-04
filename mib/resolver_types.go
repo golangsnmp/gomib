@@ -207,16 +207,12 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 
 // findTypeDefiningModule finds the module that defines a type, following imports.
 func findTypeDefiningModule(ctx *resolverContext, fromMod *module.Module, typeName string) string {
-	if defNames := ctx.moduleDefNames[fromMod]; defNames != nil {
-		if _, ok := defNames[typeName]; ok {
-			return fromMod.Name
-		}
+	if ctx.defNames.has(fromMod, typeName) {
+		return fromMod.Name
 	}
 
-	if imports := ctx.moduleImports[fromMod]; imports != nil {
-		if srcMod := imports[typeName]; srcMod != nil {
-			return srcMod.Name
-		}
+	if srcMod, ok := ctx.importSources.get(fromMod, typeName); ok {
+		return srcMod.Name
 	}
 
 	if m := ctx.findWellKnownModuleForType(typeName); m != nil {

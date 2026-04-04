@@ -149,16 +149,12 @@ func lookupNamedParentSymbol(ctx *resolverContext, def oidDefinition, name strin
 // findOidDefiningModule finds the module that defines an OID symbol,
 // checking local definitions first, then imports.
 func findOidDefiningModule(ctx *resolverContext, fromMod *module.Module, name string) string {
-	if oidDefs := ctx.moduleOidDefNames[fromMod]; oidDefs != nil {
-		if _, ok := oidDefs[name]; ok {
-			return fromMod.Name
-		}
+	if ctx.oidDefNames.has(fromMod, name) {
+		return fromMod.Name
 	}
 
-	if imports := ctx.moduleImports[fromMod]; imports != nil {
-		if srcMod := imports[name]; srcMod != nil {
-			return srcMod.Name
-		}
+	if srcMod, ok := ctx.importSources.get(fromMod, name); ok {
+		return srcMod.Name
 	}
 
 	return ""
@@ -185,9 +181,12 @@ func recordRecursiveOid(ctx *resolverContext, def oidDefinition, scc []graph.Sym
 		msg = fmt.Sprintf("recursive OID: %s is in a cycle with %s", defName, strings.Join(others, ", "))
 	}
 
-	recordUnresolved(ctx, &ctx.unresolvedOids, unresolvedOid{
-		module: def.mod, definition: defName, span: span,
-	}, def.mod, span, types.DiagOidRecursive, msg)
+	ctx.EmitDiagnostic(types.DiagOidRecursive, def.mod, span, msg)
+	ctx.mib.addUnresolved(UnresolvedRef{
+		Kind:   UnresolvedOID,
+		Module: def.mod.Name,
+		Reason: "recursive_oid",
+	})
 }
 
 // checkSmiv2IdentifierHyphens emits a diagnostic for OID definition names

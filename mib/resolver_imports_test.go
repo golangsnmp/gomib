@@ -142,7 +142,7 @@ func makeTestModule(ctx *resolverContext, name string, defNames []string) *modul
 	for _, n := range defNames {
 		defs[n] = struct{}{}
 	}
-	ctx.moduleDefNames[mod] = defs
+	ctx.defNames[mod] = defs
 	return mod
 }
 
@@ -198,7 +198,7 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 				},
 			},
 		}
-		ctx.moduleDefNames[modOld] = map[string]struct{}{
+		ctx.defNames[modOld] = map[string]struct{}{
 			"foo": {},
 			"bar": {},
 		}
@@ -213,7 +213,7 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 				},
 			},
 		}
-		ctx.moduleDefNames[modNew] = map[string]struct{}{
+		ctx.defNames[modNew] = map[string]struct{}{
 			"foo": {},
 			"bar": {},
 		}
@@ -259,8 +259,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "SNMPv2-SMI",
 			syms("MODULE-IDENTITY", "OBJECT-TYPE"))
 		// No imports registered, no unresolved recorded
-		testutil.Equal(t, 0, len(ctx.moduleImports[importing]), "expected no imports for macro-only symbols")
-		testutil.Len(t, ctx.unresolvedImports, 0, "expected no unresolved imports for macro-only symbols")
+		testutil.Equal(t, 0, len(ctx.importSources[importing]), "expected no imports for macro-only symbols")
+		testutil.Len(t, unresolvedByKind(ctx, UnresolvedImport), 0, "expected no unresolved imports for macro-only symbols")
 	})
 
 	t.Run("direct resolution", func(t *testing.T) {
@@ -272,7 +272,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "SOURCE-MIB",
 			syms("sysDescr", "sysName"))
 
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, 2, len(imports), "import count")
 		testutil.Equal(t, source, imports["sysDescr"], "sysDescr should resolve to SOURCE-MIB")
 		testutil.Equal(t, source, imports["sysName"], "sysName should resolve to SOURCE-MIB")
@@ -287,7 +287,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "SOURCE-MIB",
 			syms("OBJECT-TYPE", "sysDescr"))
 
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, 1, len(imports), "import count")
 		testutil.Equal(t, source, imports["sysDescr"], "sysDescr should resolve to SOURCE-MIB")
 	})
@@ -303,7 +303,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "SNMPv2-SMI-v1",
 			syms("enterprises", "Counter32"))
 
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, 2, len(imports), "import count")
 		testutil.Equal(t, source, imports["enterprises"], "enterprises should resolve via alias to SNMPv2-SMI")
 	})
@@ -317,8 +317,8 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "SNMPv2-SMI-v1",
 			syms("enterprises"))
 
-		testutil.Equal(t, 0, len(ctx.moduleImports[importing]), "alias should not resolve in strict mode")
-		testutil.Equal(t, 1, len(ctx.unresolvedImports), "strict should record unresolved aliased import")
+		testutil.Equal(t, 0, len(ctx.importSources[importing]), "alias should not resolve in strict mode")
+		testutil.Equal(t, 1, len(unresolvedByKind(ctx, UnresolvedImport)), "strict should record unresolved aliased import")
 	})
 
 	t.Run("forwarding resolution", func(t *testing.T) {
@@ -335,7 +335,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 				{Module: "REAL-SOURCE", Symbol: "remoteSym"},
 			},
 		}
-		ctx.moduleDefNames[intermediate] = map[string]struct{}{
+		ctx.defNames[intermediate] = map[string]struct{}{
 			"localDef": {},
 		}
 		ctx.moduleIndex["INTERMEDIATE"] = []*module.Module{intermediate}
@@ -344,7 +344,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "INTERMEDIATE",
 			syms("localDef", "remoteSym"))
 
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, 2, len(imports), "import count")
 		testutil.Equal(t, intermediate, imports["localDef"], "localDef should come from INTERMEDIATE")
 		testutil.Equal(t, realSource, imports["remoteSym"], "remoteSym should be forwarded from REAL-SOURCE")
@@ -361,13 +361,14 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "PARTIAL-MIB",
 			syms("found1", "found2", "missing1"))
 
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, 2, len(imports), "import count")
 		testutil.Equal(t, source, imports["found1"], "found1 should resolve to PARTIAL-MIB")
 		testutil.Equal(t, source, imports["found2"], "found2 should resolve to PARTIAL-MIB")
-		testutil.Len(t, ctx.unresolvedImports, 1, "unresolved count")
-		testutil.Equal(t, "missing1", ctx.unresolvedImports[0].symbol, "unresolved symbol")
-		testutil.Equal(t, reasonSymbolNotExported, ctx.unresolvedImports[0].reason, "unresolved reason")
+		unresImports := unresolvedByKind(ctx, UnresolvedImport)
+		testutil.Len(t, unresImports, 1, "unresolved count")
+		testutil.Equal(t, "missing1", unresImports[0].Symbol, "unresolved symbol")
+		testutil.Equal(t, reasonSymbolNotExported, unresImports[0].Reason, "unresolved reason")
 	})
 
 	t.Run("partial resolution keeps forwarded symbols", func(t *testing.T) {
@@ -382,7 +383,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 				{Module: "REAL-SOURCE", Symbol: "forwarded"},
 			},
 		}
-		ctx.moduleDefNames[source] = map[string]struct{}{
+		ctx.defNames[source] = map[string]struct{}{
 			"local": {},
 		}
 		ctx.moduleIndex["PARTIAL-FWD-MIB"] = []*module.Module{source}
@@ -391,13 +392,14 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "PARTIAL-FWD-MIB",
 			syms("local", "forwarded", "missing"))
 
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, 2, len(imports), "import count")
 		testutil.Equal(t, source, imports["local"], "local should resolve to PARTIAL-FWD-MIB")
 		testutil.Equal(t, realSource, imports["forwarded"], "forwarded should resolve to REAL-SOURCE")
-		testutil.Len(t, ctx.unresolvedImports, 1, "unresolved count")
-		testutil.Equal(t, "missing", ctx.unresolvedImports[0].symbol, "unresolved symbol")
-		testutil.Equal(t, reasonSymbolNotExported, ctx.unresolvedImports[0].reason, "unresolved reason")
+		fwdImports := unresolvedByKind(ctx, UnresolvedImport)
+		testutil.Len(t, fwdImports, 1, "unresolved count")
+		testutil.Equal(t, "missing", fwdImports[0].Symbol, "unresolved symbol")
+		testutil.Equal(t, reasonSymbolNotExported, fwdImports[0].Reason, "unresolved reason")
 	})
 
 	t.Run("module not found", func(t *testing.T) {
@@ -406,9 +408,10 @@ func TestResolveImportsFromModule(t *testing.T) {
 		resolveImportsFromModule(ctx, importing, "NONEXISTENT-MIB",
 			syms("something"))
 
-		testutil.Equal(t, 0, len(ctx.moduleImports[importing]), "expected no imports when module is not found")
-		testutil.Len(t, ctx.unresolvedImports, 1, "unresolved count")
-		testutil.Equal(t, reasonModuleNotFound, ctx.unresolvedImports[0].reason, "reason")
+		testutil.Equal(t, 0, len(ctx.importSources[importing]), "expected no imports when module is not found")
+		notFoundImports := unresolvedByKind(ctx, UnresolvedImport)
+		testutil.Len(t, notFoundImports, 1, "unresolved count")
+		testutil.Equal(t, reasonModuleNotFound, notFoundImports[0].Reason, "reason")
 
 		diags := ctx.Diagnostics()
 		found := false
@@ -433,9 +436,10 @@ func TestResolveImportsFromModule(t *testing.T) {
 
 		// Partial resolution is active at all levels, so missing symbols
 		// are reported as symbol_not_exported, not module_not_found.
-		testutil.Equal(t, 0, len(ctx.moduleImports[importing]), "expected no imports for missing symbol")
-		testutil.Len(t, ctx.unresolvedImports, 1, "unresolved count")
-		testutil.Equal(t, reasonSymbolNotExported, ctx.unresolvedImports[0].reason, "reason")
+		testutil.Equal(t, 0, len(ctx.importSources[importing]), "expected no imports for missing symbol")
+		missingImports := unresolvedByKind(ctx, UnresolvedImport)
+		testutil.Len(t, missingImports, 1, "unresolved count")
+		testutil.Equal(t, reasonSymbolNotExported, missingImports[0].Reason, "reason")
 	})
 
 	t.Run("forwarding works in strict mode", func(t *testing.T) {
@@ -450,13 +454,13 @@ func TestResolveImportsFromModule(t *testing.T) {
 				{Module: "REAL", Symbol: "sym"},
 			},
 		}
-		ctx.moduleDefNames[intermediate] = map[string]struct{}{}
+		ctx.defNames[intermediate] = map[string]struct{}{}
 		ctx.moduleIndex["INTER"] = []*module.Module{intermediate}
 
 		importing := &module.Module{Name: "IMPORTER"}
 		resolveImportsFromModule(ctx, importing, "INTER", syms("sym"))
 
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, 1, len(imports), "forwarding should resolve in strict mode")
 		testutil.Equal(t, realSource, imports["sym"], "sym should be forwarded from REAL")
 	})
@@ -468,12 +472,12 @@ func TestResolveTransitiveImports(t *testing.T) {
 		modA := &module.Module{Name: "A"}
 		modB := &module.Module{Name: "B"}
 
-		ctx.moduleDefNames[modB] = map[string]struct{}{"x": {}}
+		ctx.defNames[modB] = map[string]struct{}{"x": {}}
 		ctx.registerImport(modA, "x", modB)
 
 		resolveTransitiveImports(ctx)
 
-		testutil.Equal(t, modB, ctx.moduleImports[modA]["x"], "direct definer should remain unchanged")
+		testutil.Equal(t, modB, ctx.importSources[modA]["x"], "direct definer should remain unchanged")
 	})
 
 	t.Run("one-hop re-export resolved", func(t *testing.T) {
@@ -483,14 +487,14 @@ func TestResolveTransitiveImports(t *testing.T) {
 		modC := &module.Module{Name: "C"}
 
 		// B re-exports x from C; C defines x.
-		ctx.moduleDefNames[modB] = map[string]struct{}{}
-		ctx.moduleDefNames[modC] = map[string]struct{}{"x": {}}
+		ctx.defNames[modB] = map[string]struct{}{}
+		ctx.defNames[modC] = map[string]struct{}{"x": {}}
 		ctx.registerImport(modA, "x", modB)
 		ctx.registerImport(modB, "x", modC)
 
 		resolveTransitiveImports(ctx)
 
-		testutil.Equal(t, modC, ctx.moduleImports[modA]["x"], "expected A's import of x to resolve transitively to C")
+		testutil.Equal(t, modC, ctx.importSources[modA]["x"], "expected A's import of x to resolve transitively to C")
 	})
 
 	t.Run("multi-hop re-export resolved", func(t *testing.T) {
@@ -500,18 +504,18 @@ func TestResolveTransitiveImports(t *testing.T) {
 		modC := &module.Module{Name: "C"}
 		modD := &module.Module{Name: "D"}
 
-		ctx.moduleDefNames[modB] = map[string]struct{}{}
-		ctx.moduleDefNames[modC] = map[string]struct{}{}
-		ctx.moduleDefNames[modD] = map[string]struct{}{"x": {}}
+		ctx.defNames[modB] = map[string]struct{}{}
+		ctx.defNames[modC] = map[string]struct{}{}
+		ctx.defNames[modD] = map[string]struct{}{"x": {}}
 		ctx.registerImport(modA, "x", modB)
 		ctx.registerImport(modB, "x", modC)
 		ctx.registerImport(modC, "x", modD)
 
 		resolveTransitiveImports(ctx)
 
-		testutil.Equal(t, modD, ctx.moduleImports[modA]["x"], "expected A->D, got A->")
-		testutil.Equal(t, modD, ctx.moduleImports[modB]["x"], "expected B->D, got B->")
-		testutil.Equal(t, modD, ctx.moduleImports[modC]["x"], "expected C->D, got C->")
+		testutil.Equal(t, modD, ctx.importSources[modA]["x"], "expected A->D, got A->")
+		testutil.Equal(t, modD, ctx.importSources[modB]["x"], "expected B->D, got B->")
+		testutil.Equal(t, modD, ctx.importSources[modC]["x"], "expected C->D, got C->")
 	})
 
 	t.Run("cycle does not panic", func(_ *testing.T) {
@@ -519,8 +523,8 @@ func TestResolveTransitiveImports(t *testing.T) {
 		modA := &module.Module{Name: "A"}
 		modB := &module.Module{Name: "B"}
 
-		ctx.moduleDefNames[modA] = map[string]struct{}{}
-		ctx.moduleDefNames[modB] = map[string]struct{}{}
+		ctx.defNames[modA] = map[string]struct{}{}
+		ctx.defNames[modB] = map[string]struct{}{}
 		ctx.registerImport(modA, "x", modB)
 		ctx.registerImport(modB, "x", modA)
 
@@ -534,12 +538,12 @@ func TestResolveTransitiveImports(t *testing.T) {
 		modB := &module.Module{Name: "B"}
 
 		// B neither defines x nor imports it.
-		ctx.moduleDefNames[modB] = map[string]struct{}{}
+		ctx.defNames[modB] = map[string]struct{}{}
 		ctx.registerImport(modA, "x", modB)
 
 		resolveTransitiveImports(ctx)
 
-		testutil.Equal(t, modB, ctx.moduleImports[modA]["x"], "dead end should keep the original target")
+		testutil.Equal(t, modB, ctx.importSources[modA]["x"], "dead end should keep the original target")
 	})
 
 	t.Run("different symbols resolve independently", func(t *testing.T) {
@@ -549,16 +553,16 @@ func TestResolveTransitiveImports(t *testing.T) {
 		modC := &module.Module{Name: "C"}
 
 		// B defines "y" but re-exports "x" from C.
-		ctx.moduleDefNames[modB] = map[string]struct{}{"y": {}}
-		ctx.moduleDefNames[modC] = map[string]struct{}{"x": {}}
+		ctx.defNames[modB] = map[string]struct{}{"y": {}}
+		ctx.defNames[modC] = map[string]struct{}{"x": {}}
 		ctx.registerImport(modA, "x", modB)
 		ctx.registerImport(modA, "y", modB)
 		ctx.registerImport(modB, "x", modC)
 
 		resolveTransitiveImports(ctx)
 
-		testutil.Equal(t, modC, ctx.moduleImports[modA]["x"], "x should resolve transitively to C")
-		testutil.Equal(t, modB, ctx.moduleImports[modA]["y"], "y should stay at B (direct definer)")
+		testutil.Equal(t, modC, ctx.importSources[modA]["x"], "x should resolve transitively to C")
+		testutil.Equal(t, modB, ctx.importSources[modA]["y"], "y should stay at B (direct definer)")
 	})
 }
 
@@ -577,14 +581,14 @@ func TestResolveImports(t *testing.T) {
 		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 		ctx.modules = []*module.Module{importing}
 		ctx.moduleIndex["SOURCE-MIB"] = []*module.Module{source}
-		ctx.moduleDefNames[source] = map[string]struct{}{
+		ctx.defNames[source] = map[string]struct{}{
 			"sysDescr": {},
 			"sysName":  {},
 		}
 
 		resolveImports(ctx)
 
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, 2, len(imports), "import count")
 		testutil.Equal(t, source, imports["sysDescr"], "sysDescr should resolve to SOURCE-MIB")
 		testutil.Equal(t, source, imports["sysName"], "sysName should resolve to SOURCE-MIB")
@@ -605,12 +609,12 @@ func TestResolveImports(t *testing.T) {
 		ctx.modules = []*module.Module{importing}
 		ctx.moduleIndex["MOD-A"] = []*module.Module{sourceA}
 		ctx.moduleIndex["MOD-B"] = []*module.Module{sourceB}
-		ctx.moduleDefNames[sourceA] = map[string]struct{}{"alpha": {}}
-		ctx.moduleDefNames[sourceB] = map[string]struct{}{"beta": {}}
+		ctx.defNames[sourceA] = map[string]struct{}{"alpha": {}}
+		ctx.defNames[sourceB] = map[string]struct{}{"beta": {}}
 
 		resolveImports(ctx)
 
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, sourceA, imports["alpha"], "alpha should resolve to MOD-A")
 		testutil.Equal(t, sourceB, imports["beta"], "beta should resolve to MOD-B")
 	})
@@ -630,13 +634,13 @@ func TestResolveImports(t *testing.T) {
 		ctx.modules = []*module.Module{importing}
 		ctx.moduleIndex["MOD-A"] = []*module.Module{sourceA}
 		ctx.moduleIndex["MOD-B"] = []*module.Module{sourceB}
-		ctx.moduleDefNames[sourceA] = map[string]struct{}{"DisplayString": {}}
-		ctx.moduleDefNames[sourceB] = map[string]struct{}{"DisplayString": {}}
+		ctx.defNames[sourceA] = map[string]struct{}{"DisplayString": {}}
+		ctx.defNames[sourceB] = map[string]struct{}{"DisplayString": {}}
 
 		resolveImports(ctx)
 
 		// First import wins.
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, sourceA, imports["DisplayString"], "first import should win")
 
 		// Diagnostic emitted for the duplicate.
@@ -658,11 +662,11 @@ func TestResolveImports(t *testing.T) {
 		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 		ctx.modules = []*module.Module{importing}
 		ctx.moduleIndex["MOD-A"] = []*module.Module{sourceA}
-		ctx.moduleDefNames[sourceA] = map[string]struct{}{"foo": {}}
+		ctx.defNames[sourceA] = map[string]struct{}{"foo": {}}
 
 		resolveImports(ctx)
 
-		imports := ctx.moduleImports[importing]
+		imports := ctx.importSources[importing]
 		testutil.Equal(t, sourceA, imports["foo"], "import should resolve")
 
 		// No diagnostic for same-module duplicate.

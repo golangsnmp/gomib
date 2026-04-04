@@ -1118,7 +1118,7 @@ func TestIsSequenceTypeDef(t *testing.T) {
 	}
 
 	ctx := newTestContextForModules(DefaultConfig(), local, imported)
-	ctx.moduleImports[local] = map[string]*module.Module{
+	ctx.importSources[local] = map[string]*module.Module{
 		"ImportedEntry": imported,
 		"ImportedText":  imported,
 	}

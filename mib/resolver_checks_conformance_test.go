@@ -814,10 +814,10 @@ func TestCheckGroupMemberLocality(t *testing.T) {
 		objNode.setKind(types.KindScalar)
 		ctx.registerModuleNodeSymbol(modA, "importedObj", objNode)
 		// Make it available in modB via import.
-		if ctx.moduleImports[modB] == nil {
-			ctx.moduleImports[modB] = make(map[string]*module.Module)
+		if ctx.importSources[modB] == nil {
+			ctx.importSources[modB] = make(map[string]*module.Module)
 		}
-		ctx.moduleImports[modB]["importedObj"] = modA
+		ctx.importSources[modB]["importedObj"] = modA
 
 		checkGroupMemberLocality(ctx)
 
@@ -879,10 +879,10 @@ func TestCheckGroupMemberLocality(t *testing.T) {
 		notifNode.setName("importedNotif")
 		notifNode.setKind(types.KindNotification)
 		ctx.registerModuleNodeSymbol(modA, "importedNotif", notifNode)
-		if ctx.moduleImports[modB] == nil {
-			ctx.moduleImports[modB] = make(map[string]*module.Module)
+		if ctx.importSources[modB] == nil {
+			ctx.importSources[modB] = make(map[string]*module.Module)
 		}
-		ctx.moduleImports[modB]["importedNotif"] = modA
+		ctx.importSources[modB]["importedNotif"] = modA
 
 		checkGroupMemberLocality(ctx)
 

@@ -278,7 +278,7 @@ func checkGroupMemberLocality(ctx *resolverContext) {
 }
 
 func checkMemberLocality(ctx *resolverContext, mod *module.Module, span types.Span, members []string) {
-	localSymbols := ctx.moduleSymbolToNode[mod]
+	localSymbols := ctx.nodeSymbols.forModule(mod)
 	for _, memberName := range members {
 		if localSymbols == nil || localSymbols[memberName] == nil {
 			ctx.EmitDiagnostic(types.DiagComplianceMemberNotLocal,
