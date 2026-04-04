@@ -1,357 +1,108 @@
 package mib
 
+// Structural correctness checks for the resolver semantic analysis phase.
+//
+// These checks validate that the MIB structure conforms to SMI rules:
+// violations here generally mean the MIB is broken or non-conformant.
+//
+// Check index (see also resolver_checks_conformance.go, resolver_checks_style.go):
+//
+// Structural (this file):
+//   checkNodeParentKinds           DiagParent*                  parent node kind constraints
+//   checkEnumSubtyping             DiagSubtypeEnumIllegal       enum/BITS subtype validity
+//                                  DiagSubtypeBitsIllegal
+//   checkRangeConstraints          DiagSizeIllegal              range/SIZE constraint correctness
+//                                  DiagRangeIllegal
+//                                  DiagCounterRangeIllegal
+//                                  DiagTimeticksRangeIllegal
+//                                  DiagRangeExchanged
+//                                  DiagRangeBounds
+//                                  DiagRangeOverlap
+//                                  DiagRangeAscending
+//   checkIndexConstraints          DiagIndexAccessible          INDEX element constraints
+//                                  DiagIndexNotAccessible
+//                                  DiagIndexDefval
+//                                  DiagIndexCounterIllegal
+//                                  DiagIndexIllegalBasetype
+//                                  DiagIndexElementNoSize
+//                                  DiagIndexIntegerNoRange
+//                                  DiagIndexNegativeRange
+//                                  DiagIndexExceedsTooLarge
+//   checkDefvalConstraints         DiagCounterDefvalIllegal     DEFVAL validation
+//                                  DiagDefvalBasetype
+//                                  DiagDefvalRange
+//                                  DiagDefvalEnum
+//                                  DiagDefvalBits
+//   checkSequenceFields            DiagSequenceNoColumn         SEQUENCE/row consistency
+//                                  DiagSequenceMissingColumn
+//                                  DiagSequenceOrder
+//                                  DiagSequenceTypeMismatch
+//   checkAccessAndStatus           DiagAccessInvalidSMIv1       access/status rules
+//                                  DiagAccessWriteOnlySMIv1
+//                                  DiagAccessWriteOnlySMIv2
+//                                  DiagMaxAccessInSMIv1
+//                                  DiagAccessInSMIv2
+//                                  DiagAccessTableIllegal
+//                                  DiagAccessRowIllegal
+//                                  DiagScalarNotCreatable
+//                                  DiagAccessCounterIllegal
+//                                  DiagStatusInvalidSMIv1
+//                                  DiagStatusInvalidSMIv2
+//                                  DiagStatusInvalidCapabilities
+//                                  DiagTypeStatusDeprecated
+//                                  DiagTypeStatusObsolete
+//   checkNotificationReversibility DiagNotifIdTooLarge          notification OID structure
+//                                  DiagNotifNotReversible
+//
+// Conformance (resolver_checks_conformance.go):
+//   checkGroupMembership           DiagGroupMembership          group membership completeness
+//   checkComplianceStatus          DiagComplianceGroupStatus    compliance status ordering
+//                                  DiagComplianceObjectStatus
+//   checkComplianceStructure       DiagComplianceGroupInvalid   compliance structural rules
+//                                  DiagOptionalGroupExists
+//                                  DiagRefinementExists
+//                                  DiagRefinementNotListed
+//   checkGroupMemberLocality       DiagComplianceMemberNotLocal group member locality
+//   checkGroupUnreferenced         DiagGroupUnreferenced        unreferenced groups
+//   checkRowStatusDefaults         DiagRowStatusDefault         RowStatus DEFVAL/access
+//                                  DiagRowStatusAccess
+//   checkStorageTypeDefaults       DiagStorageTypeDefault       StorageType DEFVAL
+//   checkTAddressTDomain           DiagTAddressTDomain          TAddress/TDomain pairing
+//   checkInetAddressPairing        DiagInetAddressPairing       InetAddress pairing
+//                                  DiagInetAddressTypeSubtyped
+//                                  DiagInetAddressSpecific
+//   checkTransportAddressPairing   DiagTransportAddressPairing  TransportAddress pairing
+//                                  DiagTransportAddressTypeSubtyped
+//                                  DiagTransportAddressSpecific
+//
+// Style (resolver_checks_style.go):
+//   checkIntegerMisuse             DiagIntegerInSMIv2           bare INTEGER in SMIv2
+//   checkDescriptionMissing        DiagDescriptionMissing       missing DESCRIPTION
+//   checkTextualConventionNested   DiagTCNested                 TC derived from TC
+//   checkTypeAssignmentSMIv2       DiagTypeAssignmentSMIv2      plain type assignment in v2
+//   checkTableRowNaming            DiagTableNameTable           table/row naming conventions
+//                                  DiagRowNameEntry
+//                                  DiagRowNameTableName
+//   checkNamedNumberOrdering       DiagNamedNumbersAscending    enum/BITS value ordering
+//   checkHyphenInLabel             DiagHyphenInLabel            hyphens in named values
+//   checkOpaqueSMIv2               DiagOpaqueSMIv2              Opaque in SMIv2
+//   checkFormatHints               DiagInvalidFormat            DISPLAY-HINT validation
+//                                  DiagTypeWithoutFormat
+//   checkTypeUnreferenced          DiagTypeUnreferenced         unreferenced types
+//   checkIdentifierCaseMatch       DiagIdentifierCaseMatch      case-only name collisions
+//   checkTrapInSMIv2               DiagTrapInSMIv2              TRAP-TYPE in SMIv2
+//   checkBasetypeImports           DiagBasetypeNotImported      missing basetype imports
+//   checkNodeImplicit              DiagNodeImplicit             implicit OID nodes
+//   checkModuleIdentityRegistration DiagModuleIdentityReg       MODULE-IDENTITY OID checks
+//   checkIpAddressDeprecation      DiagIpAddressInSyntax        deprecated IpAddress usage
+
 import (
 	"fmt"
 	"math"
-	"strings"
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
 )
-
-// checkGroupMembership verifies that every accessible scalar, column, and
-// notification in a module appears in at least one conformance group defined
-// in the same module. Only modules that define groups are checked.
-func checkGroupMembership(ctx *resolverContext, objRefs []objectTypeRef) {
-	// Build per-module sets of grouped nodes.
-	type moduleGroupInfo struct {
-		hasObjectGroup       bool
-		hasNotificationGroup bool
-		groupedNodes         map[*Node]bool
-	}
-	modGroups := make(map[*module.Module]*moduleGroupInfo)
-
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		resolvedMod := ctx.moduleToResolved[mod]
-		if resolvedMod == nil {
-			continue
-		}
-		for _, grp := range resolvedMod.Groups() {
-			info := modGroups[mod]
-			if info == nil {
-				info = &moduleGroupInfo{groupedNodes: make(map[*Node]bool)}
-				modGroups[mod] = info
-			}
-			if grp.IsNotificationGroup() {
-				info.hasNotificationGroup = true
-			} else {
-				info.hasObjectGroup = true
-			}
-			for _, member := range grp.Members() {
-				info.groupedNodes[member] = true
-			}
-		}
-	}
-
-	// Check accessible scalars and columns.
-	for _, ref := range objRefs {
-		info := modGroups[ref.mod]
-		if info == nil || !info.hasObjectGroup {
-			continue
-		}
-		node, ok := ctx.LookupNodeForModule(ref.mod, ref.obj.Name)
-		if !ok {
-			continue
-		}
-		kind := node.Kind()
-		if kind != KindScalar && kind != KindColumn {
-			continue
-		}
-		if ref.obj.Access == types.AccessNotAccessible {
-			continue
-		}
-		if !info.groupedNodes[node] {
-			ctx.EmitDiagnostic(types.DiagGroupMembership,
-				ref.mod, ref.obj.Span,
-				fmt.Sprintf("%q is not in any OBJECT-GROUP", ref.obj.Name))
-		}
-	}
-
-	// Check notifications.
-	for _, ref := range collectNotificationRefs(ctx) {
-		info := modGroups[ref.mod]
-		if info == nil || !info.hasNotificationGroup {
-			continue
-		}
-		node, ok := ctx.LookupNodeForModule(ref.mod, ref.notif.Name)
-		if !ok {
-			continue
-		}
-		if !info.groupedNodes[node] {
-			ctx.EmitDiagnostic(types.DiagGroupMembership,
-				ref.mod, ref.notif.DefinitionSpan(),
-				fmt.Sprintf("%q is not in any NOTIFICATION-GROUP", ref.notif.Name))
-		}
-	}
-}
-
-// checkComplianceStatus emits DiagComplianceGroupStatus when a mandatory or
-// optional group's status exceeds the MODULE-COMPLIANCE's status, and
-// DiagComplianceObjectStatus when a refined object's status exceeds it.
-// SMIv1 statuses are skipped since they aren't comparable on the same scale.
-func checkComplianceStatus(ctx *resolverContext) {
-	for _, ref := range collectComplianceRefs(ctx) {
-		comp := ref.comp
-		if comp.Status.IsSMIv1() {
-			continue
-		}
-		for _, cm := range comp.Modules {
-			// Check mandatory groups.
-			for _, groupName := range cm.MandatoryGroups {
-				checkComplianceGroupStatus(ctx, ref.mod, comp, cm.ModuleName, groupName)
-			}
-			// Check optional (GROUP) groups.
-			for _, cg := range cm.Groups {
-				checkComplianceGroupStatus(ctx, ref.mod, comp, cm.ModuleName, cg.Group)
-			}
-			// Check refined objects.
-			for _, co := range cm.Objects {
-				checkComplianceObjectStatus(ctx, ref.mod, comp, cm.ModuleName, co.Object)
-			}
-		}
-	}
-}
-
-func checkComplianceGroupStatus(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, moduleName, groupName string) {
-	node := lookupComplianceMember(ctx, mod, moduleName, groupName)
-	if node == nil {
-		return
-	}
-	grp := node.Group()
-	if grp == nil {
-		return
-	}
-	gs := grp.Status()
-	if gs.IsSMIv1() {
-		return
-	}
-	if gs > comp.Status {
-		ctx.EmitDiagnostic(types.DiagComplianceGroupStatus,
-			mod, comp.DefinitionSpan(),
-			fmt.Sprintf("%s compliance %q references %s group %q", comp.Status, comp.Name, gs, groupName))
-	}
-}
-
-func checkComplianceObjectStatus(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, moduleName, objectName string) {
-	node := lookupComplianceMember(ctx, mod, moduleName, objectName)
-	if node == nil {
-		return
-	}
-	ms, ok := memberNodeStatus(node)
-	if !ok || ms.IsSMIv1() {
-		return
-	}
-	if ms > comp.Status {
-		ctx.EmitDiagnostic(types.DiagComplianceObjectStatus,
-			mod, comp.DefinitionSpan(),
-			fmt.Sprintf("%s compliance %q references %s object %q", comp.Status, comp.Name, ms, objectName))
-	}
-}
-
-// lookupComplianceMember resolves a node referenced from a MODULE-COMPLIANCE
-// MODULE clause. When moduleName is non-empty, the lookup targets that specific
-// module; otherwise the compliance's own module is used.
-func lookupComplianceMember(ctx *resolverContext, compMod *module.Module, moduleName, name string) *Node {
-	if moduleName != "" {
-		node, ok := ctx.LookupNodeInModule(moduleName, name)
-		if ok {
-			return node
-		}
-	}
-	node, ok := lookupMemberNode(ctx, compMod, name)
-	if ok {
-		return node
-	}
-	return nil
-}
-
-// checkComplianceStructure validates MODULE-COMPLIANCE structural constraints:
-// - compliance-group-invalid: group both mandatory and optional
-// - refinement-exists: duplicate OBJECT refinement
-// - optional-group-exists: duplicate GROUP clause
-// - refinement-not-listed: refined object not in any listed group
-func checkComplianceStructure(ctx *resolverContext) {
-	for _, ref := range collectComplianceRefs(ctx) {
-		comp := ref.comp
-		for _, cm := range comp.Modules {
-			checkComplianceDuplicates(ctx, ref.mod, comp, &cm)
-			checkRefinementListed(ctx, ref.mod, comp, &cm)
-		}
-	}
-}
-
-func checkComplianceDuplicates(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, cm *module.ComplianceModule) {
-	// Build mandatory group set.
-	mandatory := make(map[string]bool, len(cm.MandatoryGroups))
-	for _, g := range cm.MandatoryGroups {
-		mandatory[g] = true
-	}
-
-	// Check optional groups for duplicates and overlap with mandatory.
-	optionalSeen := make(map[string]bool, len(cm.Groups))
-	for _, cg := range cm.Groups {
-		if mandatory[cg.Group] {
-			ctx.EmitDiagnostic(types.DiagComplianceGroupInvalid,
-				mod, comp.DefinitionSpan(),
-				fmt.Sprintf("group %q is both mandatory and optional in %q", cg.Group, comp.Name))
-		}
-		if optionalSeen[cg.Group] {
-			ctx.EmitDiagnostic(types.DiagOptionalGroupExists,
-				mod, comp.DefinitionSpan(),
-				fmt.Sprintf("duplicate optional group %q in %q", cg.Group, comp.Name))
-		}
-		optionalSeen[cg.Group] = true
-	}
-
-	// Check for duplicate object refinements.
-	refinementSeen := make(map[string]bool, len(cm.Objects))
-	for _, co := range cm.Objects {
-		if refinementSeen[co.Object] {
-			ctx.EmitDiagnostic(types.DiagRefinementExists,
-				mod, comp.DefinitionSpan(),
-				fmt.Sprintf("duplicate refinement for %q in %q", co.Object, comp.Name))
-		}
-		refinementSeen[co.Object] = true
-	}
-}
-
-// checkRefinementListed verifies that each refined object in a MODULE-COMPLIANCE
-// MODULE clause is a member of at least one mandatory or optional group.
-func checkRefinementListed(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, cm *module.ComplianceModule) {
-	if len(cm.Objects) == 0 {
-		return
-	}
-
-	// Collect all group member names from mandatory and optional groups.
-	memberNames := make(map[string]bool)
-	for _, groupName := range cm.MandatoryGroups {
-		collectGroupMemberNames(ctx, mod, cm.ModuleName, groupName, memberNames)
-	}
-	for _, cg := range cm.Groups {
-		collectGroupMemberNames(ctx, mod, cm.ModuleName, cg.Group, memberNames)
-	}
-
-	for _, co := range cm.Objects {
-		if !memberNames[co.Object] {
-			ctx.EmitDiagnostic(types.DiagRefinementNotListed,
-				mod, comp.DefinitionSpan(),
-				fmt.Sprintf("refined object %q not in any mandatory or optional group of %q", co.Object, comp.Name))
-		}
-	}
-}
-
-// collectGroupMemberNames looks up a group and adds its member names to the set.
-func collectGroupMemberNames(ctx *resolverContext, mod *module.Module, moduleName, groupName string, names map[string]bool) {
-	node := lookupComplianceMember(ctx, mod, moduleName, groupName)
-	if node == nil {
-		return
-	}
-	grp := node.Group()
-	if grp == nil {
-		return
-	}
-	for _, member := range grp.Members() {
-		names[member.Name()] = true
-	}
-}
-
-// checkGroupMemberLocality validates that OBJECT-GROUP and NOTIFICATION-GROUP
-// members are defined in the same module as the group (RFC 2580 sections 3.1, 4.1).
-func checkGroupMemberLocality(ctx *resolverContext) {
-	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectGroup:
-				checkMemberLocality(ctx, mod, d.DefinitionSpan(), d.Objects)
-			case *module.NotificationGroup:
-				checkMemberLocality(ctx, mod, d.DefinitionSpan(), d.Notifications)
-			}
-		}
-	}
-}
-
-func checkMemberLocality(ctx *resolverContext, mod *module.Module, span types.Span, members []string) {
-	localSymbols := ctx.moduleSymbolToNode[mod]
-	for _, memberName := range members {
-		if localSymbols == nil || localSymbols[memberName] == nil {
-			ctx.EmitDiagnostic(types.DiagComplianceMemberNotLocal,
-				mod, span,
-				fmt.Sprintf("group member %q is not defined in module %q", memberName, mod.Name))
-		}
-	}
-}
-
-// isLegalIndexBasetype reports whether a base type is legal for INDEX
-// elements per RFC 2578 section 7.7.
-func isLegalIndexBasetype(base BaseType) bool {
-	switch base {
-	case BaseInteger32, BaseUnsigned32, BaseGauge32, BaseTimeTicks,
-		BaseIpAddress, BaseOctetString, BaseOpaque, BaseBits, BaseObjectIdentifier:
-		return true
-	default:
-		return false
-	}
-}
-
-// maxSizeFromRanges returns the maximum Max value across all size ranges,
-// or -1 if sizes is empty.
-func maxSizeFromRanges(sizes []Range) int64 {
-	if len(sizes) == 0 {
-		return -1
-	}
-	m := sizes[0].Max
-	for _, r := range sizes[1:] {
-		if r.Max > m {
-			m = r.Max
-		}
-	}
-	return m
-}
-
-// indexElementSubIds returns the maximum number of sub-identifiers an index
-// element contributes to an instance OID. Returns (count, true) if computable,
-// or (0, false) if the encoding or type constraints are insufficient.
-func indexElementSubIds(entry IndexEntry) (int, bool) {
-	obj := entry.Object
-	if obj == nil {
-		return 0, false
-	}
-	switch entry.Encoding {
-	case IndexEncodingInteger, IndexEncodingIpAddress, IndexEncodingFixedString:
-		return entry.FixedSize()
-	case IndexEncodingLengthPrefixed:
-		t := obj.Type()
-		if t == nil {
-			return 0, false
-		}
-		if t.EffectiveBase() == BaseObjectIdentifier {
-			return 128 + 1, true
-		}
-		m := maxSizeFromRanges(obj.sizes)
-		if m < 0 {
-			return 0, false
-		}
-		return int(m) + 1, true
-	case IndexEncodingImplied:
-		t := obj.Type()
-		if t == nil {
-			return 0, false
-		}
-		if t.EffectiveBase() == BaseObjectIdentifier {
-			return 128, true
-		}
-		m := maxSizeFromRanges(obj.sizes)
-		if m < 0 {
-			return 0, false
-		}
-		return int(m), true
-	default:
-		return 0, false
-	}
-}
 
 // isSimpleParentKind returns true for kinds that are valid parents of most
 // definition types: plain nodes, internal path components, and unknown nodes.
@@ -444,45 +195,289 @@ func checkNodeParentKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 }
 
-// checkIntegerMisuse flags bare INTEGER usage in SMIv2 modules. RFC 2578
-// section 7.1.1 says INTEGER and Integer32 are "indistinguishable" for
-// non-enum use, and RFC 3584 section 2.1.1 item (2) says bare INTEGER
-// SHOULD become Integer32. INTEGER with named-number enumerations is the
-// only correct use of the INTEGER keyword in SMIv2.
-func checkIntegerMisuse(ctx *resolverContext) {
+// checkEnumSubtyping validates that when a derived type or object restricts
+// an enum or BITS parent, every declared named value exists in the parent.
+func checkEnumSubtyping(ctx *resolverContext) {
 	for _, mod := range ctx.modules {
-		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
+		if module.IsBaseModule(mod.Name) {
 			continue
 		}
 		for _, def := range mod.Definitions {
 			switch d := def.(type) {
-			case *module.ObjectType:
-				if isIntegerKeywordSyntax(d.Syntax) {
-					ctx.EmitDiagnostic(types.DiagIntegerInSMIv2,
-						mod, d.Span,
-						fmt.Sprintf("%q: use Integer32 instead of INTEGER in SMIv2", d.Name))
-				}
 			case *module.TypeDef:
-				if isIntegerKeywordSyntax(d.Syntax) {
-					ctx.EmitDiagnostic(types.DiagIntegerInSMIv2,
-						mod, d.Span,
-						fmt.Sprintf("%q: use Integer32 instead of INTEGER in SMIv2", d.Name))
-				}
+				checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
+			case *module.ObjectType:
+				checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
 			}
 		}
 	}
 }
 
-// isIntegerKeywordSyntax returns true if the syntax uses the INTEGER keyword
-// without named-number enumerations (bare INTEGER or INTEGER with range).
-func isIntegerKeywordSyntax(syntax module.TypeSyntax) bool {
-	switch s := syntax.(type) {
-	case *module.TypeSyntaxTypeRef:
-		return s.Name == "INTEGER"
-	case *module.TypeSyntaxConstrained:
-		return isIntegerKeywordSyntax(s.Base)
+// checkEnumSubtypingSyntax checks a single TypeSyntaxIntegerEnum for
+// named values not present in the parent type.
+func checkEnumSubtypingSyntax(ctx *resolverContext, syntax module.TypeSyntax, name string, mod *module.Module, span types.Span) {
+	enumSyntax, ok := syntax.(*module.TypeSyntaxIntegerEnum)
+	if !ok || enumSyntax.Base == "" || len(enumSyntax.NamedNumbers) == 0 {
+		return
+	}
+
+	parentType, ok := ctx.LookupTypeForModule(mod, enumSyntax.Base)
+	if !ok {
+		return
+	}
+
+	var parentValues []NamedValue
+	var diagCode string
+	var label string
+	if bits := parentType.EffectiveBits(); len(bits) > 0 {
+		parentValues, diagCode, label = bits, types.DiagSubtypeBitsIllegal, "BITS value"
+	} else if enums := parentType.EffectiveEnums(); len(enums) > 0 {
+		parentValues, diagCode, label = enums, types.DiagSubtypeEnumIllegal, "enum value"
+	} else {
+		return
+	}
+
+	for _, nn := range enumSyntax.NamedNumbers {
+		found := false
+		for _, pv := range parentValues {
+			if pv.Label == nn.Name && pv.Value == nn.Value {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ctx.EmitDiagnostic(diagCode,
+				mod, span,
+				fmt.Sprintf("%q: %s %s(%d) not in parent type %q", name, label, nn.Name, nn.Value, enumSyntax.Base))
+		}
+	}
+}
+
+// checkRangeConstraints validates range and SIZE constraints on type
+// definitions and object-type inline syntax. Checks for:
+//   - size-illegal: SIZE on non-OCTET-STRING type
+//   - range-illegal: range on non-numeric type
+//   - range-exchanged: min > max
+//   - range-bounds: limits exceed basetype
+//   - range-overlap: adjacent ranges overlap
+//   - range-ascending: ranges not in ascending order
+func checkRangeConstraints(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		if module.IsBaseModule(mod.Name) {
+			continue
+		}
+		for _, def := range mod.Definitions {
+			switch d := def.(type) {
+			case *module.TypeDef:
+				if _, isSeq := d.Syntax.(*module.TypeSyntaxSequence); isSeq {
+					continue
+				}
+				typ, ok := ctx.LookupTypeForModule(mod, d.Name)
+				if !ok {
+					continue
+				}
+				base := typ.EffectiveBase()
+				sizes, ranges := extractConstraints(d.Syntax)
+				checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
+				checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
+
+			case *module.ObjectType:
+				sizes, ranges := extractConstraints(d.Syntax)
+				if len(sizes) == 0 && len(ranges) == 0 {
+					continue
+				}
+				resolved := ctx.lookupObjectInModuleScope(mod, d.Name)
+				if resolved == nil || resolved.Type() == nil {
+					continue
+				}
+				base := resolved.Type().EffectiveBase()
+				checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
+				checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
+			}
+		}
+	}
+}
+
+// checkRangeList validates a slice of ranges for internal consistency
+// and basetype conformance.
+func checkRangeList(ctx *resolverContext, ranges []Range, base BaseType, isSize bool, name string, mod *module.Module, span types.Span) {
+	if len(ranges) == 0 {
+		return
+	}
+
+	// SIZE only applies to OCTET STRING and Opaque (which is OCTET STRING-based).
+	if isSize && base != BaseOctetString && base != BaseOpaque {
+		ctx.EmitDiagnostic(types.DiagSizeIllegal,
+			mod, span,
+			fmt.Sprintf("%q: SIZE constraint illegal for non-octet-string type", name))
+		return
+	}
+
+	// Value range only applies to numeric types.
+	if !isSize && !isNumericBase(base) {
+		ctx.EmitDiagnostic(types.DiagRangeIllegal,
+			mod, span,
+			fmt.Sprintf("%q: range constraint illegal for non-numerical type", name))
+		return
+	}
+
+	// Counter types must not have range restrictions (RFC 2578).
+	if !isSize && (base == BaseCounter32 || base == BaseCounter64) {
+		ctx.EmitDiagnostic(types.DiagCounterRangeIllegal,
+			mod, span,
+			fmt.Sprintf("%q: range constraint illegal for Counter type", name))
+		return
+	}
+
+	// TimeTicks may not be sub-typed (RFC 2578 s7.1.8).
+	if !isSize && base == BaseTimeTicks {
+		ctx.EmitDiagnostic(types.DiagTimeticksRangeIllegal,
+			mod, span,
+			fmt.Sprintf("%q: range constraint illegal for TimeTicks type", name))
+		return
+	}
+
+	var boundsMin, boundsMax int64
+	var hasBounds bool
+	if isSize {
+		boundsMin, boundsMax, hasBounds = 0, 65535, true
+	} else {
+		boundsMin, boundsMax, hasBounds = basetypeBounds(base)
+	}
+
+	for i, r := range ranges {
+		// Exchanged limits (min > max).
+		if r.Min > r.Max {
+			ctx.EmitDiagnostic(types.DiagRangeExchanged,
+				mod, span,
+				fmt.Sprintf("%q: range %s has exchanged limits", name, r.String()))
+		}
+
+		// Bounds checking against basetype.
+		if hasBounds {
+			checkRangeBound(ctx, r.Min, boundsMin, boundsMax, name, "lower", mod, span)
+			checkRangeBound(ctx, r.Max, boundsMin, boundsMax, name, "upper", mod, span)
+		}
+
+		// Multi-range checks against previous range.
+		if i > 0 {
+			prev := ranges[i-1]
+			if r.Min < prev.Min {
+				ctx.EmitDiagnostic(types.DiagRangeAscending,
+					mod, span,
+					fmt.Sprintf("%q: ranges not in ascending order", name))
+			}
+			if r.Min <= prev.Max {
+				ctx.EmitDiagnostic(types.DiagRangeOverlap,
+					mod, span,
+					fmt.Sprintf("%q: range %s overlaps with %s", name, r.String(), prev.String()))
+			}
+		}
+	}
+}
+
+// checkRangeBound emits a range-bounds diagnostic if v falls outside
+// boundsMin..boundsMax. Values equal to MinInt64 or MaxInt64 are skipped
+// because they represent the MIN/MAX keywords.
+func checkRangeBound(ctx *resolverContext, v, boundsMin, boundsMax int64, name, which string, mod *module.Module, span types.Span) {
+	if v == math.MinInt64 || v == math.MaxInt64 {
+		return
+	}
+	if v < boundsMin || v > boundsMax {
+		ctx.EmitDiagnostic(types.DiagRangeBounds,
+			mod, span,
+			fmt.Sprintf("%q: range %s bound %d exceeds basetype", name, which, v))
+	}
+}
+
+// basetypeBounds returns the valid min/max range for a basetype.
+func basetypeBounds(base BaseType) (min, max int64, ok bool) {
+	switch base {
+	case BaseInteger32:
+		return math.MinInt32, math.MaxInt32, true
+	case BaseUnsigned32, BaseGauge32, BaseTimeTicks, BaseCounter32:
+		return 0, math.MaxUint32, true
+	case BaseCounter64:
+		// Bounds are never used (counter range/DEFVAL checks reject earlier),
+		// but Counter64 must return ok=true so isNumericBase reports correctly.
+		return 0, math.MaxInt64, true
+	default:
+		return 0, 0, false
+	}
+}
+
+// isNumericBase reports whether the base type supports value range constraints.
+func isNumericBase(base BaseType) bool {
+	_, _, ok := basetypeBounds(base)
+	return ok
+}
+
+// isLegalIndexBasetype reports whether a base type is legal for INDEX
+// elements per RFC 2578 section 7.7.
+func isLegalIndexBasetype(base BaseType) bool {
+	switch base {
+	case BaseInteger32, BaseUnsigned32, BaseGauge32, BaseTimeTicks,
+		BaseIpAddress, BaseOctetString, BaseOpaque, BaseBits, BaseObjectIdentifier:
+		return true
 	default:
 		return false
+	}
+}
+
+// maxSizeFromRanges returns the maximum Max value across all size ranges,
+// or -1 if sizes is empty.
+func maxSizeFromRanges(sizes []Range) int64 {
+	if len(sizes) == 0 {
+		return -1
+	}
+	m := sizes[0].Max
+	for _, r := range sizes[1:] {
+		if r.Max > m {
+			m = r.Max
+		}
+	}
+	return m
+}
+
+// indexElementSubIds returns the maximum number of sub-identifiers an index
+// element contributes to an instance OID. Returns (count, true) if computable,
+// or (0, false) if the encoding or type constraints are insufficient.
+func indexElementSubIds(entry IndexEntry) (int, bool) {
+	obj := entry.Object
+	if obj == nil {
+		return 0, false
+	}
+	switch entry.Encoding {
+	case IndexEncodingInteger, IndexEncodingIpAddress, IndexEncodingFixedString:
+		return entry.FixedSize()
+	case IndexEncodingLengthPrefixed:
+		t := obj.Type()
+		if t == nil {
+			return 0, false
+		}
+		if t.EffectiveBase() == BaseObjectIdentifier {
+			return 128 + 1, true
+		}
+		m := maxSizeFromRanges(obj.sizes)
+		if m < 0 {
+			return 0, false
+		}
+		return int(m) + 1, true
+	case IndexEncodingImplied:
+		t := obj.Type()
+		if t == nil {
+			return 0, false
+		}
+		if t.EffectiveBase() == BaseObjectIdentifier {
+			return 128, true
+		}
+		m := maxSizeFromRanges(obj.sizes)
+		if m < 0 {
+			return 0, false
+		}
+		return int(m), true
+	default:
+		return 0, false
 	}
 }
 
@@ -820,223 +815,6 @@ func uvalueInRanges(v uint64, ranges []Range) bool {
 	return false
 }
 
-// checkEnumSubtyping validates that when a derived type or object restricts
-// an enum or BITS parent, every declared named value exists in the parent.
-func checkEnumSubtyping(ctx *resolverContext) {
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.TypeDef:
-				checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
-			case *module.ObjectType:
-				checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
-			}
-		}
-	}
-}
-
-// checkEnumSubtypingSyntax checks a single TypeSyntaxIntegerEnum for
-// named values not present in the parent type.
-func checkEnumSubtypingSyntax(ctx *resolverContext, syntax module.TypeSyntax, name string, mod *module.Module, span types.Span) {
-	enumSyntax, ok := syntax.(*module.TypeSyntaxIntegerEnum)
-	if !ok || enumSyntax.Base == "" || len(enumSyntax.NamedNumbers) == 0 {
-		return
-	}
-
-	parentType, ok := ctx.LookupTypeForModule(mod, enumSyntax.Base)
-	if !ok {
-		return
-	}
-
-	var parentValues []NamedValue
-	var diagCode string
-	var label string
-	if bits := parentType.EffectiveBits(); len(bits) > 0 {
-		parentValues, diagCode, label = bits, types.DiagSubtypeBitsIllegal, "BITS value"
-	} else if enums := parentType.EffectiveEnums(); len(enums) > 0 {
-		parentValues, diagCode, label = enums, types.DiagSubtypeEnumIllegal, "enum value"
-	} else {
-		return
-	}
-
-	for _, nn := range enumSyntax.NamedNumbers {
-		found := false
-		for _, pv := range parentValues {
-			if pv.Label == nn.Name && pv.Value == nn.Value {
-				found = true
-				break
-			}
-		}
-		if !found {
-			ctx.EmitDiagnostic(diagCode,
-				mod, span,
-				fmt.Sprintf("%q: %s %s(%d) not in parent type %q", name, label, nn.Name, nn.Value, enumSyntax.Base))
-		}
-	}
-}
-
-// checkRangeConstraints validates range and SIZE constraints on type
-// definitions and object-type inline syntax. Checks for:
-//   - size-illegal: SIZE on non-OCTET-STRING type
-//   - range-illegal: range on non-numeric type
-//   - range-exchanged: min > max
-//   - range-bounds: limits exceed basetype
-//   - range-overlap: adjacent ranges overlap
-//   - range-ascending: ranges not in ascending order
-func checkRangeConstraints(ctx *resolverContext) {
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.TypeDef:
-				if _, isSeq := d.Syntax.(*module.TypeSyntaxSequence); isSeq {
-					continue
-				}
-				typ, ok := ctx.LookupTypeForModule(mod, d.Name)
-				if !ok {
-					continue
-				}
-				base := typ.EffectiveBase()
-				sizes, ranges := extractConstraints(d.Syntax)
-				checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
-				checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
-
-			case *module.ObjectType:
-				sizes, ranges := extractConstraints(d.Syntax)
-				if len(sizes) == 0 && len(ranges) == 0 {
-					continue
-				}
-				resolved := ctx.lookupObjectInModuleScope(mod, d.Name)
-				if resolved == nil || resolved.Type() == nil {
-					continue
-				}
-				base := resolved.Type().EffectiveBase()
-				checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
-				checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
-			}
-		}
-	}
-}
-
-// checkRangeList validates a slice of ranges for internal consistency
-// and basetype conformance.
-func checkRangeList(ctx *resolverContext, ranges []Range, base BaseType, isSize bool, name string, mod *module.Module, span types.Span) {
-	if len(ranges) == 0 {
-		return
-	}
-
-	// SIZE only applies to OCTET STRING and Opaque (which is OCTET STRING-based).
-	if isSize && base != BaseOctetString && base != BaseOpaque {
-		ctx.EmitDiagnostic(types.DiagSizeIllegal,
-			mod, span,
-			fmt.Sprintf("%q: SIZE constraint illegal for non-octet-string type", name))
-		return
-	}
-
-	// Value range only applies to numeric types.
-	if !isSize && !isNumericBase(base) {
-		ctx.EmitDiagnostic(types.DiagRangeIllegal,
-			mod, span,
-			fmt.Sprintf("%q: range constraint illegal for non-numerical type", name))
-		return
-	}
-
-	// Counter types must not have range restrictions (RFC 2578).
-	if !isSize && (base == BaseCounter32 || base == BaseCounter64) {
-		ctx.EmitDiagnostic(types.DiagCounterRangeIllegal,
-			mod, span,
-			fmt.Sprintf("%q: range constraint illegal for Counter type", name))
-		return
-	}
-
-	// TimeTicks may not be sub-typed (RFC 2578 s7.1.8).
-	if !isSize && base == BaseTimeTicks {
-		ctx.EmitDiagnostic(types.DiagTimeticksRangeIllegal,
-			mod, span,
-			fmt.Sprintf("%q: range constraint illegal for TimeTicks type", name))
-		return
-	}
-
-	var boundsMin, boundsMax int64
-	var hasBounds bool
-	if isSize {
-		boundsMin, boundsMax, hasBounds = 0, 65535, true
-	} else {
-		boundsMin, boundsMax, hasBounds = basetypeBounds(base)
-	}
-
-	for i, r := range ranges {
-		// Exchanged limits (min > max).
-		if r.Min > r.Max {
-			ctx.EmitDiagnostic(types.DiagRangeExchanged,
-				mod, span,
-				fmt.Sprintf("%q: range %s has exchanged limits", name, r.String()))
-		}
-
-		// Bounds checking against basetype.
-		if hasBounds {
-			checkRangeBound(ctx, r.Min, boundsMin, boundsMax, name, "lower", mod, span)
-			checkRangeBound(ctx, r.Max, boundsMin, boundsMax, name, "upper", mod, span)
-		}
-
-		// Multi-range checks against previous range.
-		if i > 0 {
-			prev := ranges[i-1]
-			if r.Min < prev.Min {
-				ctx.EmitDiagnostic(types.DiagRangeAscending,
-					mod, span,
-					fmt.Sprintf("%q: ranges not in ascending order", name))
-			}
-			if r.Min <= prev.Max {
-				ctx.EmitDiagnostic(types.DiagRangeOverlap,
-					mod, span,
-					fmt.Sprintf("%q: range %s overlaps with %s", name, r.String(), prev.String()))
-			}
-		}
-	}
-}
-
-// checkRangeBound emits a range-bounds diagnostic if v falls outside
-// boundsMin..boundsMax. Values equal to MinInt64 or MaxInt64 are skipped
-// because they represent the MIN/MAX keywords.
-func checkRangeBound(ctx *resolverContext, v, boundsMin, boundsMax int64, name, which string, mod *module.Module, span types.Span) {
-	if v == math.MinInt64 || v == math.MaxInt64 {
-		return
-	}
-	if v < boundsMin || v > boundsMax {
-		ctx.EmitDiagnostic(types.DiagRangeBounds,
-			mod, span,
-			fmt.Sprintf("%q: range %s bound %d exceeds basetype", name, which, v))
-	}
-}
-
-// basetypeBounds returns the valid min/max range for a basetype.
-func basetypeBounds(base BaseType) (min, max int64, ok bool) {
-	switch base {
-	case BaseInteger32:
-		return math.MinInt32, math.MaxInt32, true
-	case BaseUnsigned32, BaseGauge32, BaseTimeTicks, BaseCounter32:
-		return 0, math.MaxUint32, true
-	case BaseCounter64:
-		// Bounds are never used (counter range/DEFVAL checks reject earlier),
-		// but Counter64 must return ok=true so isNumericBase reports correctly.
-		return 0, math.MaxInt64, true
-	default:
-		return 0, 0, false
-	}
-}
-
-// isNumericBase reports whether the base type supports value range constraints.
-func isNumericBase(base BaseType) bool {
-	_, _, ok := basetypeBounds(base)
-	return ok
-}
-
 // checkSequenceFields validates that SEQUENCE definitions match their row's
 // actual columnar children: fields exist as columns, columns appear in the
 // SEQUENCE, field order matches column OID order, and field types match.
@@ -1221,6 +999,22 @@ func sequenceTypesCompatible(fieldType, colType string, colBase BaseType) bool {
 		return true
 	}
 	return false
+}
+
+// normalizeTypeName maps SMIv1 type names to their SMIv2 equivalents.
+func normalizeTypeName(name string) string {
+	switch name {
+	case "Counter":
+		return "Counter32"
+	case "Gauge":
+		return "Gauge32"
+	case "INTEGER":
+		return "Integer32"
+	case "NetworkAddress":
+		return "IpAddress"
+	default:
+		return name
+	}
 }
 
 // checkAccessAndStatus validates access values, access keywords, and status
@@ -1504,1078 +1298,6 @@ func isExemptNotification(moduleName, notifName string) bool {
 	case "IF-MIB":
 		return notifName == "linkDown" ||
 			notifName == "linkUp"
-	}
-	return false
-}
-
-// smiBaseTypes lists types that must be explicitly imported in SMIv2 modules.
-// ASN.1 primitives (INTEGER, OCTET STRING, OBJECT IDENTIFIER, BITS) are excluded
-// because they're implicitly available.
-var smiBaseTypes = map[string]string{
-	"Integer32":  moduleSNMPv2SMI,
-	"Counter32":  moduleSNMPv2SMI,
-	"Counter64":  moduleSNMPv2SMI,
-	"Gauge32":    moduleSNMPv2SMI,
-	"Unsigned32": moduleSNMPv2SMI,
-	"TimeTicks":  moduleSNMPv2SMI,
-	"IpAddress":  moduleSNMPv2SMI,
-	"Opaque":     moduleSNMPv2SMI,
-}
-
-// checkBasetypeImports verifies that SMIv2 modules explicitly import SMI base
-// types they reference. RFC 2578 requires these to be imported from SNMPv2-SMI.
-func checkBasetypeImports(ctx *resolverContext) {
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		if mod.Language != types.LanguageSMIv2 {
-			continue
-		}
-
-		// Collect imported symbol names for this module.
-		imported := make(map[string]struct{})
-		for _, imp := range mod.Imports {
-			imported[imp.Symbol] = struct{}{}
-		}
-
-		// Collect base types referenced in definitions.
-		referenced := make(map[string]struct{})
-		for _, def := range mod.Definitions {
-			collectBaseTypeRefs(def, referenced)
-		}
-
-		for typeName := range referenced {
-			if _, ok := imported[typeName]; ok {
-				continue
-			}
-			expectedMod := smiBaseTypes[typeName]
-			ctx.EmitDiagnostic(types.DiagBasetypeNotImported, mod, mod.Span,
-				fmt.Sprintf("%s used but not imported from %s in %s", typeName, expectedMod, mod.Name))
-		}
-	}
-}
-
-// collectBaseTypeRefs adds SMI base type names referenced by a definition to the set.
-func collectBaseTypeRefs(def module.Definition, refs map[string]struct{}) {
-	switch d := def.(type) {
-	case *module.ObjectType:
-		collectSyntaxBaseTypeRefs(d.Syntax, refs)
-	case *module.TypeDef:
-		collectSyntaxBaseTypeRefs(d.Syntax, refs)
-	}
-}
-
-func collectSyntaxBaseTypeRefs(syntax module.TypeSyntax, refs map[string]struct{}) {
-	switch s := syntax.(type) {
-	case *module.TypeSyntaxTypeRef:
-		if _, ok := smiBaseTypes[s.Name]; ok {
-			refs[s.Name] = struct{}{}
-		}
-	case *module.TypeSyntaxConstrained:
-		collectSyntaxBaseTypeRefs(s.Base, refs)
-	case *module.TypeSyntaxIntegerEnum:
-		if s.Base != "" {
-			if _, ok := smiBaseTypes[s.Base]; ok {
-				refs[s.Base] = struct{}{}
-			}
-		}
-	}
-}
-
-// normalizeTypeName maps SMIv1 type names to their SMIv2 equivalents.
-func normalizeTypeName(name string) string {
-	switch name {
-	case "Counter":
-		return "Counter32"
-	case "Gauge":
-		return "Gauge32"
-	case "INTEGER":
-		return "Integer32"
-	case "NetworkAddress":
-		return "IpAddress"
-	default:
-		return name
-	}
-}
-
-// checkDescriptionMissing flags SMIv2 OBJECT-TYPE definitions that lack a
-// DESCRIPTION clause. OBJECT-TYPE is the only definition type where
-// DESCRIPTION is grammatically optional (also TRAP-TYPE, but that is SMIv1).
-// For all other SMIv2 types, DESCRIPTION is a required clause in the grammar,
-// and empty descriptions are caught by the empty-description lowering check.
-func checkDescriptionMissing(ctx *resolverContext, objRefs []objectTypeRef) {
-	for _, ref := range objRefs {
-		if ref.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(ref.mod.Name) {
-			continue
-		}
-		if !ref.obj.HasDescription {
-			ctx.EmitDiagnostic(types.DiagDescriptionMissing,
-				ref.mod, ref.obj.Span,
-				fmt.Sprintf("%q: OBJECT-TYPE should have a DESCRIPTION clause", ref.obj.Name))
-		}
-	}
-}
-
-// checkTextualConventionNested flags TEXTUAL-CONVENTIONs whose parent type
-// is itself a TEXTUAL-CONVENTION. RFC 2579 section 3.5 specifies that a TC's
-// SYNTAX clause should reference a base type, not another TC. Many real MIBs
-// violate this, so it is reported at style severity.
-func checkTextualConventionNested(ctx *resolverContext) {
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok || !td.IsTextualConvention {
-				continue
-			}
-			resolved, ok := ctx.LookupTypeForModule(mod, td.Name)
-			if !ok {
-				continue
-			}
-			parent := resolved.Parent()
-			if parent != nil && parent.IsTextualConvention() {
-				ctx.EmitDiagnostic(types.DiagTCNested,
-					mod, td.Span,
-					fmt.Sprintf("%q: textual convention derived from textual convention %q", td.Name, parent.Name()))
-			}
-		}
-	}
-}
-
-// checkTypeAssignmentSMIv2 flags plain type assignments in SMIv2 modules.
-// RFC 2579 recommends using TEXTUAL-CONVENTION instead of bare type
-// assignments in SMIv2.
-func checkTypeAssignmentSMIv2(ctx *resolverContext) {
-	for _, mod := range ctx.modules {
-		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
-			continue
-		}
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok || td.IsTextualConvention {
-				continue
-			}
-			// Skip SEQUENCE type assignments (used for table rows, not real types).
-			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
-				continue
-			}
-			ctx.EmitDiagnostic(types.DiagTypeAssignmentSMIv2,
-				mod, td.Span,
-				fmt.Sprintf("%q: type assignment in SMIv2 should be a TEXTUAL-CONVENTION", td.Name))
-		}
-	}
-}
-
-// checkTableRowNaming validates table/row naming conventions:
-//   - Table names should end in "Table"
-//   - Row names should end in "Entry"
-//   - Row name prefix should match table name prefix
-func checkTableRowNaming(ctx *resolverContext, objRefs []objectTypeRef) {
-	for _, ref := range objRefs {
-		if module.IsBaseModule(ref.mod.Name) {
-			continue
-		}
-		node, ok := ctx.LookupNodeForModule(ref.mod, ref.obj.Name)
-		if !ok {
-			continue
-		}
-		switch node.Kind() {
-		case KindTable:
-			if !strings.HasSuffix(ref.obj.Name, "Table") {
-				ctx.EmitDiagnostic(types.DiagTableNameTable,
-					ref.mod, ref.obj.Span,
-					fmt.Sprintf("%q: table name should end in \"Table\"", ref.obj.Name))
-			}
-		case KindRow:
-			if !strings.HasSuffix(ref.obj.Name, "Entry") {
-				ctx.EmitDiagnostic(types.DiagRowNameEntry,
-					ref.mod, ref.obj.Span,
-					fmt.Sprintf("%q: row name should end in \"Entry\"", ref.obj.Name))
-			}
-			// Check that row name prefix matches table name prefix.
-			if node.Parent() != nil && node.Parent().Kind() == KindTable {
-				tableName := node.Parent().Name()
-				tablePrefix := strings.TrimSuffix(tableName, "Table")
-				rowPrefix := strings.TrimSuffix(ref.obj.Name, "Entry")
-				if tablePrefix != "" && rowPrefix != "" && tablePrefix != rowPrefix {
-					ctx.EmitDiagnostic(types.DiagRowNameTableName,
-						ref.mod, ref.obj.Span,
-						fmt.Sprintf("%q: row prefix %q does not match table prefix %q", ref.obj.Name, rowPrefix, tablePrefix))
-				}
-			}
-		}
-	}
-}
-
-// forEachDefinitionSyntax calls fn for each ObjectType and TypeDef definition
-// across all non-base modules. The callback receives the unwrapped syntax
-// (TypeSyntaxConstrained layers stripped), definition name, module, and span.
-func forEachDefinitionSyntax(ctx *resolverContext, fn func(module.TypeSyntax, string, *module.Module, types.Span)) {
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectType:
-				fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Span)
-			case *module.TypeDef:
-				fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Span)
-			}
-		}
-	}
-}
-
-// unwrapConstrainedSyntax strips TypeSyntaxConstrained wrappers to reach the
-// underlying enum, bits, or type reference syntax.
-func unwrapConstrainedSyntax(syntax module.TypeSyntax) module.TypeSyntax {
-	for {
-		c, ok := syntax.(*module.TypeSyntaxConstrained)
-		if !ok {
-			return syntax
-		}
-		syntax = c.Base
-	}
-}
-
-// checkNamedNumberOrdering flags enumerations and BITS where named values
-// are not in ascending order by value. This is a style recommendation per
-// common MIB authoring practice.
-func checkNamedNumberOrdering(ctx *resolverContext) {
-	forEachDefinitionSyntax(ctx, func(syntax module.TypeSyntax, name string, mod *module.Module, span types.Span) {
-		switch s := syntax.(type) {
-		case *module.TypeSyntaxIntegerEnum:
-			for i := 1; i < len(s.NamedNumbers); i++ {
-				if s.NamedNumbers[i].Value < s.NamedNumbers[i-1].Value {
-					ctx.EmitDiagnostic(types.DiagNamedNumbersAscending,
-						mod, span,
-						fmt.Sprintf("%q: named numbers not in ascending order (%s(%d) before %s(%d))",
-							name,
-							s.NamedNumbers[i-1].Name, s.NamedNumbers[i-1].Value,
-							s.NamedNumbers[i].Name, s.NamedNumbers[i].Value))
-					return
-				}
-			}
-		case *module.TypeSyntaxBits:
-			for i := 1; i < len(s.NamedBits); i++ {
-				if s.NamedBits[i].Position < s.NamedBits[i-1].Position {
-					ctx.EmitDiagnostic(types.DiagNamedNumbersAscending,
-						mod, span,
-						fmt.Sprintf("%q: BITS positions not in ascending order (%s(%d) before %s(%d))",
-							name,
-							s.NamedBits[i-1].Name, s.NamedBits[i-1].Position,
-							s.NamedBits[i].Name, s.NamedBits[i].Position))
-					return
-				}
-			}
-		}
-	})
-}
-
-// checkHyphenInLabel flags named numbers and BITS labels that contain hyphens
-// in SMIv2 modules. RFC 2578 section 7.1.4 says named values must not use
-// hyphens in SMIv2 (they are lowercase identifiers without hyphens).
-func checkHyphenInLabel(ctx *resolverContext) {
-	forEachDefinitionSyntax(ctx, func(syntax module.TypeSyntax, name string, mod *module.Module, span types.Span) {
-		if mod.Language != types.LanguageSMIv2 {
-			return
-		}
-		switch s := syntax.(type) {
-		case *module.TypeSyntaxIntegerEnum:
-			for _, nn := range s.NamedNumbers {
-				if strings.Contains(nn.Name, "-") {
-					ctx.EmitDiagnostic(types.DiagHyphenInLabel,
-						mod, span,
-						fmt.Sprintf("%q: named number %q contains a hyphen", name, nn.Name))
-				}
-			}
-		case *module.TypeSyntaxBits:
-			for _, nb := range s.NamedBits {
-				if strings.Contains(nb.Name, "-") {
-					ctx.EmitDiagnostic(types.DiagHyphenInLabel,
-						mod, span,
-						fmt.Sprintf("%q: BITS label %q contains a hyphen", name, nb.Name))
-				}
-			}
-		}
-	})
-}
-
-// checkOpaqueSMIv2 flags OBJECT-TYPE definitions that use the Opaque base type
-// in SMIv2 modules. RFC 2578 section 7.1.3 says Opaque is provided solely for
-// backward-compatibility and should not be used for new definitions.
-func checkOpaqueSMIv2(ctx *resolverContext, objRefs []objectTypeRef) {
-	for _, ref := range objRefs {
-		if ref.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(ref.mod.Name) {
-			continue
-		}
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
-		if resolved == nil {
-			continue
-		}
-		t := resolved.Type()
-		if t == nil {
-			continue
-		}
-		if t.EffectiveBase() == BaseOpaque {
-			ctx.EmitDiagnostic(types.DiagOpaqueSMIv2,
-				ref.mod, ref.obj.Span,
-				fmt.Sprintf("%q: Opaque type should not be used in SMIv2", ref.obj.Name))
-		}
-	}
-}
-
-// checkFormatHints validates DISPLAY-HINT usage on textual conventions.
-// It combines two checks:
-//   - DiagInvalidFormat: format string is syntactically invalid for the base
-//     type, or DISPLAY-HINT is present on an inapplicable base type (RFC 2579
-//     section 3.1).
-//   - DiagTypeWithoutFormat: TC for OCTET STRING or integer-based type has no
-//     DISPLAY-HINT (RFC 2579 section 3.1 recommends one).
-func checkFormatHints(ctx *resolverContext) {
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok || !td.IsTextualConvention {
-				continue
-			}
-			resolved, ok := ctx.LookupTypeForModule(mod, td.Name)
-			if !ok {
-				continue
-			}
-			base := resolved.EffectiveBase()
-
-			if td.DisplayHint != "" {
-				var valid bool
-				switch base {
-				case BaseInteger32, BaseUnsigned32, BaseGauge32, BaseTimeTicks:
-					valid = IsValidIntegerHint(td.DisplayHint)
-				case BaseOctetString, BaseOpaque:
-					valid = IsValidOctetStringHint(td.DisplayHint)
-				default:
-					// DISPLAY-HINT is not applicable to this basetype.
-					valid = false
-				}
-				if !valid {
-					ctx.EmitDiagnostic(types.DiagInvalidFormat,
-						mod, td.Span,
-						fmt.Sprintf("%q: invalid DISPLAY-HINT %q for base type %s",
-							td.Name, td.DisplayHint, base))
-				}
-			} else if resolved.EffectiveDisplayHint() == "" {
-				switch base {
-				case BaseOctetString, BaseInteger32, BaseUnsigned32, BaseGauge32:
-					ctx.EmitDiagnostic(types.DiagTypeWithoutFormat,
-						mod, td.Span,
-						fmt.Sprintf("%q: textual convention without DISPLAY-HINT", td.Name))
-				}
-			}
-		}
-	}
-}
-
-// checkTypeUnreferenced flags type definitions that are never referenced by
-// any OBJECT-TYPE SYNTAX, other type definition, or compliance refinement.
-// Only checks within the loaded module set, not external consumers.
-func checkTypeUnreferenced(ctx *resolverContext) {
-	// Build set of referenced type names per module.
-	referenced := make(map[*module.Module]map[string]struct{})
-	markRef := func(mod *module.Module, name string) {
-		refs := referenced[mod]
-		if refs == nil {
-			refs = make(map[string]struct{})
-			referenced[mod] = refs
-		}
-		refs[name] = struct{}{}
-	}
-
-	// Collect type references from all definitions.
-	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectType:
-				collectSyntaxTypeRefs(d.Syntax, mod, markRef)
-			case *module.TypeDef:
-				collectSyntaxTypeRefs(d.Syntax, mod, markRef)
-			case *module.ModuleCompliance:
-				for _, cm := range d.Modules {
-					for _, obj := range cm.Objects {
-						collectSyntaxTypeRefs(obj.Syntax, mod, markRef)
-						collectSyntaxTypeRefs(obj.WriteSyntax, mod, markRef)
-					}
-				}
-			case *module.AgentCapabilities:
-				for _, sup := range d.Supports {
-					for _, v := range sup.Variations {
-						collectSyntaxTypeRefs(v.Syntax, mod, markRef)
-						collectSyntaxTypeRefs(v.WriteSyntax, mod, markRef)
-					}
-				}
-			}
-		}
-	}
-
-	// Also mark types that are exported via imports from other modules.
-	for _, mod := range ctx.modules {
-		for _, imp := range mod.Imports {
-			// If another module imports a type name, mark it as used
-			// in the source module.
-			for _, srcMod := range ctx.moduleIndex[imp.Module] {
-				markRef(srcMod, imp.Symbol)
-			}
-		}
-	}
-
-	// Check each type definition.
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		refs := referenced[mod]
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok {
-				continue
-			}
-			// Skip SEQUENCE types (used internally for row definitions).
-			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
-				continue
-			}
-			if refs != nil {
-				if _, used := refs[td.Name]; used {
-					continue
-				}
-			}
-			ctx.EmitDiagnostic(types.DiagTypeUnreferenced,
-				mod, td.Span,
-				fmt.Sprintf("%q: type defined but never referenced", td.Name))
-		}
-	}
-}
-
-// isSequenceTypeDefDirect reports whether a definition is a SEQUENCE type
-// assignment. These conventionally share names with row OBJECT-TYPEs
-// differing only in initial case (e.g., FooEntry SEQUENCE vs fooEntry
-// OBJECT-TYPE), so they are excluded from case-collision checks.
-func isSequenceTypeDefDirect(def module.Definition) bool {
-	td, ok := def.(*module.TypeDef)
-	if !ok {
-		return false
-	}
-	_, isSeq := td.Syntax.(*module.TypeSyntaxSequence)
-	return isSeq
-}
-
-// checkIdentifierCaseMatch flags identifiers within a module that differ only
-// in case. ASN.1 identifiers are case-sensitive, but case-only differences are
-// a common source of confusion. SEQUENCE type definitions are excluded since
-// they conventionally mirror row entry names with different initial case.
-func checkIdentifierCaseMatch(ctx *resolverContext) {
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		// Group definitions by lowercased name, excluding SEQUENCE types.
-		byLower := make(map[string][]module.Definition)
-		for _, def := range mod.Definitions {
-			if isSequenceTypeDefDirect(def) {
-				continue
-			}
-			key := strings.ToLower(def.DefinitionName())
-			byLower[key] = append(byLower[key], def)
-		}
-		for _, defs := range byLower {
-			if len(defs) < 2 {
-				continue
-			}
-			// Check for actual case differences (skip exact duplicates).
-			seen := make(map[string]struct{})
-			var distinct []module.Definition
-			for _, def := range defs {
-				if _, ok := seen[def.DefinitionName()]; !ok {
-					seen[def.DefinitionName()] = struct{}{}
-					distinct = append(distinct, def)
-				}
-			}
-			if len(distinct) < 2 {
-				continue
-			}
-			// Report on all but the first definition.
-			firstName := distinct[0].DefinitionName()
-			for _, def := range distinct[1:] {
-				ctx.EmitDiagnostic(types.DiagIdentifierCaseMatch,
-					mod, def.DefinitionSpan(),
-					fmt.Sprintf("%q differs from %q only in case", def.DefinitionName(), firstName))
-			}
-		}
-	}
-}
-
-// checkTrapInSMIv2 flags TRAP-TYPE definitions in SMIv2 modules. TRAP-TYPE
-// is an SMIv1 construct; SMIv2 modules should use NOTIFICATION-TYPE instead.
-func checkTrapInSMIv2(ctx *resolverContext) {
-	for _, mod := range ctx.modules {
-		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
-			continue
-		}
-		for _, def := range mod.Definitions {
-			notif, ok := def.(*module.Notification)
-			if !ok || !notif.IsTrap() {
-				continue
-			}
-			ctx.EmitDiagnostic(types.DiagTrapInSMIv2,
-				mod, notif.Span,
-				fmt.Sprintf("%q: TRAP-TYPE should not be used in SMIv2 module, use NOTIFICATION-TYPE", notif.Name))
-		}
-	}
-}
-
-// collectSyntaxTypeRefs extracts type name references from a TypeSyntax and
-// calls markRef for each one.
-func collectSyntaxTypeRefs(syntax module.TypeSyntax, mod *module.Module, markRef func(*module.Module, string)) {
-	if syntax == nil {
-		return
-	}
-	switch s := syntax.(type) {
-	case *module.TypeSyntaxTypeRef:
-		markRef(mod, s.Name)
-	case *module.TypeSyntaxIntegerEnum:
-		if s.Base != "" {
-			markRef(mod, s.Base)
-		}
-	case *module.TypeSyntaxConstrained:
-		collectSyntaxTypeRefs(s.Base, mod, markRef)
-	case *module.TypeSyntaxSequenceOf:
-		markRef(mod, s.EntryType)
-	}
-}
-
-// checkGroupUnreferenced flags OBJECT-GROUP and NOTIFICATION-GROUP definitions
-// that are never referenced in any MODULE-COMPLIANCE (as mandatory or optional
-// groups). Only checks within the loaded module set.
-func checkGroupUnreferenced(ctx *resolverContext) {
-	// Collect all group names referenced by compliance and capabilities modules.
-	referencedGroups := make(map[string]struct{})
-	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ModuleCompliance:
-				for _, cm := range d.Modules {
-					for _, name := range cm.MandatoryGroups {
-						referencedGroups[name] = struct{}{}
-					}
-					for _, grp := range cm.Groups {
-						referencedGroups[grp.Group] = struct{}{}
-					}
-				}
-			case *module.AgentCapabilities:
-				for _, sup := range d.Supports {
-					for _, name := range sup.Includes {
-						referencedGroups[name] = struct{}{}
-					}
-				}
-			}
-		}
-	}
-
-	// Check each group definition.
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectGroup:
-				if _, ok := referencedGroups[d.Name]; !ok {
-					ctx.EmitDiagnostic(types.DiagGroupUnreferenced,
-						mod, d.Span,
-						fmt.Sprintf("%q: OBJECT-GROUP not referenced in any compliance module", d.Name))
-				}
-			case *module.NotificationGroup:
-				if _, ok := referencedGroups[d.Name]; !ok {
-					ctx.EmitDiagnostic(types.DiagGroupUnreferenced,
-						mod, d.Span,
-						fmt.Sprintf("%q: NOTIFICATION-GROUP not referenced in any compliance module", d.Name))
-				}
-			}
-		}
-	}
-}
-
-// checkNodeImplicit flags OID tree nodes that were created implicitly by
-// numeric arc resolution without any explicit definition. These are unnamed
-// intermediate nodes (KindInternal) that have children with actual
-// definitions.
-func checkNodeImplicit(ctx *resolverContext) {
-	root := ctx.mib.Root()
-	if root == nil {
-		return
-	}
-	for node := range root.Subtree() {
-		if node.IsRoot() || node.Kind() != KindInternal {
-			continue
-		}
-		if node.Name() != "" {
-			continue
-		}
-		// Only flag implicit nodes that have descendants with definitions,
-		// not leaf stubs.
-		if len(node.Children()) == 0 {
-			continue
-		}
-		// Find the module of the first named child to attribute the diagnostic.
-		var mod *module.Module
-		for _, child := range node.Children() {
-			if rm := child.Module(); rm != nil {
-				if m, ok := ctx.resolvedToModule[rm]; ok {
-					mod = m
-					break
-				}
-			}
-		}
-		ctx.EmitDiagnostic(types.DiagNodeImplicit,
-			mod, types.Span{},
-			fmt.Sprintf("implicit node at OID %s", node.OID()))
-	}
-}
-
-// checkModuleIdentityRegistration checks that MODULE-IDENTITY OIDs under the
-// IETF mgmt subtree (1.3.6.1.2) are registered under a controlled IANA
-// branch: mib-2 (1.3.6.1.2.1), transmission (1.3.6.1.2.1.10), or
-// snmpModules (1.3.6.1.6.3).
-func checkModuleIdentityRegistration(ctx *resolverContext) {
-	// mgmt prefix: 1.3.6.1.2
-	mgmtPrefix := OID{1, 3, 6, 1, 2}
-	// Controlled registration points.
-	mib2Prefix := OID{1, 3, 6, 1, 2, 1}
-	transmissionPrefix := OID{1, 3, 6, 1, 2, 1, 10}
-	snmpModulesPrefix := OID{1, 3, 6, 1, 6, 3}
-
-	for _, mod := range ctx.modules {
-		if module.IsBaseModule(mod.Name) {
-			continue
-		}
-		for _, def := range mod.Definitions {
-			mi, ok := def.(*module.ModuleIdentity)
-			if !ok {
-				continue
-			}
-			node, ok := ctx.LookupNodeForModule(mod, mi.Name)
-			if !ok {
-				continue
-			}
-			oid := node.OID()
-			if len(oid) < 2 {
-				ctx.EmitDiagnostic(types.DiagModuleIdentityReg,
-					mod, mi.Span,
-					fmt.Sprintf("%q: MODULE-IDENTITY OID too short for valid registration", mi.Name))
-				continue
-			}
-			if !oid.HasPrefix(mgmtPrefix) {
-				continue
-			}
-			if oid.HasPrefix(mib2Prefix) || oid.HasPrefix(transmissionPrefix) || oid.HasPrefix(snmpModulesPrefix) {
-				continue
-			}
-			ctx.EmitDiagnostic(types.DiagModuleIdentityReg,
-				mod, mi.Span,
-				fmt.Sprintf("%q: MODULE-IDENTITY registered under uncontrolled mgmt OID %s", mi.Name, oid))
-		}
-	}
-}
-
-// checkRowStatusDefaults checks RowStatus objects for valid DEFVAL values and
-// access levels. RowStatus DEFVAL must be 1-3 (active, notInService, notReady),
-// not 4-6 (createAndGo, createAndWait, destroy). RowStatus access must be
-// read-create (SMIv2) or read-write (SMIv1).
-func checkRowStatusDefaults(ctx *resolverContext, objRefs []objectTypeRef) {
-	rowStatusType := lookupWellKnownTC(ctx, "RowStatus")
-	if rowStatusType == nil {
-		return
-	}
-
-	rowStatusActionValues := map[int64]string{
-		4: "createAndGo", 5: "createAndWait", 6: "destroy",
-	}
-
-	for _, ref := range objRefs {
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
-		if resolved == nil {
-			continue
-		}
-		t := resolved.Type()
-		if t != rowStatusType {
-			continue
-		}
-
-		// Check access: must be read-create (or read-write in SMIv1).
-		access := ref.obj.Access
-		if ref.mod.Language == types.LanguageSMIv2 {
-			if access != types.AccessReadCreate {
-				ctx.EmitDiagnostic(types.DiagRowStatusAccess,
-					ref.mod, ref.obj.Span,
-					fmt.Sprintf("%q: RowStatus should have MAX-ACCESS read-create, has %s", ref.obj.Name, access))
-			}
-		} else if access != types.AccessReadWrite {
-			ctx.EmitDiagnostic(types.DiagRowStatusAccess,
-				ref.mod, ref.obj.Span,
-				fmt.Sprintf("%q: RowStatus should have ACCESS read-write, has %s", ref.obj.Name, access))
-		}
-
-		// Check DEFVAL.
-		dv := resolved.DefaultValue()
-		if dv.IsZero() {
-			continue
-		}
-		val, ok := defvalAsInt64(dv, rowStatusActionValues)
-		if !ok {
-			continue
-		}
-		if name, illegal := rowStatusActionValues[val]; illegal {
-			ctx.EmitDiagnostic(types.DiagRowStatusDefault,
-				ref.mod, ref.obj.Span,
-				fmt.Sprintf("%q: RowStatus DEFVAL %s(%d) is an action value, must be active(1), notInService(2), or notReady(3)", ref.obj.Name, name, val))
-		}
-	}
-}
-
-// checkStorageTypeDefaults checks StorageType objects for valid DEFVAL values.
-// StorageType DEFVAL must be 1-3 (other, volatile, nonVolatile), not 4-5
-// (permanent, readOnly).
-func checkStorageTypeDefaults(ctx *resolverContext, objRefs []objectTypeRef) {
-	storageType := lookupWellKnownTC(ctx, "StorageType")
-	if storageType == nil {
-		return
-	}
-
-	illegalValues := map[int64]string{
-		4: "permanent", 5: "readOnly",
-	}
-
-	for _, ref := range objRefs {
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
-		if resolved == nil {
-			continue
-		}
-		t := resolved.Type()
-		if t != storageType {
-			continue
-		}
-		dv := resolved.DefaultValue()
-		if dv.IsZero() {
-			continue
-		}
-		val, ok := defvalAsInt64(dv, illegalValues)
-		if !ok {
-			continue
-		}
-		if name, illegal := illegalValues[val]; illegal {
-			ctx.EmitDiagnostic(types.DiagStorageTypeDefault,
-				ref.mod, ref.obj.Span,
-				fmt.Sprintf("%q: StorageType DEFVAL %s(%d) is not a valid default, must be other(1), volatile(2), or nonVolatile(3)", ref.obj.Name, name, val))
-		}
-	}
-}
-
-// defvalAsInt64 extracts a numeric value from a DefVal, mapping enum labels
-// via the provided name map. Returns the value and true if extraction
-// succeeded, false otherwise.
-func defvalAsInt64(dv DefVal, labelToValue map[int64]string) (int64, bool) {
-	switch dv.Kind() {
-	case DefValKindInt:
-		v, _ := DefValAs[int64](dv)
-		return v, true
-	case DefValKindUint:
-		uv, _ := DefValAs[uint64](dv)
-		return int64(uv), true
-	case DefValKindEnum:
-		label, _ := DefValAs[string](dv)
-		for v, name := range labelToValue {
-			if name == label {
-				return v, true
-			}
-		}
-		return 0, false
-	default:
-		return 0, false
-	}
-}
-
-// checkTAddressTDomain verifies that column objects derived from TAddress have
-// a sibling column with TDomain type. Only checks column objects within table
-// rows.
-func checkTAddressTDomain(ctx *resolverContext, objRefs []objectTypeRef) {
-	tAddressType := lookupWellKnownTC(ctx, "TAddress")
-	tDomainType := lookupWellKnownTC(ctx, "TDomain")
-	if tAddressType == nil || tDomainType == nil {
-		return
-	}
-
-	for _, ref := range objRefs {
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
-		if resolved == nil || !resolved.IsColumn() {
-			continue
-		}
-		t := resolved.Type()
-		if t == nil || !isDerivedFromType(t, tAddressType) {
-			continue
-		}
-		row := resolved.Row()
-		if row == nil {
-			continue
-		}
-		found := false
-		for _, col := range row.Columns() {
-			ct := col.Type()
-			if ct != nil && isDerivedFromType(ct, tDomainType) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			ctx.EmitDiagnostic(types.DiagTAddressTDomain,
-				ref.mod, ref.obj.Span,
-				fmt.Sprintf("%q: TAddress column has no sibling with TDomain type", ref.obj.Name))
-		}
-	}
-}
-
-// checkIpAddressDeprecation warns when SMIv2 OBJECT-TYPEs use IpAddress,
-// which is deprecated in favor of InetAddress (RFC 4001).
-func checkIpAddressDeprecation(ctx *resolverContext, objRefs []objectTypeRef) {
-	for _, ref := range objRefs {
-		if ref.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(ref.mod.Name) {
-			continue
-		}
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
-		if resolved == nil {
-			continue
-		}
-		t := resolved.Type()
-		if t == nil {
-			continue
-		}
-		if t.EffectiveBase() == BaseIpAddress {
-			ctx.EmitDiagnostic(types.DiagIpAddressInSyntax,
-				ref.mod, ref.obj.Span,
-				fmt.Sprintf("%q: IpAddress is deprecated, use InetAddress (RFC 4001)", ref.obj.Name))
-		}
-	}
-}
-
-// isDerivedFromType walks the parent chain of t and returns true if any
-// type in the chain is target.
-func isDerivedFromType(t, target *Type) bool {
-	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
-		if current == target {
-			return true
-		}
-	}
-	return false
-}
-
-// lookupWellKnownTC looks up a textual convention from SNMPv2-TC by name.
-func lookupWellKnownTC(ctx *resolverContext, name string) *Type {
-	if ctx.snmpv2TCModule == nil {
-		return nil
-	}
-	t, _ := ctx.lookupTypeInModule(ctx.snmpv2TCModule, name)
-	return t
-}
-
-// lookupTypeInNamedModule looks up a type from a module identified by name.
-// Returns nil if the module is not loaded or the type is not found.
-func lookupTypeInNamedModule(ctx *resolverContext, moduleName, typeName string) *Type {
-	mods := ctx.moduleIndex[moduleName]
-	if len(mods) == 0 {
-		return nil
-	}
-	t, _ := ctx.lookupTypeInModule(mods[0], typeName)
-	return t
-}
-
-// addressPairingConfig defines the parameters for an address/address-type
-// pairing check (InetAddress or TransportAddress patterns).
-type addressPairingConfig struct {
-	moduleName      string   // source module, e.g. "INET-ADDRESS-MIB"
-	addressType     string   // address TC name, e.g. "InetAddress"
-	addressTypeType string   // address-type TC name, e.g. "InetAddressType"
-	specificTypes   []string // specific variant TC names, e.g. "InetAddressIPv4"
-	diagPairing     string   // diagnostic code for missing pairing
-	diagSubtyped    string   // diagnostic code for subtyped address-type
-	diagSpecific    string   // diagnostic code for specific variant usage
-}
-
-var inetAddressConfig = addressPairingConfig{
-	moduleName:      "INET-ADDRESS-MIB",
-	addressType:     "InetAddress",
-	addressTypeType: "InetAddressType",
-	specificTypes: []string{
-		"InetAddressIPv4",
-		"InetAddressIPv6",
-		"InetAddressIPv4z",
-		"InetAddressIPv6z",
-		"InetAddressDNS",
-	},
-	diagPairing:  types.DiagInetAddressPairing,
-	diagSubtyped: types.DiagInetAddressTypeSubtyped,
-	diagSpecific: types.DiagInetAddressSpecific,
-}
-
-var transportAddressConfig = addressPairingConfig{
-	moduleName:      "TRANSPORT-ADDRESS-MIB",
-	addressType:     "TransportAddress",
-	addressTypeType: "TransportAddressType",
-	specificTypes: []string{
-		"TransportAddressIPv4",
-		"TransportAddressIPv6",
-		"TransportAddressIPv4z",
-		"TransportAddressIPv6z",
-		"TransportAddressLocal",
-		"TransportAddressDns",
-	},
-	diagPairing:  types.DiagTransportAddressPairing,
-	diagSubtyped: types.DiagTransportAddressTypeSubtyped,
-	diagSpecific: types.DiagTransportAddressSpecific,
-}
-
-// checkInetAddressPairing validates InetAddress/InetAddressType pairing per RFC 4001.
-func checkInetAddressPairing(ctx *resolverContext, objRefs []objectTypeRef) {
-	checkAddressTypePairing(ctx, objRefs, &inetAddressConfig)
-}
-
-// checkTransportAddressPairing validates TransportAddress/TransportAddressType pairing per RFC 3419.
-func checkTransportAddressPairing(ctx *resolverContext, objRefs []objectTypeRef) {
-	checkAddressTypePairing(ctx, objRefs, &transportAddressConfig)
-}
-
-// checkAddressTypePairing implements three related checks for address/address-type
-// pairing patterns (used by both InetAddress and TransportAddress):
-//
-//   - Pairing: address column should have a sibling address-type column
-//   - Subtyped: address-type with enum refinement should have correspondingly
-//     constrained address sibling
-//   - Specific: specific address variants should not be used when the generic
-//     address type is appropriate
-func checkAddressTypePairing(ctx *resolverContext, objRefs []objectTypeRef, cfg *addressPairingConfig) {
-	addrType := lookupTypeInNamedModule(ctx, cfg.moduleName, cfg.addressType)
-	addrTypeType := lookupTypeInNamedModule(ctx, cfg.moduleName, cfg.addressTypeType)
-	if addrType == nil || addrTypeType == nil {
-		return
-	}
-
-	// Resolve specific variant types for the specific-variant check.
-	var specificTypes []*Type
-	for _, name := range cfg.specificTypes {
-		if t := lookupTypeInNamedModule(ctx, cfg.moduleName, name); t != nil {
-			specificTypes = append(specificTypes, t)
-		}
-	}
-
-	for _, ref := range objRefs {
-		resolved := ctx.lookupObjectInModuleScope(ref.mod, ref.obj.Name)
-		if resolved == nil || !resolved.IsColumn() {
-			continue
-		}
-		t := resolved.Type()
-		if t == nil {
-			continue
-		}
-
-		// Check 1: address column without address-type sibling.
-		if isDerivedFromType(t, addrType) {
-			checkAddressPairingSibling(ctx, ref, resolved, addrTypeType, cfg.diagPairing, cfg.addressType, cfg.addressTypeType)
-			continue
-		}
-
-		// Check 2: address-type column with enum refinement but address sibling lacks SIZE.
-		if isDerivedFromType(t, addrTypeType) {
-			checkAddressTypeSubtyped(ctx, ref, resolved, addrType, objRefs, cfg.diagSubtyped, cfg.addressType, cfg.addressTypeType)
-			continue
-		}
-
-		// Check 3: specific variant used instead of generic address type.
-		for _, specific := range specificTypes {
-			if isDerivedFromType(t, specific) {
-				ctx.EmitDiagnostic(cfg.diagSpecific,
-					ref.mod, ref.obj.Span,
-					fmt.Sprintf("%q: %s is a specific variant, use %s with %s",
-						ref.obj.Name, specific.Name(), cfg.addressType, cfg.addressTypeType))
-				break
-			}
-		}
-	}
-}
-
-// checkAddressPairingSibling checks that an address column has a sibling
-// address-type column in the same row.
-func checkAddressPairingSibling(ctx *resolverContext, ref objectTypeRef, resolved *Object, addrTypeType *Type, diagCode, addrName, addrTypeName string) {
-	row := resolved.Row()
-	if row == nil {
-		return
-	}
-	for _, col := range row.Columns() {
-		ct := col.Type()
-		if ct != nil && isDerivedFromType(ct, addrTypeType) {
-			return
-		}
-	}
-	ctx.EmitDiagnostic(diagCode,
-		ref.mod, ref.obj.Span,
-		fmt.Sprintf("%q: %s column has no sibling with %s type", ref.obj.Name, addrName, addrTypeName))
-}
-
-// checkAddressTypeSubtyped checks that if an address-type column has enum
-// refinements, the paired address column also has explicit SIZE constraints
-// in its OBJECT-TYPE SYNTAX (not just inherited from the TC).
-func checkAddressTypeSubtyped(ctx *resolverContext, ref objectTypeRef, resolved *Object, addrType *Type, objRefs []objectTypeRef, diagCode, addrName, addrTypeName string) {
-	// Only check if the OBJECT-TYPE SYNTAX has explicit enum refinement.
-	if _, isEnum := ref.obj.Syntax.(*module.TypeSyntaxIntegerEnum); !isEnum {
-		return
-	}
-	row := resolved.Row()
-	if row == nil {
-		return
-	}
-	// Find sibling address column.
-	for _, col := range row.Columns() {
-		ct := col.Type()
-		if ct == nil || !isDerivedFromType(ct, addrType) {
-			continue
-		}
-		// Check whether the sibling's OBJECT-TYPE SYNTAX has an explicit
-		// SIZE constraint (not just the TC-inherited one). Look up the
-		// module IR entry for the sibling column.
-		if hasExplicitSizeConstraint(col.Name(), ref.mod, objRefs) {
-			return
-		}
-		ctx.EmitDiagnostic(diagCode,
-			ref.mod, ref.obj.Span,
-			fmt.Sprintf("%q: %s is subtyped but sibling %q (%s) has no SIZE constraint",
-				ref.obj.Name, addrTypeName, col.Name(), addrName))
-		return
-	}
-}
-
-// hasExplicitSizeConstraint checks whether the OBJECT-TYPE definition for the
-// named object has an explicit SIZE constraint in its SYNTAX clause.
-func hasExplicitSizeConstraint(name string, mod *module.Module, objRefs []objectTypeRef) bool {
-	for _, ref := range objRefs {
-		if ref.mod != mod || ref.obj.Name != name {
-			continue
-		}
-		c, ok := ref.obj.Syntax.(*module.TypeSyntaxConstrained)
-		if !ok {
-			return false
-		}
-		_, isSize := c.Constraint.(*module.ConstraintSize)
-		return isSize
 	}
 	return false
 }
