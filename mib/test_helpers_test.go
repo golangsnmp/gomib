@@ -245,13 +245,13 @@ func hasDiag(t testing.TB, diags []Diagnostic, code string) Diagnostic {
 func noDiag(t testing.TB, diags []Diagnostic, codes ...string) {
 	t.Helper()
 	for _, code := range codes {
-		if countDiag(diags, code) != 0 {
+		if countDiagnostics(diags, code) != 0 {
 			t.Fatalf("unexpected diagnostic with code %q; got: %s", code, formatDiagnostics(diags))
 		}
 	}
 }
 
-func countDiag(diags []Diagnostic, code string) int {
+func countDiagnostics(diags []Diagnostic, code string) int {
 	count := 0
 	for _, d := range diags {
 		if d.Code == code {
@@ -273,7 +273,7 @@ func diagsByCode(diags []Diagnostic, code string) []Diagnostic {
 
 func requireDiagCount(t testing.TB, diags []Diagnostic, code string, want int) {
 	t.Helper()
-	got := countDiag(diags, code)
+	got := countDiagnostics(diags, code)
 	if got != want {
 		t.Fatalf("diagnostic %q count mismatch: got=%d want=%d all=%s", code, got, want, formatDiagnostics(diags))
 	}
