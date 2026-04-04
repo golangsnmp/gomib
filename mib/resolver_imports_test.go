@@ -673,3 +673,94 @@ func TestResolveImports(t *testing.T) {
 		}
 	})
 }
+
+func TestCheckUnusedImports(t *testing.T) {
+	t.Run("unused import emits diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+				module.NewImport("SNMPv2-TC", "DisplayString", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		d := hasDiag(t, m.Diagnostics(), types.DiagImportUnused)
+		testutil.True(t, d.Message != "", "expected non-empty message")
+	})
+
+	t.Run("all used no diagnostic", func(t *testing.T) {
+		mod := testSMIv2Module(
+			[]module.Import{
+				module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+				module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			},
+			&module.ObjectType{
+				DefBase: module.DefBase{Name: "testObj"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Status:  types.StatusCurrent,
+				Oid:     testOid("testRoot", 1),
+			},
+		)
+		m := resolveStrict(mod)
+		noDiag(t, m.Diagnostics(), types.DiagImportUnused)
+	})
+}
+
+func TestCheckObsoleteImports_RFC1155InSMIv2(t *testing.T) {
+	// An SMIv2 module importing from RFC1155-SMI should emit obsolete-import.
+	mod := buildTestModule(testModuleConfig{
+		language:    types.LanguageSMIv2,
+		baseImport:  module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		includeRoot: true,
+	})
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagObsoleteImport)
+}
+
+func TestCheckObsoleteImports_RFC1213DisplayStringInSMIv2(t *testing.T) {
+	// SMIv2 module importing DisplayString from RFC1213-MIB should emit obsolete-import.
+	mod := buildTestModule(testModuleConfig{
+		language:   types.LanguageSMIv2,
+		baseImport: module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		extraImports: []module.Import{
+			module.NewImport("RFC1213-MIB", "DisplayString", types.Span{}),
+		},
+		includeRoot: true,
+	})
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagObsoleteImport)
+}
+
+func TestCheckObsoleteImports_SMIv1ModuleSkipped(t *testing.T) {
+	// An SMIv1 module importing from RFC1155-SMI should NOT emit obsolete-import.
+	mod := buildTestModule(testModuleConfig{
+		language:    types.LanguageSMIv1,
+		baseImport:  module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
+		includeRoot: true,
+	})
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagObsoleteImport)
+}
+
+func TestCheckObsoleteImports_RFC1065InSMIv2(t *testing.T) {
+	// SMIv2 module importing from RFC1065-SMI should emit obsolete-import.
+	mod := buildTestModule(testModuleConfig{
+		language:    types.LanguageSMIv2,
+		baseImport:  module.NewImport("RFC1065-SMI", "enterprises", types.Span{}),
+		includeRoot: true,
+	})
+
+	m := resolveStrict(mod)
+	hasDiag(t, m.Diagnostics(), types.DiagObsoleteImport)
+}
+
+// --- checkIntegerMisuse ---
