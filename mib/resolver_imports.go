@@ -365,8 +365,7 @@ func resolveTransitiveImports(ctx *resolverContext) {
 		}
 		var updates []update
 		for symbol, sourceMod := range imports {
-			ultimate := resolveUltimateDefiner(ctx, sourceMod, symbol)
-			if ultimate != sourceMod {
+			if ultimate, ok := resolveUltimateDefiner(ctx, sourceMod, symbol); ok && ultimate != sourceMod {
 				updates = append(updates, update{symbol, ultimate})
 			}
 		}
@@ -377,19 +376,21 @@ func resolveTransitiveImports(ctx *resolverContext) {
 }
 
 // resolveUltimateDefiner follows import chains from mod to find the module
-// that actually defines symbol (has it in ModuleDefNames).
-func resolveUltimateDefiner(ctx *resolverContext, mod *module.Module, symbol string) *module.Module {
+// that actually defines symbol (has it in ModuleDefNames). Returns the
+// defining module and true, or nil and false if the chain is broken
+// (cycle or dead end with no definer).
+func resolveUltimateDefiner(ctx *resolverContext, mod *module.Module, symbol string) (*module.Module, bool) {
 	visited := make(map[*module.Module]struct{}, 4)
 	current := mod
 	for {
 		if _, seen := visited[current]; seen {
-			return current
+			return nil, false
 		}
 		visited[current] = struct{}{}
 
 		if defNames := ctx.moduleDefNames[current]; defNames != nil {
 			if _, ok := defNames[symbol]; ok {
-				return current
+				return current, true
 			}
 		}
 
@@ -400,7 +401,7 @@ func resolveUltimateDefiner(ctx *resolverContext, mod *module.Module, symbol str
 			}
 		}
 
-		return current
+		return nil, false
 	}
 }
 
