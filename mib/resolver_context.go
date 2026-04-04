@@ -487,14 +487,6 @@ func (c *resolverContext) RecordUnresolvedNotificationObject(mod *module.Module,
 	}, mod, span, types.DiagObjectsUnresolved, fmt.Sprintf("unresolved OBJECTS: %q references unknown object %q", notification, object))
 }
 
-// DropModules releases parsed module data to free memory after resolution completes.
-func (c *resolverContext) DropModules() {
-	c.modules = nil
-	c.moduleIndex = nil
-	c.moduleDefNames = nil
-	c.moduleOidDefNames = nil
-}
-
 func addUnresolved(m *Mib, kind UnresolvedKind, symbol, reason string, mod *module.Module) {
 	modName := ""
 	if mod != nil {

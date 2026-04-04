@@ -80,8 +80,6 @@ func (r *resolver) resolve(mods []*module.Module) *Mib {
 	copyUsedImportsToModules(ctx)
 	copyResolvedImportsToModules(ctx)
 
-	ctx.DropModules()
-
 	ctx.FinalizeUnresolved()
 
 	if len(ctx.unresolvedImports) > 0 {

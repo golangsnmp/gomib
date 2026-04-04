@@ -708,27 +708,6 @@ func TestFinalizeUnresolved_NilModule(t *testing.T) {
 	}
 }
 
-func TestDropModules(t *testing.T) {
-	mod := &module.Module{Name: "A"}
-	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
-	ctx.modules = []*module.Module{mod}
-	ctx.moduleIndex["A"] = []*module.Module{mod}
-	ctx.moduleDefNames[mod] = map[string]struct{}{"foo": {}}
-
-	testutil.NotNil(t, ctx.modules, "expected Modules to be set before DropModules")
-
-	ctx.DropModules()
-
-	testutil.Nil(t, ctx.modules, "expected Modules to be nil after DropModules")
-	testutil.Nil(t, ctx.moduleIndex, "expected ModuleIndex to be nil after DropModules")
-	testutil.Nil(t, ctx.moduleDefNames, "expected ModuleDefNames to be nil after DropModules")
-
-	// Other maps should be untouched.
-	testutil.NotNil(t, ctx.moduleSymbolToNode, "expected ModuleSymbolToNode to survive DropModules")
-	testutil.NotNil(t, ctx.moduleSymbolToType, "expected ModuleSymbolToType to survive DropModules")
-	testutil.NotNil(t, ctx.moduleImports, "expected ModuleImports to survive DropModules")
-}
-
 func TestCopyUsedImportsToModules_Direct(t *testing.T) {
 	importer := &module.Module{Name: "IMPORTER-MIB"}
 	source := &module.Module{Name: "SOURCE-MIB"}
