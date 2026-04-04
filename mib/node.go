@@ -183,6 +183,24 @@ func (n *Node) walkOID(oid OID) (matched *Node, exact bool) {
 	return current, true
 }
 
+// symbol returns a Symbol wrapping this node's highest-priority entity.
+func (n *Node) symbol() Symbol {
+	switch {
+	case n.obj != nil:
+		return symbolFromObject(n.obj)
+	case n.notif != nil:
+		return symbolFromNotification(n.notif)
+	case n.group != nil:
+		return symbolFromGroup(n.group)
+	case n.compliance != nil:
+		return symbolFromCompliance(n.compliance)
+	case n.capability != nil:
+		return symbolFromCapability(n.capability)
+	default:
+		return symbolFromNode(n)
+	}
+}
+
 // String returns a brief summary: "name (oid)" or just "(oid)" for
 // unnamed nodes.
 func (n *Node) String() string {

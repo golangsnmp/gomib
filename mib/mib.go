@@ -79,23 +79,10 @@ func (m *Mib) NodesByName(name string) []*Node {
 }
 
 // Node returns the node with the given name, or nil if not found.
-// Prefers nodes with object definitions, then notifications, then any.
+// When multiple nodes share a name, returns the highest-priority one
+// (object > notification > group > compliance > capability > plain).
 func (m *Mib) Node(name string) *Node {
-	nodes := m.nameToNodes[name]
-	for _, nd := range nodes {
-		if nd.obj != nil {
-			return nd
-		}
-	}
-	for _, nd := range nodes {
-		if nd.notif != nil {
-			return nd
-		}
-	}
-	if len(nodes) > 0 {
-		return nodes[0]
-	}
-	return nil
+	return bestNode(m.nameToNodes[name])
 }
 
 // Object returns the object with the given name, or nil if not found.
@@ -132,35 +119,9 @@ func (m *Mib) Capability(name string) *Capability {
 // node entities (object > notification > group > compliance > capability > plain node),
 // then Type. Returns a zero Symbol if not found.
 func (m *Mib) Symbol(name string) Symbol {
-	nodes := m.nameToNodes[name]
-	// Single pass: track best match by priority (lower = better).
-	bestPri := 6 // worse than any real priority
-	var best Symbol
-	for _, nd := range nodes {
-		switch {
-		case nd.obj != nil:
-			return symbolFromObject(nd.obj)
-		case nd.notif != nil && bestPri > 1:
-			bestPri = 1
-			best = symbolFromNotification(nd.notif)
-		case nd.group != nil && bestPri > 2:
-			bestPri = 2
-			best = symbolFromGroup(nd.group)
-		case nd.compliance != nil && bestPri > 3:
-			bestPri = 3
-			best = symbolFromCompliance(nd.compliance)
-		case nd.capability != nil && bestPri > 4:
-			bestPri = 4
-			best = symbolFromCapability(nd.capability)
-		case bestPri > 5:
-			bestPri = 5
-			best = symbolFromNode(nd)
-		}
+	if nd := bestNode(m.nameToNodes[name]); nd != nil {
+		return nd.symbol()
 	}
-	if bestPri < 6 {
-		return best
-	}
-	// Type lookup.
 	if t := m.typeByName[name]; t != nil {
 		return symbolFromType(t)
 	}
@@ -551,6 +512,35 @@ func (m *Mib) addUnresolved(ref UnresolvedRef) {
 type nodeEntity interface {
 	comparable
 	*Object | *Notification | *Group | *Compliance | *Capability
+}
+
+// bestNode returns the highest-priority node from a name-collision set.
+// Priority: object > notification > group > compliance > capability > plain.
+func bestNode(nodes []*Node) *Node {
+	bestPri := 6
+	var best *Node
+	for _, nd := range nodes {
+		switch {
+		case nd.obj != nil:
+			return nd
+		case nd.notif != nil && bestPri > 1:
+			bestPri = 1
+			best = nd
+		case nd.group != nil && bestPri > 2:
+			bestPri = 2
+			best = nd
+		case nd.compliance != nil && bestPri > 3:
+			bestPri = 3
+			best = nd
+		case nd.capability != nil && bestPri > 4:
+			bestPri = 4
+			best = nd
+		case bestPri > 5:
+			bestPri = 5
+			best = nd
+		}
+	}
+	return best
 }
 
 // findEntity looks up a node-attached entity by name.
