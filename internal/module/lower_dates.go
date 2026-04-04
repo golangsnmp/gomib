@@ -90,7 +90,12 @@ func checkDate(ctx *LoweringContext, date string, span types.Span, now time.Time
 	var year int
 	var offset int
 	if len(date) == 11 {
-		year = digit(date, 0)*10 + digit(date, 1) + 1900
+		yy := digit(date, 0)*10 + digit(date, 1)
+		if yy >= 70 {
+			year = 1900 + yy
+		} else {
+			year = 2000 + yy
+		}
 		offset = 2
 		ctx.emitDiagnostic(types.DiagDateYear2Digits, span,
 			fmt.Sprintf("date %q uses 2-digit year representing %d", date, year))

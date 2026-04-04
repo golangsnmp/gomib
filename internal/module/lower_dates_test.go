@@ -118,12 +118,21 @@ func TestLower_DateValue_Feb29Leap(t *testing.T) {
 }
 
 func TestLower_DateYear2Digits(t *testing.T) {
-	// 11-char format: "9501010000Z" = year 1995
+	// 11-char format: "9501010000Z" = year 1995 (>=70 maps to 19xx)
 	src := dateTestSourceSingleRev("9501010000Z")
 	d := lowerAndFindDiagnostic(t, src, types.VerboseConfig(), types.DiagDateYear2Digits)
 	testutil.NotNil(t, d, "expected %s diagnostic for 2-digit year", types.DiagDateYear2Digits)
 	testutil.Equal(t, types.SeverityWarning, d.Severity, "severity")
 	testutil.True(t, strings.Contains(d.Message, "1995"), "message should mention interpreted year: %s", d.Message)
+}
+
+func TestLower_DateYear2Digits_Post2000(t *testing.T) {
+	// 11-char format: "0501010000Z" = year 2005 (<70 maps to 20xx)
+	src := dateTestSourceSingleRev("0501010000Z")
+	d := lowerAndFindDiagnostic(t, src, types.VerboseConfig(), types.DiagDateYear2Digits)
+	testutil.NotNil(t, d, "expected %s diagnostic for 2-digit year", types.DiagDateYear2Digits)
+	testutil.Equal(t, types.SeverityWarning, d.Severity, "severity")
+	testutil.True(t, strings.Contains(d.Message, "2005"), "message should mention interpreted year: %s", d.Message)
 }
 
 func TestLower_DateInPast(t *testing.T) {
