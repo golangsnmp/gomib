@@ -281,52 +281,7 @@ func IsValidOctetStringHint(hint string) bool {
 	if hint == "" {
 		return false
 	}
-	// Walk the hint the same way parseOctetStringHint does, without allocating.
-	p := 0
-	lastSpecConsumes := false
-
-	for p < len(hint) {
-		repeat := false
-		if hint[p] == '*' {
-			repeat = true
-			p++
-		}
-
-		digitStart := p
-		take := 0
-		for p < len(hint) && hint[p] >= '0' && hint[p] <= '9' {
-			next := take*10 + int(hint[p]-'0')
-			if next < take { // overflow
-				return false
-			}
-			take = next
-			p++
-		}
-		if p == digitStart {
-			return false
-		}
-
-		if p >= len(hint) {
-			return false
-		}
-		switch hint[p] {
-		case 'd', 'x', 'o', 'a', 't':
-			p++
-		default:
-			return false
-		}
-
-		if p < len(hint) && hint[p] != '*' && (hint[p] < '0' || hint[p] > '9') {
-			p++
-			if repeat && p < len(hint) && hint[p] != '*' && (hint[p] < '0' || hint[p] > '9') {
-				p++
-			}
-		}
-
-		lastSpecConsumes = take > 0 || repeat
-	}
-
-	return lastSpecConsumes
+	return parseOctetStringHint(hint) != nil
 }
 
 // FormatInteger formats an integer value according to an RFC 2579 integer

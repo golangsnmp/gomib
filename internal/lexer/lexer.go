@@ -607,6 +607,7 @@ func (l *Lexer) scanHexOrBinString() Token {
 		}
 
 	default:
+		l.advance() // consume bad suffix so span includes it
 		span := l.spanFrom(start)
 		l.emitDiagnostic(types.DiagMissingHexBinSuffix, span, "expected 'H' or 'B' suffix for hex/binary string")
 		kind = TokError
