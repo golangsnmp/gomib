@@ -163,11 +163,15 @@ func (s *fsSource) ListModules() ([]string, error) {
 }
 
 func (s *fsSource) buildIndex() (map[string]string, error) {
-	return buildTreeIndex(s.config.extensions, func(fn fs.WalkDirFunc) error {
+	idx, err := buildTreeIndex(s.config.extensions, func(fn fs.WalkDirFunc) error {
 		return fs.WalkDir(s.fsys, ".", fn)
 	}, func(path string) ([]byte, error) {
 		return fs.ReadFile(s.fsys, path)
 	})
+	if err != nil {
+		return nil, fmt.Errorf("indexing %s: %w", s.name, err)
+	}
+	return idx, nil
 }
 
 type multiSource struct {

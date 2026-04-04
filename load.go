@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"maps"
@@ -41,7 +42,7 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 	for _, src := range sources {
 		names, err := src.ListModules()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("listing modules: %w", err)
 		}
 		for _, name := range names {
 			if _, ok := seen[name]; !ok {
