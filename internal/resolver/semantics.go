@@ -441,14 +441,16 @@ func createResolvedNotifications(ctx *resolverContext) {
 			})
 		}
 
-		for _, objName := range notif.Objects {
+		for _, objRef := range notif.Objects {
+			objName := objRef.Name
+
 			// addNotifObject adds an object to the notification, checking
 			// not-accessible and emitting a diagnostic if needed.
 			addNotifObject := func(obj *model.Object) {
 				model.AddNotificationObject(resolved, obj)
 				if obj.Access() == model.AccessNotAccessible {
 					ctx.EmitDiagnostic(types.DiagNotifObjectAccess,
-						ref.mod, notif.Span,
+						ref.mod, objRef.Span,
 						fmt.Sprintf("notification %q references %q which is not-accessible", notif.Name, objName))
 				}
 			}
@@ -474,7 +476,7 @@ func createResolvedNotifications(ctx *resolverContext) {
 						continue
 					}
 					// Node exists but has no object definition.
-					ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, ref.mod, notif.Span,
+					ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, ref.mod, objRef.Span,
 						fmt.Sprintf("notification %q references %q which is not an object definition", notif.Name, objName))
 					continue
 				}
@@ -484,11 +486,11 @@ func createResolvedNotifications(ctx *resolverContext) {
 			objNode, ok := ctx.lookupNode(ref.mod, objName)
 			switch {
 			case !ok:
-				ctx.recordUnresolved(types.DiagObjectsUnresolved, ref.mod, notif.Span,
+				ctx.recordUnresolved(types.DiagObjectsUnresolved, ref.mod, objRef.Span,
 					fmt.Sprintf("unresolved OBJECTS: %q references unknown object %q", notif.Name, objName),
 					model.UnresolvedRef{Kind: model.UnresolvedNotificationObject, Symbol: objName, Module: modName(ref.mod), Reason: reasonUnknownObject})
 			case objNode.Object() == nil:
-				ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, ref.mod, notif.Span,
+				ctx.EmitDiagnostic(types.DiagNotifObjectNotObject, ref.mod, objRef.Span,
 					fmt.Sprintf("notification %q references %q which is not an object definition", notif.Name, objName))
 			default:
 				// Node has an object but it belongs to a different module
@@ -515,7 +517,7 @@ type groupInfo struct {
 	status      model.Status
 	description string
 	reference   string
-	members     []string
+	members     []module.NameRef
 	oidRefs     []model.OidRef
 	isNotifGrp  bool
 }
@@ -563,7 +565,8 @@ func createResolvedGroups(ctx *resolverContext) {
 		model.SetGroupIsNotificationGroup(resolved, gi.isNotifGrp)
 
 		var hasObjects, hasNotifications bool
-		for _, memberName := range gi.members {
+		for _, memberRef := range gi.members {
+			memberName := memberRef.Name
 			if memberNode, ok := lookupMemberNode(ctx, gi.mod, memberName); ok {
 				model.AddGroupMember(resolved, memberNode)
 				kind := memberNode.Kind()
@@ -571,7 +574,7 @@ func createResolvedGroups(ctx *resolverContext) {
 					if kind.IsObjectType() {
 						hasObjects = true
 						ctx.EmitDiagnostic(types.DiagGroupNotificationsObject,
-							gi.mod, gi.span,
+							gi.mod, memberRef.Span,
 							fmt.Sprintf("notification group %q includes object %q", gi.name, memberName))
 					} else if kind == types.KindNotification {
 						hasNotifications = true
@@ -580,21 +583,21 @@ func createResolvedGroups(ctx *resolverContext) {
 					if kind == types.KindNotification {
 						hasNotifications = true
 						ctx.EmitDiagnostic(types.DiagGroupObjectsNotification,
-							gi.mod, gi.span,
+							gi.mod, memberRef.Span,
 							fmt.Sprintf("object group %q includes notification %q", gi.name, memberName))
 					} else if kind.IsObjectType() {
 						hasObjects = true
 					}
 					if obj := memberNode.Object(); obj != nil && obj.Access() == model.AccessNotAccessible {
 						ctx.EmitDiagnostic(types.DiagGroupNotAccessible,
-							gi.mod, gi.span,
+							gi.mod, memberRef.Span,
 							fmt.Sprintf("object %q of group %q must not be not-accessible", memberName, gi.name))
 					}
 				}
-				checkGroupMemberStatus(ctx, gi.mod, gi.span, gi.status, gi.name, memberNode, memberName)
+				checkGroupMemberStatus(ctx, gi.mod, memberRef.Span, gi.status, gi.name, memberNode, memberName)
 			} else {
 				ctx.EmitDiagnostic(types.DiagGroupMemberUnresolved,
-					gi.mod, gi.span,
+					gi.mod, memberRef.Span,
 					fmt.Sprintf("group %q references unresolved member %q", gi.name, memberName))
 			}
 		}
@@ -715,9 +718,13 @@ func createResolvedCompliances(ctx *resolverContext) {
 func convertComplianceModules(ctx *resolverContext, mod *module.Module, modules []module.ComplianceModule) []model.ComplianceModule {
 	result := make([]model.ComplianceModule, len(modules))
 	for i, m := range modules {
+		mandatoryNames := make([]string, len(m.MandatoryGroups))
+		for j, ref := range m.MandatoryGroups {
+			mandatoryNames[j] = ref.Name
+		}
 		result[i] = model.ComplianceModule{
 			ModuleName:      m.ModuleName,
-			MandatoryGroups: m.MandatoryGroups,
+			MandatoryGroups: mandatoryNames,
 			Span:            m.Span,
 		}
 		if len(m.Groups) > 0 {

@@ -158,10 +158,10 @@ func (l *lowerer) lowerObjectIdentity(n *cst.ObjectIdentityNode) *module.ObjectI
 func (l *lowerer) lowerNotificationType(n *cst.NotificationTypeNode) *module.Notification {
 	name := l.text(n.Name)
 
-	var objects []string
+	var objects []module.NameRef
 	if n.Objects != nil {
 		for _, nameTok := range n.Objects.Names {
-			objects = append(objects, l.text(nameTok))
+			objects = append(objects, module.NameRef{Name: l.text(nameTok), Span: nameTok.Span})
 		}
 	}
 
@@ -197,10 +197,10 @@ func (l *lowerer) lowerTrapType(n *cst.TrapTypeNode) *module.Notification {
 		enterprise = l.text(n.Enterprise.Name)
 	}
 
-	var variables []string
+	var variables []module.NameRef
 	if n.Variables != nil {
 		for _, nameTok := range n.Variables.Names {
-			variables = append(variables, l.text(nameTok))
+			variables = append(variables, module.NameRef{Name: l.text(nameTok), Span: nameTok.Span})
 		}
 	}
 
@@ -311,10 +311,10 @@ func (l *lowerer) lowerValueAssignment(n *cst.ValueAssignmentNode) *module.Value
 func (l *lowerer) lowerObjectGroup(n *cst.ObjectGroupNode) *module.ObjectGroup {
 	name := l.text(n.Name)
 
-	var members []string
+	var members []module.NameRef
 	if n.Objects != nil {
 		for _, nameTok := range n.Objects.Names {
-			members = append(members, l.text(nameTok))
+			members = append(members, module.NameRef{Name: l.text(nameTok), Span: nameTok.Span})
 		}
 	}
 
@@ -344,10 +344,10 @@ func (l *lowerer) lowerObjectGroup(n *cst.ObjectGroupNode) *module.ObjectGroup {
 func (l *lowerer) lowerNotificationGroup(n *cst.NotificationGroupNode) *module.NotificationGroup {
 	name := l.text(n.Name)
 
-	var members []string
+	var members []module.NameRef
 	if n.Notifications != nil {
 		for _, nameTok := range n.Notifications.Names {
-			members = append(members, l.text(nameTok))
+			members = append(members, module.NameRef{Name: l.text(nameTok), Span: nameTok.Span})
 		}
 	}
 

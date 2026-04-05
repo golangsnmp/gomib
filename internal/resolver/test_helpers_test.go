@@ -245,6 +245,15 @@ func testTableModule(extraImports []module.Import, columns ...module.Definition)
 	return mod
 }
 
+// nameRefs converts string names to NameRef values with zero spans, for tests.
+func nameRefs(names ...string) []module.NameRef {
+	refs := make([]module.NameRef, len(names))
+	for i, n := range names {
+		refs[i] = module.NameRef{Name: n}
+	}
+	return refs
+}
+
 func unresolvedByKind(ctx *resolverContext, kind model.UnresolvedKind) []model.UnresolvedRef {
 	var result []model.UnresolvedRef
 	for _, u := range ctx.mib.Unresolved() {

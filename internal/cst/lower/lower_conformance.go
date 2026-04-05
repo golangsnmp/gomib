@@ -42,10 +42,10 @@ func (l *lowerer) lowerComplianceModule(n *cst.ComplianceModuleNode) module.Comp
 		moduleName = l.text(n.ModuleName)
 	}
 
-	var mandatoryGroups []string
+	var mandatoryGroups []module.NameRef
 	if n.MandatoryGroups != nil {
 		for _, name := range n.MandatoryGroups.Names {
-			mandatoryGroups = append(mandatoryGroups, l.text(name))
+			mandatoryGroups = append(mandatoryGroups, module.NameRef{Name: l.text(name), Span: name.Span})
 		}
 	}
 

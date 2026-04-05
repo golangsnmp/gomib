@@ -55,6 +55,14 @@ type ObjectType struct {
 
 func (d *ObjectType) DefinitionOid() *OidAssignment { return &d.Oid }
 
+// NameRef is a reference to a named symbol with its source span.
+// Used for member lists where individual diagnostic positioning is useful
+// (e.g., notification OBJECTS, group members, mandatory groups).
+type NameRef struct {
+	Name string
+	Span types.Span
+}
+
 // IndexItem is an entry in an OBJECT-TYPE INDEX clause.
 type IndexItem struct {
 	Implied bool
@@ -96,7 +104,7 @@ func (d *ObjectIdentity) DefinitionOid() *OidAssignment { return &d.Oid }
 // Notification represents both SMIv1 TRAP-TYPE and SMIv2 NOTIFICATION-TYPE.
 type Notification struct {
 	DefBase
-	Objects        []string
+	Objects        []NameRef
 	Status         types.Status
 	Description    string
 	HasDescription bool // true when DESCRIPTION clause was present in source
@@ -159,7 +167,7 @@ func (d *ValueAssignment) DefinitionOid() *OidAssignment { return &d.Oid }
 // ObjectGroup is an OBJECT-GROUP definition.
 type ObjectGroup struct {
 	DefBase
-	Objects     []string
+	Objects     []NameRef
 	Status      types.Status
 	Description string
 	Reference   string
@@ -171,7 +179,7 @@ func (d *ObjectGroup) DefinitionOid() *OidAssignment { return &d.Oid }
 // NotificationGroup is a NOTIFICATION-GROUP definition.
 type NotificationGroup struct {
 	DefBase
-	Notifications []string
+	Notifications []NameRef
 	Status        types.Status
 	Description   string
 	Reference     string
@@ -196,7 +204,7 @@ func (d *ModuleCompliance) DefinitionOid() *OidAssignment { return &d.Oid }
 type ComplianceModule struct {
 	// ModuleName is empty when referring to the current module.
 	ModuleName      string
-	MandatoryGroups []string
+	MandatoryGroups []NameRef
 	Groups          []ComplianceGroup
 	Objects         []ComplianceObject
 	Span            types.Span

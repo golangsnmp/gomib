@@ -105,8 +105,8 @@ func checkComplianceStatus(ctx *resolverContext) {
 		}
 		for _, cm := range comp.Modules {
 			// Check mandatory groups.
-			for _, groupName := range cm.MandatoryGroups {
-				checkComplianceGroupStatus(ctx, ref.mod, comp, cm.ModuleName, groupName)
+			for _, groupRef := range cm.MandatoryGroups {
+				checkComplianceGroupStatus(ctx, ref.mod, comp, cm.ModuleName, groupRef.Name)
 			}
 			// Check optional (GROUP) groups.
 			for _, cg := range cm.Groups {
@@ -192,7 +192,7 @@ func checkComplianceDuplicates(ctx *resolverContext, mod *module.Module, comp *m
 	// Build mandatory group set.
 	mandatory := make(map[string]bool, len(cm.MandatoryGroups))
 	for _, g := range cm.MandatoryGroups {
-		mandatory[g] = true
+		mandatory[g.Name] = true
 	}
 
 	// Check optional groups for duplicates and overlap with mandatory.
@@ -232,8 +232,8 @@ func checkRefinementListed(ctx *resolverContext, mod *module.Module, comp *modul
 
 	// Collect all group member names from mandatory and optional groups.
 	memberNames := make(map[string]bool)
-	for _, groupName := range cm.MandatoryGroups {
-		collectGroupMemberNames(ctx, mod, cm.ModuleName, groupName, memberNames)
+	for _, groupRef := range cm.MandatoryGroups {
+		collectGroupMemberNames(ctx, mod, cm.ModuleName, groupRef.Name, memberNames)
 	}
 	for _, cg := range cm.Groups {
 		collectGroupMemberNames(ctx, mod, cm.ModuleName, cg.Group, memberNames)
@@ -268,21 +268,21 @@ func collectGroupMemberNames(ctx *resolverContext, mod *module.Module, moduleNam
 func checkGroupMemberLocality(ctx *resolverContext) {
 	for _, mod := range ctx.modules {
 		for _, d := range mod.ObjectGroups {
-			checkMemberLocality(ctx, mod, d.DefinitionSpan(), d.Objects)
+			checkMemberLocality(ctx, mod, d.Objects)
 		}
 		for _, d := range mod.NotificationGroups {
-			checkMemberLocality(ctx, mod, d.DefinitionSpan(), d.Notifications)
+			checkMemberLocality(ctx, mod, d.Notifications)
 		}
 	}
 }
 
-func checkMemberLocality(ctx *resolverContext, mod *module.Module, span types.Span, members []string) {
+func checkMemberLocality(ctx *resolverContext, mod *module.Module, members []module.NameRef) {
 	localSymbols := ctx.nodeSymbols.forModule(mod)
-	for _, memberName := range members {
-		if localSymbols == nil || localSymbols[memberName] == nil {
+	for _, memberRef := range members {
+		if localSymbols == nil || localSymbols[memberRef.Name] == nil {
 			ctx.EmitDiagnostic(types.DiagComplianceMemberNotLocal,
-				mod, span,
-				fmt.Sprintf("group member %q is not defined in module %q", memberName, mod.Name))
+				mod, memberRef.Span,
+				fmt.Sprintf("group member %q is not defined in module %q", memberRef.Name, mod.Name))
 		}
 	}
 }
@@ -296,8 +296,8 @@ func checkGroupUnreferenced(ctx *resolverContext) {
 	for _, mod := range ctx.modules {
 		for _, d := range mod.Compliances {
 			for _, cm := range d.Modules {
-				for _, name := range cm.MandatoryGroups {
-					referencedGroups[name] = struct{}{}
+				for _, ref := range cm.MandatoryGroups {
+					referencedGroups[ref.Name] = struct{}{}
 				}
 				for _, grp := range cm.Groups {
 					referencedGroups[grp.Group] = struct{}{}

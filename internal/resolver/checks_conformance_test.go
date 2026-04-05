@@ -64,13 +64,13 @@ func TestCheckGroupMembership_AllCovered(t *testing.T) {
 		},
 		&module.ObjectGroup{
 			DefBase: module.DefBase{Name: "testObjGroup"},
-			Objects: []string{"testScalar"},
+			Objects: nameRefs("testScalar"),
 			Status:  types.StatusCurrent,
 			Oid:     testOid("testMIB", 3),
 		},
 		&module.NotificationGroup{
 			DefBase:       module.DefBase{Name: "testNotifGroup"},
-			Notifications: []string{"testNotif"},
+			Notifications: nameRefs("testNotif"),
 			Status:        types.StatusCurrent,
 			Oid:           testOid("testMIB", 4),
 		},
@@ -110,7 +110,7 @@ func TestCheckGroupMembership_MissingObject(t *testing.T) {
 		},
 		&module.ObjectGroup{
 			DefBase: module.DefBase{Name: "testObjGroup"},
-			Objects: []string{"testScalar1"},
+			Objects: nameRefs("testScalar1"),
 			Status:  types.StatusCurrent,
 			Oid:     testOid("testMIB", 3),
 		},
@@ -166,7 +166,7 @@ func TestCheckGroupMembership_NotAccessibleExcluded(t *testing.T) {
 		},
 		&module.ObjectGroup{
 			DefBase: module.DefBase{Name: "testGroup"},
-			Objects: []string{"testValue"},
+			Objects: nameRefs("testValue"),
 			Status:  types.StatusCurrent,
 			Oid:     testOid("testMIB", 2),
 		},
@@ -201,7 +201,7 @@ func TestCheckGroupMembership_MissingNotification(t *testing.T) {
 		},
 		&module.NotificationGroup{
 			DefBase:       module.DefBase{Name: "testNotifGroup"},
-			Notifications: []string{"testNotif1"},
+			Notifications: nameRefs("testNotif1"),
 			Status:        types.StatusCurrent,
 			Oid:           testOid("testMIB", 3),
 		},
@@ -219,14 +219,14 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "obsGroup"},
-				Objects: []string{"someObj"},
+				Objects: nameRefs("someObj"),
 				Status:  types.StatusObsolete,
 			},
 			&module.ModuleCompliance{
 				DefBase: module.DefBase{Name: "testCompliance"},
 				Status:  types.StatusCurrent,
 				Modules: []module.ComplianceModule{
-					{MandatoryGroups: []string{"obsGroup"}},
+					{MandatoryGroups: nameRefs("obsGroup")},
 				},
 				Oid: testOid("testNode", 10),
 			},
@@ -266,14 +266,14 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "curGroup"},
-				Objects: []string{"someObj"},
+				Objects: nameRefs("someObj"),
 				Status:  types.StatusCurrent,
 			},
 			&module.ModuleCompliance{
 				DefBase: module.DefBase{Name: "testCompliance"},
 				Status:  types.StatusCurrent,
 				Modules: []module.ComplianceModule{
-					{MandatoryGroups: []string{"curGroup"}},
+					{MandatoryGroups: nameRefs("curGroup")},
 				},
 				Oid: testOid("testNode", 10),
 			},
@@ -313,7 +313,7 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "optGroup"},
-				Objects: []string{"someObj"},
+				Objects: nameRefs("someObj"),
 				Status:  types.StatusObsolete,
 			},
 			&module.ModuleCompliance{
@@ -360,14 +360,14 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "obsGroup"},
-				Objects: []string{"someObj"},
+				Objects: nameRefs("someObj"),
 				Status:  types.StatusObsolete,
 			},
 			&module.ModuleCompliance{
 				DefBase: module.DefBase{Name: "testCompliance"},
 				Status:  types.StatusMandatory,
 				Modules: []module.ComplianceModule{
-					{MandatoryGroups: []string{"obsGroup"}},
+					{MandatoryGroups: nameRefs("obsGroup")},
 				},
 				Oid: testOid("testNode", 10),
 			},
@@ -559,7 +559,7 @@ func TestCheckComplianceStructure(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "sharedGroup"},
-				Objects: []string{"someObj"},
+				Objects: nameRefs("someObj"),
 				Status:  types.StatusCurrent,
 			},
 			&module.ModuleCompliance{
@@ -567,7 +567,7 @@ func TestCheckComplianceStructure(t *testing.T) {
 				Status:  types.StatusCurrent,
 				Modules: []module.ComplianceModule{
 					{
-						MandatoryGroups: []string{"sharedGroup"},
+						MandatoryGroups: nameRefs("sharedGroup"),
 						Groups:          []module.ComplianceGroup{{Group: "sharedGroup"}},
 					},
 				},
@@ -661,7 +661,7 @@ func TestCheckComplianceStructure(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "myGroup"},
-				Objects: []string{"memberObj"},
+				Objects: nameRefs("memberObj"),
 				Status:  types.StatusCurrent,
 			},
 			&module.ModuleCompliance{
@@ -669,7 +669,7 @@ func TestCheckComplianceStructure(t *testing.T) {
 				Status:  types.StatusCurrent,
 				Modules: []module.ComplianceModule{
 					{
-						MandatoryGroups: []string{"myGroup"},
+						MandatoryGroups: nameRefs("myGroup"),
 						Objects:         []module.ComplianceObject{{Object: "unlistedObj"}},
 					},
 				},
@@ -711,7 +711,7 @@ func TestCheckComplianceStructure(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "myGroup"},
-				Objects: []string{"listedObj"},
+				Objects: nameRefs("listedObj"),
 				Status:  types.StatusCurrent,
 			},
 			&module.ModuleCompliance{
@@ -719,7 +719,7 @@ func TestCheckComplianceStructure(t *testing.T) {
 				Status:  types.StatusCurrent,
 				Modules: []module.ComplianceModule{
 					{
-						MandatoryGroups: []string{"myGroup"},
+						MandatoryGroups: nameRefs("myGroup"),
 						Objects:         []module.ComplianceObject{{Object: "listedObj"}},
 					},
 				},
@@ -764,7 +764,7 @@ func TestCheckComplianceStructure(t *testing.T) {
 				Status:  types.StatusCurrent,
 				Modules: []module.ComplianceModule{
 					{
-						MandatoryGroups: []string{"groupA"},
+						MandatoryGroups: nameRefs("groupA"),
 						Groups:          []module.ComplianceGroup{{Group: "groupB"}},
 						Objects:         []module.ComplianceObject{{Object: "objA"}, {Object: "objB"}},
 					},
@@ -796,7 +796,7 @@ func TestCheckGroupMemberLocality(t *testing.T) {
 		addDefs(modB, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "testGroup"},
-				Objects: []string{"importedObj"},
+				Objects: nameRefs("importedObj"),
 				Status:  types.StatusCurrent,
 			},
 		})
@@ -832,7 +832,7 @@ func TestCheckGroupMemberLocality(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "testGroup"},
-				Objects: []string{"localObj"},
+				Objects: nameRefs("localObj"),
 				Status:  types.StatusCurrent,
 			},
 		})
@@ -863,7 +863,7 @@ func TestCheckGroupMemberLocality(t *testing.T) {
 		addDefs(modB, []module.Definition{
 			&module.NotificationGroup{
 				DefBase:       module.DefBase{Name: "testNotifGroup"},
-				Notifications: []string{"importedNotif"},
+				Notifications: nameRefs("importedNotif"),
 				Status:        types.StatusCurrent,
 			},
 		})
@@ -1266,7 +1266,7 @@ func TestCheckGroupUnreferenced(t *testing.T) {
 				DefBase: module.DefBase{Name: "testCompliance"},
 				Modules: []module.ComplianceModule{
 					{
-						MandatoryGroups: []string{"usedObjectGroup"},
+						MandatoryGroups: nameRefs("usedObjectGroup"),
 					},
 				},
 			},

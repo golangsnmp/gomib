@@ -705,7 +705,7 @@ func TestConvertComplianceModules(t *testing.T) {
 		input := []module.ComplianceModule{
 			{
 				ModuleName:      "IF-MIB",
-				MandatoryGroups: []string{"ifGeneralGroup", "ifStackGroup"},
+				MandatoryGroups: nameRefs("ifGeneralGroup", "ifStackGroup"),
 			},
 		}
 		result := convertComplianceModules(nil, nil, input)
@@ -2375,7 +2375,7 @@ func TestLookupMemberNode(t *testing.T) {
 
 // groupTestDef creates a module definition for either an ObjectGroup or
 // NotificationGroup depending on isNotifGrp, with the given name and members.
-func groupTestDef(name string, members []string, isNotifGrp bool) module.Definition {
+func groupTestDef(name string, members []module.NameRef, isNotifGrp bool) module.Definition {
 	if isNotifGrp {
 		return &module.NotificationGroup{
 			DefBase:       module.DefBase{Name: name},
@@ -2396,7 +2396,7 @@ func TestCreateResolvedGroups(t *testing.T) {
 		}
 
 		t.Run(label+"/creates group with members", func(t *testing.T) {
-			def := groupTestDef("testGroup", []string{"m1", "m2"}, isNotifGrp)
+			def := groupTestDef("testGroup", nameRefs("m1", "m2"), isNotifGrp)
 			mod := &module.Module{
 				Name: "TEST-MIB",
 			}
@@ -2425,7 +2425,7 @@ func TestCreateResolvedGroups(t *testing.T) {
 		})
 
 		t.Run(label+"/unresolved group node skipped", func(t *testing.T) {
-			def := groupTestDef("missingGroup", []string{"m1"}, isNotifGrp)
+			def := groupTestDef("missingGroup", nameRefs("m1"), isNotifGrp)
 			mod := &module.Module{
 				Name: "TEST-MIB",
 			}
@@ -2438,7 +2438,7 @@ func TestCreateResolvedGroups(t *testing.T) {
 		})
 
 		t.Run(label+"/unresolved member emits diagnostic", func(t *testing.T) {
-			def := groupTestDef("testGroup", []string{"m1", "missing"}, isNotifGrp)
+			def := groupTestDef("testGroup", nameRefs("m1", "missing"), isNotifGrp)
 			mod := &module.Module{
 				Name: "TEST-MIB",
 			}
@@ -2461,7 +2461,7 @@ func TestCreateResolvedGroups(t *testing.T) {
 		})
 
 		t.Run(label+"/wrong-kind member emits diagnostic", func(t *testing.T) {
-			def := groupTestDef("testGroup", []string{"wrong1"}, isNotifGrp)
+			def := groupTestDef("testGroup", nameRefs("wrong1"), isNotifGrp)
 			mod := &module.Module{
 				Name: "TEST-MIB",
 			}
@@ -2489,7 +2489,7 @@ func TestCreateResolvedGroups(t *testing.T) {
 		})
 
 		t.Run(label+"/mixed members emit group-member-mixed", func(t *testing.T) {
-			def := groupTestDef("mixedGroup", []string{"obj1", "notif1"}, isNotifGrp)
+			def := groupTestDef("mixedGroup", nameRefs("obj1", "notif1"), isNotifGrp)
 			mod := &module.Module{
 				Name: "TEST-MIB",
 			}
@@ -2517,7 +2517,7 @@ func TestCreateResolvedGroups(t *testing.T) {
 		})
 
 		t.Run(label+"/deprecated member in current group emits status diagnostic", func(t *testing.T) {
-			def := groupTestDef("currentGroup", []string{"depMember"}, isNotifGrp)
+			def := groupTestDef("currentGroup", nameRefs("depMember"), isNotifGrp)
 			mod := &module.Module{
 				Name: "TEST-MIB",
 			}
@@ -2556,7 +2556,7 @@ func TestCreateResolvedGroups(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "testGroup"},
-				Objects: []string{"notAccessObj"},
+				Objects: nameRefs("notAccessObj"),
 			},
 		})
 
@@ -2583,7 +2583,7 @@ func TestCreateResolvedGroups(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "currentGroup"},
-				Objects: []string{"currentObj"},
+				Objects: nameRefs("currentObj"),
 				Status:  types.StatusCurrent,
 			},
 		})
@@ -2612,7 +2612,7 @@ func TestCreateResolvedGroups(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.ObjectGroup{
 				DefBase: module.DefBase{Name: "currentGroup"},
-				Objects: []string{"mandatoryObj"},
+				Objects: nameRefs("mandatoryObj"),
 				Status:  types.StatusCurrent,
 			},
 		})
@@ -2706,7 +2706,7 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.Notification{
 				DefBase: module.DefBase{Name: "myNotif"},
-				Objects: []string{"obj1", "obj2"},
+				Objects: nameRefs("obj1", "obj2"),
 				Status:  types.StatusCurrent,
 			},
 		})
@@ -2740,7 +2740,7 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 		addDefs(mod, []module.Definition{
 			&module.Notification{
 				DefBase: module.DefBase{Name: "myNotif"},
-				Objects: []string{"missingObj"},
+				Objects: nameRefs("missingObj"),
 			},
 		})
 
@@ -2763,7 +2763,7 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 		addDefs(modA, []module.Definition{
 			&module.Notification{
 				DefBase: module.DefBase{Name: "myNotif"},
-				Objects: []string{"foreignObj"},
+				Objects: nameRefs("foreignObj"),
 			},
 		})
 		modB := &module.Module{Name: "B-MIB"}
@@ -2793,7 +2793,7 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 		addDefs(modA, []module.Definition{
 			&module.Notification{
 				DefBase: module.DefBase{Name: "myNotif"},
-				Objects: []string{"foreignObj"},
+				Objects: nameRefs("foreignObj"),
 			},
 		})
 		modB := &module.Module{Name: "B-MIB"}
@@ -2856,7 +2856,7 @@ func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 	addDefs(mod, []module.Definition{
 		&module.Notification{
 			DefBase: module.DefBase{Name: "testNotif"},
-			Objects: []string{"intermediateNode"},
+			Objects: nameRefs("intermediateNode"),
 		},
 	})
 

@@ -1,7 +1,7 @@
 // Package module provides a normalized representation of MIB modules.
 //
-// The parser produces module IR directly, independent of whether the source
-// was SMIv1 or SMIv2. Key transformations during parsing:
+// The CST lowerer produces module IR from the lossless CST, independent of
+// whether the source was SMIv1 or SMIv2. Key transformations during lowering:
 //
 //   - Language detection from imports
 //   - Import flattening (one symbol per import)
