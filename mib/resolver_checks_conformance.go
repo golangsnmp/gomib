@@ -266,13 +266,11 @@ func collectGroupMemberNames(ctx *resolverContext, mod *module.Module, moduleNam
 // members are defined in the same module as the group (RFC 2580 sections 3.1, 4.1).
 func checkGroupMemberLocality(ctx *resolverContext) {
 	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectGroup:
-				checkMemberLocality(ctx, mod, d.DefinitionSpan(), d.Objects)
-			case *module.NotificationGroup:
-				checkMemberLocality(ctx, mod, d.DefinitionSpan(), d.Notifications)
-			}
+		for _, d := range mod.ObjectGroups {
+			checkMemberLocality(ctx, mod, d.DefinitionSpan(), d.Objects)
+		}
+		for _, d := range mod.NotificationGroups {
+			checkMemberLocality(ctx, mod, d.DefinitionSpan(), d.Notifications)
 		}
 	}
 }
@@ -295,22 +293,20 @@ func checkGroupUnreferenced(ctx *resolverContext) {
 	// Collect all group names referenced by compliance and capabilities modules.
 	referencedGroups := make(map[string]struct{})
 	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ModuleCompliance:
-				for _, cm := range d.Modules {
-					for _, name := range cm.MandatoryGroups {
-						referencedGroups[name] = struct{}{}
-					}
-					for _, grp := range cm.Groups {
-						referencedGroups[grp.Group] = struct{}{}
-					}
+		for _, d := range mod.Compliances {
+			for _, cm := range d.Modules {
+				for _, name := range cm.MandatoryGroups {
+					referencedGroups[name] = struct{}{}
 				}
-			case *module.AgentCapabilities:
-				for _, sup := range d.Supports {
-					for _, name := range sup.Includes {
-						referencedGroups[name] = struct{}{}
-					}
+				for _, grp := range cm.Groups {
+					referencedGroups[grp.Group] = struct{}{}
+				}
+			}
+		}
+		for _, d := range mod.Capabilities {
+			for _, sup := range d.Supports {
+				for _, name := range sup.Includes {
+					referencedGroups[name] = struct{}{}
 				}
 			}
 		}
@@ -321,20 +317,18 @@ func checkGroupUnreferenced(ctx *resolverContext) {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectGroup:
-				if _, ok := referencedGroups[d.Name]; !ok {
-					ctx.EmitDiagnostic(types.DiagGroupUnreferenced,
-						mod, d.Span,
-						fmt.Sprintf("%q: OBJECT-GROUP not referenced in any compliance module", d.Name))
-				}
-			case *module.NotificationGroup:
-				if _, ok := referencedGroups[d.Name]; !ok {
-					ctx.EmitDiagnostic(types.DiagGroupUnreferenced,
-						mod, d.Span,
-						fmt.Sprintf("%q: NOTIFICATION-GROUP not referenced in any compliance module", d.Name))
-				}
+		for _, d := range mod.ObjectGroups {
+			if _, ok := referencedGroups[d.Name]; !ok {
+				ctx.EmitDiagnostic(types.DiagGroupUnreferenced,
+					mod, d.Span,
+					fmt.Sprintf("%q: OBJECT-GROUP not referenced in any compliance module", d.Name))
+			}
+		}
+		for _, d := range mod.NotificationGroups {
+			if _, ok := referencedGroups[d.Name]; !ok {
+				ctx.EmitDiagnostic(types.DiagGroupUnreferenced,
+					mod, d.Span,
+					fmt.Sprintf("%q: NOTIFICATION-GROUP not referenced in any compliance module", d.Name))
 			}
 		}
 	}

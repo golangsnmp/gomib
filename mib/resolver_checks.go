@@ -161,38 +161,44 @@ func checkNodeParentKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			var code string
-			var label string
-			switch def.(type) {
-			case *module.Notification:
-				code = types.DiagParentNotification
-				label = "notification"
-			case *module.ObjectIdentity, *module.ModuleIdentity, *module.ValueAssignment:
-				code = types.DiagParentNode
-				label = "node"
-			case *module.ObjectGroup, *module.NotificationGroup:
-				code = types.DiagParentGroup
-				label = "group"
-			case *module.ModuleCompliance:
-				code = types.DiagParentCompliance
-				label = "compliance"
-			case *module.AgentCapabilities:
-				code = types.DiagParentCapabilities
-				label = "capabilities"
-			default:
-				continue
-			}
-			node, ok := ctx.lookupNode(mod, def.DefinitionName())
-			if !ok || node.Parent() == nil || node.Parent().IsRoot() {
-				continue
-			}
-			if !isSimpleParentKind(node.Parent().Kind()) {
-				ctx.EmitDiagnostic(code,
-					mod, def.DefinitionSpan(),
-					fmt.Sprintf("%q: %s's parent node must be a simple node", def.DefinitionName(), label))
-			}
+		for _, d := range mod.Notifications {
+			checkSimpleParentKind(ctx, mod, d.Name, d.Span, types.DiagParentNotification, "notification")
 		}
+		for _, d := range mod.ObjectIdentities {
+			checkSimpleParentKind(ctx, mod, d.Name, d.Span, types.DiagParentNode, "node")
+		}
+		for _, d := range mod.ModuleIdentities {
+			checkSimpleParentKind(ctx, mod, d.Name, d.Span, types.DiagParentNode, "node")
+		}
+		for _, d := range mod.ValueAssignments {
+			checkSimpleParentKind(ctx, mod, d.Name, d.Span, types.DiagParentNode, "node")
+		}
+		for _, d := range mod.ObjectGroups {
+			checkSimpleParentKind(ctx, mod, d.Name, d.Span, types.DiagParentGroup, "group")
+		}
+		for _, d := range mod.NotificationGroups {
+			checkSimpleParentKind(ctx, mod, d.Name, d.Span, types.DiagParentGroup, "group")
+		}
+		for _, d := range mod.Compliances {
+			checkSimpleParentKind(ctx, mod, d.Name, d.Span, types.DiagParentCompliance, "compliance")
+		}
+		for _, d := range mod.Capabilities {
+			checkSimpleParentKind(ctx, mod, d.Name, d.Span, types.DiagParentCapabilities, "capabilities")
+		}
+	}
+}
+
+// checkSimpleParentKind validates that a named definition's parent node is a
+// simple node (KindNode, KindInternal, or KindUnknown).
+func checkSimpleParentKind(ctx *resolverContext, mod *module.Module, name string, span types.Span, code, label string) {
+	node, ok := ctx.lookupNode(mod, name)
+	if !ok || node.Parent() == nil || node.Parent().IsRoot() {
+		return
+	}
+	if !isSimpleParentKind(node.Parent().Kind()) {
+		ctx.EmitDiagnostic(code,
+			mod, span,
+			fmt.Sprintf("%q: %s's parent node must be a simple node", name, label))
 	}
 }
 
@@ -203,13 +209,11 @@ func checkEnumSubtyping(ctx *resolverContext) {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.TypeDef:
-				checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
-			case *module.ObjectType:
-				checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
-			}
+		for _, d := range mod.TypeDefs {
+			checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
+		}
+		for _, d := range mod.ObjectTypes {
+			checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
 		}
 	}
 }
@@ -267,34 +271,31 @@ func checkRangeConstraints(ctx *resolverContext) {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.TypeDef:
-				if _, isSeq := d.Syntax.(*module.TypeSyntaxSequence); isSeq {
-					continue
-				}
-				typ, ok := ctx.resolveTypeForModule(mod, d.Name)
-				if !ok {
-					continue
-				}
-				base := typ.EffectiveBase()
-				sizes, ranges := extractConstraints(d.Syntax)
-				checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
-				checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
-
-			case *module.ObjectType:
-				sizes, ranges := extractConstraints(d.Syntax)
-				if len(sizes) == 0 && len(ranges) == 0 {
-					continue
-				}
-				resolved := ctx.lookupObject(mod, d.Name)
-				if resolved == nil || resolved.Type() == nil {
-					continue
-				}
-				base := resolved.Type().EffectiveBase()
-				checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
-				checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
+		for _, d := range mod.TypeDefs {
+			if _, isSeq := d.Syntax.(*module.TypeSyntaxSequence); isSeq {
+				continue
 			}
+			typ, ok := ctx.resolveTypeForModule(mod, d.Name)
+			if !ok {
+				continue
+			}
+			base := typ.EffectiveBase()
+			sizes, ranges := extractConstraints(d.Syntax)
+			checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
+			checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
+		}
+		for _, d := range mod.ObjectTypes {
+			sizes, ranges := extractConstraints(d.Syntax)
+			if len(sizes) == 0 && len(ranges) == 0 {
+				continue
+			}
+			resolved := ctx.lookupObject(mod, d.Name)
+			if resolved == nil || resolved.Type() == nil {
+				continue
+			}
+			base := resolved.Type().EffectiveBase()
+			checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
+			checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
 		}
 	}
 }
@@ -944,8 +945,8 @@ func findSequenceTypeDef(ctx *resolverContext, mod *module.Module, name string) 
 }
 
 func getSequenceTypeDef(mod *module.Module, name string) *module.TypeDef {
-	for _, def := range mod.Definitions {
-		if td, ok := def.(*module.TypeDef); ok && td.Name == name {
+	for _, td := range mod.TypeDefs {
+		if td.Name == name {
 			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
 				return td
 			}
@@ -1146,57 +1147,61 @@ func checkStatusPerVersion(ctx *resolverContext) {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			var status types.Status
-			var hasStatus bool
-			switch d := def.(type) {
-			case *module.ObjectType:
-				status, hasStatus = d.Status, true
-			case *module.ObjectIdentity:
-				status, hasStatus = d.Status, true
-			case *module.Notification:
-				// TRAP-TYPE has no STATUS clause; the synthetic default
-				// would produce false positives.
-				if d.IsTrap() {
-					continue
-				}
-				status, hasStatus = d.Status, true
-			case *module.TypeDef:
-				// Only textual conventions have a STATUS clause; plain
-				// type assignments and SEQUENCE defs default to current.
-				if !d.IsTextualConvention {
-					continue
-				}
-				status, hasStatus = d.Status, true
-			case *module.ObjectGroup:
-				status, hasStatus = d.Status, true
-			case *module.NotificationGroup:
-				status, hasStatus = d.Status, true
-			case *module.ModuleCompliance:
-				status, hasStatus = d.Status, true
-			case *module.AgentCapabilities:
-				status, hasStatus = d.Status, true
-			}
-			if !hasStatus {
+		for _, d := range mod.ObjectTypes {
+			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
+		}
+		for _, d := range mod.ObjectIdentities {
+			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
+		}
+		for _, d := range mod.Notifications {
+			// TRAP-TYPE has no STATUS clause; the synthetic default
+			// would produce false positives.
+			if d.IsTrap() {
 				continue
 			}
-			switch mod.Language {
-			case types.LanguageSMIv1:
-				if status == types.StatusCurrent {
-					ctx.EmitDiagnostic(types.DiagStatusInvalidSMIv1,
-						mod, def.DefinitionSpan(),
-						fmt.Sprintf("%q: invalid status current in SMIv1", def.DefinitionName()))
-				}
-			case types.LanguageSMIv2:
-				if status == types.StatusMandatory || status == types.StatusOptional {
-					ctx.EmitDiagnostic(types.DiagStatusInvalidSMIv2,
-						mod, def.DefinitionSpan(),
-						fmt.Sprintf("%q: invalid status %s in SMIv2", def.DefinitionName(), status.String()))
-				}
-			case types.LanguageUnknown:
-				// Cannot validate version-specific status rules without known language.
-			}
+			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
 		}
+		for _, d := range mod.TypeDefs {
+			// Only textual conventions have a STATUS clause; plain
+			// type assignments and SEQUENCE defs default to current.
+			if !d.IsTextualConvention {
+				continue
+			}
+			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
+		}
+		for _, d := range mod.ObjectGroups {
+			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
+		}
+		for _, d := range mod.NotificationGroups {
+			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
+		}
+		for _, d := range mod.Compliances {
+			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
+		}
+		for _, d := range mod.Capabilities {
+			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
+		}
+	}
+}
+
+// checkDefinitionStatus validates that a single definition's status is legal
+// for the module's SMI version.
+func checkDefinitionStatus(ctx *resolverContext, mod *module.Module, status types.Status, name string, span types.Span) {
+	switch mod.Language {
+	case types.LanguageSMIv1:
+		if status == types.StatusCurrent {
+			ctx.EmitDiagnostic(types.DiagStatusInvalidSMIv1,
+				mod, span,
+				fmt.Sprintf("%q: invalid status current in SMIv1", name))
+		}
+	case types.LanguageSMIv2:
+		if status == types.StatusMandatory || status == types.StatusOptional {
+			ctx.EmitDiagnostic(types.DiagStatusInvalidSMIv2,
+				mod, span,
+				fmt.Sprintf("%q: invalid status %s in SMIv2", name, status.String()))
+		}
+	case types.LanguageUnknown:
+		// Cannot validate version-specific status rules without known language.
 	}
 }
 
@@ -1207,11 +1212,7 @@ func checkCapabilitiesStatus(ctx *resolverContext) {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			ac, ok := def.(*module.AgentCapabilities)
-			if !ok {
-				continue
-			}
+		for _, ac := range mod.Capabilities {
 			if ac.Status != types.StatusCurrent && ac.Status != types.StatusObsolete {
 				ctx.EmitDiagnostic(types.DiagStatusInvalidCapabilities,
 					mod, ac.DefinitionSpan(),

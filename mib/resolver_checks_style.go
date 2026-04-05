@@ -24,20 +24,18 @@ func checkIntegerMisuse(ctx *resolverContext) {
 		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectType:
-				if isIntegerKeywordSyntax(d.Syntax) {
-					ctx.EmitDiagnostic(types.DiagIntegerInSMIv2,
-						mod, d.Span,
-						fmt.Sprintf("%q: use Integer32 instead of INTEGER in SMIv2", d.Name))
-				}
-			case *module.TypeDef:
-				if isIntegerKeywordSyntax(d.Syntax) {
-					ctx.EmitDiagnostic(types.DiagIntegerInSMIv2,
-						mod, d.Span,
-						fmt.Sprintf("%q: use Integer32 instead of INTEGER in SMIv2", d.Name))
-				}
+		for _, d := range mod.ObjectTypes {
+			if isIntegerKeywordSyntax(d.Syntax) {
+				ctx.EmitDiagnostic(types.DiagIntegerInSMIv2,
+					mod, d.Span,
+					fmt.Sprintf("%q: use Integer32 instead of INTEGER in SMIv2", d.Name))
+			}
+		}
+		for _, d := range mod.TypeDefs {
+			if isIntegerKeywordSyntax(d.Syntax) {
+				ctx.EmitDiagnostic(types.DiagIntegerInSMIv2,
+					mod, d.Span,
+					fmt.Sprintf("%q: use Integer32 instead of INTEGER in SMIv2", d.Name))
 			}
 		}
 	}
@@ -83,9 +81,8 @@ func checkTextualConventionNested(ctx *resolverContext) {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok || !td.IsTextualConvention {
+		for _, td := range mod.TypeDefs {
+			if !td.IsTextualConvention {
 				continue
 			}
 			resolved, ok := ctx.resolveTypeForModule(mod, td.Name)
@@ -110,9 +107,8 @@ func checkTypeAssignmentSMIv2(ctx *resolverContext) {
 		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok || td.IsTextualConvention {
+		for _, td := range mod.TypeDefs {
+			if td.IsTextualConvention {
 				continue
 			}
 			// Skip SEQUENCE type assignments (used for table rows, not real types).
@@ -175,13 +171,11 @@ func forEachDefinitionSyntax(ctx *resolverContext, fn func(module.TypeSyntax, st
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectType:
-				fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Span)
-			case *module.TypeDef:
-				fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Span)
-			}
+		for _, d := range mod.ObjectTypes {
+			fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Span)
+		}
+		for _, d := range mod.TypeDefs {
+			fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Span)
 		}
 	}
 }
@@ -297,9 +291,8 @@ func checkFormatHints(ctx *resolverContext) {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok || !td.IsTextualConvention {
+		for _, td := range mod.TypeDefs {
+			if !td.IsTextualConvention {
 				continue
 			}
 			resolved, ok := ctx.resolveTypeForModule(mod, td.Name)
@@ -354,25 +347,25 @@ func checkTypeUnreferenced(ctx *resolverContext) {
 
 	// Collect type references from all definitions.
 	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectType:
-				collectSyntaxTypeRefs(d.Syntax, mod, markRef)
-			case *module.TypeDef:
-				collectSyntaxTypeRefs(d.Syntax, mod, markRef)
-			case *module.ModuleCompliance:
-				for _, cm := range d.Modules {
-					for _, obj := range cm.Objects {
-						collectSyntaxTypeRefs(obj.Syntax, mod, markRef)
-						collectSyntaxTypeRefs(obj.WriteSyntax, mod, markRef)
-					}
+		for _, d := range mod.ObjectTypes {
+			collectSyntaxTypeRefs(d.Syntax, mod, markRef)
+		}
+		for _, d := range mod.TypeDefs {
+			collectSyntaxTypeRefs(d.Syntax, mod, markRef)
+		}
+		for _, d := range mod.Compliances {
+			for _, cm := range d.Modules {
+				for _, obj := range cm.Objects {
+					collectSyntaxTypeRefs(obj.Syntax, mod, markRef)
+					collectSyntaxTypeRefs(obj.WriteSyntax, mod, markRef)
 				}
-			case *module.AgentCapabilities:
-				for _, sup := range d.Supports {
-					for _, v := range sup.Variations {
-						collectSyntaxTypeRefs(v.Syntax, mod, markRef)
-						collectSyntaxTypeRefs(v.WriteSyntax, mod, markRef)
-					}
+			}
+		}
+		for _, d := range mod.Capabilities {
+			for _, sup := range d.Supports {
+				for _, v := range sup.Variations {
+					collectSyntaxTypeRefs(v.Syntax, mod, markRef)
+					collectSyntaxTypeRefs(v.WriteSyntax, mod, markRef)
 				}
 			}
 		}
@@ -395,11 +388,7 @@ func checkTypeUnreferenced(ctx *resolverContext) {
 			continue
 		}
 		refs := referenced[mod]
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok {
-				continue
-			}
+		for _, td := range mod.TypeDefs {
 			// Skip SEQUENCE types (used internally for row definitions).
 			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
 				continue
@@ -440,7 +429,7 @@ func checkIdentifierCaseMatch(ctx *resolverContext) {
 		}
 		// Group definitions by lowercased name, excluding SEQUENCE types.
 		byLower := make(map[string][]module.Definition)
-		for _, def := range mod.Definitions {
+		for def := range mod.AllDefinitions() {
 			if isSequenceTypeDefDirect(def) {
 				continue
 			}
@@ -481,9 +470,8 @@ func checkTrapInSMIv2(ctx *resolverContext) {
 		if mod.Language != types.LanguageSMIv2 || module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			notif, ok := def.(*module.Notification)
-			if !ok || !notif.IsTrap() {
+		for _, notif := range mod.Notifications {
+			if !notif.IsTrap() {
 				continue
 			}
 			ctx.EmitDiagnostic(types.DiagTrapInSMIv2,
@@ -546,8 +534,11 @@ func checkBasetypeImports(ctx *resolverContext) {
 
 		// Collect base types referenced in definitions.
 		referenced := make(map[string]struct{})
-		for _, def := range mod.Definitions {
-			collectBaseTypeRefs(def, referenced)
+		for _, d := range mod.ObjectTypes {
+			collectSyntaxBaseTypeRefs(d.Syntax, referenced)
+		}
+		for _, d := range mod.TypeDefs {
+			collectSyntaxBaseTypeRefs(d.Syntax, referenced)
 		}
 
 		for typeName := range referenced {
@@ -558,16 +549,6 @@ func checkBasetypeImports(ctx *resolverContext) {
 			ctx.EmitDiagnostic(types.DiagBasetypeNotImported, mod, mod.Span,
 				fmt.Sprintf("%s used but not imported from %s in %s", typeName, expectedMod, mod.Name))
 		}
-	}
-}
-
-// collectBaseTypeRefs adds SMI base type names referenced by a definition to the set.
-func collectBaseTypeRefs(def module.Definition, refs map[string]struct{}) {
-	switch d := def.(type) {
-	case *module.ObjectType:
-		collectSyntaxBaseTypeRefs(d.Syntax, refs)
-	case *module.TypeDef:
-		collectSyntaxBaseTypeRefs(d.Syntax, refs)
 	}
 }
 
@@ -641,11 +622,7 @@ func checkModuleIdentityRegistration(ctx *resolverContext) {
 		if module.IsBaseModule(mod.Name) {
 			continue
 		}
-		for _, def := range mod.Definitions {
-			mi, ok := def.(*module.ModuleIdentity)
-			if !ok {
-				continue
-			}
+		for _, mi := range mod.ModuleIdentities {
 			node, ok := ctx.lookupNode(mod, mi.Name)
 			if !ok {
 				continue
