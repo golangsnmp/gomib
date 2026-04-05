@@ -33,6 +33,18 @@ type Module struct {
 	Span        types.Span
 	Diagnostics []types.Diagnostic
 
+	// Typed definition slices - populated alongside Definitions.
+	ObjectTypes        []*ObjectType
+	TypeDefs           []*TypeDef
+	Notifications      []*Notification
+	ModuleIdentities   []*ModuleIdentity
+	ObjectIdentities   []*ObjectIdentity
+	ValueAssignments   []*ValueAssignment
+	ObjectGroups       []*ObjectGroup
+	NotificationGroups []*NotificationGroup
+	Compliances        []*ModuleCompliance
+	Capabilities       []*AgentCapabilities
+
 	// SourcePath is the file path that this module was loaded from.
 	// Empty for synthetic base modules.
 	SourcePath string
@@ -65,10 +77,83 @@ func (m *Module) HasErrors() bool {
 	})
 }
 
+// AllDefinitions returns an iterator over all definitions in the module,
+// yielding ObjectTypes first, then TypeDefs, Notifications, ModuleIdentities,
+// ObjectIdentities, ValueAssignments, ObjectGroups, NotificationGroups,
+// Compliances, and Capabilities.
+func (m *Module) AllDefinitions() iter.Seq[Definition] {
+	return func(yield func(Definition) bool) {
+		for _, d := range m.ObjectTypes {
+			if !yield(d) {
+				return
+			}
+		}
+		for _, d := range m.TypeDefs {
+			if !yield(d) {
+				return
+			}
+		}
+		for _, d := range m.Notifications {
+			if !yield(d) {
+				return
+			}
+		}
+		for _, d := range m.ModuleIdentities {
+			if !yield(d) {
+				return
+			}
+		}
+		for _, d := range m.ObjectIdentities {
+			if !yield(d) {
+				return
+			}
+		}
+		for _, d := range m.ValueAssignments {
+			if !yield(d) {
+				return
+			}
+		}
+		for _, d := range m.ObjectGroups {
+			if !yield(d) {
+				return
+			}
+		}
+		for _, d := range m.NotificationGroups {
+			if !yield(d) {
+				return
+			}
+		}
+		for _, d := range m.Compliances {
+			if !yield(d) {
+				return
+			}
+		}
+		for _, d := range m.Capabilities {
+			if !yield(d) {
+				return
+			}
+		}
+	}
+}
+
+// DefinitionCount returns the total number of definitions across all typed slices.
+func (m *Module) DefinitionCount() int {
+	return len(m.ObjectTypes) +
+		len(m.TypeDefs) +
+		len(m.Notifications) +
+		len(m.ModuleIdentities) +
+		len(m.ObjectIdentities) +
+		len(m.ValueAssignments) +
+		len(m.ObjectGroups) +
+		len(m.NotificationGroups) +
+		len(m.Compliances) +
+		len(m.Capabilities)
+}
+
 // DefinitionNames returns an iterator over the names of all definitions.
 func (m *Module) DefinitionNames() iter.Seq[string] {
 	return func(yield func(string) bool) {
-		for _, def := range m.Definitions {
+		for def := range m.AllDefinitions() {
 			if !yield(def.DefinitionName()) {
 				return
 			}

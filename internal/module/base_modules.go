@@ -132,8 +132,17 @@ func createSNMPv2SMI() *Module {
 	module := NewModule("SNMPv2-SMI", types.Synthetic)
 	module.Language = types.LanguageSMIv2
 
-	module.Definitions = append(module.Definitions, createOidDefinitions()...)
-	module.Definitions = append(module.Definitions, createBaseTypeDefinitions()...)
+	oids := createOidDefinitions()
+	module.ValueAssignments = oids
+	for _, d := range oids {
+		module.Definitions = append(module.Definitions, d)
+	}
+
+	typedefs := createBaseTypeDefinitions()
+	module.TypeDefs = typedefs
+	for _, d := range typedefs {
+		module.Definitions = append(module.Definitions, d)
+	}
 
 	return module
 }
@@ -146,7 +155,11 @@ func createSNMPv2TC() *Module {
 		NewImport("SNMPv2-SMI", "TimeTicks", types.Synthetic),
 	}
 
-	module.Definitions = append(module.Definitions, createTCDefinitions()...)
+	tcs := createTCDefinitions()
+	module.TypeDefs = tcs
+	for _, d := range tcs {
+		module.Definitions = append(module.Definitions, d)
+	}
 
 	return module
 }
@@ -162,8 +175,17 @@ func createSMIv1Base(name string) *Module {
 	module := NewModule(name, types.Synthetic)
 	module.Language = types.LanguageSMIv1
 
-	module.Definitions = append(module.Definitions, createSMIv1TypeDefinitions()...)
-	module.Definitions = append(module.Definitions, createSMIv1OidDefinitions()...)
+	typedefs := createSMIv1TypeDefinitions()
+	module.TypeDefs = typedefs
+	for _, d := range typedefs {
+		module.Definitions = append(module.Definitions, d)
+	}
+
+	oids := createSMIv1OidDefinitions()
+	module.ValueAssignments = oids
+	for _, d := range oids {
+		module.Definitions = append(module.Definitions, d)
+	}
 
 	return module
 }
@@ -215,7 +237,7 @@ func constrainedUintRange(max uint64) TypeSyntax {
 	)
 }
 
-func makeOidValue(name string, components []OidComponent, desc, ref string) Definition {
+func makeOidValue(name string, components []OidComponent, desc, ref string) *ValueAssignment {
 	return &ValueAssignment{
 		DefBase:     DefBase{Name: name, Span: types.Synthetic},
 		Oid:         NewOidAssignment(components, types.Synthetic),
@@ -226,7 +248,7 @@ func makeOidValue(name string, components []OidComponent, desc, ref string) Defi
 
 func basePtr(b types.BaseType) *types.BaseType { return &b }
 
-func makeTypeDef(name string, syntax TypeSyntax, base *types.BaseType, desc, ref string) Definition {
+func makeTypeDef(name string, syntax TypeSyntax, base *types.BaseType, desc, ref string) *TypeDef {
 	return &TypeDef{
 		DefBase:     DefBase{Name: name, Span: types.Synthetic},
 		Syntax:      syntax,
@@ -237,7 +259,7 @@ func makeTypeDef(name string, syntax TypeSyntax, base *types.BaseType, desc, ref
 	}
 }
 
-func makeTC(name, displayHint string, syntax TypeSyntax, status types.Status, desc string) Definition {
+func makeTC(name, displayHint string, syntax TypeSyntax, status types.Status, desc string) *TypeDef {
 	return &TypeDef{
 		DefBase:             DefBase{Name: name, Span: types.Synthetic},
 		Syntax:              syntax,
@@ -250,8 +272,8 @@ func makeTC(name, displayHint string, syntax TypeSyntax, status types.Status, de
 }
 
 // coreOidDefinitions returns the OID tree shared by both SMIv2 and SMIv1.
-func coreOidDefinitions() []Definition {
-	return []Definition{
+func coreOidDefinitions() []*ValueAssignment {
+	return []*ValueAssignment{
 		// iso OBJECT IDENTIFIER ::= { 1 }
 		makeOidValue("iso", []OidComponent{&OidComponentNumber{Value: 1}},
 			"ISO assigned OIDs.", ""),
@@ -298,10 +320,10 @@ func coreOidDefinitions() []Definition {
 	}
 }
 
-func createOidDefinitions() []Definition {
+func createOidDefinitions() []*ValueAssignment {
 	const rfc2578 = "RFC 2578"
 
-	defs := []Definition{
+	defs := []*ValueAssignment{
 		// ccitt OBJECT IDENTIFIER ::= { 0 }
 		makeOidValue("ccitt", []OidComponent{&OidComponentNumber{Value: 0}},
 			"ITU-T (formerly CCITT) assigned OIDs.", ""),
@@ -355,7 +377,7 @@ func createOidDefinitions() []Definition {
 	return defs
 }
 
-func createBaseTypeDefinitions() []Definition {
+func createBaseTypeDefinitions() []*TypeDef {
 	int32Min := int64(math.MinInt32)
 	int32Max := int64(math.MaxInt32)
 	uint32Max := uint64(math.MaxUint32)
@@ -363,7 +385,7 @@ func createBaseTypeDefinitions() []Definition {
 
 	const rfc2578 = "RFC 2578, Section 7.1"
 
-	return []Definition{
+	return []*TypeDef{
 		// Integer32 ::= INTEGER (-2147483648..2147483647)
 		makeTypeDef("Integer32",
 			constrainedIntRange(
@@ -445,12 +467,12 @@ func createBaseTypeDefinitions() []Definition {
 	}
 }
 
-func createSMIv1TypeDefinitions() []Definition {
+func createSMIv1TypeDefinitions() []*TypeDef {
 	uint32Max := uint64(math.MaxUint32)
 
 	const rfc1155 = "RFC 1155, Section 3.2.3"
 
-	return []Definition{
+	return []*TypeDef{
 		// Counter ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
 		makeTypeDef("Counter", constrainedUintRange(uint32Max), basePtr(types.BaseCounter32),
 			"A non-negative 32-bit counter that monotonically increases until it wraps at 2^32-1. The SMIv1 equivalent of Counter32.",
@@ -489,14 +511,14 @@ func createSMIv1TypeDefinitions() []Definition {
 	}
 }
 
-func createSMIv1OidDefinitions() []Definition {
+func createSMIv1OidDefinitions() []*ValueAssignment {
 	return coreOidDefinitions()
 }
 
-func createTCDefinitions() []Definition {
+func createTCDefinitions() []*TypeDef {
 	int32Max := int64(math.MaxInt32)
 
-	return []Definition{
+	return []*TypeDef{
 		// DisplayString ::= TEXTUAL-CONVENTION DISPLAY-HINT "255a" SYNTAX OCTET STRING (SIZE (0..255))
 		makeTC("DisplayString", "255a", constrainedOctetRange(0, 255), types.StatusCurrent,
 			"An NVT ASCII string of 0 to 255 characters. Preferred over the deprecated RFC 1213 DisplayString.",
