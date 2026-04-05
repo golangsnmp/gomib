@@ -149,7 +149,7 @@ func FuzzParse(f *testing.F) {
 	})
 }
 
-// FuzzPipeline fuzzes the full processing pipeline: parse -> lower -> resolve.
+// FuzzPipeline fuzzes the full processing pipeline: parse -> validate -> resolve.
 // This catches issues that only manifest when phases interact.
 func FuzzPipeline(f *testing.F) {
 	for _, seed := range pipelineSeeds {
