@@ -91,13 +91,13 @@ func TestExtractLastUpdated(t *testing.T) {
 		mod := &module.Module{
 			Name:        "TEST-MIB",
 			LastUpdated: "0210180000Z",
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{
-					DefBase:     module.DefBase{Name: "testMIB"},
-					LastUpdated: "0210180000Z",
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				LastUpdated: "0210180000Z",
+			},
+		})
 		got := extractLastUpdated(mod)
 		testutil.Equal(t, "200210180000Z", got, "extractLastUpdated()")
 	})
@@ -105,10 +105,10 @@ func TestExtractLastUpdated(t *testing.T) {
 	t.Run("module without ModuleIdentity", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectType{DefBase: module.DefBase{Name: "testObject"}},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectType{DefBase: module.DefBase{Name: "testObject"}},
+		})
 		got := extractLastUpdated(mod)
 		testutil.Equal(t, "", got, "extractLastUpdated()")
 	})
@@ -116,13 +116,13 @@ func TestExtractLastUpdated(t *testing.T) {
 	t.Run("module with empty LastUpdated", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{
-					DefBase:     module.DefBase{Name: "testMIB"},
-					LastUpdated: "   ",
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				LastUpdated: "   ",
+			},
+		})
 		got := extractLastUpdated(mod)
 		testutil.Equal(t, "", got, "extractLastUpdated()")
 	})
@@ -191,13 +191,13 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 		modOld := &module.Module{
 			Name:        "MOD-OLD",
 			LastUpdated: "9901010000Z",
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{
-					DefBase:     module.DefBase{Name: "modOld"},
-					LastUpdated: "9901010000Z",
-				},
-			},
 		}
+		addDefs(modOld, []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "modOld"},
+				LastUpdated: "9901010000Z",
+			},
+		})
 		ctx.defNames[modOld] = map[string]struct{}{
 			"foo": {},
 			"bar": {},
@@ -206,13 +206,13 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 		modNew := &module.Module{
 			Name:        "MOD-NEW",
 			LastUpdated: "200501010000Z",
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{
-					DefBase:     module.DefBase{Name: "modNew"},
-					LastUpdated: "200501010000Z",
-				},
-			},
 		}
+		addDefs(modNew, []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "modNew"},
+				LastUpdated: "200501010000Z",
+			},
+		})
 		ctx.defNames[modNew] = map[string]struct{}{
 			"foo": {},
 			"bar": {},

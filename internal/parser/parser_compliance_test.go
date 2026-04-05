@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
@@ -19,12 +18,11 @@ func TestParseModuleComplianceBaseline(t *testing.T) {
 			::= { testConformance 1 }
 		END`)
 
-	if len(mod.Definitions) == 0 {
+	if len(mod.Compliances) == 0 {
 		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := mod.Definitions[0].(*module.ModuleCompliance)
-	testutil.True(t, ok, "expected ModuleCompliance, got %T", mod.Definitions[0])
+	def := mod.Compliances[0]
 	testutil.Equal(t, "testCompliance", def.Name, "compliance name")
 	testutil.Greater(t, len(def.Modules), 0, "should have at least one MODULE clause")
 	if len(def.Modules) > 0 {
@@ -90,11 +88,10 @@ func TestParseModuleComplianceRefinements(t *testing.T) {
 
 			mod := parseModule(source)
 
-			if len(mod.Definitions) == 0 {
+			if len(mod.Compliances) == 0 {
 				t.Fatal("expected definitions in module")
 			}
-			def, ok := mod.Definitions[0].(*module.ModuleCompliance)
-			testutil.True(t, ok, "expected ModuleCompliance, got %T", mod.Definitions[0])
+			def := mod.Compliances[0]
 			testutil.Equal(t, 1, len(def.Modules), "module clauses count")
 			cm := def.Modules[0]
 			testutil.Equal(t, 1, len(cm.Objects), "objects count")
@@ -135,12 +132,11 @@ func TestParseModuleComplianceGroupAndObject(t *testing.T) {
 			::= { testConformance 1 }
 		END`)
 
-	if len(mod.Definitions) == 0 {
+	if len(mod.Compliances) == 0 {
 		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := mod.Definitions[0].(*module.ModuleCompliance)
-	testutil.True(t, ok, "expected ModuleCompliance, got %T", mod.Definitions[0])
+	def := mod.Compliances[0]
 
 	cm := def.Modules[0]
 	testutil.Equal(t, 1, len(cm.Groups), "groups count")
@@ -160,12 +156,11 @@ func TestParseModuleComplianceNamedModule(t *testing.T) {
 			::= { testConformance 1 }
 		END`)
 
-	if len(mod.Definitions) == 0 {
+	if len(mod.Compliances) == 0 {
 		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := mod.Definitions[0].(*module.ModuleCompliance)
-	testutil.True(t, ok, "expected ModuleCompliance, got %T", mod.Definitions[0])
+	def := mod.Compliances[0]
 
 	testutil.Equal(t, 1, len(def.Modules), "module clauses count")
 	cm := def.Modules[0]

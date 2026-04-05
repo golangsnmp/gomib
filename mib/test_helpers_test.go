@@ -47,19 +47,14 @@ func newTestContextForModulesWithPolicy(strictness ResolverStrictness, config Di
 
 // setTestModules sets ctx.modules and builds the oidDefNames cache
 // for tests that don't go through registerModules.
-// If a module has Definitions populated but empty typed slices (struct literal
-// construction), the typed slices are backfilled so both access paths work.
 func setTestModules(ctx *resolverContext, mods []*module.Module) {
 	ctx.modules = mods
 	for _, mod := range mods {
-		if len(mod.Definitions) > 0 && mod.DefinitionCount() == 0 {
-			populateTypedSlices(mod, mod.Definitions)
-		}
 		if _, exists := ctx.oidDefNames[mod]; exists {
 			continue
 		}
 		oidDefs := make(map[string]struct{})
-		for _, def := range mod.Definitions {
+		for def := range mod.AllDefinitions() {
 			if def.DefinitionOid() != nil {
 				oidDefs[def.DefinitionName()] = struct{}{}
 			}
@@ -109,10 +104,8 @@ type testModuleConfig struct {
 	rootArc      uint32
 }
 
-// populateTypedSlices distributes a flat Definition slice into the typed slices on mod.
-// Both Definitions and the typed slices are populated so that either access path works.
-func populateTypedSlices(mod *module.Module, defs []module.Definition) {
-	mod.Definitions = defs
+// addDefs distributes a flat Definition slice into the typed slices on mod.
+func addDefs(mod *module.Module, defs []module.Definition) {
 	for _, def := range defs {
 		switch d := def.(type) {
 		case *module.ObjectType:
@@ -177,7 +170,7 @@ func buildTestModule(cfg testModuleConfig, defs ...module.Definition) *module.Mo
 		Language: cfg.language,
 		Imports:  imports,
 	}
-	populateTypedSlices(mod, allDefs)
+	addDefs(mod, allDefs)
 	return mod
 }
 
@@ -247,7 +240,7 @@ func testTableModule(extraImports []module.Import, columns ...module.Definition)
 		Language: types.LanguageSMIv2,
 		Imports:  imports,
 	}
-	populateTypedSlices(mod, defs)
+	addDefs(mod, defs)
 	return mod
 }
 

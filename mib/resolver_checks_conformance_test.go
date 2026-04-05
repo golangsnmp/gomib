@@ -16,20 +16,20 @@ func TestCheckGroupMembership_NoGroups(t *testing.T) {
 		Imports: []module.Import{
 			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 		},
-		Definitions: []module.Definition{
-			&module.ModuleIdentity{
-				DefBase: module.DefBase{Name: "testMIB"},
-				Oid:     testOid("enterprises", 99999),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "testScalar"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
-				Access:  types.AccessReadOnly,
-				Status:  types.StatusCurrent,
-				Oid:     testOid("testMIB", 1),
-			},
-		},
 	}
+	addDefs(mod, []module.Definition{
+		&module.ModuleIdentity{
+			DefBase: module.DefBase{Name: "testMIB"},
+			Oid:     testOid("enterprises", 99999),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testScalar"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testMIB", 1),
+		},
+	})
 	m := resolveStrict(mod)
 	noDiag(t, m.Diagnostics(), types.DiagGroupMembership)
 }
@@ -43,37 +43,37 @@ func TestCheckGroupMembership_AllCovered(t *testing.T) {
 			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
 		},
-		Definitions: []module.Definition{
-			&module.ModuleIdentity{
-				DefBase: module.DefBase{Name: "testMIB"},
-				Oid:     testOid("enterprises", 99999),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "testScalar"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-				Access:  types.AccessReadOnly,
-				Status:  types.StatusCurrent,
-				Oid:     testOid("testMIB", 1),
-			},
-			&module.Notification{
-				DefBase: module.DefBase{Name: "testNotif"},
-				Status:  types.StatusCurrent,
-				Oid:     &module.OidAssignment{Components: testOid("testMIB", 2).Components, Span: types.Span{}},
-			},
-			&module.ObjectGroup{
-				DefBase: module.DefBase{Name: "testObjGroup"},
-				Objects: []string{"testScalar"},
-				Status:  types.StatusCurrent,
-				Oid:     testOid("testMIB", 3),
-			},
-			&module.NotificationGroup{
-				DefBase:       module.DefBase{Name: "testNotifGroup"},
-				Notifications: []string{"testNotif"},
-				Status:        types.StatusCurrent,
-				Oid:           testOid("testMIB", 4),
-			},
-		},
 	}
+	addDefs(mod, []module.Definition{
+		&module.ModuleIdentity{
+			DefBase: module.DefBase{Name: "testMIB"},
+			Oid:     testOid("enterprises", 99999),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testScalar"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testMIB", 1),
+		},
+		&module.Notification{
+			DefBase: module.DefBase{Name: "testNotif"},
+			Status:  types.StatusCurrent,
+			Oid:     &module.OidAssignment{Components: testOid("testMIB", 2).Components, Span: types.Span{}},
+		},
+		&module.ObjectGroup{
+			DefBase: module.DefBase{Name: "testObjGroup"},
+			Objects: []string{"testScalar"},
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testMIB", 3),
+		},
+		&module.NotificationGroup{
+			DefBase:       module.DefBase{Name: "testNotifGroup"},
+			Notifications: []string{"testNotif"},
+			Status:        types.StatusCurrent,
+			Oid:           testOid("testMIB", 4),
+		},
+	})
 	m := resolveStrict(mod)
 	noDiag(t, m.Diagnostics(), types.DiagGroupMembership)
 }
@@ -87,33 +87,33 @@ func TestCheckGroupMembership_MissingObject(t *testing.T) {
 			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
 		},
-		Definitions: []module.Definition{
-			&module.ModuleIdentity{
-				DefBase: module.DefBase{Name: "testMIB"},
-				Oid:     testOid("enterprises", 99999),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "testScalar1"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-				Access:  types.AccessReadOnly,
-				Status:  types.StatusCurrent,
-				Oid:     testOid("testMIB", 1),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "testScalar2"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-				Access:  types.AccessReadWrite,
-				Status:  types.StatusCurrent,
-				Oid:     testOid("testMIB", 2),
-			},
-			&module.ObjectGroup{
-				DefBase: module.DefBase{Name: "testObjGroup"},
-				Objects: []string{"testScalar1"},
-				Status:  types.StatusCurrent,
-				Oid:     testOid("testMIB", 3),
-			},
-		},
 	}
+	addDefs(mod, []module.Definition{
+		&module.ModuleIdentity{
+			DefBase: module.DefBase{Name: "testMIB"},
+			Oid:     testOid("enterprises", 99999),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testScalar1"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testMIB", 1),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testScalar2"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Access:  types.AccessReadWrite,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testMIB", 2),
+		},
+		&module.ObjectGroup{
+			DefBase: module.DefBase{Name: "testObjGroup"},
+			Objects: []string{"testScalar1"},
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testMIB", 3),
+		},
+	})
 	m := resolveStrict(mod)
 	d := hasDiag(t, m.Diagnostics(), types.DiagGroupMembership)
 	testutil.Contains(t, d.Message, "testScalar2", "diagnostic message")
@@ -128,48 +128,48 @@ func TestCheckGroupMembership_NotAccessibleExcluded(t *testing.T) {
 			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
 		},
-		Definitions: []module.Definition{
-			&module.ModuleIdentity{
-				DefBase: module.DefBase{Name: "testMIB"},
-				Oid:     testOid("enterprises", 99999),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "testTable"},
-				Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
-				Access:  types.AccessNotAccessible,
-				Status:  types.StatusCurrent,
-				Oid:     testOid("testMIB", 1),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "testEntry"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
-				Access:  types.AccessNotAccessible,
-				Status:  types.StatusCurrent,
-				Index:   []module.IndexItem{{Object: "testIndex"}},
-				Oid:     testOid("testTable", 1),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "testIndex"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-				Access:  types.AccessNotAccessible,
-				Status:  types.StatusCurrent,
-				Oid:     testOid("testEntry", 1),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "testValue"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-				Access:  types.AccessReadOnly,
-				Status:  types.StatusCurrent,
-				Oid:     testOid("testEntry", 2),
-			},
-			&module.ObjectGroup{
-				DefBase: module.DefBase{Name: "testGroup"},
-				Objects: []string{"testValue"},
-				Status:  types.StatusCurrent,
-				Oid:     testOid("testMIB", 2),
-			},
-		},
 	}
+	addDefs(mod, []module.Definition{
+		&module.ModuleIdentity{
+			DefBase: module.DefBase{Name: "testMIB"},
+			Oid:     testOid("enterprises", 99999),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testTable"},
+			Syntax:  &module.TypeSyntaxSequenceOf{EntryType: "TestEntry"},
+			Access:  types.AccessNotAccessible,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testMIB", 1),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testEntry"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
+			Access:  types.AccessNotAccessible,
+			Status:  types.StatusCurrent,
+			Index:   []module.IndexItem{{Object: "testIndex"}},
+			Oid:     testOid("testTable", 1),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testIndex"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Access:  types.AccessNotAccessible,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", 1),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "testValue"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Access:  types.AccessReadOnly,
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testEntry", 2),
+		},
+		&module.ObjectGroup{
+			DefBase: module.DefBase{Name: "testGroup"},
+			Objects: []string{"testValue"},
+			Status:  types.StatusCurrent,
+			Oid:     testOid("testMIB", 2),
+		},
+	})
 	m := resolveStrict(mod)
 	noDiag(t, m.Diagnostics(), types.DiagGroupMembership)
 }
@@ -182,29 +182,29 @@ func TestCheckGroupMembership_MissingNotification(t *testing.T) {
 		Imports: []module.Import{
 			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 		},
-		Definitions: []module.Definition{
-			&module.ModuleIdentity{
-				DefBase: module.DefBase{Name: "testMIB"},
-				Oid:     testOid("enterprises", 99999),
-			},
-			&module.Notification{
-				DefBase: module.DefBase{Name: "testNotif1"},
-				Status:  types.StatusCurrent,
-				Oid:     &module.OidAssignment{Components: testOid("testMIB", 1).Components, Span: types.Span{}},
-			},
-			&module.Notification{
-				DefBase: module.DefBase{Name: "testNotif2"},
-				Status:  types.StatusCurrent,
-				Oid:     &module.OidAssignment{Components: testOid("testMIB", 2).Components, Span: types.Span{}},
-			},
-			&module.NotificationGroup{
-				DefBase:       module.DefBase{Name: "testNotifGroup"},
-				Notifications: []string{"testNotif1"},
-				Status:        types.StatusCurrent,
-				Oid:           testOid("testMIB", 3),
-			},
-		},
 	}
+	addDefs(mod, []module.Definition{
+		&module.ModuleIdentity{
+			DefBase: module.DefBase{Name: "testMIB"},
+			Oid:     testOid("enterprises", 99999),
+		},
+		&module.Notification{
+			DefBase: module.DefBase{Name: "testNotif1"},
+			Status:  types.StatusCurrent,
+			Oid:     &module.OidAssignment{Components: testOid("testMIB", 1).Components, Span: types.Span{}},
+		},
+		&module.Notification{
+			DefBase: module.DefBase{Name: "testNotif2"},
+			Status:  types.StatusCurrent,
+			Oid:     &module.OidAssignment{Components: testOid("testMIB", 2).Components, Span: types.Span{}},
+		},
+		&module.NotificationGroup{
+			DefBase:       module.DefBase{Name: "testNotifGroup"},
+			Notifications: []string{"testNotif1"},
+			Status:        types.StatusCurrent,
+			Oid:           testOid("testMIB", 3),
+		},
+	})
 	m := resolveStrict(mod)
 	d := hasDiag(t, m.Diagnostics(), types.DiagGroupMembership)
 	testutil.Contains(t, d.Message, "testNotif2", "diagnostic message")
@@ -214,22 +214,22 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 	t.Run("obsolete group in current compliance emits diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "obsGroup"},
-					Objects: []string{"someObj"},
-					Status:  types.StatusObsolete,
-				},
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{MandatoryGroups: []string{"obsGroup"}},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "obsGroup"},
+				Objects: []string{"someObj"},
+				Status:  types.StatusObsolete,
+			},
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{MandatoryGroups: []string{"obsGroup"}},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -261,22 +261,22 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 	t.Run("current group in current compliance no diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "curGroup"},
-					Objects: []string{"someObj"},
-					Status:  types.StatusCurrent,
-				},
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{MandatoryGroups: []string{"curGroup"}},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "curGroup"},
+				Objects: []string{"someObj"},
+				Status:  types.StatusCurrent,
+			},
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{MandatoryGroups: []string{"curGroup"}},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -308,22 +308,22 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 	t.Run("optional GROUP clause with obsolete group emits diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "optGroup"},
-					Objects: []string{"someObj"},
-					Status:  types.StatusObsolete,
-				},
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{Groups: []module.ComplianceGroup{{Group: "optGroup"}}},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "optGroup"},
+				Objects: []string{"someObj"},
+				Status:  types.StatusObsolete,
+			},
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{Groups: []module.ComplianceGroup{{Group: "optGroup"}}},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -355,22 +355,22 @@ func TestCheckComplianceStatus_GroupStatus(t *testing.T) {
 	t.Run("smiv1 compliance status skips check", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "obsGroup"},
-					Objects: []string{"someObj"},
-					Status:  types.StatusObsolete,
-				},
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusMandatory,
-					Modules: []module.ComplianceModule{
-						{MandatoryGroups: []string{"obsGroup"}},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "obsGroup"},
+				Objects: []string{"someObj"},
+				Status:  types.StatusObsolete,
+			},
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusMandatory,
+				Modules: []module.ComplianceModule{
+					{MandatoryGroups: []string{"obsGroup"}},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -404,17 +404,17 @@ func TestCheckComplianceStatus_ObjectStatus(t *testing.T) {
 	t.Run("obsolete object in current compliance emits diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{Objects: []module.ComplianceObject{{Object: "obsObj"}}},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{Objects: []module.ComplianceObject{{Object: "obsObj"}}},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -441,17 +441,17 @@ func TestCheckComplianceStatus_ObjectStatus(t *testing.T) {
 	t.Run("current object in current compliance no diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{Objects: []module.ComplianceObject{{Object: "curObj"}}},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{Objects: []module.ComplianceObject{{Object: "curObj"}}},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -478,17 +478,17 @@ func TestCheckComplianceStatus_ObjectStatus(t *testing.T) {
 	t.Run("deprecated object in deprecated compliance no diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusDeprecated,
-					Modules: []module.ComplianceModule{
-						{Objects: []module.ComplianceObject{{Object: "depObj"}}},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusDeprecated,
+				Modules: []module.ComplianceModule{
+					{Objects: []module.ComplianceObject{{Object: "depObj"}}},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -515,17 +515,17 @@ func TestCheckComplianceStatus_ObjectStatus(t *testing.T) {
 	t.Run("smiv1 object status skips check", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{Objects: []module.ComplianceObject{{Object: "mandObj"}}},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{Objects: []module.ComplianceObject{{Object: "mandObj"}}},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -554,25 +554,25 @@ func TestCheckComplianceStructure(t *testing.T) {
 	t.Run("group both mandatory and optional emits compliance-group-invalid", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "sharedGroup"},
-					Objects: []string{"someObj"},
-					Status:  types.StatusCurrent,
-				},
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{
-							MandatoryGroups: []string{"sharedGroup"},
-							Groups:          []module.ComplianceGroup{{Group: "sharedGroup"}},
-						},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "sharedGroup"},
+				Objects: []string{"someObj"},
+				Status:  types.StatusCurrent,
+			},
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{
+						MandatoryGroups: []string{"sharedGroup"},
+						Groups:          []module.ComplianceGroup{{Group: "sharedGroup"}},
+					},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -590,22 +590,22 @@ func TestCheckComplianceStructure(t *testing.T) {
 	t.Run("duplicate refinement emits refinement-exists", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{
-							Objects: []module.ComplianceObject{
-								{Object: "dupObj"},
-								{Object: "dupObj"},
-							},
+		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{
+						Objects: []module.ComplianceObject{
+							{Object: "dupObj"},
+							{Object: "dupObj"},
 						},
 					},
-					Oid: testOid("testNode", 10),
 				},
+				Oid: testOid("testNode", 10),
 			},
-		}
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -623,22 +623,22 @@ func TestCheckComplianceStructure(t *testing.T) {
 	t.Run("duplicate optional group emits optional-group-exists", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{
-							Groups: []module.ComplianceGroup{
-								{Group: "dupGroup"},
-								{Group: "dupGroup"},
-							},
+		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{
+						Groups: []module.ComplianceGroup{
+							{Group: "dupGroup"},
+							{Group: "dupGroup"},
 						},
 					},
-					Oid: testOid("testNode", 10),
 				},
+				Oid: testOid("testNode", 10),
 			},
-		}
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -656,25 +656,25 @@ func TestCheckComplianceStructure(t *testing.T) {
 	t.Run("refinement not in any group emits refinement-not-listed", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "myGroup"},
-					Objects: []string{"memberObj"},
-					Status:  types.StatusCurrent,
-				},
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{
-							MandatoryGroups: []string{"myGroup"},
-							Objects:         []module.ComplianceObject{{Object: "unlistedObj"}},
-						},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "myGroup"},
+				Objects: []string{"memberObj"},
+				Status:  types.StatusCurrent,
+			},
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{
+						MandatoryGroups: []string{"myGroup"},
+						Objects:         []module.ComplianceObject{{Object: "unlistedObj"}},
+					},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -706,25 +706,25 @@ func TestCheckComplianceStructure(t *testing.T) {
 	t.Run("refinement in mandatory group no diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "myGroup"},
-					Objects: []string{"listedObj"},
-					Status:  types.StatusCurrent,
-				},
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{
-							MandatoryGroups: []string{"myGroup"},
-							Objects:         []module.ComplianceObject{{Object: "listedObj"}},
-						},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "myGroup"},
+				Objects: []string{"listedObj"},
+				Status:  types.StatusCurrent,
+			},
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{
+						MandatoryGroups: []string{"myGroup"},
+						Objects:         []module.ComplianceObject{{Object: "listedObj"}},
+					},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -756,21 +756,21 @@ func TestCheckComplianceStructure(t *testing.T) {
 	t.Run("no duplicates no diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ModuleCompliance{
-					DefBase: module.DefBase{Name: "testCompliance"},
-					Status:  types.StatusCurrent,
-					Modules: []module.ComplianceModule{
-						{
-							MandatoryGroups: []string{"groupA"},
-							Groups:          []module.ComplianceGroup{{Group: "groupB"}},
-							Objects:         []module.ComplianceObject{{Object: "objA"}, {Object: "objB"}},
-						},
-					},
-					Oid: testOid("testNode", 10),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleCompliance{
+				DefBase: module.DefBase{Name: "testCompliance"},
+				Status:  types.StatusCurrent,
+				Modules: []module.ComplianceModule{
+					{
+						MandatoryGroups: []string{"groupA"},
+						Groups:          []module.ComplianceGroup{{Group: "groupB"}},
+						Objects:         []module.ComplianceObject{{Object: "objA"}, {Object: "objB"}},
+					},
+				},
+				Oid: testOid("testNode", 10),
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -791,14 +791,14 @@ func TestCheckGroupMemberLocality(t *testing.T) {
 		modA := &module.Module{Name: "SOURCE-MIB"}
 		modB := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "testGroup"},
-					Objects: []string{"importedObj"},
-					Status:  types.StatusCurrent,
-				},
-			},
 		}
+		addDefs(modB, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "testGroup"},
+				Objects: []string{"importedObj"},
+				Status:  types.StatusCurrent,
+			},
+		})
 
 		ctx := newComplianceTestContext(modA, modB)
 
@@ -827,14 +827,14 @@ func TestCheckGroupMemberLocality(t *testing.T) {
 	t.Run("local member no diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "testGroup"},
-					Objects: []string{"localObj"},
-					Status:  types.StatusCurrent,
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "testGroup"},
+				Objects: []string{"localObj"},
+				Status:  types.StatusCurrent,
+			},
+		})
 
 		ctx := newComplianceTestContext(mod)
 
@@ -858,14 +858,14 @@ func TestCheckGroupMemberLocality(t *testing.T) {
 		modA := &module.Module{Name: "SOURCE-MIB"}
 		modB := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.NotificationGroup{
-					DefBase:       module.DefBase{Name: "testNotifGroup"},
-					Notifications: []string{"importedNotif"},
-					Status:        types.StatusCurrent,
-				},
-			},
 		}
+		addDefs(modB, []module.Definition{
+			&module.NotificationGroup{
+				DefBase:       module.DefBase{Name: "testNotifGroup"},
+				Notifications: []string{"importedNotif"},
+				Status:        types.StatusCurrent,
+			},
+		})
 
 		ctx := newComplianceTestContext(modA, modB)
 
@@ -1180,7 +1180,7 @@ func testTransportAddressMIB() *module.Module {
 		module.NewImport("SNMPv2-SMI", "mib-2", types.Span{}),
 		module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
 	}
-	populateTypedSlices(mod, []module.Definition{
+	addDefs(mod, []module.Definition{
 		&module.ModuleIdentity{
 			DefBase: module.DefBase{Name: "transportAddressMIB"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
@@ -1239,13 +1239,11 @@ func testTransportAddressMIB() *module.Module {
 func TestCheckGroupUnreferenced(t *testing.T) {
 	t.Run("unreferenced groups emit diagnostics", func(t *testing.T) {
 		mod := module.NewModule("TEST-MIB", types.Span{})
-		mod.Definitions = []module.Definition{
-			&module.ObjectGroup{
-				DefBase: module.DefBase{Name: "unusedObjectGroup"},
-			},
-			&module.NotificationGroup{
-				DefBase: module.DefBase{Name: "unusedNotificationGroup"},
-			},
+		mod.ObjectGroups = []*module.ObjectGroup{
+			{DefBase: module.DefBase{Name: "unusedObjectGroup"}},
+		}
+		mod.NotificationGroups = []*module.NotificationGroup{
+			{DefBase: module.DefBase{Name: "unusedNotificationGroup"}},
 		}
 
 		ctx := newTestContextForModules(VerboseConfig(), mod)
@@ -1256,14 +1254,14 @@ func TestCheckGroupUnreferenced(t *testing.T) {
 
 	t.Run("compliance and capabilities references suppress diagnostics", func(t *testing.T) {
 		mod := module.NewModule("TEST-MIB", types.Span{})
-		mod.Definitions = []module.Definition{
-			&module.ObjectGroup{
-				DefBase: module.DefBase{Name: "usedObjectGroup"},
-			},
-			&module.NotificationGroup{
-				DefBase: module.DefBase{Name: "usedNotificationGroup"},
-			},
-			&module.ModuleCompliance{
+		mod.ObjectGroups = []*module.ObjectGroup{
+			{DefBase: module.DefBase{Name: "usedObjectGroup"}},
+		}
+		mod.NotificationGroups = []*module.NotificationGroup{
+			{DefBase: module.DefBase{Name: "usedNotificationGroup"}},
+		}
+		mod.Compliances = []*module.ModuleCompliance{
+			{
 				DefBase: module.DefBase{Name: "testCompliance"},
 				Modules: []module.ComplianceModule{
 					{
@@ -1271,7 +1269,9 @@ func TestCheckGroupUnreferenced(t *testing.T) {
 					},
 				},
 			},
-			&module.AgentCapabilities{
+		}
+		mod.Capabilities = []*module.AgentCapabilities{
+			{
 				DefBase: module.DefBase{Name: "testCaps"},
 				Supports: []module.SupportsModule{
 					{

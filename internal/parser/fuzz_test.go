@@ -119,7 +119,7 @@ func FuzzParseModule(f *testing.F) {
 			}
 
 			// Validate definition spans are ordered and within input bounds.
-			for _, def := range mod.Definitions {
+			for def := range mod.AllDefinitions() {
 				span := def.DefinitionSpan()
 				if span.Start > span.End {
 					t.Fatalf("definition span start %d > end %d", span.Start, span.End)
@@ -231,7 +231,7 @@ func FuzzConstraintParsing(f *testing.F) {
 		if mod.Span.End > inputLen {
 			t.Fatalf("module span end %d > input length %d", mod.Span.End, inputLen)
 		}
-		for _, def := range mod.Definitions {
+		for def := range mod.AllDefinitions() {
 			span := def.DefinitionSpan()
 			if span.Start > span.End {
 				t.Fatalf("definition span start %d > end %d", span.Start, span.End)

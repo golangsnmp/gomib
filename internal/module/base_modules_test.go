@@ -22,11 +22,11 @@ func TestBaseModuleNames_DefensiveCopy(t *testing.T) {
 
 // --- helpers for inspecting base module definitions ---
 
-// defNames returns the names of all definitions.
-func defNames(defs []Definition) []string {
-	names := make([]string, len(defs))
-	for i, d := range defs {
-		names[i] = d.DefinitionName()
+// defNames returns the names of all definitions in the module.
+func defNames(mod *Module) []string {
+	var names []string
+	for d := range mod.AllDefinitions() {
+		names = append(names, d.DefinitionName())
 	}
 	return names
 }
@@ -64,7 +64,7 @@ func TestCreateBaseModules_MacroOnlyModulesEmpty(t *testing.T) {
 	for _, mod := range modules {
 		switch mod.Name {
 		case "SNMPv2-CONF", "RFC-1212", "RFC-1215":
-			testutil.Len(t, mod.Definitions, 0, "%s definitions", mod.Name)
+			testutil.Equal(t, 0, mod.DefinitionCount(), "%s definitions", mod.Name)
 		}
 	}
 }
@@ -379,17 +379,16 @@ func TestSNMPv2TC_AllDefinitionsPresent(t *testing.T) {
 		"VariablePointer", "RowPointer", "TDomain", "TAddress",
 	}
 
-	names := defNames(mod.Definitions)
+	names := defNames(mod)
 	for _, want := range wantTCs {
 		testutil.True(t, slices.Contains(names, want), "TC %q should be defined", want)
 	}
-	testutil.Len(t, mod.Definitions, len(wantTCs), "TC count")
+	testutil.Equal(t, len(wantTCs), mod.DefinitionCount(), "TC count")
 }
 
 func TestSNMPv2TC_AllAreTextualConventions(t *testing.T) {
 	mod := GetBaseModule("SNMPv2-TC")
-	for _, def := range mod.Definitions {
-		td := def.(*TypeDef)
+	for _, td := range mod.TypeDefs {
 		testutil.True(t, td.IsTextualConvention, "%s should be a TC", td.Name)
 	}
 }
@@ -662,7 +661,7 @@ func TestSMIv1Base_OIDTree(t *testing.T) {
 	mod := GetBaseModule("RFC1155-SMI")
 
 	coreOIDs := []string{"iso", "org", "dod", "internet", "directory", "mgmt", "experimental", "private", "enterprises"}
-	names := defNames(mod.Definitions)
+	names := defNames(mod)
 	for _, name := range coreOIDs {
 		testutil.True(t, slices.Contains(names, name), "%s: OID %q should be defined", mod.Name, name)
 	}

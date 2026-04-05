@@ -132,17 +132,8 @@ func createSNMPv2SMI() *Module {
 	module := NewModule("SNMPv2-SMI", types.Synthetic)
 	module.Language = types.LanguageSMIv2
 
-	oids := createOidDefinitions()
-	module.ValueAssignments = oids
-	for _, d := range oids {
-		module.Definitions = append(module.Definitions, d)
-	}
-
-	typedefs := createBaseTypeDefinitions()
-	module.TypeDefs = typedefs
-	for _, d := range typedefs {
-		module.Definitions = append(module.Definitions, d)
-	}
+	module.ValueAssignments = createOidDefinitions()
+	module.TypeDefs = createBaseTypeDefinitions()
 
 	return module
 }
@@ -155,11 +146,7 @@ func createSNMPv2TC() *Module {
 		NewImport("SNMPv2-SMI", "TimeTicks", types.Synthetic),
 	}
 
-	tcs := createTCDefinitions()
-	module.TypeDefs = tcs
-	for _, d := range tcs {
-		module.Definitions = append(module.Definitions, d)
-	}
+	module.TypeDefs = createTCDefinitions()
 
 	return module
 }
@@ -175,17 +162,8 @@ func createSMIv1Base(name string) *Module {
 	module := NewModule(name, types.Synthetic)
 	module.Language = types.LanguageSMIv1
 
-	typedefs := createSMIv1TypeDefinitions()
-	module.TypeDefs = typedefs
-	for _, d := range typedefs {
-		module.Definitions = append(module.Definitions, d)
-	}
-
-	oids := createSMIv1OidDefinitions()
-	module.ValueAssignments = oids
-	for _, d := range oids {
-		module.Definitions = append(module.Definitions, d)
-	}
+	module.TypeDefs = createSMIv1TypeDefinitions()
+	module.ValueAssignments = createSMIv1OidDefinitions()
 
 	return module
 }

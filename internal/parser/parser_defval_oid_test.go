@@ -19,9 +19,8 @@ func TestParseDefValOidNamed(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 
 	oidVal, ok := def.DefVal.(*module.DefValOidValue)
@@ -41,9 +40,8 @@ func TestParseDefValOidNumeric(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 
 	oidVal, ok := def.DefVal.(*module.DefValOidValue)
@@ -63,9 +61,8 @@ func TestParseDefValOidNamedNumber(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 
 	oidVal, ok := def.DefVal.(*module.DefValOidValue)
@@ -90,9 +87,8 @@ func TestParseDefValOidEmpty(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 
 	bitsVal, ok := def.DefVal.(*module.DefValBits)

@@ -25,8 +25,8 @@ END
 	testutil.Equal(t, "A-MIB", mods[0].Name, "first module name")
 	testutil.Equal(t, "B-MIB", mods[1].Name, "second module name")
 
-	testutil.Greater(t, len(mods[0].Definitions), 0, "first module should have definitions")
-	testutil.Greater(t, len(mods[1].Definitions), 0, "second module should have definitions")
+	testutil.Greater(t, mods[0].DefinitionCount(), 0, "first module should have definitions")
+	testutil.Greater(t, mods[1].DefinitionCount(), 0, "second module should have definitions")
 	testutil.Equal(t, 1, len(mods[1].Imports), "second module should have one import")
 }
 

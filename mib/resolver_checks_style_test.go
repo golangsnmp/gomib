@@ -512,18 +512,18 @@ func TestCheckNodeImplicit(t *testing.T) {
 				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 				module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
 			},
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{
-					DefBase:     module.DefBase{Name: "testMIB"},
-					Description: "test",
-					Oid: module.NewOidAssignment([]module.OidComponent{
-						&module.OidComponentName{NameValue: "enterprises"},
-						&module.OidComponentNumber{Value: 99999},
-						&module.OidComponentNumber{Value: 1},
-					}, types.Span{}),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				Description: "test",
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "enterprises"},
+					&module.OidComponentNumber{Value: 99999},
+					&module.OidComponentNumber{Value: 1},
+				}, types.Span{}),
+			},
+		})
 		m := resolveStrict(mod)
 		hasDiag(t, m.Diagnostics(), types.DiagNodeImplicit)
 	})
@@ -536,18 +536,18 @@ func TestCheckNodeImplicit(t *testing.T) {
 				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 				module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
 			},
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{
-					DefBase:     module.DefBase{Name: "testMIB"},
-					Description: "test",
-					Oid:         testOid("testEnterprise", 1),
-				},
-				&module.ValueAssignment{
-					DefBase: module.DefBase{Name: "testEnterprise"},
-					Oid:     testOid("enterprises", 99999),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				Description: "test",
+				Oid:         testOid("testEnterprise", 1),
+			},
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "testEnterprise"},
+				Oid:     testOid("enterprises", 99999),
+			},
+		})
 		m := resolveStrict(mod)
 		noDiag(t, m.Diagnostics(), types.DiagNodeImplicit)
 	})
@@ -561,21 +561,21 @@ func TestCheckModuleIdentityRegistration(t *testing.T) {
 			Imports: []module.Import{
 				module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
 			},
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{
-					DefBase:     module.DefBase{Name: "testMIB"},
-					Description: "test",
-					Oid: module.NewOidAssignment([]module.OidComponent{
-						&module.OidComponentNamedNumber{NameValue: "iso", NumberValue: 1},
-						&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
-						&module.OidComponentNamedNumber{NameValue: "dod", NumberValue: 6},
-						&module.OidComponentNamedNumber{NameValue: "internet", NumberValue: 1},
-						&module.OidComponentNamedNumber{NameValue: "mgmt", NumberValue: 2},
-						&module.OidComponentNumber{Value: 99},
-					}, types.Span{}),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				Description: "test",
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentNamedNumber{NameValue: "iso", NumberValue: 1},
+					&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+					&module.OidComponentNamedNumber{NameValue: "dod", NumberValue: 6},
+					&module.OidComponentNamedNumber{NameValue: "internet", NumberValue: 1},
+					&module.OidComponentNamedNumber{NameValue: "mgmt", NumberValue: 2},
+					&module.OidComponentNumber{Value: 99},
+				}, types.Span{}),
+			},
+		})
 		m := resolveStrict(mod)
 		hasDiag(t, m.Diagnostics(), types.DiagModuleIdentityReg)
 	})
@@ -588,14 +588,14 @@ func TestCheckModuleIdentityRegistration(t *testing.T) {
 				module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
 				module.NewImport("SNMPv2-SMI", "mib-2", types.Span{}),
 			},
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{
-					DefBase:     module.DefBase{Name: "testMIB"},
-					Description: "test",
-					Oid:         testOid("mib-2", 999),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				Description: "test",
+				Oid:         testOid("mib-2", 999),
+			},
+		})
 		m := resolveStrict(mod)
 		noDiag(t, m.Diagnostics(), types.DiagModuleIdentityReg)
 	})
@@ -608,14 +608,14 @@ func TestCheckModuleIdentityRegistration(t *testing.T) {
 				module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
 				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 			},
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{
-					DefBase:     module.DefBase{Name: "testMIB"},
-					Description: "test",
-					Oid:         testOid("enterprises", 12345),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ModuleIdentity{
+				DefBase:     module.DefBase{Name: "testMIB"},
+				Description: "test",
+				Oid:         testOid("enterprises", 12345),
+			},
+		})
 		m := resolveStrict(mod)
 		noDiag(t, m.Diagnostics(), types.DiagModuleIdentityReg)
 	})
@@ -737,8 +737,8 @@ func TestCheckIntegerMisuse_Integer32NoDiag(t *testing.T) {
 func TestCheckTypeUnreferenced(t *testing.T) {
 	t.Run("emits for unused local type", func(t *testing.T) {
 		mod := module.NewModule("TEST-MIB", types.Span{})
-		mod.Definitions = []module.Definition{
-			&module.TypeDef{
+		mod.TypeDefs = []*module.TypeDef{
+			{
 				DefBase: module.DefBase{Name: "UnusedType"},
 				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			},
@@ -752,16 +752,18 @@ func TestCheckTypeUnreferenced(t *testing.T) {
 
 	t.Run("skips locally referenced types", func(t *testing.T) {
 		mod := module.NewModule("TEST-MIB", types.Span{})
-		mod.Definitions = []module.Definition{
-			&module.TypeDef{
+		mod.TypeDefs = []*module.TypeDef{
+			{
 				DefBase: module.DefBase{Name: "ParentType"},
 				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			},
-			&module.TypeDef{
+			{
 				DefBase: module.DefBase{Name: "ChildType"},
 				Syntax:  &module.TypeSyntaxTypeRef{Name: "ParentType"},
 			},
-			&module.ObjectType{
+		}
+		mod.ObjectTypes = []*module.ObjectType{
+			{
 				DefBase: module.DefBase{Name: "testObject"},
 				Syntax:  &module.TypeSyntaxTypeRef{Name: "ChildType"},
 			},
@@ -775,8 +777,8 @@ func TestCheckTypeUnreferenced(t *testing.T) {
 
 	t.Run("treats imported type as referenced in source module", func(t *testing.T) {
 		source := module.NewModule("SOURCE-MIB", types.Span{})
-		source.Definitions = []module.Definition{
-			&module.TypeDef{
+		source.TypeDefs = []*module.TypeDef{
+			{
 				DefBase: module.DefBase{Name: "ExportedType"},
 				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			},
@@ -786,8 +788,8 @@ func TestCheckTypeUnreferenced(t *testing.T) {
 		user.Imports = []module.Import{
 			module.NewImport("SOURCE-MIB", "ExportedType", types.Span{}),
 		}
-		user.Definitions = []module.Definition{
-			&module.ObjectType{
+		user.ObjectTypes = []*module.ObjectType{
+			{
 				DefBase: module.DefBase{Name: "testObject"},
 				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			},
@@ -803,13 +805,11 @@ func TestCheckTypeUnreferenced(t *testing.T) {
 func TestCheckIdentifierCaseMatch(t *testing.T) {
 	t.Run("case-only collision emits diagnostic", func(t *testing.T) {
 		mod := module.NewModule("TEST-MIB", types.Span{})
-		mod.Definitions = []module.Definition{
-			&module.ValueAssignment{
-				DefBase: module.DefBase{Name: "testNode"},
-			},
-			&module.ObjectIdentity{
-				DefBase: module.DefBase{Name: "TestNode"},
-			},
+		mod.ValueAssignments = []*module.ValueAssignment{
+			{DefBase: module.DefBase{Name: "testNode"}},
+		}
+		mod.ObjectIdentities = []*module.ObjectIdentity{
+			{DefBase: module.DefBase{Name: "TestNode"}},
 		}
 
 		ctx := newTestContextForModules(VerboseConfig(), mod)
@@ -822,14 +822,16 @@ func TestCheckIdentifierCaseMatch(t *testing.T) {
 
 	t.Run("sequence row naming convention is skipped", func(t *testing.T) {
 		mod := module.NewModule("TEST-MIB", types.Span{})
-		mod.Definitions = []module.Definition{
-			&module.TypeDef{
+		mod.TypeDefs = []*module.TypeDef{
+			{
 				DefBase: module.DefBase{Name: "TestEntry"},
 				Syntax: &module.TypeSyntaxSequence{
 					Fields: []module.SequenceField{{Name: "index", Syntax: &module.TypeSyntaxTypeRef{Name: "Integer32"}}},
 				},
 			},
-			&module.ObjectType{
+		}
+		mod.ObjectTypes = []*module.ObjectType{
+			{
 				DefBase: module.DefBase{Name: "testEntry"},
 				Syntax:  &module.TypeSyntaxTypeRef{Name: "TestEntry"},
 			},

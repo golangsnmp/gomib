@@ -183,7 +183,6 @@ func (p *Parser) parseOneModule() *module.Module {
 				p.advance()
 			}
 		} else if def != nil {
-			mod.Definitions = append(mod.Definitions, def)
 			switch d := def.(type) {
 			case *module.ObjectType:
 				mod.ObjectTypes = append(mod.ObjectTypes, d)
@@ -220,18 +219,15 @@ func (p *Parser) parseOneModule() *module.Module {
 	mod.LineTable = lineTable
 
 	// Cache LAST-UPDATED for efficient access during resolution.
-	for _, def := range mod.Definitions {
-		if mi, ok := def.(*module.ModuleIdentity); ok && strings.TrimSpace(mi.LastUpdated) != "" {
-			mod.LastUpdated = mi.LastUpdated
-			break
-		}
+	if len(mod.ModuleIdentities) > 0 {
+		mod.LastUpdated = strings.TrimSpace(mod.ModuleIdentities[0].LastUpdated)
 	}
 
 	mod.Diagnostics = p.convertDiagnostics(p.collectSpanDiagnostics(lexDiagsBefore), name, lineTable)
 
 	p.Log(slog.LevelDebug, "parsing complete",
 		slog.String("module", name),
-		slog.Int("definitions", len(mod.Definitions)),
+		slog.Int("definitions", mod.DefinitionCount()),
 		slog.Int("diagnostics", p.DiagnosticCount()))
 
 	return mod

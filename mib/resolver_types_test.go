@@ -515,7 +515,7 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 
 	t.Run("links local and imported parents", func(t *testing.T) {
 		baseMod := module.NewModule("BASE-MIB", types.Span{})
-		populateTypedSlices(baseMod, []module.Definition{
+		addDefs(baseMod, []module.Definition{
 			makeTypeDef("BaseText", "INTEGER"),
 		})
 
@@ -523,7 +523,7 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 		userMod.Imports = []module.Import{
 			module.NewImport("BASE-MIB", "BaseText", types.Span{}),
 		}
-		populateTypedSlices(userMod, []module.Definition{
+		addDefs(userMod, []module.Definition{
 			makeTypeDef("MidText", "BaseText"),
 			makeTypeDef("LeafText", "MidText"),
 		})
@@ -562,7 +562,7 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 
 	t.Run("records each cycle participant as unresolved", func(t *testing.T) {
 		mod := module.NewModule("CYCLE-MIB", types.Span{})
-		populateTypedSlices(mod, []module.Definition{
+		addDefs(mod, []module.Definition{
 			makeTypeDef("TypeA", "TypeB"),
 			makeTypeDef("TypeB", "TypeA"),
 		})
@@ -694,7 +694,7 @@ func TestTryResolveTypeParent(t *testing.T) {
 func TestLinkPrimitiveSyntaxParents(t *testing.T) {
 	smiMod := module.NewModule(moduleSNMPv2SMI, types.Span{})
 	userMod := module.NewModule("USER-MIB", types.Span{})
-	populateTypedSlices(userMod, []module.Definition{
+	addDefs(userMod, []module.Definition{
 		&module.TypeDef{
 			DefBase: module.DefBase{Name: "MyOctets"},
 			Syntax:  &module.TypeSyntaxOctetString{},
@@ -739,7 +739,7 @@ func TestLinkPrimitiveSyntaxParents(t *testing.T) {
 
 	t.Run("existing parent is preserved", func(t *testing.T) {
 		mod := module.NewModule("KEEP-MIB", types.Span{})
-		populateTypedSlices(mod, []module.Definition{
+		addDefs(mod, []module.Definition{
 			&module.TypeDef{
 				DefBase: module.DefBase{Name: "AlreadyLinked"},
 				Syntax:  &module.TypeSyntaxOctetString{},
@@ -762,12 +762,12 @@ func TestLinkPrimitiveSyntaxParents(t *testing.T) {
 
 func TestLinkRFC1213TypesToTCs(t *testing.T) {
 	rfc1213 := module.NewModule("RFC1213-MIB", types.Span{})
-	populateTypedSlices(rfc1213, []module.Definition{
+	addDefs(rfc1213, []module.Definition{
 		&module.TypeDef{DefBase: module.DefBase{Name: "DisplayString"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
 		&module.TypeDef{DefBase: module.DefBase{Name: "PhysAddress"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
 	})
 	snmpv2tc := module.NewModule(moduleSNMPv2TC, types.Span{})
-	populateTypedSlices(snmpv2tc, []module.Definition{
+	addDefs(snmpv2tc, []module.Definition{
 		&module.TypeDef{DefBase: module.DefBase{Name: "DisplayString"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
 		&module.TypeDef{DefBase: module.DefBase{Name: "PhysAddress"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
 	})
@@ -832,7 +832,7 @@ func TestCreateUserTypes_Reference(t *testing.T) {
 	// Reference() populated on the resolved Type.
 	mod := module.NewModule("REF-TEST-MIB", types.Span{})
 	mod.Language = types.LanguageSMIv2
-	populateTypedSlices(mod, []module.Definition{
+	addDefs(mod, []module.Definition{
 		&module.TypeDef{
 			DefBase:             module.DefBase{Name: "MyTC"},
 			Syntax:              &module.TypeSyntaxTypeRef{Name: "DisplayString"},

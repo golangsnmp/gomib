@@ -12,7 +12,7 @@ func TestParseEmptyModule(t *testing.T) {
 	mod := parseModule("TEST-MIB DEFINITIONS ::= BEGIN END")
 
 	testutil.Equal(t, "TEST-MIB", mod.Name, "module name")
-	testutil.Len(t, mod.Definitions, 0, "body should be empty")
+	testutil.Equal(t, 0, mod.DefinitionCount(), "body should be empty")
 }
 
 func TestParseModuleWithImports(t *testing.T) {
@@ -38,9 +38,8 @@ func TestParseValueAssignment(t *testing.T) {
 		testObject OBJECT IDENTIFIER ::= { iso 3 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ValueAssignment)
-	testutil.True(t, ok, "expected ValueAssignment, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ValueAssignments, 1, "definitions count")
+	def := mod.ValueAssignments[0]
 	testutil.Equal(t, "testObject", def.Name, "definition name")
 	testutil.Len(t, def.Oid.Components, 2, "OID components count")
 }
@@ -55,9 +54,8 @@ func TestParseSimpleObjectType(t *testing.T) {
 			::= { testEntry 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.Equal(t, "testIndex", def.Name, "definition name")
 	testutil.Equal(t, types.AccessReadOnly, def.Access, "access value")
 	testutil.Equal(t, types.StatusCurrent, def.Status, "status value")
@@ -74,9 +72,8 @@ func TestParseIntegerEnum(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	enumSyntax, ok := def.Syntax.(*module.TypeSyntaxIntegerEnum)
 	testutil.True(t, ok, "expected IntegerEnum syntax, got %T", def.Syntax)
 	testutil.Len(t, enumSyntax.NamedNumbers, 3, "named numbers count")
@@ -94,9 +91,8 @@ func TestParseIntegerEnumMissingComma(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	enumSyntax, ok := def.Syntax.(*module.TypeSyntaxIntegerEnum)
 	testutil.True(t, ok, "expected IntegerEnum syntax, got %T", def.Syntax)
 	testutil.Len(t, enumSyntax.NamedNumbers, 3, "named numbers count")
@@ -169,9 +165,8 @@ func TestParseModuleIdentity(t *testing.T) {
 			::= { enterprises 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ModuleIdentity)
-	testutil.True(t, ok, "expected ModuleIdentity, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ModuleIdentities, 1, "definitions count")
+	def := mod.ModuleIdentities[0]
 	testutil.Equal(t, "testMIB", def.Name, "definition name")
 	testutil.Equal(t, "200001010000Z", def.LastUpdated, "last-updated value")
 	testutil.Equal(t, "Test Org", def.Organization, "organization value")
@@ -186,9 +181,8 @@ func TestParseTextualConvention(t *testing.T) {
 			SYNTAX OCTET STRING (SIZE (0..255))
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.TypeDef)
-	testutil.True(t, ok, "expected TypeDef, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.TypeDefs, 1, "definitions count")
+	def := mod.TypeDefs[0]
 	testutil.Equal(t, "TestString", def.Name, "definition name")
 	testutil.True(t, def.IsTextualConvention, "should be a textual convention")
 	testutil.Equal(t, "255a", def.DisplayHint, "display-hint value")
@@ -208,9 +202,8 @@ func TestParseObjectGroup(t *testing.T) {
 			::= { testConformance 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectGroup)
-	testutil.True(t, ok, "expected ObjectGroup, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectGroups, 1, "definitions count")
+	def := mod.ObjectGroups[0]
 	testutil.Equal(t, "testGroup", def.Name, "definition name")
 	testutil.Len(t, def.Objects, 2, "objects count")
 }
@@ -223,9 +216,8 @@ func TestParseTypeAssignment(t *testing.T) {
 		}
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.TypeDef)
-	testutil.True(t, ok, "expected TypeDef, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.TypeDefs, 1, "definitions count")
+	def := mod.TypeDefs[0]
 	testutil.Equal(t, "TestEntry", def.Name, "definition name")
 	testutil.False(t, def.IsTextualConvention, "should not be a textual convention")
 	seq, ok := def.Syntax.(*module.TypeSyntaxSequence)
@@ -238,13 +230,12 @@ func TestParseTaggedType(t *testing.T) {
 		MyCounter ::= [APPLICATION 1] IMPLICIT INTEGER (0..4294967295)
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.TypeDef)
-	testutil.True(t, ok, "expected TypeDef, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.TypeDefs, 1, "definitions count")
+	def := mod.TypeDefs[0]
 	testutil.Equal(t, "MyCounter", def.Name, "definition name")
 	// Tagged types are normalized to the underlying type during parsing.
 	// The underlying type should be a constrained INTEGER.
-	_, ok = def.Syntax.(*module.TypeSyntaxConstrained)
+	_, ok := def.Syntax.(*module.TypeSyntaxConstrained)
 	testutil.True(t, ok, "expected constrained underlying type, got %T", def.Syntax)
 }
 
@@ -259,9 +250,8 @@ func TestParseDefVal(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 	intVal, ok := def.DefVal.(*module.DefValInteger)
 	testutil.True(t, ok, "expected integer DEFVAL, got %T", def.DefVal)
@@ -279,9 +269,8 @@ func TestParseIndex(t *testing.T) {
 			::= { testTable 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.Len(t, def.Index, 2, "index items count")
 	testutil.False(t, def.Index[0].Implied, "first index should not be IMPLIED")
 	testutil.True(t, def.Index[1].Implied, "second index should be IMPLIED")
@@ -298,9 +287,8 @@ func TestParseIndexBareOctetString(t *testing.T) {
 			::= { testTable 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.Len(t, def.Index, 2, "OCTET STRING should be one index item, not two")
 	testutil.Equal(t, "OCTET STRING", def.Index[0].Object, "first index should be OCTET STRING")
 	testutil.Equal(t, "testOther", def.Index[1].Object, "second index should be testOther")
@@ -327,12 +315,12 @@ func TestParseErrorRecovery(t *testing.T) {
 	testutil.Greater(t, len(mod.Diagnostics), 0, "expected diagnostics from parse error")
 
 	// Should have recovered and parsed the second definition
-	testutil.Greater(t, len(mod.Definitions), 0, "expected at least one definition after recovery")
+	testutil.Greater(t, mod.DefinitionCount(), 0, "expected at least one definition after recovery")
 
 	// Verify the recovered definition is goodObject
 	var found bool
-	for _, def := range mod.Definitions {
-		if objDef, ok := def.(*module.ObjectType); ok && objDef.Name == "goodObject" {
+	for _, objDef := range mod.ObjectTypes {
+		if objDef.Name == "goodObject" {
 			found = true
 			break
 		}
@@ -383,11 +371,10 @@ func TestParseTrapType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mod := parseModule(tt.source)
-			if len(mod.Definitions) == 0 {
+			if len(mod.Notifications) == 0 {
 				t.Fatal("expected definitions in module")
 			}
-			def, ok := mod.Definitions[0].(*module.Notification)
-			testutil.True(t, ok, "expected Notification, got %T", mod.Definitions[0])
+			def := mod.Notifications[0]
 			testutil.Equal(t, tt.wantName, def.Name, "trap name")
 			testutil.NotNil(t, def.TrapInfo, "TrapInfo should be set for TRAP-TYPE")
 			testutil.Equal(t, "testEnterprise", def.TrapInfo.Enterprise, "enterprise")
@@ -436,11 +423,10 @@ func TestParseNotificationType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mod := parseModule(tt.source)
-			if len(mod.Definitions) == 0 {
+			if len(mod.Notifications) == 0 {
 				t.Fatal("expected definitions in module")
 			}
-			def, ok := mod.Definitions[0].(*module.Notification)
-			testutil.True(t, ok, "expected Notification, got %T", mod.Definitions[0])
+			def := mod.Notifications[0]
 			testutil.Equal(t, "testNotification", def.Name, "notification name")
 			testutil.Len(t, def.Objects, tt.wantObjects, "objects count")
 			testutil.Equal(t, types.StatusCurrent, def.Status, "status should be current")
@@ -459,12 +445,11 @@ func TestParseAgentCapabilities(t *testing.T) {
 			::= { testCapabilities 1 }
 		END`)
 
-	if len(mod.Definitions) == 0 {
+	if len(mod.Capabilities) == 0 {
 		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := mod.Definitions[0].(*module.AgentCapabilities)
-	testutil.True(t, ok, "expected AgentCapabilities, got %T", mod.Definitions[0])
+	def := mod.Capabilities[0]
 	testutil.Equal(t, "testAgent", def.Name, "agent capabilities name")
 	testutil.Equal(t, "Test Agent 1.0", def.ProductRelease, "product release")
 	testutil.Greater(t, len(def.Supports), 0, "should have at least one SUPPORTS clause")
@@ -479,12 +464,11 @@ func TestParseNotificationGroup(t *testing.T) {
 			::= { testConformance 2 }
 		END`)
 
-	if len(mod.Definitions) == 0 {
+	if len(mod.NotificationGroups) == 0 {
 		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := mod.Definitions[0].(*module.NotificationGroup)
-	testutil.True(t, ok, "expected NotificationGroup, got %T", mod.Definitions[0])
+	def := mod.NotificationGroups[0]
 	testutil.Equal(t, "testNotifGroup", def.Name, "notification group name")
 	testutil.Len(t, def.Notifications, 2, "notifications count")
 }
@@ -497,12 +481,11 @@ func TestParseObjectIdentity(t *testing.T) {
 			::= { testObjects 1 }
 		END`)
 
-	if len(mod.Definitions) == 0 {
+	if len(mod.ObjectIdentities) == 0 {
 		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := mod.Definitions[0].(*module.ObjectIdentity)
-	testutil.True(t, ok, "expected ObjectIdentity, got %T", mod.Definitions[0])
+	def := mod.ObjectIdentities[0]
 	testutil.Equal(t, "testIdentity", def.Name, "identity name")
 }
 
@@ -536,7 +519,7 @@ func TestParseModuleWithMultipleDefinitions(t *testing.T) {
 			SYNTAX Integer32
 		END`)
 
-	testutil.Equal(t, 3, len(mod.Definitions), "should have 3 definitions")
+	testutil.Equal(t, 3, mod.DefinitionCount(), "should have 3 definitions")
 }
 
 func TestParseSyntaxWithRange(t *testing.T) {
@@ -549,9 +532,8 @@ func TestParseSyntaxWithRange(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	constrained, ok := def.Syntax.(*module.TypeSyntaxConstrained)
 	testutil.True(t, ok, "expected constrained syntax, got %T", def.Syntax)
 	rangeConstraint, ok := constrained.Constraint.(*module.ConstraintRange)
@@ -570,9 +552,8 @@ func TestParseAugments(t *testing.T) {
 			::= { testAugTable 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.True(t, def.Augments != "", "AUGMENTS clause not parsed")
 	testutil.Equal(t, "testEntry", def.Augments, "augments target")
 }
@@ -587,9 +568,8 @@ func TestParseBitsSyntax(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	bits, ok := def.Syntax.(*module.TypeSyntaxBits)
 	testutil.True(t, ok, "expected TypeSyntaxBits, got %T", def.Syntax)
 	testutil.Len(t, bits.NamedBits, 3, "named bits count")
@@ -638,7 +618,7 @@ func TestParseBitsNegativePosition(t *testing.T) {
 		END`)
 
 	testutil.Equal(t, 1, countDiagnostics(mod.Diagnostics, types.DiagBitsNumberNegative), "bits-number-negative diagnostic")
-	def := mod.Definitions[0].(*module.ObjectType)
+	def := mod.ObjectTypes[0]
 	bits := def.Syntax.(*module.TypeSyntaxBits)
 	testutil.Equal(t, uint32(0), bits.NamedBits[0].Position, "negative position should be clamped to 0")
 }
@@ -654,7 +634,7 @@ func TestParseBitsLargePosition(t *testing.T) {
 		END`, types.VerboseConfig())
 
 	testutil.Equal(t, 1, countDiagnostics(mod.Diagnostics, types.DiagBitsNumberLarge), "bits-number-large diagnostic")
-	def := mod.Definitions[0].(*module.ObjectType)
+	def := mod.ObjectTypes[0]
 	bits := def.Syntax.(*module.TypeSyntaxBits)
 	testutil.Equal(t, uint32(128), bits.NamedBits[0].Position, "large position should be preserved")
 }
@@ -670,7 +650,7 @@ func TestParseBitsTooLargePosition(t *testing.T) {
 		END`)
 
 	testutil.Equal(t, 1, countDiagnostics(mod.Diagnostics, types.DiagBitsNumberTooLarge), "bits-number-too-large diagnostic")
-	def := mod.Definitions[0].(*module.ObjectType)
+	def := mod.ObjectTypes[0]
 	bits := def.Syntax.(*module.TypeSyntaxBits)
 	testutil.Equal(t, uint32(0), bits.NamedBits[0].Position, "too-large position should be clamped to 0")
 }
@@ -686,9 +666,8 @@ func TestParseDefValString(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 	strVal, ok := def.DefVal.(*module.DefValString)
 	testutil.True(t, ok, "expected string DEFVAL, got %T", def.DefVal)
@@ -706,9 +685,8 @@ func TestParseDefValHex(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 	hexVal, ok := def.DefVal.(*module.DefValHexString)
 	testutil.True(t, ok, "expected DefValHexString, got %T", def.DefVal)
@@ -726,9 +704,8 @@ func TestParseDefValBits(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
 	bitsVal, ok := def.DefVal.(*module.DefValBits)
 	testutil.True(t, ok, "expected DefValBits, got %T", def.DefVal)
@@ -747,10 +724,9 @@ func TestParseSequenceOf(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
-	_, ok = def.Syntax.(*module.TypeSyntaxSequenceOf)
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
+	_, ok := def.Syntax.(*module.TypeSyntaxSequenceOf)
 	testutil.True(t, ok, "expected TypeSyntaxSequenceOf, got %T", def.Syntax)
 }
 
@@ -765,12 +741,11 @@ func TestParseSMIv1ObjectType(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	if len(mod.Definitions) == 0 {
+	if len(mod.ObjectTypes) == 0 {
 		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	def := mod.ObjectTypes[0]
 	testutil.Equal(t, "testSMIv1", def.Name, "SMIv1 object name")
 	testutil.Equal(t, types.AccessReadOnly, def.Access, "SMIv1 access")
 	testutil.Equal(t, types.StatusMandatory, def.Status, "SMIv1 mandatory status")
@@ -843,12 +818,11 @@ func TestParseVariationDescriptionOnly(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	if len(mod.Definitions) == 0 {
+	if len(mod.Capabilities) == 0 {
 		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := mod.Definitions[0].(*module.AgentCapabilities)
-	testutil.True(t, ok, "expected AgentCapabilities, got %T", mod.Definitions[0])
+	def := mod.Capabilities[0]
 	if len(def.Supports) == 0 {
 		t.Fatal("expected SUPPORTS clause")
 	}
@@ -878,12 +852,11 @@ func TestParseVariationWithSyntax(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	if len(mod.Definitions) == 0 {
+	if len(mod.Capabilities) == 0 {
 		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := mod.Definitions[0].(*module.AgentCapabilities)
-	testutil.True(t, ok, "expected AgentCapabilities, got %T", mod.Definitions[0])
+	def := mod.Capabilities[0]
 	if len(def.Supports) == 0 || len(def.Supports[0].Variations) == 0 {
 		t.Fatal("expected SUPPORTS with VARIATION")
 	}
@@ -910,8 +883,8 @@ func TestRecoverToUppercaseObjectType(t *testing.T) {
 
 	// Should recover and parse FooCount despite the uppercase identifier
 	var found bool
-	for _, def := range mod.Definitions {
-		if ot, ok := def.(*module.ObjectType); ok && ot.Name == "FooCount" {
+	for _, ot := range mod.ObjectTypes {
+		if ot.Name == "FooCount" {
 			found = true
 			break
 		}
@@ -930,9 +903,8 @@ func TestParseTextualConventionWithAssignment(t *testing.T) {
 			SYNTAX OCTET STRING (SIZE (0..255))
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.TypeDef)
-	testutil.True(t, ok, "expected TypeDef, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.TypeDefs, 1, "definitions count")
+	def := mod.TypeDefs[0]
 	testutil.Equal(t, "TestDisplay", def.Name, "TC name")
 	testutil.True(t, def.IsTextualConvention, "should be a textual convention")
 	testutil.Equal(t, "255a", def.DisplayHint, "display hint value")
@@ -952,7 +924,7 @@ func TestParseMacroDefinition(t *testing.T) {
 
 	// MACRO definitions are now skipped (not semantic definitions),
 	// so the module should have no definitions.
-	testutil.Len(t, mod.Definitions, 0, "definitions count (macros are skipped)")
+	testutil.Equal(t, 0, mod.DefinitionCount(), "definitions count (macros are skipped)")
 }
 
 func TestParseMacroFollowedByDefinition(t *testing.T) {
@@ -968,10 +940,9 @@ func TestParseMacroFollowedByDefinition(t *testing.T) {
 		END`)
 
 	// MACRO is skipped, only the value assignment remains.
-	testutil.Len(t, mod.Definitions, 1, "definitions count (macro skipped)")
+	testutil.Len(t, mod.ValueAssignments, 1, "definitions count (macro skipped)")
 
-	valAssign, ok := mod.Definitions[0].(*module.ValueAssignment)
-	testutil.True(t, ok, "expected ValueAssignment, got %T", mod.Definitions[0])
+	valAssign := mod.ValueAssignments[0]
 	testutil.Equal(t, "testObject", valAssign.Name, "definition after macro")
 }
 
@@ -988,7 +959,7 @@ func TestParseMultipleMacros(t *testing.T) {
 		END`)
 
 	// Both macros are skipped.
-	testutil.Len(t, mod.Definitions, 0, "definitions count (macros are skipped)")
+	testutil.Equal(t, 0, mod.DefinitionCount(), "definitions count (macros are skipped)")
 }
 
 func TestParseMacroMissingEnd(t *testing.T) {
@@ -1016,11 +987,10 @@ func TestParseDefValSkipBraced(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
-	_, ok = def.DefVal.(*module.DefValUnparsed)
+	_, ok := def.DefVal.(*module.DefValUnparsed)
 	testutil.True(t, ok, "expected DefValUnparsed, got %T", def.DefVal)
 }
 
@@ -1036,11 +1006,10 @@ func TestParseDefValSkipBracedNested(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
-	_, ok = def.DefVal.(*module.DefValUnparsed)
+	_, ok := def.DefVal.(*module.DefValUnparsed)
 	testutil.True(t, ok, "expected DefValUnparsed, got %T", def.DefVal)
 }
 
@@ -1063,9 +1032,8 @@ func TestParseDefValSkipBracedRecovery(t *testing.T) {
 			::= { test 2 }
 		END`)
 
-	testutil.Equal(t, 2, len(mod.Definitions), "both definitions should be parsed")
-	second, ok := mod.Definitions[1].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[1])
+	testutil.Equal(t, 2, len(mod.ObjectTypes), "both definitions should be parsed")
+	second := mod.ObjectTypes[1]
 	testutil.Equal(t, "testGood", second.Name, "second definition name")
 }
 
@@ -1081,11 +1049,10 @@ func TestParseDefValSkipUnknown(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
-	_, ok = def.DefVal.(*module.DefValUnparsed)
+	_, ok := def.DefVal.(*module.DefValUnparsed)
 	testutil.True(t, ok, "expected DefValUnparsed, got %T", def.DefVal)
 }
 
@@ -1102,11 +1069,10 @@ func TestParseDefValSkipUnknownWithBraces(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 	testutil.NotNil(t, def.DefVal, "DEFVAL should be set")
-	_, ok = def.DefVal.(*module.DefValUnparsed)
+	_, ok := def.DefVal.(*module.DefValUnparsed)
 	testutil.True(t, ok, "expected DefValUnparsed, got %T", def.DefVal)
 }
 
@@ -1129,9 +1095,8 @@ func TestParseDefValSkipUnknownRecovery(t *testing.T) {
 			::= { test 2 }
 		END`)
 
-	testutil.Equal(t, 2, len(mod.Definitions), "both definitions should be parsed")
-	second, ok := mod.Definitions[1].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[1])
+	testutil.Equal(t, 2, len(mod.ObjectTypes), "both definitions should be parsed")
+	second := mod.ObjectTypes[1]
 	testutil.Equal(t, "testGood", second.Name, "second definition name")
 }
 

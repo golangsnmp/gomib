@@ -15,9 +15,8 @@ func TestParseChoiceTypeAssignment(t *testing.T) {
 		}
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.TypeDef)
-	testutil.True(t, ok, "expected TypeDef, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.TypeDefs, 1, "definitions count")
+	def := mod.TypeDefs[0]
 	testutil.Equal(t, "TestChoice", def.Name, "type name")
 
 	// CHOICE is normalized to the first alternative during parsing.
@@ -35,9 +34,8 @@ func TestParseChoiceWithBuiltinTypes(t *testing.T) {
 		}
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.TypeDef)
-	testutil.True(t, ok, "expected TypeDef, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.TypeDefs, 1, "definitions count")
+	def := mod.TypeDefs[0]
 
 	// CHOICE normalized to first alternative: INTEGER -> TypeSyntaxTypeRef
 	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)
@@ -52,9 +50,8 @@ func TestParseChoiceSingleAlternative(t *testing.T) {
 		}
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.TypeDef)
-	testutil.True(t, ok, "expected TypeDef, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.TypeDefs, 1, "definitions count")
+	def := mod.TypeDefs[0]
 
 	// Single alternative normalized to its type.
 	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)
@@ -72,8 +69,8 @@ func TestParseChoiceAlternativeSyntax(t *testing.T) {
 		}
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def := mod.Definitions[0].(*module.TypeDef)
+	testutil.Len(t, mod.TypeDefs, 1, "definitions count")
+	def := mod.TypeDefs[0]
 
 	// CHOICE is normalized to the first alternative (INTEGER).
 	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)
@@ -91,8 +88,8 @@ func TestParseChoiceWithNamedNumbers(t *testing.T) {
 		}
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def := mod.Definitions[0].(*module.TypeDef)
+	testutil.Len(t, mod.TypeDefs, 1, "definitions count")
+	def := mod.TypeDefs[0]
 
 	// First alternative is an INTEGER enum.
 	intEnum, ok := def.Syntax.(*module.TypeSyntaxIntegerEnum)
@@ -114,8 +111,8 @@ func TestParseChoiceNested(t *testing.T) {
 		}
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def := mod.Definitions[0].(*module.TypeDef)
+	testutil.Len(t, mod.TypeDefs, 1, "definitions count")
+	def := mod.TypeDefs[0]
 
 	// Outer CHOICE -> first alternative's syntax = inner CHOICE -> first alternative = INTEGER
 	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)
@@ -136,9 +133,8 @@ func TestParseChoiceInObjectTypeSyntax(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, mod.Definitions, 1, "definitions count")
-	def, ok := mod.Definitions[0].(*module.ObjectType)
-	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
+	testutil.Len(t, mod.ObjectTypes, 1, "definitions count")
+	def := mod.ObjectTypes[0]
 
 	// CHOICE normalized to first alternative (INTEGER).
 	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)

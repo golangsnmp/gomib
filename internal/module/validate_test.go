@@ -21,10 +21,9 @@ func validateAndFindDiagnostic(t *testing.T, mod *Module, config types.Diagnosti
 	return nil
 }
 
-// addDefs adds definitions to a module, populating both Definitions and typed slices.
+// addDefs adds definitions to a module, populating the appropriate typed slices.
 func addDefs(mod *Module, defs ...Definition) {
 	for _, def := range defs {
-		mod.Definitions = append(mod.Definitions, def)
 		switch d := def.(type) {
 		case *ModuleIdentity:
 			mod.ModuleIdentities = append(mod.ModuleIdentities, d)

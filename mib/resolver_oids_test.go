@@ -62,7 +62,7 @@ func TestCollectOidDefinitions(t *testing.T) {
 		&module.OidComponentNumber{Value: 99},
 	}, types.Synthetic)
 
-	populateTypedSlices(mod, []module.Definition{
+	addDefs(mod, []module.Definition{
 		&module.ObjectType{DefBase: module.DefBase{Name: "myObject"}, Oid: oid},
 		&module.ModuleIdentity{DefBase: module.DefBase{Name: "myModId"}, Oid: oid},
 		&module.ObjectIdentity{DefBase: module.DefBase{Name: "myObjId"}, Oid: oid},
@@ -151,15 +151,15 @@ func TestGetOidParentSymbol(t *testing.T) {
 	t.Run("OidComponentName local def", func(t *testing.T) {
 		localMod := &module.Module{
 			Name: "LOCAL-MIB",
-			Definitions: []module.Definition{
-				&module.ValueAssignment{
-					DefBase: module.DefBase{Name: "enterprises"},
-					Oid: module.NewOidAssignment([]module.OidComponent{
-						&module.OidComponentNumber{Value: 1},
-					}, types.Synthetic),
-				},
-			},
 		}
+		addDefs(localMod, []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "enterprises"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentNumber{Value: 1},
+				}, types.Synthetic),
+			},
+		})
 		localCtx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 		setTestModules(localCtx, []*module.Module{localMod})
 		def := oidDefinition{
@@ -182,15 +182,15 @@ func TestGetOidParentSymbol(t *testing.T) {
 	t.Run("OidComponentNamedNumber with known name", func(t *testing.T) {
 		localMod := &module.Module{
 			Name: "LOCAL-MIB",
-			Definitions: []module.Definition{
-				&module.ValueAssignment{
-					DefBase: module.DefBase{Name: "org"},
-					Oid: module.NewOidAssignment([]module.OidComponent{
-						&module.OidComponentNumber{Value: 3},
-					}, types.Synthetic),
-				},
-			},
 		}
+		addDefs(localMod, []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "org"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentNumber{Value: 3},
+				}, types.Synthetic),
+			},
+		})
 		localCtx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 		setTestModules(localCtx, []*module.Module{localMod})
 		def := oidDefinition{
@@ -498,17 +498,17 @@ func TestShouldPreferModule(t *testing.T) {
 		newSrc := &module.Module{
 			Name:     "NEW-MIB",
 			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{DefBase: module.DefBase{Name: "newMIB"}, LastUpdated: "200501010000Z"},
-			},
 		}
+		addDefs(newSrc, []module.Definition{
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "newMIB"}, LastUpdated: "200501010000Z"},
+		})
 		oldSrc := &module.Module{
 			Name:     "OLD-MIB",
 			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{DefBase: module.DefBase{Name: "oldMIB"}, LastUpdated: "200001010000Z"},
-			},
 		}
+		addDefs(oldSrc, []module.Definition{
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "oldMIB"}, LastUpdated: "200001010000Z"},
+		})
 		newMod := newModule("NEW-MIB")
 		oldMod := newModule("OLD-MIB")
 
@@ -523,17 +523,17 @@ func TestShouldPreferModule(t *testing.T) {
 		newSrc := &module.Module{
 			Name:     "OLD-MIB",
 			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{DefBase: module.DefBase{Name: "oldMIB"}, LastUpdated: "199901010000Z"},
-			},
 		}
+		addDefs(newSrc, []module.Definition{
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "oldMIB"}, LastUpdated: "199901010000Z"},
+		})
 		oldSrc := &module.Module{
 			Name:     "NEW-MIB",
 			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{DefBase: module.DefBase{Name: "newMIB"}, LastUpdated: "200501010000Z"},
-			},
 		}
+		addDefs(oldSrc, []module.Definition{
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "newMIB"}, LastUpdated: "200501010000Z"},
+		})
 		newMod := newModule("OLD-MIB")
 		oldMod := newModule("NEW-MIB")
 
@@ -565,10 +565,10 @@ func TestShouldPreferModule(t *testing.T) {
 		vendorSrc := &module.Module{
 			Name:     "VENDOR-MIB",
 			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{DefBase: module.DefBase{Name: "vendorMIB"}, LastUpdated: "202501010000Z"},
-			},
 		}
+		addDefs(vendorSrc, []module.Definition{
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "vendorMIB"}, LastUpdated: "202501010000Z"},
+		})
 		baseMod := newModule("RFC1155-SMI")
 		vendorMod := newModule("VENDOR-MIB")
 
@@ -587,17 +587,17 @@ func TestShouldPreferModule(t *testing.T) {
 		aSrc := &module.Module{
 			Name:     "ALPHA-MIB",
 			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{DefBase: module.DefBase{Name: "alphaMIB"}, LastUpdated: "200501010000Z"},
-			},
 		}
+		addDefs(aSrc, []module.Definition{
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "alphaMIB"}, LastUpdated: "200501010000Z"},
+		})
 		bSrc := &module.Module{
 			Name:     "BRAVO-MIB",
 			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ModuleIdentity{DefBase: module.DefBase{Name: "bravoMIB"}, LastUpdated: "200501010000Z"},
-			},
 		}
+		addDefs(bSrc, []module.Definition{
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "bravoMIB"}, LastUpdated: "200501010000Z"},
+		})
 		aMod := newModule("ALPHA-MIB")
 		bMod := newModule("BRAVO-MIB")
 
@@ -834,7 +834,7 @@ func TestCollectOidDefinitionsKindMapping(t *testing.T) {
 		&module.OidComponentNumber{Value: 1},
 	}, types.Synthetic)
 
-	populateTypedSlices(mod, []module.Definition{
+	addDefs(mod, []module.Definition{
 		&module.ObjectType{DefBase: module.DefBase{Name: "obj"}, Oid: oid},
 		&module.ModuleIdentity{DefBase: module.DefBase{Name: "modId"}, Oid: oid},
 		&module.ObjectIdentity{DefBase: module.DefBase{Name: "objId"}, Oid: oid},
@@ -879,35 +879,35 @@ func TestResolveOids(t *testing.T) {
 		parentMod := &module.Module{
 			Name:     "PARENT-MIB",
 			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ValueAssignment{
-					DefBase: module.DefBase{Name: "parentRoot"},
-					Oid: module.NewOidAssignment([]module.OidComponent{
-						&module.OidComponentName{NameValue: "iso"},
-						&module.OidComponentNumber{Value: 3},
-						&module.OidComponentNumber{Value: 6},
-						&module.OidComponentNumber{Value: 1},
-						&module.OidComponentNumber{Value: 4},
-						&module.OidComponentNumber{Value: 1},
-						&module.OidComponentNumber{Value: 55555},
-					}, types.Span{}),
-				},
-			},
 		}
+		addDefs(parentMod, []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "parentRoot"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "iso"},
+					&module.OidComponentNumber{Value: 3},
+					&module.OidComponentNumber{Value: 6},
+					&module.OidComponentNumber{Value: 1},
+					&module.OidComponentNumber{Value: 4},
+					&module.OidComponentNumber{Value: 1},
+					&module.OidComponentNumber{Value: 55555},
+				}, types.Span{}),
+			},
+		})
 
 		childMod := &module.Module{
 			Name:     "CHILD-MIB",
 			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ValueAssignment{
-					DefBase: module.DefBase{Name: "childNode"},
-					Oid: module.NewOidAssignment([]module.OidComponent{
-						&module.OidComponentQualifiedName{ModuleValue: "PARENT-MIB", NameValue: "parentRoot"},
-						&module.OidComponentNumber{Value: 7},
-					}, types.Span{}),
-				},
-			},
 		}
+		addDefs(childMod, []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "childNode"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentQualifiedName{ModuleValue: "PARENT-MIB", NameValue: "parentRoot"},
+					&module.OidComponentNumber{Value: 7},
+				}, types.Span{}),
+			},
+		})
 
 		ctx := newTestContextForModules(VerboseConfig(), parentMod, childMod)
 
@@ -927,25 +927,25 @@ func TestResolveOids(t *testing.T) {
 		mod := &module.Module{
 			Name:     "TRAP-MIB",
 			Language: types.LanguageSMIv1,
-			Definitions: []module.Definition{
-				&module.ValueAssignment{
-					DefBase: module.DefBase{Name: "vendorEnterprise"},
-					Oid: module.NewOidAssignment([]module.OidComponent{
-						&module.OidComponentName{NameValue: "iso"},
-						&module.OidComponentNumber{Value: 3},
-						&module.OidComponentNumber{Value: 6},
-						&module.OidComponentNumber{Value: 1},
-						&module.OidComponentNumber{Value: 4},
-						&module.OidComponentNumber{Value: 1},
-						&module.OidComponentNumber{Value: 424242},
-					}, types.Span{}),
-				},
-				&module.Notification{
-					DefBase:  module.DefBase{Name: "vendorTrap"},
-					TrapInfo: &module.TrapInfo{Enterprise: "vendorEnterprise", TrapNumber: 11},
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "vendorEnterprise"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "iso"},
+					&module.OidComponentNumber{Value: 3},
+					&module.OidComponentNumber{Value: 6},
+					&module.OidComponentNumber{Value: 1},
+					&module.OidComponentNumber{Value: 4},
+					&module.OidComponentNumber{Value: 1},
+					&module.OidComponentNumber{Value: 424242},
+				}, types.Span{}),
+			},
+			&module.Notification{
+				DefBase:  module.DefBase{Name: "vendorTrap"},
+				TrapInfo: &module.TrapInfo{Enterprise: "vendorEnterprise", TrapNumber: 11},
+			},
+		})
 
 		ctx := newTestContextForModules(VerboseConfig(), mod)
 
@@ -966,23 +966,23 @@ func TestResolveOids(t *testing.T) {
 		mod := &module.Module{
 			Name:     "CYCLE-MIB",
 			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ValueAssignment{
-					DefBase: module.DefBase{Name: "nodeA"},
-					Oid: module.NewOidAssignment([]module.OidComponent{
-						&module.OidComponentName{NameValue: "nodeB"},
-						&module.OidComponentNumber{Value: 1},
-					}, types.Span{}),
-				},
-				&module.ValueAssignment{
-					DefBase: module.DefBase{Name: "nodeB"},
-					Oid: module.NewOidAssignment([]module.OidComponent{
-						&module.OidComponentName{NameValue: "nodeA"},
-						&module.OidComponentNumber{Value: 2},
-					}, types.Span{}),
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "nodeA"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "nodeB"},
+					&module.OidComponentNumber{Value: 1},
+				}, types.Span{}),
+			},
+			&module.ValueAssignment{
+				DefBase: module.DefBase{Name: "nodeB"},
+				Oid: module.NewOidAssignment([]module.OidComponent{
+					&module.OidComponentName{NameValue: "nodeA"},
+					&module.OidComponentNumber{Value: 2},
+				}, types.Span{}),
+			},
+		})
 
 		ctx := newTestContextForModules(VerboseConfig(), mod)
 
@@ -1671,23 +1671,23 @@ func TestOidReuse_DifferentValueAssignments(t *testing.T) {
 		Imports: []module.Import{
 			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 		},
-		Definitions: []module.Definition{
-			&module.ValueAssignment{
-				DefBase: module.DefBase{Name: "firstNode"},
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "enterprises"},
-					&module.OidComponentNumber{Value: 99999},
-				}, types.Span{}),
-			},
-			&module.ValueAssignment{
-				DefBase: module.DefBase{Name: "secondNode"},
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "enterprises"},
-					&module.OidComponentNumber{Value: 99999},
-				}, types.Span{}),
-			},
-		},
 	}
+	addDefs(mod, []module.Definition{
+		&module.ValueAssignment{
+			DefBase: module.DefBase{Name: "firstNode"},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "enterprises"},
+				&module.OidComponentNumber{Value: 99999},
+			}, types.Span{}),
+		},
+		&module.ValueAssignment{
+			DefBase: module.DefBase{Name: "secondNode"},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "enterprises"},
+				&module.OidComponentNumber{Value: 99999},
+			}, types.Span{}),
+		},
+	})
 
 	m := resolveStrict(mod)
 	hasDiag(t, m.Diagnostics(), types.DiagOidReuse)
@@ -1705,7 +1705,7 @@ func TestOidRegistered_DifferentObjectTypes(t *testing.T) {
 			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
 		},
 	}
-	populateTypedSlices(mod, []module.Definition{
+	addDefs(mod, []module.Definition{
 		&module.ValueAssignment{
 			DefBase: module.DefBase{Name: "testRoot"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
@@ -1746,32 +1746,32 @@ func TestOidReuse_SameNameNoDiagnostic(t *testing.T) {
 		Imports: []module.Import{
 			module.NewImport("RFC1155-SMI", "enterprises", types.Span{}),
 		},
-		Definitions: []module.Definition{
-			&module.ValueAssignment{
-				DefBase: module.DefBase{Name: "testNode"},
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "enterprises"},
-					&module.OidComponentNumber{Value: 99999},
-				}, types.Span{}),
-			},
-		},
 	}
+	addDefs(mod1, []module.Definition{
+		&module.ValueAssignment{
+			DefBase: module.DefBase{Name: "testNode"},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "enterprises"},
+				&module.OidComponentNumber{Value: 99999},
+			}, types.Span{}),
+		},
+	})
 	mod2 := &module.Module{
 		Name:     "TEST-MIB-V2",
 		Language: types.LanguageSMIv2,
 		Imports: []module.Import{
 			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 		},
-		Definitions: []module.Definition{
-			&module.ValueAssignment{
-				DefBase: module.DefBase{Name: "testNode"},
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "enterprises"},
-					&module.OidComponentNumber{Value: 99999},
-				}, types.Span{}),
-			},
-		},
 	}
+	addDefs(mod2, []module.Definition{
+		&module.ValueAssignment{
+			DefBase: module.DefBase{Name: "testNode"},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "enterprises"},
+				&module.OidComponentNumber{Value: 99999},
+			}, types.Span{}),
+		},
+	})
 
 	m := resolveStrict(mod1, mod2)
 	noDiag(t, m.Diagnostics(), types.DiagOidReuse, types.DiagOidRegistered)
@@ -1794,7 +1794,7 @@ func TestResolveOidsCycleDetection(t *testing.T) {
 			&module.OidComponentName{NameValue: "nodeA"},
 			&module.OidComponentNumber{Value: 2},
 		}, types.Span{})
-		populateTypedSlices(mod, []module.Definition{
+		addDefs(mod, []module.Definition{
 			&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeA"}, Oid: oidA},
 			&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeB"}, Oid: oidB},
 		})
@@ -1818,7 +1818,7 @@ func TestResolveOidsCycleDetection(t *testing.T) {
 			&module.OidComponentName{NameValue: "selfNode"},
 			&module.OidComponentNumber{Value: 1},
 		}, types.Span{})
-		populateTypedSlices(mod, []module.Definition{
+		addDefs(mod, []module.Definition{
 			&module.ValueAssignment{DefBase: module.DefBase{Name: "selfNode"}, Oid: oid},
 		})
 
@@ -1847,8 +1847,8 @@ func TestLastSubidZero(t *testing.T) {
 			&module.OidComponentNumber{Value: 0},
 		}, types.Span{})
 
-		mod.Definitions = []module.Definition{
-			&module.ObjectType{DefBase: module.DefBase{Name: "badObj"}, Oid: oid},
+		mod.ObjectTypes = []*module.ObjectType{
+			{DefBase: module.DefBase{Name: "badObj"}, Oid: oid},
 		}
 
 		m := resolveStrict(mod)
@@ -1872,8 +1872,8 @@ func TestLastSubidZero(t *testing.T) {
 			&module.OidComponentNumber{Value: 0},
 		}, types.Span{})
 
-		mod.Definitions = []module.Definition{
-			&module.ValueAssignment{DefBase: module.DefBase{Name: "okNode"}, Oid: oid},
+		mod.ValueAssignments = []*module.ValueAssignment{
+			{DefBase: module.DefBase{Name: "okNode"}, Oid: oid},
 		}
 
 		m := resolveStrict(mod)
@@ -1895,8 +1895,8 @@ func TestLastSubidZero(t *testing.T) {
 			&module.OidComponentNumber{Value: 1},
 		}, types.Span{})
 
-		mod.Definitions = []module.Definition{
-			&module.ObjectType{DefBase: module.DefBase{Name: "goodObj"}, Oid: oid},
+		mod.ObjectTypes = []*module.ObjectType{
+			{DefBase: module.DefBase{Name: "goodObj"}, Oid: oid},
 		}
 
 		m := resolveStrict(mod)

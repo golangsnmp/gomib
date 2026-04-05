@@ -28,38 +28,6 @@ func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 	ctx.modules = slices.Concat(baseModules, userModules)
 
 	for _, mod := range ctx.modules {
-		// If Definitions is populated but typed slices are empty, backfill the
-		// typed slices. This handles modules constructed via struct literals
-		// without using AddDefinition. Base modules are always built correctly.
-		if !module.IsBaseModule(mod.Name) && len(mod.Definitions) > 0 && mod.DefinitionCount() == 0 {
-			for _, def := range mod.Definitions {
-				switch d := def.(type) {
-				case *module.ObjectType:
-					mod.ObjectTypes = append(mod.ObjectTypes, d)
-				case *module.TypeDef:
-					mod.TypeDefs = append(mod.TypeDefs, d)
-				case *module.Notification:
-					mod.Notifications = append(mod.Notifications, d)
-				case *module.ModuleIdentity:
-					mod.ModuleIdentities = append(mod.ModuleIdentities, d)
-				case *module.ObjectIdentity:
-					mod.ObjectIdentities = append(mod.ObjectIdentities, d)
-				case *module.ValueAssignment:
-					mod.ValueAssignments = append(mod.ValueAssignments, d)
-				case *module.ObjectGroup:
-					mod.ObjectGroups = append(mod.ObjectGroups, d)
-				case *module.NotificationGroup:
-					mod.NotificationGroups = append(mod.NotificationGroups, d)
-				case *module.ModuleCompliance:
-					mod.Compliances = append(mod.Compliances, d)
-				case *module.AgentCapabilities:
-					mod.Capabilities = append(mod.Capabilities, d)
-				}
-			}
-		}
-	}
-
-	for _, mod := range ctx.modules {
 		resolved := newModule(mod.Name)
 		resolved.setLineTable(mod.LineTable)
 		resolved.setSourcePath(mod.SourcePath)

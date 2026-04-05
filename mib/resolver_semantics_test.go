@@ -1096,26 +1096,26 @@ func TestExtractOidRefs(t *testing.T) {
 func TestIsSequenceTypeDef(t *testing.T) {
 	imported := &module.Module{
 		Name: "IMPORTED-MIB",
-		Definitions: []module.Definition{
-			&module.TypeDef{
-				DefBase: module.DefBase{Name: "ImportedEntry"},
-				Syntax:  &module.TypeSyntaxSequence{},
-			},
-			&module.TypeDef{
-				DefBase: module.DefBase{Name: "ImportedText"},
-				Syntax:  &module.TypeSyntaxOctetString{},
-			},
-		},
 	}
+	addDefs(imported, []module.Definition{
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "ImportedEntry"},
+			Syntax:  &module.TypeSyntaxSequence{},
+		},
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "ImportedText"},
+			Syntax:  &module.TypeSyntaxOctetString{},
+		},
+	})
 	local := &module.Module{
 		Name: "LOCAL-MIB",
-		Definitions: []module.Definition{
-			&module.TypeDef{
-				DefBase: module.DefBase{Name: "LocalEntry"},
-				Syntax:  &module.TypeSyntaxSequence{},
-			},
-		},
 	}
+	addDefs(local, []module.Definition{
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "LocalEntry"},
+			Syntax:  &module.TypeSyntaxSequence{},
+		},
+	})
 
 	ctx := newTestContextForModules(DefaultConfig(), local, imported)
 	ctx.importSources[local] = map[string]*module.Module{
@@ -1187,50 +1187,50 @@ func TestResolveSyntaxConstraints(t *testing.T) {
 func TestCreateResolvedObjects(t *testing.T) {
 	mod := &module.Module{
 		Name: "TEST-MIB",
-		Definitions: []module.Definition{
-			&module.TypeDef{
-				DefBase: module.DefBase{Name: "IfEntry"},
-				Syntax:  &module.TypeSyntaxSequence{},
-			},
-			&module.ObjectType{
-				DefBase:     module.DefBase{Name: "sysName"},
-				Syntax:      &module.TypeSyntaxTypeRef{Name: "DisplayString"},
-				Access:      types.AccessReadOnly,
-				Status:      types.StatusCurrent,
-				Description: "system name",
-				Reference:   "RFC1213",
-				Units:       "chars",
-				DefVal:      &module.DefValString{Value: "public"},
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "testRoot"},
-					&module.OidComponentNumber{Value: 1},
-				}, types.Span{}),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "ifIndex"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-				Access:  types.AccessNotAccessible,
-				Status:  types.StatusCurrent,
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "ifEntry"},
-					&module.OidComponentNumber{Value: 1},
-				}, types.Span{}),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "ifEntry"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "IfEntry"},
-				Access:  types.AccessNotAccessible,
-				Status:  types.StatusCurrent,
-				Index: []module.IndexItem{
-					{Object: "ifIndex"},
-				},
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "testRoot"},
-					&module.OidComponentNumber{Value: 2},
-				}, types.Span{}),
-			},
-		},
 	}
+	addDefs(mod, []module.Definition{
+		&module.TypeDef{
+			DefBase: module.DefBase{Name: "IfEntry"},
+			Syntax:  &module.TypeSyntaxSequence{},
+		},
+		&module.ObjectType{
+			DefBase:     module.DefBase{Name: "sysName"},
+			Syntax:      &module.TypeSyntaxTypeRef{Name: "DisplayString"},
+			Access:      types.AccessReadOnly,
+			Status:      types.StatusCurrent,
+			Description: "system name",
+			Reference:   "RFC1213",
+			Units:       "chars",
+			DefVal:      &module.DefValString{Value: "public"},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "testRoot"},
+				&module.OidComponentNumber{Value: 1},
+			}, types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "ifIndex"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Access:  types.AccessNotAccessible,
+			Status:  types.StatusCurrent,
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "ifEntry"},
+				&module.OidComponentNumber{Value: 1},
+			}, types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "ifEntry"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "IfEntry"},
+			Access:  types.AccessNotAccessible,
+			Status:  types.StatusCurrent,
+			Index: []module.IndexItem{
+				{Object: "ifIndex"},
+			},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "testRoot"},
+				&module.OidComponentNumber{Value: 2},
+			}, types.Span{}),
+		},
+	})
 
 	ctx := newTestContextForModules(DefaultConfig(), mod)
 
@@ -1290,41 +1290,41 @@ func TestCreateResolvedObjects(t *testing.T) {
 func TestCreateResolvedCapabilities(t *testing.T) {
 	defMod := &module.Module{
 		Name: "CAP-MIB",
-		Definitions: []module.Definition{
-			&module.AgentCapabilities{
-				DefBase:        module.DefBase{Name: "testAgent"},
-				ProductRelease: "1.0",
-				Status:         types.StatusCurrent,
-				Description:    "capability description",
-				Reference:      "RFC2580",
-				Supports: []module.SupportsModule{
-					{
-						ModuleName: "IF-MIB",
-						Includes:   []string{"ifGeneralGroup"},
-						Variations: []module.Variation{
-							{
-								Name:             "ifAdminStatus",
-								Syntax:           &module.TypeSyntaxTypeRef{Name: "DisplayString"},
-								Access:           func() *types.Access { v := types.AccessReadOnly; return &v }(),
-								CreationRequires: []string{"ifIndex"},
-								DefVal:           &module.DefValString{Value: "up"},
-								Description:      "object variation",
-							},
-							{
-								Name:        "linkDown",
-								Access:      func() *types.Access { v := types.AccessReadOnly; return &v }(),
-								Description: "notification variation",
-							},
+	}
+	addDefs(defMod, []module.Definition{
+		&module.AgentCapabilities{
+			DefBase:        module.DefBase{Name: "testAgent"},
+			ProductRelease: "1.0",
+			Status:         types.StatusCurrent,
+			Description:    "capability description",
+			Reference:      "RFC2580",
+			Supports: []module.SupportsModule{
+				{
+					ModuleName: "IF-MIB",
+					Includes:   []string{"ifGeneralGroup"},
+					Variations: []module.Variation{
+						{
+							Name:             "ifAdminStatus",
+							Syntax:           &module.TypeSyntaxTypeRef{Name: "DisplayString"},
+							Access:           func() *types.Access { v := types.AccessReadOnly; return &v }(),
+							CreationRequires: []string{"ifIndex"},
+							DefVal:           &module.DefValString{Value: "up"},
+							Description:      "object variation",
+						},
+						{
+							Name:        "linkDown",
+							Access:      func() *types.Access { v := types.AccessReadOnly; return &v }(),
+							Description: "notification variation",
 						},
 					},
 				},
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "testRoot"},
-					&module.OidComponentNumber{Value: 100},
-				}, types.Span{}),
 			},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "testRoot"},
+				&module.OidComponentNumber{Value: 100},
+			}, types.Span{}),
 		},
-	}
+	})
 	supportsMod := &module.Module{Name: "IF-MIB"}
 
 	ctx := newTestContextForModules(VerboseConfig(), defMod, supportsMod)
@@ -2397,9 +2397,9 @@ func TestCreateResolvedGroups(t *testing.T) {
 		t.Run(label+"/creates group with members", func(t *testing.T) {
 			def := groupTestDef("testGroup", []string{"m1", "m2"}, isNotifGrp)
 			mod := &module.Module{
-				Name:        "TEST-MIB",
-				Definitions: []module.Definition{def},
+				Name: "TEST-MIB",
 			}
+			addDefs(mod, []module.Definition{def})
 
 			ctx := newTestContextForModules(DefaultConfig(), mod)
 			root := ctx.mib.Root()
@@ -2426,9 +2426,9 @@ func TestCreateResolvedGroups(t *testing.T) {
 		t.Run(label+"/unresolved group node skipped", func(t *testing.T) {
 			def := groupTestDef("missingGroup", []string{"m1"}, isNotifGrp)
 			mod := &module.Module{
-				Name:        "TEST-MIB",
-				Definitions: []module.Definition{def},
+				Name: "TEST-MIB",
 			}
+			addDefs(mod, []module.Definition{def})
 
 			ctx := newTestContextForModules(DefaultConfig(), mod)
 
@@ -2439,9 +2439,9 @@ func TestCreateResolvedGroups(t *testing.T) {
 		t.Run(label+"/unresolved member emits diagnostic", func(t *testing.T) {
 			def := groupTestDef("testGroup", []string{"m1", "missing"}, isNotifGrp)
 			mod := &module.Module{
-				Name:        "TEST-MIB",
-				Definitions: []module.Definition{def},
+				Name: "TEST-MIB",
 			}
+			addDefs(mod, []module.Definition{def})
 
 			ctx := newTestContextForModules(DefaultConfig(), mod)
 			root := ctx.mib.Root()
@@ -2462,9 +2462,9 @@ func TestCreateResolvedGroups(t *testing.T) {
 		t.Run(label+"/wrong-kind member emits diagnostic", func(t *testing.T) {
 			def := groupTestDef("testGroup", []string{"wrong1"}, isNotifGrp)
 			mod := &module.Module{
-				Name:        "TEST-MIB",
-				Definitions: []module.Definition{def},
+				Name: "TEST-MIB",
 			}
+			addDefs(mod, []module.Definition{def})
 
 			ctx := newTestContextForModules(DefaultConfig(), mod)
 			root := ctx.mib.Root()
@@ -2490,9 +2490,9 @@ func TestCreateResolvedGroups(t *testing.T) {
 		t.Run(label+"/mixed members emit group-member-mixed", func(t *testing.T) {
 			def := groupTestDef("mixedGroup", []string{"obj1", "notif1"}, isNotifGrp)
 			mod := &module.Module{
-				Name:        "TEST-MIB",
-				Definitions: []module.Definition{def},
+				Name: "TEST-MIB",
 			}
+			addDefs(mod, []module.Definition{def})
 
 			ctx := newTestContextForModules(DefaultConfig(), mod)
 			root := ctx.mib.Root()
@@ -2518,9 +2518,9 @@ func TestCreateResolvedGroups(t *testing.T) {
 		t.Run(label+"/deprecated member in current group emits status diagnostic", func(t *testing.T) {
 			def := groupTestDef("currentGroup", []string{"depMember"}, isNotifGrp)
 			mod := &module.Module{
-				Name:        "TEST-MIB",
-				Definitions: []module.Definition{def},
+				Name: "TEST-MIB",
 			}
+			addDefs(mod, []module.Definition{def})
 
 			ctx := newTestContextForModules(VerboseConfig(), mod)
 			root := ctx.mib.Root()
@@ -2551,13 +2551,13 @@ func TestCreateResolvedGroups(t *testing.T) {
 	t.Run("object-group/not-accessible member emits diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "testGroup"},
-					Objects: []string{"notAccessObj"},
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "testGroup"},
+				Objects: []string{"notAccessObj"},
+			},
+		})
 
 		ctx := newTestContextForModules(DefaultConfig(), mod)
 		root := ctx.mib.Root()
@@ -2578,14 +2578,14 @@ func TestCreateResolvedGroups(t *testing.T) {
 	t.Run("object-group/current member in current group no status diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "currentGroup"},
-					Objects: []string{"currentObj"},
-					Status:  types.StatusCurrent,
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "currentGroup"},
+				Objects: []string{"currentObj"},
+				Status:  types.StatusCurrent,
+			},
+		})
 
 		ctx := newTestContextForModules(VerboseConfig(), mod)
 		root := ctx.mib.Root()
@@ -2607,14 +2607,14 @@ func TestCreateResolvedGroups(t *testing.T) {
 	t.Run("object-group/smiv1 status member skips status check", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.ObjectGroup{
-					DefBase: module.DefBase{Name: "currentGroup"},
-					Objects: []string{"mandatoryObj"},
-					Status:  types.StatusCurrent,
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.ObjectGroup{
+				DefBase: module.DefBase{Name: "currentGroup"},
+				Objects: []string{"mandatoryObj"},
+				Status:  types.StatusCurrent,
+			},
+		})
 
 		ctx := newTestContextForModules(VerboseConfig(), mod)
 		root := ctx.mib.Root()
@@ -2701,14 +2701,14 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 	t.Run("creates notification with objects", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.Notification{
-					DefBase: module.DefBase{Name: "myNotif"},
-					Objects: []string{"obj1", "obj2"},
-					Status:  types.StatusCurrent,
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.Notification{
+				DefBase: module.DefBase{Name: "myNotif"},
+				Objects: []string{"obj1", "obj2"},
+				Status:  types.StatusCurrent,
+			},
+		})
 
 		ctx := newTestContextForModules(DefaultConfig(), mod)
 
@@ -2735,13 +2735,13 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 	t.Run("unresolved object emits diagnostic", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.Notification{
-					DefBase: module.DefBase{Name: "myNotif"},
-					Objects: []string{"missingObj"},
-				},
-			},
 		}
+		addDefs(mod, []module.Definition{
+			&module.Notification{
+				DefBase: module.DefBase{Name: "myNotif"},
+				Objects: []string{"missingObj"},
+			},
+		})
 
 		ctx := newTestContextForModules(DefaultConfig(), mod)
 
@@ -2758,13 +2758,13 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 	t.Run("permissive global lookup for notification objects", func(t *testing.T) {
 		modA := &module.Module{
 			Name: "A-MIB",
-			Definitions: []module.Definition{
-				&module.Notification{
-					DefBase: module.DefBase{Name: "myNotif"},
-					Objects: []string{"foreignObj"},
-				},
-			},
 		}
+		addDefs(modA, []module.Definition{
+			&module.Notification{
+				DefBase: module.DefBase{Name: "myNotif"},
+				Objects: []string{"foreignObj"},
+			},
+		})
 		modB := &module.Module{Name: "B-MIB"}
 
 		ctx := newTestContextForModulesWithPolicy(ResolverPermissive, DefaultConfig(), modA, modB)
@@ -2788,13 +2788,13 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 	t.Run("strict mode no global lookup for notification objects", func(t *testing.T) {
 		modA := &module.Module{
 			Name: "A-MIB",
-			Definitions: []module.Definition{
-				&module.Notification{
-					DefBase: module.DefBase{Name: "myNotif"},
-					Objects: []string{"foreignObj"},
-				},
-			},
 		}
+		addDefs(modA, []module.Definition{
+			&module.Notification{
+				DefBase: module.DefBase{Name: "myNotif"},
+				Objects: []string{"foreignObj"},
+			},
+		})
 		modB := &module.Module{Name: "B-MIB"}
 
 		ctx := newTestContextForModulesWithPolicy(ResolverStrict, VerboseConfig(), modA, modB)
@@ -2818,16 +2818,16 @@ func TestCreateResolvedNotifications_FullCycle(t *testing.T) {
 	t.Run("trap info preserved", func(t *testing.T) {
 		mod := &module.Module{
 			Name: "TEST-MIB",
-			Definitions: []module.Definition{
-				&module.Notification{
-					DefBase: module.DefBase{Name: "myTrap"},
-					TrapInfo: &module.TrapInfo{
-						Enterprise: "enterprises",
-						TrapNumber: 42,
-					},
+		}
+		addDefs(mod, []module.Definition{
+			&module.Notification{
+				DefBase: module.DefBase{Name: "myTrap"},
+				TrapInfo: &module.TrapInfo{
+					Enterprise: "enterprises",
+					TrapNumber: 42,
 				},
 			},
-		}
+		})
 
 		ctx := newTestContextForModules(DefaultConfig(), mod)
 
@@ -2851,13 +2851,13 @@ func TestCreateResolvedNotifications_NilObjectDiagnostic(t *testing.T) {
 	// emitted rather than silently dropping the reference.
 	mod := &module.Module{
 		Name: "TEST-MIB",
-		Definitions: []module.Definition{
-			&module.Notification{
-				DefBase: module.DefBase{Name: "testNotif"},
-				Objects: []string{"intermediateNode"},
-			},
-		},
 	}
+	addDefs(mod, []module.Definition{
+		&module.Notification{
+			DefBase: module.DefBase{Name: "testNotif"},
+			Objects: []string{"intermediateNode"},
+		},
+	})
 
 	ctx := newTestContextForModules(DefaultConfig(), mod)
 
