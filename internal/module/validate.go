@@ -9,6 +9,18 @@ import (
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
+// firstDefinition returns the definition with the smallest span start across
+// all typed slices. Returns (nil, false) if the module has no definitions.
+func firstDefinition(mod *Module) (Definition, bool) {
+	var first Definition
+	for def := range mod.AllDefinitions() {
+		if first == nil || def.DefinitionSpan().Start < first.DefinitionSpan().Start {
+			first = def
+		}
+	}
+	return first, first != nil
+}
+
 // smiEpoch is Jan 1, 1990 00:00:00 UTC, the start of the SMI standard era.
 var smiEpoch = time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -67,27 +79,22 @@ func ValidateModule(mod *Module, source []byte, logger *slog.Logger, diagConfig 
 	validateModuleNameSuffix(ctx, mod)
 
 	if mod.Language == types.LanguageSMIv2 && !IsBaseModule(mod.Name) {
-		var moduleIdentities []*ModuleIdentity
-		firstIndex := -1
-		for i, def := range mod.Definitions {
-			if mi, ok := def.(*ModuleIdentity); ok {
-				if firstIndex == -1 {
-					firstIndex = i
-				}
-				moduleIdentities = append(moduleIdentities, mi)
-			}
-		}
-
-		if len(moduleIdentities) == 0 {
+		if len(mod.ModuleIdentities) == 0 {
 			ctx.emitDiagnostic(types.DiagMissingModuleIdentity, mod.Span,
 				fmt.Sprintf("SMIv2 module %s lacks MODULE-IDENTITY", mod.Name))
 		} else {
-			if firstIndex > 0 {
-				ctx.emitDiagnostic(types.DiagModuleIdentityNotFirst, moduleIdentities[0].Span,
-					"MODULE-IDENTITY should be the first definition in "+mod.Name)
+			// Check that the MODULE-IDENTITY is the first definition by span.
+			// Find the earliest span start across all definitions.
+			mi0 := mod.ModuleIdentities[0]
+			firstDef, hasFirst := firstDefinition(mod)
+			if hasFirst {
+				if _, ok := firstDef.(*ModuleIdentity); !ok {
+					ctx.emitDiagnostic(types.DiagModuleIdentityNotFirst, mi0.Span,
+						"MODULE-IDENTITY should be the first definition in "+mod.Name)
+				}
 			}
 
-			for _, mi := range moduleIdentities[1:] {
+			for _, mi := range mod.ModuleIdentities[1:] {
 				ctx.emitDiagnostic(types.DiagModuleIdentityMultiple, mi.Span,
 					"multiple MODULE-IDENTITY definitions in "+mod.Name)
 			}
@@ -97,11 +104,9 @@ func ValidateModule(mod *Module, source []byte, logger *slog.Logger, diagConfig 
 	}
 
 	// Validate dates on all MODULE-IDENTITY definitions.
-	for _, def := range mod.Definitions {
-		if mi, ok := def.(*ModuleIdentity); ok {
-			validateModuleIdentityDates(ctx, mi)
-			validateRevisionLastUpdated(ctx, mi)
-		}
+	for _, mi := range mod.ModuleIdentities {
+		validateModuleIdentityDates(ctx, mi)
+		validateRevisionLastUpdated(ctx, mi)
 	}
 
 	ctx.Log(slog.LevelDebug, "validation complete",
@@ -135,33 +140,40 @@ func validateMacroImports(ctx *validateContext, mod *Module) {
 		}
 	}
 
-	// Determine which macros are used by scanning definitions.
+	// Determine which macros are used by checking typed slices.
 	usedMacros := make(map[string]struct{})
-	for _, def := range mod.Definitions {
-		switch d := def.(type) {
-		case *ModuleIdentity:
-			usedMacros["MODULE-IDENTITY"] = struct{}{}
-		case *ObjectIdentity:
-			usedMacros["OBJECT-IDENTITY"] = struct{}{}
-		case *ObjectType:
-			usedMacros["OBJECT-TYPE"] = struct{}{}
-		case *Notification:
-			if d.TrapInfo == nil {
-				usedMacros["NOTIFICATION-TYPE"] = struct{}{}
-			}
-		case *TypeDef:
-			if d.IsTextualConvention {
-				usedMacros["TEXTUAL-CONVENTION"] = struct{}{}
-			}
-		case *ObjectGroup:
-			usedMacros["OBJECT-GROUP"] = struct{}{}
-		case *NotificationGroup:
-			usedMacros["NOTIFICATION-GROUP"] = struct{}{}
-		case *ModuleCompliance:
-			usedMacros["MODULE-COMPLIANCE"] = struct{}{}
-		case *AgentCapabilities:
-			usedMacros["AGENT-CAPABILITIES"] = struct{}{}
+	if len(mod.ModuleIdentities) > 0 {
+		usedMacros["MODULE-IDENTITY"] = struct{}{}
+	}
+	if len(mod.ObjectIdentities) > 0 {
+		usedMacros["OBJECT-IDENTITY"] = struct{}{}
+	}
+	if len(mod.ObjectTypes) > 0 {
+		usedMacros["OBJECT-TYPE"] = struct{}{}
+	}
+	for _, n := range mod.Notifications {
+		if n.TrapInfo == nil {
+			usedMacros["NOTIFICATION-TYPE"] = struct{}{}
+			break
 		}
+	}
+	for _, td := range mod.TypeDefs {
+		if td.IsTextualConvention {
+			usedMacros["TEXTUAL-CONVENTION"] = struct{}{}
+			break
+		}
+	}
+	if len(mod.ObjectGroups) > 0 {
+		usedMacros["OBJECT-GROUP"] = struct{}{}
+	}
+	if len(mod.NotificationGroups) > 0 {
+		usedMacros["NOTIFICATION-GROUP"] = struct{}{}
+	}
+	if len(mod.Compliances) > 0 {
+		usedMacros["MODULE-COMPLIANCE"] = struct{}{}
+	}
+	if len(mod.Capabilities) > 0 {
+		usedMacros["AGENT-CAPABILITIES"] = struct{}{}
 	}
 
 	for macro := range usedMacros {

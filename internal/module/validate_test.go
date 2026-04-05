@@ -21,30 +21,59 @@ func validateAndFindDiagnostic(t *testing.T, mod *Module, config types.Diagnosti
 	return nil
 }
 
+// addDefs adds definitions to a module, populating both Definitions and typed slices.
+func addDefs(mod *Module, defs ...Definition) {
+	for _, def := range defs {
+		mod.Definitions = append(mod.Definitions, def)
+		switch d := def.(type) {
+		case *ModuleIdentity:
+			mod.ModuleIdentities = append(mod.ModuleIdentities, d)
+		case *ObjectIdentity:
+			mod.ObjectIdentities = append(mod.ObjectIdentities, d)
+		case *ObjectType:
+			mod.ObjectTypes = append(mod.ObjectTypes, d)
+		case *Notification:
+			mod.Notifications = append(mod.Notifications, d)
+		case *TypeDef:
+			mod.TypeDefs = append(mod.TypeDefs, d)
+		case *ObjectGroup:
+			mod.ObjectGroups = append(mod.ObjectGroups, d)
+		case *NotificationGroup:
+			mod.NotificationGroups = append(mod.NotificationGroups, d)
+		case *ModuleCompliance:
+			mod.Compliances = append(mod.Compliances, d)
+		case *AgentCapabilities:
+			mod.Capabilities = append(mod.Capabilities, d)
+		}
+	}
+}
+
 // smiv2Module returns a minimal SMIv2 module with the given name and definitions.
 func smiv2Module(name string, defs ...Definition) *Module {
-	return &Module{
+	mod := &Module{
 		Name:     name,
 		Language: types.LanguageSMIv2,
 		Imports: []Import{
 			{Module: "SNMPv2-SMI", Symbol: "MODULE-IDENTITY"},
 		},
-		Definitions: defs,
-		Span:        types.Span{Start: 0, End: 100},
+		Span: types.Span{Start: 0, End: 100},
 	}
+	addDefs(mod, defs...)
+	return mod
 }
 
 // smiv1Module returns a minimal SMIv1 module with the given name and definitions.
 func smiv1Module(name string, defs ...Definition) *Module {
-	return &Module{
+	mod := &Module{
 		Name:     name,
 		Language: types.LanguageSMIv1,
 		Imports: []Import{
 			{Module: "RFC1155-SMI", Symbol: "enterprises"},
 		},
-		Definitions: defs,
-		Span:        types.Span{Start: 0, End: 100},
+		Span: types.Span{Start: 0, End: 100},
 	}
+	addDefs(mod, defs...)
+	return mod
 }
 
 // testMI returns a ModuleIdentity definition with sensible defaults.
@@ -108,12 +137,13 @@ func TestValidate_MissingModuleIdentity_SNMPv2MIBNotBase(t *testing.T) {
 // --- MODULE-IDENTITY position ---
 
 func TestValidate_ModuleIdentityNotFirst(t *testing.T) {
-	mod := smiv2Module("NOT-FIRST-MIB",
-		testOT("someObject"),
-		testMI("notFirstTest", "200001010000Z",
-			Revision{Date: "200001010000Z", Description: "Test", Span: types.Span{Start: 30, End: 50}},
-		),
+	ot := testOT("someObject")
+	ot.Span = types.Span{Start: 10, End: 30} // OT comes first in source
+	mi := testMI("notFirstTest", "200001010000Z",
+		Revision{Date: "200001010000Z", Description: "Test", Span: types.Span{Start: 50, End: 70}},
 	)
+	mi.Span = types.Span{Start: 40, End: 90} // MI comes after OT
+	mod := smiv2Module("NOT-FIRST-MIB", ot, mi)
 	mod.Imports = append(mod.Imports, Import{Module: "SNMPv2-SMI", Symbol: "OBJECT-TYPE"})
 
 	d := validateAndFindDiagnostic(t, mod, types.VerboseConfig(), types.DiagModuleIdentityNotFirst)

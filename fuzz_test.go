@@ -134,7 +134,7 @@ func FuzzParse(f *testing.F) {
 		}
 
 		// All definitions must have valid spans (Start <= End).
-		for _, def := range mod.Definitions {
+		for def := range mod.AllDefinitions() {
 			span := def.DefinitionSpan()
 			if span.Start > span.End {
 				t.Fatalf("definition %q: span start %d > end %d",

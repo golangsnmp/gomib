@@ -6,7 +6,7 @@ import "testing"
 // Fails the test if not found or wrong type.
 func requireDef[T Definition](t *testing.T, mod *Module, name string) T {
 	t.Helper()
-	for _, d := range mod.Definitions {
+	for d := range mod.AllDefinitions() {
 		if d.DefinitionName() == name {
 			v, ok := d.(T)
 			if !ok {
