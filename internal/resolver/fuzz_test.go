@@ -3,9 +3,10 @@ package resolver
 import (
 	"testing"
 
+	"github.com/golangsnmp/gomib/internal/cst/lower"
+	cstparser "github.com/golangsnmp/gomib/internal/cst/parser"
 	"github.com/golangsnmp/gomib/internal/model"
 	"github.com/golangsnmp/gomib/internal/module"
-	"github.com/golangsnmp/gomib/internal/parser"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -38,8 +39,9 @@ func FuzzFormatOID(f *testing.F) {
 			::= { testMIB 1 }
 		END`)
 	cfg := types.DefaultConfig()
-	p := parser.New(src, nil, cfg)
-	mods := p.ParseModule()
+	p := cstparser.New(src, nil, cfg)
+	file := p.ParseModule()
+	mods := lower.Lower(file, src, p.Diagnostics(), cfg)
 	mod := mods[0]
 	module.ValidateModule(mod, src, nil, cfg)
 	resolverCfg := model.DefaultConfig()

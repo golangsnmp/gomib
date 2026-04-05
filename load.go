@@ -14,8 +14,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/golangsnmp/gomib/internal/cst/lower"
+	cstparser "github.com/golangsnmp/gomib/internal/cst/parser"
 	"github.com/golangsnmp/gomib/internal/module"
-	"github.com/golangsnmp/gomib/internal/parser"
 	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -274,8 +275,9 @@ func decodeModules(content []byte, sourcePath string, cfg *loadConfig) []*module
 		return nil
 	}
 
-	p := parser.New(content, componentLogger(cfg.logger, "parser"), cfg.diagConfig)
-	mods := p.ParseModule()
+	p := cstparser.New(content, componentLogger(cfg.logger, "parser"), cfg.diagConfig)
+	file := p.ParseModule()
+	mods := lower.Lower(file, content, p.Diagnostics(), cfg.diagConfig)
 
 	for _, mod := range mods {
 		mod.SourcePath = sourcePath

@@ -3,8 +3,9 @@ package gomib
 import (
 	"testing"
 
+	"github.com/golangsnmp/gomib/internal/cst/lower"
+	cstparser "github.com/golangsnmp/gomib/internal/cst/parser"
 	"github.com/golangsnmp/gomib/internal/module"
-	"github.com/golangsnmp/gomib/internal/parser"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
@@ -112,8 +113,9 @@ func FuzzParse(f *testing.F) {
 
 		cfg := types.DefaultConfig()
 
-		p := parser.New(data, nil, cfg)
-		mods := p.ParseModule()
+		p := cstparser.New(data, nil, cfg)
+		file := p.ParseModule()
+		mods := lower.Lower(file, data, p.Diagnostics(), cfg)
 		if len(mods) == 0 {
 			return
 		}
@@ -166,8 +168,9 @@ func FuzzPipeline(f *testing.F) {
 
 		cfg := types.DefaultConfig()
 
-		p := parser.New(data, nil, cfg)
-		mods := p.ParseModule()
+		p := cstparser.New(data, nil, cfg)
+		file := p.ParseModule()
+		mods := lower.Lower(file, data, p.Diagnostics(), cfg)
 		if len(mods) == 0 {
 			return
 		}
@@ -582,8 +585,9 @@ func FuzzMultiModule(f *testing.F) {
 
 		var mods []*module.Module
 		for _, data := range [][]byte{dataA, dataB} {
-			p := parser.New(data, nil, cfg)
-			parsed := p.ParseModule()
+			p := cstparser.New(data, nil, cfg)
+			file := p.ParseModule()
+			parsed := lower.Lower(file, data, p.Diagnostics(), cfg)
 			if len(parsed) == 0 {
 				continue
 			}

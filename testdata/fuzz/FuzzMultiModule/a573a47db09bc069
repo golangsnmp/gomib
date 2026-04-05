@@ -1,3 +1,0 @@
-go test fuzz v1
-[]byte("A DEFINITIONS::=BEGIN\nIMPORTS enterprises FROM SNMPv2-SMI\nA\nFROM B-MIB;\nA OBJECT-TYPE SYNTAX A\nACCESS read-only::={enterprises }")
-[]byte("B-MIB DEFINITIONS::=BEGIN aMPORTS TEXTUAL-CONVENTION FROM SNMPv2-TC;:N")
