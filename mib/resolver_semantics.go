@@ -134,44 +134,34 @@ type notificationRef struct {
 	notif *module.Notification
 }
 
-// collectDefinitionRefs collects definitions matching matchFn across all modules.
-func collectDefinitionRefs[T any](ctx *resolverContext, matchFn func(*module.Module, module.Definition) (T, bool)) []T {
-	var refs []T
+func collectObjectTypeRefs(ctx *resolverContext) []objectTypeRef {
+	var refs []objectTypeRef
 	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			if ref, ok := matchFn(mod, def); ok {
-				refs = append(refs, ref)
-			}
+		for _, obj := range mod.ObjectTypes {
+			refs = append(refs, objectTypeRef{mod: mod, obj: obj})
 		}
 	}
 	return refs
 }
 
-func collectObjectTypeRefs(ctx *resolverContext) []objectTypeRef {
-	return collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (objectTypeRef, bool) {
-		if obj, ok := def.(*module.ObjectType); ok {
-			return objectTypeRef{mod: mod, obj: obj}, true
-		}
-		return objectTypeRef{}, false
-	})
-}
-
 func collectNotificationRefs(ctx *resolverContext) []notificationRef {
-	return collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (notificationRef, bool) {
-		if notif, ok := def.(*module.Notification); ok {
-			return notificationRef{mod: mod, notif: notif}, true
+	var refs []notificationRef
+	for _, mod := range ctx.modules {
+		for _, notif := range mod.Notifications {
+			refs = append(refs, notificationRef{mod: mod, notif: notif})
 		}
-		return notificationRef{}, false
-	})
+	}
+	return refs
 }
 
 func collectComplianceRefs(ctx *resolverContext) []complianceRef {
-	return collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (complianceRef, bool) {
-		if comp, ok := def.(*module.ModuleCompliance); ok {
-			return complianceRef{mod: mod, comp: comp}, true
+	var refs []complianceRef
+	for _, mod := range ctx.modules {
+		for _, comp := range mod.Compliances {
+			refs = append(refs, complianceRef{mod: mod, comp: comp})
 		}
-		return complianceRef{}, false
-	})
+	}
+	return refs
 }
 
 func resolveTableSemantics(ctx *resolverContext, objRefs []objectTypeRef) {
@@ -532,24 +522,22 @@ type groupInfo struct {
 func createResolvedGroups(ctx *resolverContext) {
 	var groups []groupInfo
 	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			switch d := def.(type) {
-			case *module.ObjectGroup:
-				groups = append(groups, groupInfo{
-					mod: mod, name: d.Name, span: d.DefinitionSpan(),
-					status: d.Status, description: d.Description,
-					reference: d.Reference, members: d.Objects,
-					oidRefs: extractOidRefs(d.DefinitionOid()),
-				})
-			case *module.NotificationGroup:
-				groups = append(groups, groupInfo{
-					mod: mod, name: d.Name, span: d.DefinitionSpan(),
-					status: d.Status, description: d.Description,
-					reference: d.Reference, members: d.Notifications,
-					oidRefs:    extractOidRefs(d.DefinitionOid()),
-					isNotifGrp: true,
-				})
-			}
+		for _, d := range mod.ObjectGroups {
+			groups = append(groups, groupInfo{
+				mod: mod, name: d.Name, span: d.DefinitionSpan(),
+				status: d.Status, description: d.Description,
+				reference: d.Reference, members: d.Objects,
+				oidRefs: extractOidRefs(d.DefinitionOid()),
+			})
+		}
+		for _, d := range mod.NotificationGroups {
+			groups = append(groups, groupInfo{
+				mod: mod, name: d.Name, span: d.DefinitionSpan(),
+				status: d.Status, description: d.Description,
+				reference: d.Reference, members: d.Notifications,
+				oidRefs:    extractOidRefs(d.DefinitionOid()),
+				isNotifGrp: true,
+			})
 		}
 	}
 
@@ -681,11 +669,6 @@ type complianceRef struct {
 	comp *module.ModuleCompliance
 }
 
-type capabilitiesRef struct {
-	mod *module.Module
-	cap *module.AgentCapabilities
-}
-
 func createResolvedCompliances(ctx *resolverContext) {
 	created := 0
 	for _, ref := range collectComplianceRefs(ctx) {
@@ -757,33 +740,29 @@ func convertComplianceModules(ctx *resolverContext, mod *module.Module, modules 
 
 func createResolvedCapabilities(ctx *resolverContext) {
 	created := 0
-	for _, ref := range collectDefinitionRefs(ctx, func(mod *module.Module, def module.Definition) (capabilitiesRef, bool) {
-		if ac, ok := def.(*module.AgentCapabilities); ok {
-			return capabilitiesRef{mod: mod, cap: ac}, true
-		}
-		return capabilitiesRef{}, false
-	}) {
-		ac := ref.cap
-		node, ok := ctx.lookupNode(ref.mod, ac.Name)
-		if !ok {
-			continue
-		}
+	for _, mod := range ctx.modules {
+		for _, ac := range mod.Capabilities {
+			node, ok := ctx.lookupNode(mod, ac.Name)
+			if !ok {
+				continue
+			}
 
-		resolved := newCapability(ac.Name)
-		resolved.setSpan(ac.Span)
-		resolved.setOidRefs(extractOidRefs(ac.DefinitionOid()))
-		resolved.setNode(node)
-		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
-			resolved.setModule(resolvedMod)
-		}
-		resolved.setStatus(ac.Status)
-		resolved.setDescription(ac.Description)
-		resolved.setReference(ac.Reference)
-		resolved.setProductRelease(ac.ProductRelease)
-		resolved.setSupports(convertSupportsModules(ctx, ref.mod, ac.Supports))
+			resolved := newCapability(ac.Name)
+			resolved.setSpan(ac.Span)
+			resolved.setOidRefs(extractOidRefs(ac.DefinitionOid()))
+			resolved.setNode(node)
+			if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
+				resolved.setModule(resolvedMod)
+			}
+			resolved.setStatus(ac.Status)
+			resolved.setDescription(ac.Description)
+			resolved.setReference(ac.Reference)
+			resolved.setProductRelease(ac.ProductRelease)
+			resolved.setSupports(convertSupportsModules(ctx, mod, ac.Supports))
 
-		registerCapability(ctx, ref.mod, node, resolved)
-		created++
+			registerCapability(ctx, mod, node, resolved)
+			created++
+		}
 	}
 
 	if ctx.TraceEnabled() {

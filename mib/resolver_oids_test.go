@@ -62,7 +62,7 @@ func TestCollectOidDefinitions(t *testing.T) {
 		&module.OidComponentNumber{Value: 99},
 	}, types.Synthetic)
 
-	mod.Definitions = []module.Definition{
+	populateTypedSlices(mod, []module.Definition{
 		&module.ObjectType{DefBase: module.DefBase{Name: "myObject"}, Oid: oid},
 		&module.ModuleIdentity{DefBase: module.DefBase{Name: "myModId"}, Oid: oid},
 		&module.ObjectIdentity{DefBase: module.DefBase{Name: "myObjId"}, Oid: oid},
@@ -75,7 +75,7 @@ func TestCollectOidDefinitions(t *testing.T) {
 		&module.ModuleCompliance{DefBase: module.DefBase{Name: "myComp"}, Oid: oid},
 		&module.AgentCapabilities{DefBase: module.DefBase{Name: "myCap"}, Oid: oid},
 		&module.TypeDef{DefBase: module.DefBase{Name: "MyType"}}, // skipped
-	}
+	})
 
 	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 	ctx.modules = []*module.Module{mod}
@@ -834,7 +834,7 @@ func TestCollectOidDefinitionsKindMapping(t *testing.T) {
 		&module.OidComponentNumber{Value: 1},
 	}, types.Synthetic)
 
-	mod.Definitions = []module.Definition{
+	populateTypedSlices(mod, []module.Definition{
 		&module.ObjectType{DefBase: module.DefBase{Name: "obj"}, Oid: oid},
 		&module.ModuleIdentity{DefBase: module.DefBase{Name: "modId"}, Oid: oid},
 		&module.ObjectIdentity{DefBase: module.DefBase{Name: "objId"}, Oid: oid},
@@ -844,7 +844,7 @@ func TestCollectOidDefinitionsKindMapping(t *testing.T) {
 		&module.NotificationGroup{DefBase: module.DefBase{Name: "notifGrp"}, Oid: oid},
 		&module.ModuleCompliance{DefBase: module.DefBase{Name: "comp"}, Oid: oid},
 		&module.AgentCapabilities{DefBase: module.DefBase{Name: "cap"}, Oid: oid},
-	}
+	})
 
 	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 	ctx.modules = []*module.Module{mod}

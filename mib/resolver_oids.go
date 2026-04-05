@@ -251,57 +251,50 @@ type collectedOidDefinitions struct {
 }
 
 func collectOidDefinitions(ctx *resolverContext) collectedOidDefinitions {
-	// Estimate capacity: most definitions are OID-bearing (TypeDefs are the exception).
 	totalDefs := 0
 	for _, mod := range ctx.modules {
-		totalDefs += len(mod.Definitions)
+		totalDefs += mod.DefinitionCount()
 	}
 	defs := collectedOidDefinitions{
 		oidDefs: make([]oidDefinition, 0, totalDefs),
 	}
-
 	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			var kind definitionKind
-			switch d := def.(type) {
-			case *module.ObjectType:
-				kind = defObjectType
-			case *module.ModuleIdentity:
-				kind = defModuleIdentity
-			case *module.ObjectIdentity:
-				kind = defObjectIdentity
-			case *module.Notification:
-				switch {
-				case d.Oid != nil:
-					kind = defNotification
-				case d.TrapInfo != nil:
-					defs.trapDefs = append(defs.trapDefs, trapTypeRef{mod: mod, notif: d})
-					continue
-				default:
-					ctx.EmitDiagnostic(types.DiagNotifNoOid,
-						mod, d.Span,
-						fmt.Sprintf("notification %q has no OID or trap info", d.Name))
-					continue
-				}
-			case *module.ValueAssignment:
-				kind = defValueAssignment
-			case *module.ObjectGroup:
-				kind = defObjectGroup
-			case *module.NotificationGroup:
-				kind = defNotificationGroup
-			case *module.ModuleCompliance:
-				kind = defModuleCompliance
-			case *module.AgentCapabilities:
-				kind = defAgentCapabilities
-			case *module.TypeDef:
-				continue
+		for _, d := range mod.ObjectTypes {
+			defs.oidDefs = append(defs.oidDefs, oidDefinition{mod: mod, def: d, kind: defObjectType})
+		}
+		for _, d := range mod.ModuleIdentities {
+			defs.oidDefs = append(defs.oidDefs, oidDefinition{mod: mod, def: d, kind: defModuleIdentity})
+		}
+		for _, d := range mod.ObjectIdentities {
+			defs.oidDefs = append(defs.oidDefs, oidDefinition{mod: mod, def: d, kind: defObjectIdentity})
+		}
+		for _, d := range mod.Notifications {
+			switch {
+			case d.Oid != nil:
+				defs.oidDefs = append(defs.oidDefs, oidDefinition{mod: mod, def: d, kind: defNotification})
+			case d.TrapInfo != nil:
+				defs.trapDefs = append(defs.trapDefs, trapTypeRef{mod: mod, notif: d})
 			default:
-				continue
+				ctx.EmitDiagnostic(types.DiagNotifNoOid, mod, d.Span,
+					fmt.Sprintf("notification %q has no OID or trap info", d.Name))
 			}
-			defs.oidDefs = append(defs.oidDefs, oidDefinition{mod: mod, def: def, kind: kind})
+		}
+		for _, d := range mod.ValueAssignments {
+			defs.oidDefs = append(defs.oidDefs, oidDefinition{mod: mod, def: d, kind: defValueAssignment})
+		}
+		for _, d := range mod.ObjectGroups {
+			defs.oidDefs = append(defs.oidDefs, oidDefinition{mod: mod, def: d, kind: defObjectGroup})
+		}
+		for _, d := range mod.NotificationGroups {
+			defs.oidDefs = append(defs.oidDefs, oidDefinition{mod: mod, def: d, kind: defNotificationGroup})
+		}
+		for _, d := range mod.Compliances {
+			defs.oidDefs = append(defs.oidDefs, oidDefinition{mod: mod, def: d, kind: defModuleCompliance})
+		}
+		for _, d := range mod.Capabilities {
+			defs.oidDefs = append(defs.oidDefs, oidDefinition{mod: mod, def: d, kind: defAgentCapabilities})
 		}
 	}
-
 	return defs
 }
 

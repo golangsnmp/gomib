@@ -47,9 +47,14 @@ func newTestContextForModulesWithPolicy(strictness ResolverStrictness, config Di
 
 // setTestModules sets ctx.modules and builds the oidDefNames cache
 // for tests that don't go through registerModules.
+// If a module has Definitions populated but empty typed slices (struct literal
+// construction), the typed slices are backfilled so both access paths work.
 func setTestModules(ctx *resolverContext, mods []*module.Module) {
 	ctx.modules = mods
 	for _, mod := range mods {
+		if len(mod.Definitions) > 0 && mod.DefinitionCount() == 0 {
+			populateTypedSlices(mod, mod.Definitions)
+		}
 		if _, exists := ctx.oidDefNames[mod]; exists {
 			continue
 		}
