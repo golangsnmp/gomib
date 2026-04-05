@@ -136,7 +136,7 @@ func (p *Parser) parseDefValBracedContent() (module.DefVal, *types.SpanDiagnosti
 	case lexer.TokLowercaseIdent, lexer.TokUppercaseIdent:
 		return p.parseDefValBracedIdent(innerStart)
 	case lexer.TokNumber:
-		return p.parseDefValOidNumeric(innerStart)
+		return p.finishDefValOid(nil)
 	default:
 		// Keywords can be valid BITS labels (e.g., mandatory, optional)
 		if kind.IsKeyword() {
@@ -155,7 +155,7 @@ func (p *Parser) parseDefValBracedIdent(innerStart types.ByteOffset) (module.Def
 		return p.parseDefValBitsLabels(identName, innerStart)
 	}
 	// This is OID: { sysName 0 } or { iso 3 6 1 }
-	return p.parseDefValOidWithFirstIdent(identName, identToken, innerStart)
+	return p.parseDefValOidWithFirstIdent(identName, identToken)
 }
 
 func (p *Parser) parseDefValBitsLabels(first string, _ types.ByteOffset) (module.DefVal, *types.SpanDiagnostic) {
@@ -176,7 +176,7 @@ func (p *Parser) parseDefValBitsLabels(first string, _ types.ByteOffset) (module
 	return &module.DefValBits{Labels: labels}, nil
 }
 
-func (p *Parser) parseDefValOidWithFirstIdent(identName string, identToken lexer.Token, innerStart types.ByteOffset) (module.DefVal, *types.SpanDiagnostic) {
+func (p *Parser) parseDefValOidWithFirstIdent(identName string, identToken lexer.Token) (module.DefVal, *types.SpanDiagnostic) {
 	var components []module.OidComponent
 
 	// First component is the identifier we already parsed
@@ -201,14 +201,10 @@ func (p *Parser) parseDefValOidWithFirstIdent(identName string, identToken lexer
 	}
 
 	// Parse remaining components and closing brace
-	return p.finishDefValOid(components, innerStart)
+	return p.finishDefValOid(components)
 }
 
-func (p *Parser) parseDefValOidNumeric(innerStart types.ByteOffset) (module.DefVal, *types.SpanDiagnostic) {
-	return p.finishDefValOid(nil, innerStart)
-}
-
-func (p *Parser) finishDefValOid(components []module.OidComponent, _ types.ByteOffset) (module.DefVal, *types.SpanDiagnostic) {
+func (p *Parser) finishDefValOid(components []module.OidComponent) (module.DefVal, *types.SpanDiagnostic) {
 	components, err := p.parseDefValOidComponents(components)
 	if err != nil {
 		return nil, err
