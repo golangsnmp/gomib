@@ -102,7 +102,6 @@ func FuzzParseModule(f *testing.F) {
 		if len(mods) == 0 {
 			t.Fatal("ParseModule returned empty slice")
 		}
-		inputLen := types.ByteOffset(len(data))
 		for _, mod := range mods {
 			for _, d := range mod.Diagnostics {
 				if d.Code == "" {
@@ -111,6 +110,7 @@ func FuzzParseModule(f *testing.F) {
 			}
 
 			// Validate module span.
+			inputLen := types.ByteOffset(len(data))
 			if mod.Span.Start > mod.Span.End {
 				t.Fatalf("module span start %d > end %d", mod.Span.Start, mod.Span.End)
 			}
@@ -119,7 +119,7 @@ func FuzzParseModule(f *testing.F) {
 			}
 
 			// Validate definition spans are ordered and within input bounds.
-			for _, def := range mod.Body {
+			for _, def := range mod.Definitions {
 				span := def.DefinitionSpan()
 				if span.Start > span.End {
 					t.Fatalf("definition span start %d > end %d", span.Start, span.End)
@@ -127,21 +127,17 @@ func FuzzParseModule(f *testing.F) {
 				if span.End > inputLen {
 					t.Fatalf("definition span end %d > input length %d", span.End, inputLen)
 				}
-				// Definition name span (if present) must also be valid.
-				if name := def.DefinitionName(); name != nil && name.Name != "" {
-					ns := name.Span
-					if ns.Start > ns.End {
+				// Definition name should be non-empty for valid definitions.
+				if name := def.DefinitionName(); name != "" {
+					nameSpan := def.DefinitionSpan()
+					if nameSpan.Start > nameSpan.End {
 						t.Fatalf("definition name %q span start %d > end %d",
-							name.Name, ns.Start, ns.End)
-					}
-					if ns.End > inputLen {
-						t.Fatalf("definition name %q span end %d > input length %d",
-							name.Name, ns.End, inputLen)
+							name, nameSpan.Start, nameSpan.End)
 					}
 				}
 			}
 
-			// Validate import clause spans.
+			// Validate import spans.
 			for _, imp := range mod.Imports {
 				if imp.Span.Start > imp.Span.End {
 					t.Fatalf("import span start %d > end %d", imp.Span.Start, imp.Span.End)
@@ -151,13 +147,14 @@ func FuzzParseModule(f *testing.F) {
 				}
 			}
 
-			// Validate diagnostic spans.
+			// Validate diagnostics have codes (no span validation since
+			// Diagnostics use line/column, not byte spans).
 			for _, d := range mod.Diagnostics {
-				if d.Span.Start > d.Span.End {
-					t.Fatalf("diagnostic span start %d > end %d", d.Span.Start, d.Span.End)
+				if d.Code == "" {
+					t.Fatal("diagnostic has empty Code")
 				}
-				if d.Span.End > inputLen {
-					t.Fatalf("diagnostic span end %d > input length %d", d.Span.End, inputLen)
+				if d.Line < 0 {
+					t.Fatalf("diagnostic line %d is negative", d.Line)
 				}
 			}
 		}
@@ -234,7 +231,7 @@ func FuzzConstraintParsing(f *testing.F) {
 		if mod.Span.End > inputLen {
 			t.Fatalf("module span end %d > input length %d", mod.Span.End, inputLen)
 		}
-		for _, def := range mod.Body {
+		for _, def := range mod.Definitions {
 			span := def.DefinitionSpan()
 			if span.Start > span.End {
 				t.Fatalf("definition span start %d > end %d", span.Start, span.End)

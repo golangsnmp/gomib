@@ -95,10 +95,10 @@ var pipelineSeeds = [][]byte{
 	[]byte("TEST DEFINITIONS ::= BEGIN"),
 }
 
-// FuzzLower fuzzes the parse and lowering stages without resolution.
-// This isolates lowering-specific issues and runs faster than FuzzPipeline
+// FuzzParse fuzzes the parse and validation stages without resolution.
+// This isolates parsing issues and runs faster than FuzzPipeline
 // since it skips the resolver.
-func FuzzLower(f *testing.F) {
+func FuzzParse(f *testing.F) {
 	for _, seed := range pipelineSeeds {
 		f.Add(seed)
 	}
@@ -106,7 +106,6 @@ func FuzzLower(f *testing.F) {
 	testutil.AddPrimaryCorpusSeeds(f)
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		// Skip pathologically large inputs to avoid excessive memory use.
 		if len(data) > 1<<20 {
 			return
 		}
@@ -114,26 +113,23 @@ func FuzzLower(f *testing.F) {
 		cfg := types.DefaultConfig()
 
 		p := parser.New(data, nil, cfg)
-		astMods := p.ParseModule()
-		if len(astMods) == 0 {
+		mods := p.ParseModule()
+		if len(mods) == 0 {
 			return
 		}
-		astMod := astMods[0]
+		mod := mods[0]
 
-		mod := module.Lower(astMod, data, nil, cfg)
-		if mod == nil {
-			return
-		}
+		module.ValidateModule(mod, data, nil, cfg)
 
-		// Module name should match AST.
-		if mod.Name == "" && astMod.Name.Name != "" {
-			t.Fatal("lowered module lost its name")
+		// Module name should be non-empty if parsing succeeded.
+		if mod.Name == "" {
+			t.Fatal("parsed module has empty name")
 		}
 
 		// All diagnostics must have codes.
 		for _, d := range mod.Diagnostics {
 			if d.Code == "" {
-				t.Fatal("lowered module diagnostic has empty Code")
+				t.Fatal("module diagnostic has empty Code")
 			}
 		}
 
@@ -171,15 +167,13 @@ func FuzzPipeline(f *testing.F) {
 		cfg := types.DefaultConfig()
 
 		p := parser.New(data, nil, cfg)
-		astMods := p.ParseModule()
-		if len(astMods) == 0 {
+		mods := p.ParseModule()
+		if len(mods) == 0 {
 			return
 		}
+		mod := mods[0]
 
-		mod := module.Lower(astMods[0], data, nil, cfg)
-		if mod == nil {
-			return
-		}
+		module.ValidateModule(mod, data, nil, cfg)
 
 		resolverCfg := mib.DefaultConfig()
 		m := mib.Resolve([]*module.Module{mod}, nil, nil, &resolverCfg)
@@ -589,14 +583,13 @@ func FuzzMultiModule(f *testing.F) {
 		var mods []*module.Module
 		for _, data := range [][]byte{dataA, dataB} {
 			p := parser.New(data, nil, cfg)
-			astMods := p.ParseModule()
-			if len(astMods) == 0 {
+			parsed := p.ParseModule()
+			if len(parsed) == 0 {
 				continue
 			}
-			mod := module.Lower(astMods[0], data, nil, cfg)
-			if mod != nil {
-				mods = append(mods, mod)
-			}
+			mod := parsed[0]
+			module.ValidateModule(mod, data, nil, cfg)
+			mods = append(mods, mod)
 		}
 		if len(mods) == 0 {
 			return

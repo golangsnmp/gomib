@@ -262,7 +262,7 @@ func collectModules(modules map[string]*module.Module) []*module.Module {
 	return mods
 }
 
-// decodeModules runs the heuristic/parse/lower pipeline on raw MIB content.
+// decodeModules runs the heuristic/parse/validate pipeline on raw MIB content.
 // A single file may contain multiple modules. Returns nil if the content
 // doesn't look like a MIB.
 func decodeModules(content []byte, sourcePath string, cfg *loadConfig) []*module.Module {
@@ -275,15 +275,11 @@ func decodeModules(content []byte, sourcePath string, cfg *loadConfig) []*module
 	}
 
 	p := parser.New(content, componentLogger(cfg.logger, "parser"), cfg.diagConfig)
-	astModules := p.ParseModule()
+	mods := p.ParseModule()
 
-	var mods []*module.Module
-	for _, am := range astModules {
-		mod := module.Lower(am, content, componentLogger(cfg.logger, "module"), cfg.diagConfig)
-		if mod != nil {
-			mod.SourcePath = sourcePath
-			mods = append(mods, mod)
-		}
+	for _, mod := range mods {
+		mod.SourcePath = sourcePath
+		module.ValidateModule(mod, content, componentLogger(cfg.logger, "module"), cfg.diagConfig)
 	}
 	return mods
 }

@@ -330,10 +330,6 @@ func init() {
 	diagCodePhase = make(map[string]string, len(codes))
 	for _, c := range codes {
 		phase := c.Phase
-		// Map "lowering" to schema vocabulary "lower"
-		if phase == "lowering" {
-			phase = "lower"
-		}
 		diagCodePhase[c.Code] = phase
 	}
 }

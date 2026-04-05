@@ -1,6 +1,6 @@
 package types
 
-// Diagnostic codes emitted by the lexer, parser, lowering, and resolver phases.
+// Diagnostic codes emitted by the lexer, parser, validate, and resolver phases.
 // Each code has a fixed severity defined here. Centralizing codes and severities
 // prevents silent breakage from typos and ensures 1:1 code-to-severity mapping.
 
@@ -32,7 +32,7 @@ const (
 	DiagMissingComma         = "missing-comma"
 )
 
-// Lowering diagnostic codes.
+// Validation diagnostic codes.
 const (
 	DiagMissingModuleIdentity  = "missing-module-identity"
 	DiagRevisionLastUpdated    = "revision-last-updated"
@@ -236,7 +236,7 @@ var parserDiagCodes = []codeEntry{
 	{DiagMissingComma, SeverityMinor},
 }
 
-var loweringDiagCodes = []codeEntry{
+var validateDiagCodes = []codeEntry{
 	{DiagMissingModuleIdentity, SeverityWarning},
 	{DiagRevisionLastUpdated, SeverityMinor},
 	{DiagRevisionNotDescending, SeverityMinor},
@@ -413,7 +413,7 @@ var diagPhases = []struct {
 }{
 	{"lexer", lexerDiagCodes},
 	{"parser", parserDiagCodes},
-	{"lowering", loweringDiagCodes},
+	{"validate", validateDiagCodes},
 	{"resolver", resolverDiagCodes},
 }
 

@@ -60,7 +60,7 @@ func isIntegerKeywordSyntax(syntax module.TypeSyntax) bool {
 // DESCRIPTION clause. OBJECT-TYPE is the only definition type where
 // DESCRIPTION is grammatically optional (also TRAP-TYPE, but that is SMIv1).
 // For all other SMIv2 types, DESCRIPTION is a required clause in the grammar,
-// and empty descriptions are caught by the empty-description lowering check.
+// and empty descriptions are caught by the empty-description parser check.
 func checkDescriptionMissing(ctx *resolverContext, objRefs []objectTypeRef) {
 	for _, ref := range objRefs {
 		if ref.mod.Language != types.LanguageSMIv2 || module.IsBaseModule(ref.mod.Name) {

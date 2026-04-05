@@ -1,13 +1,13 @@
 // Package module provides a normalized representation of MIB modules.
 //
-// Lowering transforms AST structures into a simplified module representation
-// independent of whether the source was SMIv1 or SMIv2. Key transformations:
+// The parser produces module IR directly, independent of whether the source
+// was SMIv1 or SMIv2. Key transformations during parsing:
 //
 //   - Language detection from imports
 //   - Import flattening (one symbol per import)
 //   - Unified notification type (TRAP-TYPE and NOTIFICATION-TYPE)
 //
-// Lowering preserves values verbatim without normalization:
+// Values are preserved verbatim without normalization:
 //   - STATUS: mandatory, optional kept distinct (not mapped to current/deprecated)
 //   - ACCESS keyword kept (ACCESS vs MAX-ACCESS)
 //   - OID components kept as symbols (resolution is the resolver's job)
@@ -38,7 +38,7 @@ type Module struct {
 	SourcePath string
 
 	// LastUpdated is the LAST-UPDATED value from MODULE-IDENTITY, if present.
-	// Set during lowering to avoid repeated definition scans during resolution.
+	// Set during parsing to avoid repeated definition scans during resolution.
 	// Whitespace-only values are not cached.
 	LastUpdated string
 
@@ -76,11 +76,18 @@ func (m *Module) DefinitionNames() iter.Seq[string] {
 	}
 }
 
-// Import is a single imported symbol, flattened from the AST's grouped format.
+// Import is a single imported symbol, flattened from the source's grouped format.
 type Import struct {
 	Module string
 	Symbol string
 	Span   types.Span
+}
+
+// LineColFromLineTable converts a span to line/col using a module's precomputed
+// line table. Used by the resolver for diagnostics when source bytes are no
+// longer available.
+func LineColFromLineTable(lineTable []int, span types.Span) (line, col int) {
+	return types.LineColFromTable(lineTable, span.Start)
 }
 
 // NewImport returns an Import for the given symbol from the given module.

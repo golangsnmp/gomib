@@ -23,11 +23,11 @@ func TestParseMalformedHeaders(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			module := parseModule(tt.source)
-			testutil.Equal(t, "UNKNOWN", module.Name.Name, "module name should be UNKNOWN on header failure")
-			testutil.Greater(t, len(module.Diagnostics), 0, "should have diagnostics")
-			testutil.Equal(t, types.DiagParseError, module.Diagnostics[0].Code, "diagnostic code")
-			testutil.Contains(t, module.Diagnostics[0].Message, tt.wantMsgSub, "diagnostic message should indicate the parse failure point")
+			mod := parseModule(tt.source)
+			testutil.Equal(t, "UNKNOWN", mod.Name, "module name should be UNKNOWN on header failure")
+			testutil.Greater(t, len(mod.Diagnostics), 0, "should have diagnostics")
+			testutil.Equal(t, types.DiagParseError, mod.Diagnostics[0].Code, "diagnostic code")
+			testutil.Contains(t, mod.Diagnostics[0].Message, tt.wantMsgSub, "diagnostic message should indicate the parse failure point")
 		})
 	}
 }

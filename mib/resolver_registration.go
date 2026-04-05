@@ -52,7 +52,7 @@ func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 		ctx.moduleToResolved[mod] = resolved
 		ctx.resolvedToModule[resolved] = mod
 
-		// Collect diagnostics from parsing and lowering
+		// Collect diagnostics from parsing and validation
 		for _, d := range mod.Diagnostics {
 			ctx.mib.addDiagnostic(d)
 		}

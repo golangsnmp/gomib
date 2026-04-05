@@ -15,7 +15,7 @@ golangci-lint run ./... # lint
 The parser uses four method prefixes, distinguished by what they return:
 
 - `expect*` - consume a single token matching a condition, return `lexer.Token`
-- `parse*` - consume tokens and build a typed AST fragment (returns `ast.*` types)
+- `parse*` - consume tokens and build a typed module IR fragment (returns `module.*` types)
 - `skip*` - discard tokens without producing a value
 - `convert*` - transform already-consumed span text into a Go value (no token consumption)
 

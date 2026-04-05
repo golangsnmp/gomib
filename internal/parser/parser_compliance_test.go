@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golangsnmp/gomib/internal/ast"
+	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func TestParseModuleComplianceBaseline(t *testing.T) {
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	mod := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testCompliance MODULE-COMPLIANCE
 			STATUS current
 			DESCRIPTION "Test compliance"
@@ -19,13 +19,13 @@ func TestParseModuleComplianceBaseline(t *testing.T) {
 			::= { testConformance 1 }
 		END`)
 
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
+	if len(mod.Definitions) == 0 {
+		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-	testutil.True(t, ok, "expected ModuleComplianceDef, got %T", module.Body[0])
-	testutil.Equal(t, "testCompliance", def.Name.Name, "compliance name")
+	def, ok := mod.Definitions[0].(*module.ModuleCompliance)
+	testutil.True(t, ok, "expected ModuleCompliance, got %T", mod.Definitions[0])
+	testutil.Equal(t, "testCompliance", def.Name, "compliance name")
 	testutil.Greater(t, len(def.Modules), 0, "should have at least one MODULE clause")
 	if len(def.Modules) > 0 {
 		testutil.Greater(t, len(def.Modules[0].MandatoryGroups), 0, "should have mandatory groups")
@@ -88,18 +88,17 @@ func TestParseModuleComplianceRefinements(t *testing.T) {
 			::= { testConformance 1 }
 		END`, tt.objectClause)
 
-			module := parseModule(source)
+			mod := parseModule(source)
 
-			if len(module.Body) == 0 {
-				t.Fatal("expected definitions in module body")
+			if len(mod.Definitions) == 0 {
+				t.Fatal("expected definitions in module")
 			}
-			def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-			testutil.True(t, ok, "expected ModuleComplianceDef, got %T", module.Body[0])
+			def, ok := mod.Definitions[0].(*module.ModuleCompliance)
+			testutil.True(t, ok, "expected ModuleCompliance, got %T", mod.Definitions[0])
 			testutil.Equal(t, 1, len(def.Modules), "module clauses count")
-			mod := def.Modules[0]
-			testutil.Equal(t, 1, len(mod.Compliances), "compliances count")
-			obj, ok := mod.Compliances[0].(*ast.ComplianceObject)
-			testutil.True(t, ok, "expected ComplianceObject, got %T", mod.Compliances[0])
+			cm := def.Modules[0]
+			testutil.Equal(t, 1, len(cm.Objects), "objects count")
+			obj := cm.Objects[0]
 
 			if tt.wantSyntax {
 				testutil.NotNil(t, obj.Syntax, "SYNTAX should be set")
@@ -113,7 +112,7 @@ func TestParseModuleComplianceRefinements(t *testing.T) {
 			}
 			if tt.wantMinAccess {
 				testutil.NotNil(t, obj.MinAccess, "MIN-ACCESS should be set")
-				testutil.Equal(t, tt.minAccessValue, obj.MinAccess.Value, "MIN-ACCESS value")
+				testutil.Equal(t, tt.minAccessValue, *obj.MinAccess, "MIN-ACCESS value")
 			} else {
 				testutil.Nil(t, obj.MinAccess, "MIN-ACCESS should not be set")
 			}
@@ -122,7 +121,7 @@ func TestParseModuleComplianceRefinements(t *testing.T) {
 }
 
 func TestParseModuleComplianceGroupAndObject(t *testing.T) {
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	mod := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testCompliance MODULE-COMPLIANCE
 			STATUS current
 			DESCRIPTION "Test compliance"
@@ -136,25 +135,23 @@ func TestParseModuleComplianceGroupAndObject(t *testing.T) {
 			::= { testConformance 1 }
 		END`)
 
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
+	if len(mod.Definitions) == 0 {
+		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-	testutil.True(t, ok, "expected ModuleComplianceDef, got %T", module.Body[0])
+	def, ok := mod.Definitions[0].(*module.ModuleCompliance)
+	testutil.True(t, ok, "expected ModuleCompliance, got %T", mod.Definitions[0])
 
-	mod := def.Modules[0]
-	testutil.Equal(t, 2, len(mod.Compliances), "compliances count (GROUP + OBJECT)")
+	cm := def.Modules[0]
+	testutil.Equal(t, 1, len(cm.Groups), "groups count")
+	testutil.Equal(t, 1, len(cm.Objects), "objects count")
 
-	_, ok = mod.Compliances[0].(*ast.ComplianceGroup)
-	testutil.True(t, ok, "first compliance should be ComplianceGroup, got %T", mod.Compliances[0])
-
-	_, ok = mod.Compliances[1].(*ast.ComplianceObject)
-	testutil.True(t, ok, "second compliance should be ComplianceObject, got %T", mod.Compliances[1])
+	testutil.Equal(t, "testOptionalGroup", cm.Groups[0].Group, "group name")
+	testutil.Equal(t, "testObj", cm.Objects[0].Object, "object name")
 }
 
 func TestParseModuleComplianceNamedModule(t *testing.T) {
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	mod := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testCompliance MODULE-COMPLIANCE
 			STATUS current
 			DESCRIPTION "Test compliance"
@@ -163,17 +160,16 @@ func TestParseModuleComplianceNamedModule(t *testing.T) {
 			::= { testConformance 1 }
 		END`)
 
-	if len(module.Body) == 0 {
-		t.Fatal("expected definitions in module body")
+	if len(mod.Definitions) == 0 {
+		t.Fatal("expected definitions in module")
 	}
 
-	def, ok := module.Body[0].(*ast.ModuleComplianceDef)
-	testutil.True(t, ok, "expected ModuleComplianceDef, got %T", module.Body[0])
+	def, ok := mod.Definitions[0].(*module.ModuleCompliance)
+	testutil.True(t, ok, "expected ModuleCompliance, got %T", mod.Definitions[0])
 
 	testutil.Equal(t, 1, len(def.Modules), "module clauses count")
-	mod := def.Modules[0]
-	testutil.NotNil(t, mod.ModuleName, "module name should be set")
-	testutil.Equal(t, "SNMPv2-MIB", mod.ModuleName.Name, "module name")
-	testutil.Len(t, mod.MandatoryGroups, 1, "mandatory groups count")
-	testutil.Equal(t, "systemGroup", mod.MandatoryGroups[0].Name, "mandatory group name")
+	cm := def.Modules[0]
+	testutil.Equal(t, "SNMPv2-MIB", cm.ModuleName, "module name")
+	testutil.Len(t, cm.MandatoryGroups, 1, "mandatory groups count")
+	testutil.Equal(t, "systemGroup", cm.MandatoryGroups[0], "mandatory group name")
 }

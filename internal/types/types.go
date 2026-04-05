@@ -64,7 +64,7 @@ func NewSpan(start, end ByteOffset) Span {
 }
 
 // SpanDiagnostic is an internal diagnostic from the lexer or parser.
-// Converted to Diagnostic during lowering with module name and
+// Converted to Diagnostic during parsing with module name and
 // line/column info.
 type SpanDiagnostic struct {
 	Severity Severity

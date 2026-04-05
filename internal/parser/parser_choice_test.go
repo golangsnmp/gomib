@@ -3,70 +3,68 @@ package parser
 import (
 	"testing"
 
-	"github.com/golangsnmp/gomib/internal/ast"
+	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
 func TestParseChoiceTypeAssignment(t *testing.T) {
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	mod := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestChoice ::= CHOICE {
 			internet Integer32,
 			raw DisplayString
 		}
 		END`)
 
-	testutil.Len(t, module.Body, 1, "definitions count")
-	def, ok := module.Body[0].(*ast.TypeAssignmentDef)
-	testutil.True(t, ok, "expected TypeAssignmentDef, got %T", module.Body[0])
-	testutil.Equal(t, "TestChoice", def.Name.Name, "type name")
+	testutil.Len(t, mod.Definitions, 1, "definitions count")
+	def, ok := mod.Definitions[0].(*module.TypeDef)
+	testutil.True(t, ok, "expected TypeDef, got %T", mod.Definitions[0])
+	testutil.Equal(t, "TestChoice", def.Name, "type name")
 
-	choice, ok := def.Syntax.(*ast.TypeSyntaxChoice)
-	testutil.True(t, ok, "expected TypeSyntaxChoice, got %T", def.Syntax)
-	testutil.Len(t, choice.Alternatives, 2, "alternatives count")
-	testutil.Equal(t, "internet", choice.Alternatives[0].Name.Name, "first alternative name")
-	testutil.Equal(t, "raw", choice.Alternatives[1].Name.Name, "second alternative name")
+	// CHOICE is normalized to the first alternative during parsing.
+	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)
+	testutil.True(t, ok, "expected TypeSyntaxTypeRef (first alternative), got %T", def.Syntax)
+	testutil.Equal(t, "Integer32", ref.Name, "first alternative type")
 }
 
 func TestParseChoiceWithBuiltinTypes(t *testing.T) {
 	// Test CHOICE with builtin types like INTEGER and OCTET STRING
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	mod := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestBuiltinChoice ::= CHOICE {
 			num INTEGER,
 			str OCTET STRING
 		}
 		END`)
 
-	testutil.Len(t, module.Body, 1, "definitions count")
-	def, ok := module.Body[0].(*ast.TypeAssignmentDef)
-	testutil.True(t, ok, "expected TypeAssignmentDef, got %T", module.Body[0])
+	testutil.Len(t, mod.Definitions, 1, "definitions count")
+	def, ok := mod.Definitions[0].(*module.TypeDef)
+	testutil.True(t, ok, "expected TypeDef, got %T", mod.Definitions[0])
 
-	choice, ok := def.Syntax.(*ast.TypeSyntaxChoice)
-	testutil.True(t, ok, "expected TypeSyntaxChoice, got %T", def.Syntax)
-	testutil.Len(t, choice.Alternatives, 2, "alternatives count")
-	testutil.Equal(t, "num", choice.Alternatives[0].Name.Name, "first alternative name")
-	testutil.Equal(t, "str", choice.Alternatives[1].Name.Name, "second alternative name")
+	// CHOICE normalized to first alternative: INTEGER -> TypeSyntaxTypeRef
+	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)
+	testutil.True(t, ok, "expected TypeSyntaxTypeRef (first alternative), got %T", def.Syntax)
+	testutil.Equal(t, "INTEGER", ref.Name, "first alternative type")
 }
 
 func TestParseChoiceSingleAlternative(t *testing.T) {
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	mod := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		SingleChoice ::= CHOICE {
 			only Integer32
 		}
 		END`)
 
-	testutil.Len(t, module.Body, 1, "definitions count")
-	def, ok := module.Body[0].(*ast.TypeAssignmentDef)
-	testutil.True(t, ok, "expected TypeAssignmentDef, got %T", module.Body[0])
+	testutil.Len(t, mod.Definitions, 1, "definitions count")
+	def, ok := mod.Definitions[0].(*module.TypeDef)
+	testutil.True(t, ok, "expected TypeDef, got %T", mod.Definitions[0])
 
-	choice, ok := def.Syntax.(*ast.TypeSyntaxChoice)
-	testutil.True(t, ok, "expected TypeSyntaxChoice, got %T", def.Syntax)
-	testutil.Len(t, choice.Alternatives, 1, "alternatives count")
-	testutil.Equal(t, "only", choice.Alternatives[0].Name.Name, "alternative name")
+	// Single alternative normalized to its type.
+	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)
+	testutil.True(t, ok, "expected TypeSyntaxTypeRef, got %T", def.Syntax)
+	testutil.Equal(t, "Integer32", ref.Name, "alternative type")
 }
 
 func TestParseChoiceAlternativeSyntax(t *testing.T) {
-	// Verify that alternative Syntax fields are populated correctly.
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	// Verify CHOICE normalization picks the first alternative's syntax.
+	mod := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestChoice ::= CHOICE {
 			num INTEGER,
 			str OCTET STRING,
@@ -74,48 +72,39 @@ func TestParseChoiceAlternativeSyntax(t *testing.T) {
 		}
 		END`)
 
-	testutil.Len(t, module.Body, 1, "definitions count")
-	def := module.Body[0].(*ast.TypeAssignmentDef)
-	choice := def.Syntax.(*ast.TypeSyntaxChoice)
-	testutil.Len(t, choice.Alternatives, 3, "alternatives count")
+	testutil.Len(t, mod.Definitions, 1, "definitions count")
+	def := mod.Definitions[0].(*module.TypeDef)
 
-	// INTEGER alternative should have a builtin syntax
-	if choice.Alternatives[0].Syntax == nil {
-		t.Fatal("first alternative should have non-nil Syntax")
-	}
-	// OCTET STRING alternative
-	if choice.Alternatives[1].Syntax == nil {
-		t.Fatal("second alternative should have non-nil Syntax")
-	}
-	// DisplayString is a type reference
-	ref, ok := choice.Alternatives[2].Syntax.(*ast.TypeSyntaxTypeRef)
-	testutil.True(t, ok, "third alternative Syntax: expected TypeSyntaxTypeRef, got %T", choice.Alternatives[2].Syntax)
-	testutil.Equal(t, "DisplayString", ref.Name.Name, "type ref name")
+	// CHOICE is normalized to the first alternative (INTEGER).
+	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)
+	testutil.True(t, ok, "expected TypeSyntaxTypeRef (normalized from CHOICE), got %T", def.Syntax)
+	testutil.Equal(t, "INTEGER", ref.Name, "first alternative type")
 }
 
 func TestParseChoiceWithNamedNumbers(t *testing.T) {
 	// CHOICE alternative with INTEGER that has named number values.
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	// Normalized to the first alternative.
+	mod := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestChoice ::= CHOICE {
 			status INTEGER { up(1), down(2) },
 			name OCTET STRING
 		}
 		END`)
 
-	testutil.Len(t, module.Body, 1, "definitions count")
-	def := module.Body[0].(*ast.TypeAssignmentDef)
-	choice := def.Syntax.(*ast.TypeSyntaxChoice)
-	testutil.Len(t, choice.Alternatives, 2, "alternatives count")
+	testutil.Len(t, mod.Definitions, 1, "definitions count")
+	def := mod.Definitions[0].(*module.TypeDef)
 
-	// First alternative should have an IntegerEnum syntax with named numbers
-	intEnum, ok := choice.Alternatives[0].Syntax.(*ast.TypeSyntaxIntegerEnum)
-	testutil.True(t, ok, "expected TypeSyntaxIntegerEnum, got %T", choice.Alternatives[0].Syntax)
+	// First alternative is an INTEGER enum.
+	intEnum, ok := def.Syntax.(*module.TypeSyntaxIntegerEnum)
+	testutil.True(t, ok, "expected TypeSyntaxIntegerEnum (first alternative), got %T", def.Syntax)
 	testutil.Len(t, intEnum.NamedNumbers, 2, "named numbers count")
 }
 
 func TestParseChoiceNested(t *testing.T) {
 	// Nested CHOICE inside a CHOICE alternative.
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	// Outer CHOICE normalizes to first alternative, which is an inner CHOICE
+	// that also normalizes to its first alternative.
+	mod := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		TestChoice ::= CHOICE {
 			inner CHOICE {
 				x INTEGER,
@@ -125,21 +114,17 @@ func TestParseChoiceNested(t *testing.T) {
 		}
 		END`)
 
-	testutil.Len(t, module.Body, 1, "definitions count")
-	def := module.Body[0].(*ast.TypeAssignmentDef)
-	outer := def.Syntax.(*ast.TypeSyntaxChoice)
-	testutil.Len(t, outer.Alternatives, 2, "outer alternatives count")
+	testutil.Len(t, mod.Definitions, 1, "definitions count")
+	def := mod.Definitions[0].(*module.TypeDef)
 
-	// First alternative's syntax should be a nested CHOICE
-	inner, ok := outer.Alternatives[0].Syntax.(*ast.TypeSyntaxChoice)
-	testutil.True(t, ok, "expected nested TypeSyntaxChoice, got %T", outer.Alternatives[0].Syntax)
-	testutil.Len(t, inner.Alternatives, 2, "inner alternatives count")
-	testutil.Equal(t, "x", inner.Alternatives[0].Name.Name, "inner first alternative")
-	testutil.Equal(t, "y", inner.Alternatives[1].Name.Name, "inner second alternative")
+	// Outer CHOICE -> first alternative's syntax = inner CHOICE -> first alternative = INTEGER
+	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)
+	testutil.True(t, ok, "expected TypeSyntaxTypeRef (nested CHOICE normalized), got %T", def.Syntax)
+	testutil.Equal(t, "INTEGER", ref.Name, "doubly-nested first alternative type")
 }
 
 func TestParseChoiceInObjectTypeSyntax(t *testing.T) {
-	module := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
+	mod := parseModule(`TEST-MIB DEFINITIONS ::= BEGIN
 		testObj OBJECT-TYPE
 			SYNTAX CHOICE {
 				alpha INTEGER,
@@ -151,11 +136,12 @@ func TestParseChoiceInObjectTypeSyntax(t *testing.T) {
 			::= { test 1 }
 		END`)
 
-	testutil.Len(t, module.Body, 1, "definitions count")
-	def, ok := module.Body[0].(*ast.ObjectTypeDef)
-	testutil.True(t, ok, "expected ObjectTypeDef, got %T", module.Body[0])
+	testutil.Len(t, mod.Definitions, 1, "definitions count")
+	def, ok := mod.Definitions[0].(*module.ObjectType)
+	testutil.True(t, ok, "expected ObjectType, got %T", mod.Definitions[0])
 
-	choice, ok := def.Syntax.Syntax.(*ast.TypeSyntaxChoice)
-	testutil.True(t, ok, "expected TypeSyntaxChoice, got %T", def.Syntax.Syntax)
-	testutil.Len(t, choice.Alternatives, 2, "alternatives count")
+	// CHOICE normalized to first alternative (INTEGER).
+	ref, ok := def.Syntax.(*module.TypeSyntaxTypeRef)
+	testutil.True(t, ok, "expected TypeSyntaxTypeRef (CHOICE normalized), got %T", def.Syntax)
+	testutil.Equal(t, "INTEGER", ref.Name, "first alternative type")
 }
