@@ -795,7 +795,7 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 	for i, m := range modules {
 		result[i] = model.CapabilitiesModule{
 			ModuleName: m.ModuleName,
-			Includes:   m.Includes,
+			Includes:   nameRefNames(m.Includes),
 			Span:       m.Span,
 		}
 		for _, v := range m.Variations {
@@ -823,7 +823,7 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 				ov.Syntax = resolveSyntaxConstraints(ctx, v.Syntax, mod, v.Name, v.Span)
 				ov.WriteSyntax = resolveSyntaxConstraints(ctx, v.WriteSyntax, mod, v.Name, v.Span)
 				if len(v.CreationRequires) > 0 {
-					ov.CreationRequires = slices.Clone(v.CreationRequires)
+					ov.CreationRequires = nameRefNames(v.CreationRequires)
 				}
 				if v.Access != nil {
 					ov.Access = v.Access
@@ -863,6 +863,15 @@ func isNotificationVariation(ctx *resolverContext, mod *module.Module, supportsM
 	}
 	// Cannot resolve; fall back to syntactic heuristic.
 	return v.Syntax == nil && v.WriteSyntax == nil && len(v.CreationRequires) == 0 && v.DefVal == nil
+}
+
+// nameRefNames extracts just the name strings from a slice of NameRefs.
+func nameRefNames(refs []module.NameRef) []string {
+	names := make([]string, len(refs))
+	for i, r := range refs {
+		names[i] = r.Name
+	}
+	return names
 }
 
 func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*model.Node, bool) {

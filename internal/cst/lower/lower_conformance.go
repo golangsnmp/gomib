@@ -164,10 +164,10 @@ func (l *lowerer) lowerAgentCapabilities(n *cst.AgentCapabilitiesNode) *module.A
 func (l *lowerer) lowerSupportsModule(n *cst.CapabilityModuleNode) module.SupportsModule {
 	moduleName := l.text(n.ModuleName)
 
-	var includes []string
+	var includes []module.NameRef
 	if n.Includes != nil {
 		for _, name := range n.Includes.Names {
-			includes = append(includes, l.text(name))
+			includes = append(includes, module.NameRef{Name: l.text(name), Span: name.Span})
 		}
 	}
 
@@ -203,10 +203,10 @@ func (l *lowerer) lowerVariation(n *cst.CapabilityVariationNode) module.Variatio
 		access = &accessValue
 	}
 
-	var creationRequires []string
+	var creationRequires []module.NameRef
 	if n.CreationRequires != nil {
 		for _, name := range n.CreationRequires.Names {
-			creationRequires = append(creationRequires, l.text(name))
+			creationRequires = append(creationRequires, module.NameRef{Name: l.text(name), Span: name.Span})
 		}
 	}
 

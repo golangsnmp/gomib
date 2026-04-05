@@ -825,7 +825,7 @@ func TestConvertSupportsModules(t *testing.T) {
 		input := []module.SupportsModule{
 			{
 				ModuleName: "IF-MIB",
-				Includes:   []string{"ifGeneralGroup"},
+				Includes:   []module.NameRef{{Name: "ifGeneralGroup"}},
 			},
 		}
 		result := convertSupportsModules(ctx, mod, input)
@@ -911,7 +911,7 @@ func TestConvertSupportsModules(t *testing.T) {
 		input := []module.SupportsModule{
 			{
 				ModuleName: "MIX-MIB",
-				Includes:   []string{"ifGeneralGroup"},
+				Includes:   []module.NameRef{{Name: "ifGeneralGroup"}},
 				Variations: []module.Variation{
 					{Name: "ifAdminStatus", Access: &readOnly},
 					{Name: "linkDown", Access: &notImpl},
@@ -939,7 +939,7 @@ func TestConvertSupportsModules(t *testing.T) {
 							Constraint: &module.ConstraintRange{Ranges: []module.Range{module.NewRangeSigned(1, 2, types.Span{})}},
 						},
 						WriteSyntax:      &module.TypeSyntaxTypeRef{Name: "Integer32"},
-						CreationRequires: []string{"ifType", "ifSpeed"},
+						CreationRequires: []module.NameRef{{Name: "ifType"}, {Name: "ifSpeed"}},
 						Description:      "restricted",
 					},
 				},
@@ -1302,13 +1302,13 @@ func TestCreateResolvedCapabilities(t *testing.T) {
 			Supports: []module.SupportsModule{
 				{
 					ModuleName: "IF-MIB",
-					Includes:   []string{"ifGeneralGroup"},
+					Includes:   []module.NameRef{{Name: "ifGeneralGroup"}},
 					Variations: []module.Variation{
 						{
 							Name:             "ifAdminStatus",
 							Syntax:           &module.TypeSyntaxTypeRef{Name: "DisplayString"},
 							Access:           func() *types.Access { v := types.AccessReadOnly; return &v }(),
-							CreationRequires: []string{"ifIndex"},
+							CreationRequires: []module.NameRef{{Name: "ifIndex"}},
 							DefVal:           &module.DefValString{Value: "up"},
 							Description:      "object variation",
 						},

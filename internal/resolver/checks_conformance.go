@@ -106,21 +106,21 @@ func checkComplianceStatus(ctx *resolverContext) {
 		for _, cm := range comp.Modules {
 			// Check mandatory groups.
 			for _, groupRef := range cm.MandatoryGroups {
-				checkComplianceGroupStatus(ctx, ref.mod, comp, cm.ModuleName, groupRef.Name)
+				checkComplianceGroupStatus(ctx, ref.mod, comp, cm.ModuleName, groupRef.Name, groupRef.Span)
 			}
 			// Check optional (GROUP) groups.
 			for _, cg := range cm.Groups {
-				checkComplianceGroupStatus(ctx, ref.mod, comp, cm.ModuleName, cg.Group)
+				checkComplianceGroupStatus(ctx, ref.mod, comp, cm.ModuleName, cg.Group, cg.Span)
 			}
 			// Check refined objects.
 			for _, co := range cm.Objects {
-				checkComplianceObjectStatus(ctx, ref.mod, comp, cm.ModuleName, co.Object)
+				checkComplianceObjectStatus(ctx, ref.mod, comp, cm.ModuleName, co.Object, co.Span)
 			}
 		}
 	}
 }
 
-func checkComplianceGroupStatus(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, moduleName, groupName string) {
+func checkComplianceGroupStatus(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, moduleName, groupName string, span types.Span) {
 	node := lookupComplianceMember(ctx, mod, moduleName, groupName)
 	if node == nil {
 		return
@@ -135,12 +135,12 @@ func checkComplianceGroupStatus(ctx *resolverContext, mod *module.Module, comp *
 	}
 	if gs > comp.Status {
 		ctx.EmitDiagnostic(types.DiagComplianceGroupStatus,
-			mod, comp.DefinitionSpan(),
+			mod, span,
 			fmt.Sprintf("%s compliance %q references %s group %q", comp.Status, comp.Name, gs, groupName))
 	}
 }
 
-func checkComplianceObjectStatus(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, moduleName, objectName string) {
+func checkComplianceObjectStatus(ctx *resolverContext, mod *module.Module, comp *module.ModuleCompliance, moduleName, objectName string, span types.Span) {
 	node := lookupComplianceMember(ctx, mod, moduleName, objectName)
 	if node == nil {
 		return
@@ -151,7 +151,7 @@ func checkComplianceObjectStatus(ctx *resolverContext, mod *module.Module, comp 
 	}
 	if ms > comp.Status {
 		ctx.EmitDiagnostic(types.DiagComplianceObjectStatus,
-			mod, comp.DefinitionSpan(),
+			mod, span,
 			fmt.Sprintf("%s compliance %q references %s object %q", comp.Status, comp.Name, ms, objectName))
 	}
 }
@@ -200,12 +200,12 @@ func checkComplianceDuplicates(ctx *resolverContext, mod *module.Module, comp *m
 	for _, cg := range cm.Groups {
 		if mandatory[cg.Group] {
 			ctx.EmitDiagnostic(types.DiagComplianceGroupInvalid,
-				mod, comp.DefinitionSpan(),
+				mod, cg.Span,
 				fmt.Sprintf("group %q is both mandatory and optional in %q", cg.Group, comp.Name))
 		}
 		if optionalSeen[cg.Group] {
 			ctx.EmitDiagnostic(types.DiagOptionalGroupExists,
-				mod, comp.DefinitionSpan(),
+				mod, cg.Span,
 				fmt.Sprintf("duplicate optional group %q in %q", cg.Group, comp.Name))
 		}
 		optionalSeen[cg.Group] = true
@@ -216,7 +216,7 @@ func checkComplianceDuplicates(ctx *resolverContext, mod *module.Module, comp *m
 	for _, co := range cm.Objects {
 		if refinementSeen[co.Object] {
 			ctx.EmitDiagnostic(types.DiagRefinementExists,
-				mod, comp.DefinitionSpan(),
+				mod, co.Span,
 				fmt.Sprintf("duplicate refinement for %q in %q", co.Object, comp.Name))
 		}
 		refinementSeen[co.Object] = true
@@ -242,7 +242,7 @@ func checkRefinementListed(ctx *resolverContext, mod *module.Module, comp *modul
 	for _, co := range cm.Objects {
 		if !memberNames[co.Object] {
 			ctx.EmitDiagnostic(types.DiagRefinementNotListed,
-				mod, comp.DefinitionSpan(),
+				mod, co.Span,
 				fmt.Sprintf("refined object %q not in any mandatory or optional group of %q", co.Object, comp.Name))
 		}
 	}
@@ -306,8 +306,8 @@ func checkGroupUnreferenced(ctx *resolverContext) {
 		}
 		for _, d := range mod.Capabilities {
 			for _, sup := range d.Supports {
-				for _, name := range sup.Includes {
-					referencedGroups[name] = struct{}{}
+				for _, ref := range sup.Includes {
+					referencedGroups[ref.Name] = struct{}{}
 				}
 			}
 		}

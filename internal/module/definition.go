@@ -243,7 +243,7 @@ func (d *AgentCapabilities) DefinitionOid() *OidAssignment { return &d.Oid }
 // SupportsModule is a SUPPORTS clause in AGENT-CAPABILITIES.
 type SupportsModule struct {
 	ModuleName string
-	Includes   []string
+	Includes   []NameRef
 	Variations []Variation
 	Span       types.Span
 }
@@ -256,7 +256,7 @@ type Variation struct {
 	Syntax           TypeSyntax
 	WriteSyntax      TypeSyntax
 	Access           *types.Access
-	CreationRequires []string
+	CreationRequires []NameRef
 	DefVal           DefVal
 	Description      string
 	Span             types.Span

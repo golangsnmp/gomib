@@ -1277,7 +1277,7 @@ func TestCheckGroupUnreferenced(t *testing.T) {
 				Supports: []module.SupportsModule{
 					{
 						ModuleName: "TEST-MIB",
-						Includes:   []string{"usedNotificationGroup"},
+						Includes:   []module.NameRef{{Name: "usedNotificationGroup"}},
 					},
 				},
 			},
