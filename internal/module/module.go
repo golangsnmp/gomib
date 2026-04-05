@@ -70,6 +70,34 @@ func NewModule(name string, span types.Span) *Module {
 	}
 }
 
+// AddDefinition appends a single definition to both the flat Definitions slice
+// and the appropriate typed slice.
+func (m *Module) AddDefinition(def Definition) {
+	m.Definitions = append(m.Definitions, def)
+	switch d := def.(type) {
+	case *ObjectType:
+		m.ObjectTypes = append(m.ObjectTypes, d)
+	case *TypeDef:
+		m.TypeDefs = append(m.TypeDefs, d)
+	case *Notification:
+		m.Notifications = append(m.Notifications, d)
+	case *ModuleIdentity:
+		m.ModuleIdentities = append(m.ModuleIdentities, d)
+	case *ObjectIdentity:
+		m.ObjectIdentities = append(m.ObjectIdentities, d)
+	case *ValueAssignment:
+		m.ValueAssignments = append(m.ValueAssignments, d)
+	case *ObjectGroup:
+		m.ObjectGroups = append(m.ObjectGroups, d)
+	case *NotificationGroup:
+		m.NotificationGroups = append(m.NotificationGroups, d)
+	case *ModuleCompliance:
+		m.Compliances = append(m.Compliances, d)
+	case *AgentCapabilities:
+		m.Capabilities = append(m.Capabilities, d)
+	}
+}
+
 // HasErrors reports whether this module has any error-level diagnostics.
 func (m *Module) HasErrors() bool {
 	return slices.ContainsFunc(m.Diagnostics, func(d types.Diagnostic) bool {

@@ -35,17 +35,13 @@ func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 		resolved.setLanguage(mod.Language)
 		resolved.setImports(groupImports(mod.Imports))
 
-		for _, def := range mod.Definitions {
-			mi, ok := def.(*module.ModuleIdentity)
-			if !ok {
-				continue
-			}
+		if len(mod.ModuleIdentities) > 0 {
+			mi := mod.ModuleIdentities[0]
 			resolved.setOrganization(mi.Organization)
 			resolved.setContactInfo(mi.ContactInfo)
 			resolved.setDescription(mi.Description)
 			resolved.setLastUpdated(mi.LastUpdated)
 			resolved.setRevisions(convertRevisions(mi.Revisions))
-			break
 		}
 
 		ctx.mib.addModule(resolved)
@@ -73,9 +69,9 @@ func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 		ctx.moduleIndex[mod.Name] = append(ctx.moduleIndex[mod.Name], mod)
 
 		// Cache definition names for faster import/OID resolution.
-		defNames := make(map[string]struct{}, len(mod.Definitions))
+		defNames := make(map[string]struct{}, mod.DefinitionCount())
 		oidDefNames := make(map[string]struct{})
-		for _, def := range mod.Definitions {
+		for def := range mod.AllDefinitions() {
 			name := def.DefinitionName()
 			defNames[name] = struct{}{}
 			if def.DefinitionOid() != nil {
@@ -88,7 +84,7 @@ func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 		if ctx.TraceEnabled() {
 			ctx.Trace("registered module",
 				slog.String("name", mod.Name),
-				slog.Int("definitions", len(mod.Definitions)))
+				slog.Int("definitions", mod.DefinitionCount()))
 		}
 	}
 }

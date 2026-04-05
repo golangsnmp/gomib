@@ -1704,34 +1704,34 @@ func TestOidRegistered_DifferentObjectTypes(t *testing.T) {
 			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
 			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
 		},
-		Definitions: []module.Definition{
-			&module.ValueAssignment{
-				DefBase: module.DefBase{Name: "testRoot"},
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "enterprises"},
-					&module.OidComponentNumber{Value: 99999},
-				}, types.Span{}),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "firstObj"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-				Status:  types.StatusCurrent,
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "testRoot"},
-					&module.OidComponentNumber{Value: 1},
-				}, types.Span{}),
-			},
-			&module.ObjectType{
-				DefBase: module.DefBase{Name: "secondObj"},
-				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
-				Status:  types.StatusCurrent,
-				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "testRoot"},
-					&module.OidComponentNumber{Value: 1},
-				}, types.Span{}),
-			},
-		},
 	}
+	populateTypedSlices(mod, []module.Definition{
+		&module.ValueAssignment{
+			DefBase: module.DefBase{Name: "testRoot"},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "enterprises"},
+				&module.OidComponentNumber{Value: 99999},
+			}, types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "firstObj"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Status:  types.StatusCurrent,
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "testRoot"},
+				&module.OidComponentNumber{Value: 1},
+			}, types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "secondObj"},
+			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			Status:  types.StatusCurrent,
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				&module.OidComponentName{NameValue: "testRoot"},
+				&module.OidComponentNumber{Value: 1},
+			}, types.Span{}),
+		},
+	})
 
 	m := resolveStrict(mod)
 	hasDiag(t, m.Diagnostics(), types.DiagOidRegistered)
@@ -1786,7 +1786,6 @@ func TestResolveOidsCycleDetection(t *testing.T) {
 				module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 			},
 		}
-
 		oidA := module.NewOidAssignment([]module.OidComponent{
 			&module.OidComponentName{NameValue: "nodeB"},
 			&module.OidComponentNumber{Value: 1},
@@ -1795,11 +1794,10 @@ func TestResolveOidsCycleDetection(t *testing.T) {
 			&module.OidComponentName{NameValue: "nodeA"},
 			&module.OidComponentNumber{Value: 2},
 		}, types.Span{})
-
-		mod.Definitions = []module.Definition{
+		populateTypedSlices(mod, []module.Definition{
 			&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeA"}, Oid: oidA},
 			&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeB"}, Oid: oidB},
-		}
+		})
 
 		m := resolveStrict(mod)
 
@@ -1816,15 +1814,13 @@ func TestResolveOidsCycleDetection(t *testing.T) {
 			Name:     "SELF-REF-MIB",
 			Language: types.LanguageSMIv2,
 		}
-
 		oid := module.NewOidAssignment([]module.OidComponent{
 			&module.OidComponentName{NameValue: "selfNode"},
 			&module.OidComponentNumber{Value: 1},
 		}, types.Span{})
-
-		mod.Definitions = []module.Definition{
+		populateTypedSlices(mod, []module.Definition{
 			&module.ValueAssignment{DefBase: module.DefBase{Name: "selfNode"}, Oid: oid},
-		}
+		})
 
 		m := resolveStrict(mod)
 

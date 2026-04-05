@@ -104,6 +104,36 @@ type testModuleConfig struct {
 	rootArc      uint32
 }
 
+// populateTypedSlices distributes a flat Definition slice into the typed slices on mod.
+// Both Definitions and the typed slices are populated so that either access path works.
+func populateTypedSlices(mod *module.Module, defs []module.Definition) {
+	mod.Definitions = defs
+	for _, def := range defs {
+		switch d := def.(type) {
+		case *module.ObjectType:
+			mod.ObjectTypes = append(mod.ObjectTypes, d)
+		case *module.TypeDef:
+			mod.TypeDefs = append(mod.TypeDefs, d)
+		case *module.Notification:
+			mod.Notifications = append(mod.Notifications, d)
+		case *module.ModuleIdentity:
+			mod.ModuleIdentities = append(mod.ModuleIdentities, d)
+		case *module.ObjectIdentity:
+			mod.ObjectIdentities = append(mod.ObjectIdentities, d)
+		case *module.ValueAssignment:
+			mod.ValueAssignments = append(mod.ValueAssignments, d)
+		case *module.ObjectGroup:
+			mod.ObjectGroups = append(mod.ObjectGroups, d)
+		case *module.NotificationGroup:
+			mod.NotificationGroups = append(mod.NotificationGroups, d)
+		case *module.ModuleCompliance:
+			mod.Compliances = append(mod.Compliances, d)
+		case *module.AgentCapabilities:
+			mod.Capabilities = append(mod.Capabilities, d)
+		}
+	}
+}
+
 func buildTestModule(cfg testModuleConfig, defs ...module.Definition) *module.Module {
 	name := cfg.name
 	if name == "" {
@@ -137,12 +167,13 @@ func buildTestModule(cfg testModuleConfig, defs ...module.Definition) *module.Mo
 	}
 	allDefs = append(allDefs, defs...)
 
-	return &module.Module{
-		Name:        name,
-		Language:    cfg.language,
-		Imports:     imports,
-		Definitions: allDefs,
+	mod := &module.Module{
+		Name:     name,
+		Language: cfg.language,
+		Imports:  imports,
 	}
+	populateTypedSlices(mod, allDefs)
+	return mod
 }
 
 // testSMIv2Module builds a TEST-MIB with SMIv2 language, base enterprises import,
@@ -206,12 +237,13 @@ func testTableModule(extraImports []module.Import, columns ...module.Definition)
 	}
 	defs = append(defs, columns...)
 
-	return &module.Module{
-		Name:        "TEST-MIB",
-		Language:    types.LanguageSMIv2,
-		Imports:     imports,
-		Definitions: defs,
+	mod := &module.Module{
+		Name:     "TEST-MIB",
+		Language: types.LanguageSMIv2,
+		Imports:  imports,
 	}
+	populateTypedSlices(mod, defs)
+	return mod
 }
 
 func unresolvedByKind(ctx *resolverContext, kind UnresolvedKind) []UnresolvedRef {

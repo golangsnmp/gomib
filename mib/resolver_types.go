@@ -51,11 +51,7 @@ func createUserTypes(ctx *resolverContext) {
 	for _, mod := range ctx.modules {
 		resolved := ctx.moduleToResolved[mod]
 
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok {
-				continue
-			}
+		for _, td := range mod.TypeDefs {
 			// Skip SEQUENCE type assignments (e.g., IfEntry ::= SEQUENCE { ... }).
 			// These are structural declarations for table rows, not data types.
 			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
@@ -138,11 +134,7 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 	g := graph.New(nTypes)
 
 	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok {
-				continue
-			}
+		for _, td := range mod.TypeDefs {
 			if _, isSeq := td.Syntax.(*module.TypeSyntaxSequence); isSeq {
 				continue
 			}
@@ -273,11 +265,7 @@ func getPrimitiveParentName(syntax module.TypeSyntax) string {
 
 func linkPrimitiveSyntaxParents(ctx *resolverContext) {
 	for _, mod := range ctx.modules {
-		for _, def := range mod.Definitions {
-			td, ok := def.(*module.TypeDef)
-			if !ok {
-				continue
-			}
+		for _, td := range mod.TypeDefs {
 			primitiveName := getPrimitiveParentName(td.Syntax)
 			if primitiveName == "" {
 				continue

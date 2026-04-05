@@ -49,13 +49,10 @@ func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 	baseNames := module.BaseModuleNames()
 
 	t.Run("with user modules", func(t *testing.T) {
-		userMod := &module.Module{
-			Name:     "MY-MIB",
-			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ObjectType{DefBase: module.DefBase{Name: "myObject", Span: types.Synthetic}},
-			},
-		}
+		userMod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv2}
+		populateTypedSlices(userMod, []module.Definition{
+			&module.ObjectType{DefBase: module.DefBase{Name: "myObject", Span: types.Synthetic}},
+		})
 		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
 		registerModules(ctx, []*module.Module{userMod})
@@ -174,14 +171,11 @@ func TestRegisterModules_BaseModulePointersCached(t *testing.T) {
 
 func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 	t.Run("user module", func(t *testing.T) {
-		userMod := &module.Module{
-			Name:     "MY-MIB",
-			Language: types.LanguageSMIv2,
-			Definitions: []module.Definition{
-				&module.ObjectType{DefBase: module.DefBase{Name: "fooObject", Span: types.Synthetic}},
-				&module.TypeDef{DefBase: module.DefBase{Name: "BarType", Span: types.Synthetic}},
-			},
-		}
+		userMod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv2}
+		populateTypedSlices(userMod, []module.Definition{
+			&module.ObjectType{DefBase: module.DefBase{Name: "fooObject", Span: types.Synthetic}},
+			&module.TypeDef{DefBase: module.DefBase{Name: "BarType", Span: types.Synthetic}},
+		})
 		ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
 		registerModules(ctx, []*module.Module{userMod})
@@ -283,15 +277,12 @@ func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
 		},
 		Oid: module.NewOidAssignment(nil, types.Synthetic),
 	}
-	userMod := &module.Module{
-		Name:     "MY-MIB",
-		Language: types.LanguageSMIv2,
-		Definitions: []module.Definition{
-			// Some other definition before MODULE-IDENTITY
-			&module.ObjectType{DefBase: module.DefBase{Name: "someObj", Span: types.Synthetic}},
-			mi,
-		},
-	}
+	userMod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv2}
+	populateTypedSlices(userMod, []module.Definition{
+		// Some other definition before MODULE-IDENTITY
+		&module.ObjectType{DefBase: module.DefBase{Name: "someObj", Span: types.Synthetic}},
+		mi,
+	})
 	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
 	registerModules(ctx, []*module.Module{userMod})
@@ -321,13 +312,10 @@ func TestRegisterModules_ModuleIdentityExtracted(t *testing.T) {
 
 func TestRegisterModules_NoModuleIdentity(t *testing.T) {
 	// A module without MODULE-IDENTITY should have empty metadata on the resolved module.
-	userMod := &module.Module{
-		Name:     "MY-MIB",
-		Language: types.LanguageSMIv1,
-		Definitions: []module.Definition{
-			&module.ObjectType{DefBase: module.DefBase{Name: "someObj", Span: types.Synthetic}},
-		},
-	}
+	userMod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv1}
+	populateTypedSlices(userMod, []module.Definition{
+		&module.ObjectType{DefBase: module.DefBase{Name: "someObj", Span: types.Synthetic}},
+	})
 	ctx := newResolverContext(nil, ResolverNormal, DefaultConfig())
 
 	registerModules(ctx, []*module.Module{userMod})

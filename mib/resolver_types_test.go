@@ -515,18 +515,18 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 
 	t.Run("links local and imported parents", func(t *testing.T) {
 		baseMod := module.NewModule("BASE-MIB", types.Span{})
-		baseMod.Definitions = []module.Definition{
+		populateTypedSlices(baseMod, []module.Definition{
 			makeTypeDef("BaseText", "INTEGER"),
-		}
+		})
 
 		userMod := module.NewModule("USER-MIB", types.Span{})
 		userMod.Imports = []module.Import{
 			module.NewImport("BASE-MIB", "BaseText", types.Span{}),
 		}
-		userMod.Definitions = []module.Definition{
+		populateTypedSlices(userMod, []module.Definition{
 			makeTypeDef("MidText", "BaseText"),
 			makeTypeDef("LeafText", "MidText"),
-		}
+		})
 
 		ctx := newTestContextForModules(DefaultConfig(), baseMod, userMod)
 		ctx.snmpv2SMIModule = baseMod
@@ -562,10 +562,10 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 
 	t.Run("records each cycle participant as unresolved", func(t *testing.T) {
 		mod := module.NewModule("CYCLE-MIB", types.Span{})
-		mod.Definitions = []module.Definition{
+		populateTypedSlices(mod, []module.Definition{
 			makeTypeDef("TypeA", "TypeB"),
 			makeTypeDef("TypeB", "TypeA"),
-		}
+		})
 
 		ctx := newTestContextForModules(DefaultConfig(), mod)
 		ctx.defNames[mod] = map[string]struct{}{
@@ -694,7 +694,7 @@ func TestTryResolveTypeParent(t *testing.T) {
 func TestLinkPrimitiveSyntaxParents(t *testing.T) {
 	smiMod := module.NewModule(moduleSNMPv2SMI, types.Span{})
 	userMod := module.NewModule("USER-MIB", types.Span{})
-	userMod.Definitions = []module.Definition{
+	populateTypedSlices(userMod, []module.Definition{
 		&module.TypeDef{
 			DefBase: module.DefBase{Name: "MyOctets"},
 			Syntax:  &module.TypeSyntaxOctetString{},
@@ -711,7 +711,7 @@ func TestLinkPrimitiveSyntaxParents(t *testing.T) {
 			DefBase: module.DefBase{Name: "MyOid"},
 			Syntax:  &module.TypeSyntaxObjectIdentifier{},
 		},
-	}
+	})
 
 	ctx := newTestContextForModules(DefaultConfig(), smiMod, userMod)
 	ctx.snmpv2SMIModule = smiMod
@@ -739,12 +739,12 @@ func TestLinkPrimitiveSyntaxParents(t *testing.T) {
 
 	t.Run("existing parent is preserved", func(t *testing.T) {
 		mod := module.NewModule("KEEP-MIB", types.Span{})
-		mod.Definitions = []module.Definition{
+		populateTypedSlices(mod, []module.Definition{
 			&module.TypeDef{
 				DefBase: module.DefBase{Name: "AlreadyLinked"},
 				Syntax:  &module.TypeSyntaxOctetString{},
 			},
-		}
+		})
 		ctx := newTestContextForModules(DefaultConfig(), smiMod, mod)
 		ctx.snmpv2SMIModule = smiMod
 		seedPrimitiveTypes(ctx)
@@ -762,15 +762,15 @@ func TestLinkPrimitiveSyntaxParents(t *testing.T) {
 
 func TestLinkRFC1213TypesToTCs(t *testing.T) {
 	rfc1213 := module.NewModule("RFC1213-MIB", types.Span{})
-	rfc1213.Definitions = []module.Definition{
+	populateTypedSlices(rfc1213, []module.Definition{
 		&module.TypeDef{DefBase: module.DefBase{Name: "DisplayString"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
 		&module.TypeDef{DefBase: module.DefBase{Name: "PhysAddress"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
-	}
+	})
 	snmpv2tc := module.NewModule(moduleSNMPv2TC, types.Span{})
-	snmpv2tc.Definitions = []module.Definition{
+	populateTypedSlices(snmpv2tc, []module.Definition{
 		&module.TypeDef{DefBase: module.DefBase{Name: "DisplayString"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
 		&module.TypeDef{DefBase: module.DefBase{Name: "PhysAddress"}, Syntax: &module.TypeSyntaxTypeRef{Name: "OCTET STRING"}},
-	}
+	})
 
 	ctx := newTestContextForModules(DefaultConfig(), rfc1213, snmpv2tc)
 	createUserTypes(ctx)
@@ -832,7 +832,7 @@ func TestCreateUserTypes_Reference(t *testing.T) {
 	// Reference() populated on the resolved Type.
 	mod := module.NewModule("REF-TEST-MIB", types.Span{})
 	mod.Language = types.LanguageSMIv2
-	mod.Definitions = []module.Definition{
+	populateTypedSlices(mod, []module.Definition{
 		&module.TypeDef{
 			DefBase:             module.DefBase{Name: "MyTC"},
 			Syntax:              &module.TypeSyntaxTypeRef{Name: "DisplayString"},
@@ -841,7 +841,7 @@ func TestCreateUserTypes_Reference(t *testing.T) {
 			Reference:           "RFC 1234, Section 5",
 			IsTextualConvention: true,
 		},
-	}
+	})
 
 	m := Resolve([]*module.Module{mod}, nil, nil, nil)
 	testutil.NotNil(t, m, "Resolve returned nil Mib")

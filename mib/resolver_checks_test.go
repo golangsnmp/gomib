@@ -915,7 +915,7 @@ func testInetAddressMIB() *module.Module {
 		module.NewImport("SNMPv2-SMI", "Unsigned32", types.Span{}),
 		module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
 	}
-	mod.Definitions = []module.Definition{
+	populateTypedSlices(mod, []module.Definition{
 		&module.ModuleIdentity{
 			DefBase: module.DefBase{Name: "inetAddressMIB"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
@@ -969,7 +969,7 @@ func testInetAddressMIB() *module.Module {
 			Status:              types.StatusCurrent,
 			IsTextualConvention: true,
 		},
-	}
+	})
 	return mod
 }
 
@@ -1485,12 +1485,9 @@ func buildTableModule(seqFields []module.SequenceField, columns []string) *modul
 		})
 	}
 
-	return &module.Module{
-		Name:        "TEST-MIB",
-		Language:    types.LanguageSMIv2,
-		Imports:     imports,
-		Definitions: defs,
-	}
+	mod := &module.Module{Name: "TEST-MIB", Language: types.LanguageSMIv2, Imports: imports}
+	populateTypedSlices(mod, defs)
+	return mod
 }
 
 func TestCheckSequenceFields_Valid(t *testing.T) {

@@ -1180,7 +1180,7 @@ func testTransportAddressMIB() *module.Module {
 		module.NewImport("SNMPv2-SMI", "mib-2", types.Span{}),
 		module.NewImport("SNMPv2-TC", "TEXTUAL-CONVENTION", types.Span{}),
 	}
-	mod.Definitions = []module.Definition{
+	populateTypedSlices(mod, []module.Definition{
 		&module.ModuleIdentity{
 			DefBase: module.DefBase{Name: "transportAddressMIB"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
@@ -1232,7 +1232,7 @@ func testTransportAddressMIB() *module.Module {
 			Status:              types.StatusCurrent,
 			IsTextualConvention: true,
 		},
-	}
+	})
 	return mod
 }
 
