@@ -1,5 +1,8 @@
-// Package mib provides the resolved, read-only model produced by loading
-// SNMP MIB modules.
+// Package mib re-exports the resolved MIB data model and resolver entry point.
+//
+// All model types are aliases for types in internal/model. All enum types and
+// constants are aliases for types in internal/types. The [Resolve] function
+// delegates to internal/resolver.
 //
 // The central type is [Mib], which contains the merged OID tree, modules,
 // objects, types, notifications, groups, compliances, capabilities, and
