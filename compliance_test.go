@@ -106,7 +106,7 @@ func TestComplianceModules(t *testing.T) {
 
 	mandatorySet := make(map[string]bool)
 	for _, g := range mod.MandatoryGroups {
-		mandatorySet[g] = true
+		mandatorySet[g.Name] = true
 	}
 	testutil.True(t, mandatorySet["snmpGroup"], "snmpGroup should be mandatory")
 	testutil.True(t, mandatorySet["systemGroup"], "systemGroup should be mandatory")

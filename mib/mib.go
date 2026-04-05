@@ -142,6 +142,9 @@ func DecodeSuffix(indexes []IndexEntry, suffix OID) []DecodedIndex {
 	return model.DecodeSuffix(indexes, suffix)
 }
 
+// NameRefNames returns just the name strings from a slice of NameRefs.
+var NameRefNames = model.NameRefNames
+
 // --- Compliance / Capability value types ---
 
 type (
@@ -151,6 +154,7 @@ type (
 	CapabilitiesModule    = model.CapabilitiesModule
 	ObjectVariation       = model.ObjectVariation
 	NotificationVariation = model.NotificationVariation
+	NameRef               = model.NameRef
 )
 
 // --- Resolve entry point ---

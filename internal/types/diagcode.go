@@ -202,6 +202,10 @@ const (
 	DiagTransportAddressPairing      = "transportaddress-transportaddresstype"
 	DiagTransportAddressTypeSubtyped = "transportaddresstype-subtyped"
 	DiagTransportAddressSpecific     = "transportaddress-specific"
+	DiagIncludesUnresolved           = "includes-unresolved"
+	DiagIncludesDuplicate            = "includes-duplicate"
+	DiagCreationRequiresUnresolved   = "creation-requires-unresolved"
+	DiagCreationRequiresDuplicate    = "creation-requires-duplicate"
 )
 
 // codeEntry pairs a diagnostic code with its severity.
@@ -404,6 +408,10 @@ var resolverDiagCodes = []codeEntry{
 	{DiagTransportAddressPairing, SeverityWarning},
 	{DiagTransportAddressTypeSubtyped, SeverityWarning},
 	{DiagTransportAddressSpecific, SeverityStyle},
+	{DiagIncludesUnresolved, SeverityWarning},
+	{DiagIncludesDuplicate, SeverityWarning},
+	{DiagCreationRequiresUnresolved, SeverityWarning},
+	{DiagCreationRequiresDuplicate, SeverityWarning},
 }
 
 // diagPhases maps phase names to their diagnostic code entries.

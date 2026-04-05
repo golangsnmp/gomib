@@ -67,7 +67,7 @@ func (e *emitter) emitModuleCompliance(comp *mib.Compliance) error {
 			return err
 		}
 
-		if err := e.writeInlineList("        ", "MANDATORY-GROUPS", cm.MandatoryGroups); err != nil {
+		if err := e.writeNameRefList("        ", "MANDATORY-GROUPS", cm.MandatoryGroups); err != nil {
 			return err
 		}
 
@@ -134,7 +134,7 @@ func (e *emitter) emitAgentCapabilities(cap *mib.Capability) error {
 		if _, err := fmt.Fprintf(e.w, "    SUPPORTS %s\n", sm.ModuleName); err != nil {
 			return err
 		}
-		if err := e.writeInlineList("        ", "INCLUDES", sm.Includes); err != nil {
+		if err := e.writeNameRefList("        ", "INCLUDES", sm.Includes); err != nil {
 			return err
 		}
 
@@ -158,7 +158,7 @@ func (e *emitter) emitAgentCapabilities(cap *mib.Capability) error {
 					return err
 				}
 			}
-			if err := e.writeInlineList("            ", "CREATION-REQUIRES", ov.CreationRequires); err != nil {
+			if err := e.writeNameRefList("            ", "CREATION-REQUIRES", ov.CreationRequires); err != nil {
 				return err
 			}
 			if !ov.DefVal.IsZero() {

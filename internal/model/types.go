@@ -19,6 +19,14 @@ type Import struct {
 	Symbols []ImportSymbol
 }
 
+// NameRef is a named symbol reference with its source span.
+// Used in member lists where per-item diagnostic positioning is useful
+// (mandatory groups, INCLUDES groups, CREATION-REQUIRES columns).
+type NameRef struct {
+	Name string
+	Span Span
+}
+
 // Range represents a min..max constraint for sizes or values.
 type Range struct {
 	Min, Max int64
@@ -282,7 +290,7 @@ func bytesToHex(b []byte) string {
 // ComplianceModule is a MODULE clause within a MODULE-COMPLIANCE definition.
 type ComplianceModule struct {
 	ModuleName      string             // module name (empty = current module)
-	MandatoryGroups []string           // MANDATORY-GROUPS references
+	MandatoryGroups []NameRef          // MANDATORY-GROUPS references
 	Groups          []ComplianceGroup  // GROUP refinements
 	Objects         []ComplianceObject // OBJECT refinements
 	Span            Span
@@ -318,10 +326,19 @@ func (cm *ComplianceModule) clone() ComplianceModule {
 	return result
 }
 
+// NameRefNames returns just the name strings from a slice of NameRefs.
+func NameRefNames(refs []NameRef) []string {
+	names := make([]string, len(refs))
+	for i, r := range refs {
+		names[i] = r.Name
+	}
+	return names
+}
+
 // CapabilitiesModule is a SUPPORTS clause within an AGENT-CAPABILITIES definition.
 type CapabilitiesModule struct {
 	ModuleName             string                  // supported module name
-	Includes               []string                // INCLUDES group references
+	Includes               []NameRef               // INCLUDES group references
 	ObjectVariations       []ObjectVariation       // object VARIATION clauses
 	NotificationVariations []NotificationVariation // notification VARIATION clauses
 	Span                   Span
@@ -348,7 +365,7 @@ type ObjectVariation struct {
 	Syntax           *SyntaxConstraints // SYNTAX refinement (nil if not specified)
 	WriteSyntax      *SyntaxConstraints // WRITE-SYNTAX refinement (nil if not specified)
 	Access           *Access            // ACCESS restriction (nil if not specified)
-	CreationRequires []string           // CREATION-REQUIRES columns (nil if not specified)
+	CreationRequires []NameRef          // CREATION-REQUIRES columns (nil if not specified)
 	DefVal           DefVal             // overridden default value (zero if not specified)
 	Description      string
 	Span             Span

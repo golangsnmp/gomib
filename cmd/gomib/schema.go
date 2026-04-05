@@ -1119,8 +1119,8 @@ func buildExportCompliance(comp *mib.Compliance, m *mib.Mib) ExportCompliance {
 			Objects:         make([]ExportComplianceObject, 0),
 		}
 
-		for _, grpName := range cm.MandatoryGroups {
-			ref := resolveNamedRef(m, effectiveModName, grpName)
+		for _, grpRef := range cm.MandatoryGroups {
+			ref := resolveNamedRef(m, effectiveModName, grpRef.Name)
 			vcm.MandatoryGroups = append(vcm.MandatoryGroups, ref)
 		}
 
@@ -1185,8 +1185,8 @@ func buildExportCapability(cap *mib.Capability, m *mib.Mib) ExportCapability {
 			NotificationVariations: make([]ExportNotificationVariation, 0),
 		}
 
-		for _, grpName := range s.Includes {
-			ref := resolveNamedRef(m, s.ModuleName, grpName)
+		for _, grpRef := range s.Includes {
+			ref := resolveNamedRef(m, s.ModuleName, grpRef.Name)
 			vs.Includes = append(vs.Includes, ref)
 		}
 
@@ -1206,7 +1206,7 @@ func buildExportCapability(cap *mib.Capability, m *mib.Mib) ExportCapability {
 				vov.Access = &a
 			}
 			for _, cr := range ov.CreationRequires {
-				crRef := resolveNamedRef(m, s.ModuleName, cr)
+				crRef := resolveNamedRef(m, s.ModuleName, cr.Name)
 				vov.CreationRequires = append(vov.CreationRequires, crRef)
 			}
 			vs.ObjectVariations = append(vs.ObjectVariations, vov)

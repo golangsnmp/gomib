@@ -703,3 +703,63 @@ func hasExplicitSizeConstraint(name string, mod *module.Module, objRefs []object
 	}
 	return false
 }
+
+// checkIncludesGroups validates that each INCLUDES group name in
+// AGENT-CAPABILITIES SUPPORTS clauses resolves to an actual group and
+// checks for duplicates.
+func checkIncludesGroups(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		for _, ac := range mod.Capabilities {
+			for _, sup := range ac.Supports {
+				seen := make(map[string]bool, len(sup.Includes))
+				for _, ref := range sup.Includes {
+					if seen[ref.Name] {
+						ctx.EmitDiagnostic(types.DiagIncludesDuplicate,
+							mod, ref.Span,
+							fmt.Sprintf("duplicate INCLUDES group %q in SUPPORTS %s", ref.Name, sup.ModuleName))
+					}
+					seen[ref.Name] = true
+
+					node := lookupComplianceMember(ctx, mod, sup.ModuleName, ref.Name)
+					if node == nil {
+						ctx.EmitDiagnostic(types.DiagIncludesUnresolved,
+							mod, ref.Span,
+							fmt.Sprintf("INCLUDES group %q not found in module %q", ref.Name, sup.ModuleName))
+					}
+				}
+			}
+		}
+	}
+}
+
+// checkCreationRequires validates that each CREATION-REQUIRES column name in
+// AGENT-CAPABILITIES VARIATION clauses resolves and checks for duplicates.
+func checkCreationRequires(ctx *resolverContext) {
+	for _, mod := range ctx.modules {
+		for _, ac := range mod.Capabilities {
+			for _, sup := range ac.Supports {
+				for _, v := range sup.Variations {
+					if len(v.CreationRequires) == 0 {
+						continue
+					}
+					seen := make(map[string]bool, len(v.CreationRequires))
+					for _, ref := range v.CreationRequires {
+						if seen[ref.Name] {
+							ctx.EmitDiagnostic(types.DiagCreationRequiresDuplicate,
+								mod, ref.Span,
+								fmt.Sprintf("duplicate CREATION-REQUIRES %q in VARIATION %s", ref.Name, v.Name))
+						}
+						seen[ref.Name] = true
+
+						node := lookupComplianceMember(ctx, mod, sup.ModuleName, ref.Name)
+						if node == nil {
+							ctx.EmitDiagnostic(types.DiagCreationRequiresUnresolved,
+								mod, ref.Span,
+								fmt.Sprintf("CREATION-REQUIRES %q not found in module %q", ref.Name, sup.ModuleName))
+						}
+					}
+				}
+			}
+		}
+	}
+}

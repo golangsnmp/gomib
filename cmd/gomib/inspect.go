@@ -283,7 +283,7 @@ func (c *cli) inspectCompliance(m *mib.Mib, comp *mib.Compliance) {
 		}
 		fmt.Fprintf(c.stdout, "\nModule: %s\n", modName)
 		if len(cm.MandatoryGroups) > 0 {
-			fmt.Fprintf(c.stdout, "  Mandatory groups: %s\n", strings.Join(cm.MandatoryGroups, ", "))
+			fmt.Fprintf(c.stdout, "  Mandatory groups: %s\n", strings.Join(mib.NameRefNames(cm.MandatoryGroups), ", "))
 		}
 		for _, cg := range cm.Groups {
 			fmt.Fprintf(c.stdout, "  Group: %s\n", cg.Group)
@@ -320,7 +320,7 @@ func (c *cli) inspectCapability(m *mib.Mib, cap *mib.Capability) {
 	for _, sm := range cap.Supports() {
 		fmt.Fprintf(c.stdout, "\nSupports: %s\n", sm.ModuleName)
 		if len(sm.Includes) > 0 {
-			fmt.Fprintf(c.stdout, "  Includes: %s\n", strings.Join(sm.Includes, ", "))
+			fmt.Fprintf(c.stdout, "  Includes: %s\n", strings.Join(mib.NameRefNames(sm.Includes), ", "))
 		}
 		for i := range sm.ObjectVariations {
 			ov := &sm.ObjectVariations[i]
@@ -538,7 +538,7 @@ func (c *cli) printComplianceReferences(m *mib.Mib, groupName string) {
 	var refs []string
 	for _, comp := range m.Compliances() {
 		for _, cm := range comp.Modules() {
-			if slices.Contains(cm.MandatoryGroups, groupName) {
+			if slices.Contains(mib.NameRefNames(cm.MandatoryGroups), groupName) {
 				modName := ""
 				if comp.Module() != nil {
 					modName = comp.Module().Name()

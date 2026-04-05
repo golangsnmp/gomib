@@ -198,10 +198,10 @@ func (e *emitter) collectImports(defs *definitions) {
 			e.it.addMacro("MODULE-COMPLIANCE")
 			e.it.addNodeParent(comp.Node())
 			for _, cm := range comp.Modules() {
-				for _, gname := range cm.MandatoryGroups {
+				for _, gref := range cm.MandatoryGroups {
 					// Try to find the group's module
-					if nd := e.m.Node(gname); nd != nil && nd.Module() != nil {
-						e.it.addSymbol(nd.Module().Name(), gname)
+					if nd := e.m.Node(gref.Name); nd != nil && nd.Module() != nil {
+						e.it.addSymbol(nd.Module().Name(), gref.Name)
 					}
 				}
 				for _, cg := range cm.Groups {

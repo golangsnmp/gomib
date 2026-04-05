@@ -109,7 +109,7 @@ func TestCapabilitySupports(t *testing.T) {
 
 	includeSet := make(map[string]bool)
 	for _, g := range sup.Includes {
-		includeSet[g] = true
+		includeSet[g.Name] = true
 	}
 	testutil.True(t, includeSet["systemGroup"], "should include systemGroup")
 	testutil.True(t, includeSet["snmpGroup"], "should include snmpGroup")

@@ -143,6 +143,11 @@ func (e *emitter) writeOptionalDescription(indent, desc string) error {
 	return err
 }
 
+// writeNameRefList writes a NameRef list as a comma-separated keyword clause.
+func (e *emitter) writeNameRefList(indent, keyword string, refs []mib.NameRef) error {
+	return e.writeInlineList(indent, keyword, mib.NameRefNames(refs))
+}
+
 // writeInlineList writes a comma-separated list of names inside braces.
 // Example output: "    OBJECTS { foo, bar, baz }\n"
 func (e *emitter) writeInlineList(indent, keyword string, names []string) error {

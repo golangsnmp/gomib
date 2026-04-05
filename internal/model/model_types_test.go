@@ -169,7 +169,7 @@ func TestComplianceAccessors(t *testing.T) {
 	c.setDescription("Test compliance")
 	c.setReference("RFC 5678")
 	c.setModules([]ComplianceModule{
-		{ModuleName: "IF-MIB", MandatoryGroups: []string{"ifGroup"}},
+		{ModuleName: "IF-MIB", MandatoryGroups: []NameRef{{Name: "ifGroup"}}},
 	})
 
 	testutil.Equal(t, "testCompliance", c.Name(), "Name()")
@@ -205,7 +205,7 @@ func TestCapabilityAccessors(t *testing.T) {
 	cap.setReference("RFC 9999")
 	cap.setProductRelease("Agent 1.0")
 	cap.setSupports([]CapabilitiesModule{
-		{ModuleName: "IF-MIB", Includes: []string{"ifGroup"}},
+		{ModuleName: "IF-MIB", Includes: []NameRef{{Name: "ifGroup"}}},
 	})
 
 	testutil.Equal(t, "testCap", cap.Name(), "Name()")

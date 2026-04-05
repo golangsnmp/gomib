@@ -54,6 +54,8 @@ func resolveSemantics(ctx *resolverContext) {
 	checkRowStatusDefaults(ctx, objRefs)
 	checkStorageTypeDefaults(ctx, objRefs)
 	checkTAddressTDomain(ctx, objRefs)
+	checkIncludesGroups(ctx)
+	checkCreationRequires(ctx)
 	checkIpAddressDeprecation(ctx, objRefs)
 	checkInetAddressPairing(ctx, objRefs)
 	checkTransportAddressPairing(ctx, objRefs)
@@ -718,13 +720,9 @@ func createResolvedCompliances(ctx *resolverContext) {
 func convertComplianceModules(ctx *resolverContext, mod *module.Module, modules []module.ComplianceModule) []model.ComplianceModule {
 	result := make([]model.ComplianceModule, len(modules))
 	for i, m := range modules {
-		mandatoryNames := make([]string, len(m.MandatoryGroups))
-		for j, ref := range m.MandatoryGroups {
-			mandatoryNames[j] = ref.Name
-		}
 		result[i] = model.ComplianceModule{
 			ModuleName:      m.ModuleName,
-			MandatoryGroups: mandatoryNames,
+			MandatoryGroups: convertNameRefs(m.MandatoryGroups),
 			Span:            m.Span,
 		}
 		if len(m.Groups) > 0 {
@@ -795,7 +793,7 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 	for i, m := range modules {
 		result[i] = model.CapabilitiesModule{
 			ModuleName: m.ModuleName,
-			Includes:   nameRefNames(m.Includes),
+			Includes:   convertNameRefs(m.Includes),
 			Span:       m.Span,
 		}
 		for _, v := range m.Variations {
@@ -823,7 +821,7 @@ func convertSupportsModules(ctx *resolverContext, mod *module.Module, modules []
 				ov.Syntax = resolveSyntaxConstraints(ctx, v.Syntax, mod, v.Name, v.Span)
 				ov.WriteSyntax = resolveSyntaxConstraints(ctx, v.WriteSyntax, mod, v.Name, v.Span)
 				if len(v.CreationRequires) > 0 {
-					ov.CreationRequires = nameRefNames(v.CreationRequires)
+					ov.CreationRequires = convertNameRefs(v.CreationRequires)
 				}
 				if v.Access != nil {
 					ov.Access = v.Access
@@ -865,13 +863,14 @@ func isNotificationVariation(ctx *resolverContext, mod *module.Module, supportsM
 	return v.Syntax == nil && v.WriteSyntax == nil && len(v.CreationRequires) == 0 && v.DefVal == nil
 }
 
-// nameRefNames extracts just the name strings from a slice of NameRefs.
-func nameRefNames(refs []module.NameRef) []string {
-	names := make([]string, len(refs))
+// convertNameRefs converts module-IR NameRefs to model NameRefs, preserving
+// per-item spans for diagnostic positioning by downstream consumers.
+func convertNameRefs(refs []module.NameRef) []model.NameRef {
+	result := make([]model.NameRef, len(refs))
 	for i, r := range refs {
-		names[i] = r.Name
+		result[i] = model.NameRef{Name: r.Name, Span: r.Span}
 	}
-	return names
+	return result
 }
 
 func lookupMemberNode(ctx *resolverContext, mod *module.Module, name string) (*model.Node, bool) {

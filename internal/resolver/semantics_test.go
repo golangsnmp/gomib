@@ -712,6 +712,8 @@ func TestConvertComplianceModules(t *testing.T) {
 		testutil.Len(t, result, 1, "expected 1, got")
 		testutil.Equal(t, "IF-MIB", result[0].ModuleName, "module name")
 		testutil.Len(t, result[0].MandatoryGroups, 2, "mandatory groups")
+		testutil.Equal(t, "ifGeneralGroup", result[0].MandatoryGroups[0].Name, "mandatory groups[0]")
+		testutil.Equal(t, "ifStackGroup", result[0].MandatoryGroups[1].Name, "mandatory groups[1]")
 	})
 
 	t.Run("module with groups", func(t *testing.T) {
@@ -832,7 +834,7 @@ func TestConvertSupportsModules(t *testing.T) {
 		testutil.Len(t, result, 1, "expected 1, got")
 		testutil.Equal(t, "IF-MIB", result[0].ModuleName, "module name")
 		testutil.Len(t, result[0].Includes, 1, "includes len")
-		testutil.Equal(t, "ifGeneralGroup", result[0].Includes[0], "includes[0]")
+		testutil.Equal(t, "ifGeneralGroup", result[0].Includes[0].Name, "includes[0]")
 	})
 
 	t.Run("object variations with access", func(t *testing.T) {
@@ -955,8 +957,8 @@ func TestConvertSupportsModules(t *testing.T) {
 		testutil.NotNil(t, v.WriteSyntax, "expected non-nil WriteSyntax")
 		testutil.Equal(t, intType, v.WriteSyntax.Type, "WriteSyntax.Type does not match")
 		testutil.Len(t, v.CreationRequires, 2, "CreationRequires len")
-		testutil.Equal(t, "ifType", v.CreationRequires[0], "CreationRequires[0]")
-		testutil.Equal(t, "ifSpeed", v.CreationRequires[1], "CreationRequires[1]")
+		testutil.Equal(t, "ifType", v.CreationRequires[0].Name, "CreationRequires[0]")
+		testutil.Equal(t, "ifSpeed", v.CreationRequires[1].Name, "CreationRequires[1]")
 	})
 
 	t.Run("object variation with defval", func(t *testing.T) {
@@ -1371,7 +1373,7 @@ func TestCreateResolvedCapabilities(t *testing.T) {
 	testutil.NotNil(t, objVar.Access, "object variation access")
 	testutil.Equal(t, model.AccessReadOnly, *objVar.Access, "object variation access")
 	testutil.Len(t, objVar.CreationRequires, 1, "object variation creation-requires")
-	testutil.Equal(t, "ifIndex", objVar.CreationRequires[0], "object variation creation-requires")
+	testutil.Equal(t, "ifIndex", objVar.CreationRequires[0].Name, "object variation creation-requires")
 	testutil.Equal(t, model.DefValKindString, objVar.DefVal.Kind(), "object variation defval kind")
 
 	notifVar := supports[0].NotificationVariations[0]

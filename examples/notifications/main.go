@@ -67,7 +67,7 @@ func main() {
 			name = "(current module)"
 		}
 		fmt.Printf("  MODULE %s\n", name)
-		fmt.Printf("    mandatory groups: %s\n", strings.Join(mod.MandatoryGroups, ", "))
+		fmt.Printf("    mandatory groups: %s\n", strings.Join(mib.NameRefNames(mod.MandatoryGroups), ", "))
 		for _, grp := range mod.Groups {
 			fmt.Printf("    GROUP %s\n", grp.Group)
 		}
@@ -83,7 +83,7 @@ func main() {
 	fmt.Printf("  Product release:  %s\n", cap.ProductRelease())
 	for _, sup := range cap.Supports() {
 		fmt.Printf("  SUPPORTS %s\n", sup.ModuleName)
-		fmt.Printf("    includes: %s\n", strings.Join(sup.Includes, ", "))
+		fmt.Printf("    includes: %s\n", strings.Join(mib.NameRefNames(sup.Includes), ", "))
 		for i := range sup.ObjectVariations {
 			v := &sup.ObjectVariations[i]
 			access := ""

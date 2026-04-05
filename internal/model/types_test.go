@@ -227,7 +227,7 @@ func TestComplianceModulesDeepClone(t *testing.T) {
 	c.setModules([]ComplianceModule{
 		{
 			ModuleName:      "IF-MIB",
-			MandatoryGroups: []string{"ifGeneralGroup"},
+			MandatoryGroups: []NameRef{{Name: "ifGeneralGroup"}},
 			Groups:          []ComplianceGroup{{Group: "ifGroup", Description: "desc"}},
 			Objects: []ComplianceObject{{
 				Object:      "ifType",
@@ -246,8 +246,8 @@ func TestComplianceModulesDeepClone(t *testing.T) {
 	}{
 		{
 			"MandatoryGroups",
-			func(m []ComplianceModule) { m[0].MandatoryGroups[0] = "X" },
-			func() bool { return c.modules[0].MandatoryGroups[0] == "X" },
+			func(m []ComplianceModule) { m[0].MandatoryGroups[0].Name = "X" },
+			func() bool { return c.modules[0].MandatoryGroups[0].Name == "X" },
 		},
 		{
 			"Groups",
@@ -284,12 +284,12 @@ func TestCapabilitySupportsDeepClone(t *testing.T) {
 	cap.setSupports([]CapabilitiesModule{
 		{
 			ModuleName: "IF-MIB",
-			Includes:   []string{"ifGeneralGroup"},
+			Includes:   []NameRef{{Name: "ifGeneralGroup"}},
 			ObjectVariations: []ObjectVariation{{
 				Object:           "ifType",
 				Syntax:           &SyntaxConstraints{Enums: []NamedValue{{Label: "e1", Value: 1}}},
 				WriteSyntax:      &SyntaxConstraints{Bits: []NamedValue{{Label: "b1", Value: 0}}},
-				CreationRequires: []string{"ifName"},
+				CreationRequires: []NameRef{{Name: "ifName"}},
 				Description:      "var desc",
 			}},
 			NotificationVariations: []NotificationVariation{{
@@ -306,8 +306,8 @@ func TestCapabilitySupportsDeepClone(t *testing.T) {
 	}{
 		{
 			"Includes",
-			func(m []CapabilitiesModule) { m[0].Includes[0] = "X" },
-			func() bool { return cap.supports[0].Includes[0] == "X" },
+			func(m []CapabilitiesModule) { m[0].Includes[0].Name = "X" },
+			func() bool { return cap.supports[0].Includes[0].Name == "X" },
 		},
 		{
 			"ObjectVariations",
@@ -316,8 +316,8 @@ func TestCapabilitySupportsDeepClone(t *testing.T) {
 		},
 		{
 			"CreationRequires",
-			func(m []CapabilitiesModule) { m[0].ObjectVariations[0].CreationRequires[0] = "X" },
-			func() bool { return cap.supports[0].ObjectVariations[0].CreationRequires[0] == "X" },
+			func(m []CapabilitiesModule) { m[0].ObjectVariations[0].CreationRequires[0].Name = "X" },
+			func() bool { return cap.supports[0].ObjectVariations[0].CreationRequires[0].Name == "X" },
 		},
 		{
 			"Syntax",
