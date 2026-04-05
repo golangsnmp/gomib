@@ -28,14 +28,14 @@ func checkIntegerMisuse(ctx *resolverContext) {
 		for _, d := range mod.ObjectTypes {
 			if isIntegerKeywordSyntax(d.Syntax) {
 				ctx.EmitDiagnostic(types.DiagIntegerInSMIv2,
-					mod, d.Span,
+					mod, d.Spans.Syntax,
 					fmt.Sprintf("%q: use Integer32 instead of INTEGER in SMIv2", d.Name))
 			}
 		}
 		for _, d := range mod.TypeDefs {
 			if isIntegerKeywordSyntax(d.Syntax) {
 				ctx.EmitDiagnostic(types.DiagIntegerInSMIv2,
-					mod, d.Span,
+					mod, d.Spans.Syntax,
 					fmt.Sprintf("%q: use Integer32 instead of INTEGER in SMIv2", d.Name))
 			}
 		}
@@ -93,7 +93,7 @@ func checkTextualConventionNested(ctx *resolverContext) {
 			parent := resolved.Parent()
 			if parent != nil && parent.IsTextualConvention() {
 				ctx.EmitDiagnostic(types.DiagTCNested,
-					mod, td.Span,
+					mod, td.Spans.Syntax,
 					fmt.Sprintf("%q: textual convention derived from textual convention %q", td.Name, parent.Name()))
 			}
 		}
@@ -173,10 +173,10 @@ func forEachDefinitionSyntax(ctx *resolverContext, fn func(module.TypeSyntax, st
 			continue
 		}
 		for _, d := range mod.ObjectTypes {
-			fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Span)
+			fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Spans.Syntax)
 		}
 		for _, d := range mod.TypeDefs {
-			fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Span)
+			fn(unwrapConstrainedSyntax(d.Syntax), d.Name, mod, d.Spans.Syntax)
 		}
 	}
 }
@@ -274,7 +274,7 @@ func checkOpaqueSMIv2(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 		if t.EffectiveBase() == model.BaseOpaque {
 			ctx.EmitDiagnostic(types.DiagOpaqueSMIv2,
-				ref.mod, ref.obj.Span,
+				ref.mod, ref.obj.Spans.Syntax,
 				fmt.Sprintf("%q: Opaque type should not be used in SMIv2", ref.obj.Name))
 		}
 	}
@@ -315,7 +315,7 @@ func checkFormatHints(ctx *resolverContext) {
 				}
 				if !valid {
 					ctx.EmitDiagnostic(types.DiagInvalidFormat,
-						mod, td.Span,
+						mod, td.Spans.DisplayHint,
 						fmt.Sprintf("%q: invalid DISPLAY-HINT %q for base type %s",
 							td.Name, td.DisplayHint, base))
 				}
@@ -665,7 +665,7 @@ func checkIpAddressDeprecation(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 		if t.EffectiveBase() == model.BaseIpAddress {
 			ctx.EmitDiagnostic(types.DiagIpAddressInSyntax,
-				ref.mod, ref.obj.Span,
+				ref.mod, ref.obj.Spans.Syntax,
 				fmt.Sprintf("%q: IpAddress is deprecated, use InetAddress (RFC 4001)", ref.obj.Name))
 		}
 	}

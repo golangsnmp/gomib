@@ -211,10 +211,10 @@ func checkEnumSubtyping(ctx *resolverContext) {
 			continue
 		}
 		for _, d := range mod.TypeDefs {
-			checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
+			checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Spans.Syntax)
 		}
 		for _, d := range mod.ObjectTypes {
-			checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Span)
+			checkEnumSubtypingSyntax(ctx, d.Syntax, d.Name, mod, d.Spans.Syntax)
 		}
 	}
 }
@@ -282,8 +282,8 @@ func checkRangeConstraints(ctx *resolverContext) {
 			}
 			base := typ.EffectiveBase()
 			sizes, ranges := extractConstraints(d.Syntax)
-			checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
-			checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
+			checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Spans.Syntax)
+			checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Spans.Syntax)
 		}
 		for _, d := range mod.ObjectTypes {
 			sizes, ranges := extractConstraints(d.Syntax)
@@ -295,8 +295,8 @@ func checkRangeConstraints(ctx *resolverContext) {
 				continue
 			}
 			base := resolved.Type().EffectiveBase()
-			checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Span)
-			checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Span)
+			checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Spans.Syntax)
+			checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Spans.Syntax)
 		}
 	}
 }
@@ -510,13 +510,13 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			case types.LanguageSMIv2:
 				if idxObj.Access() != model.AccessNotAccessible {
 					ctx.EmitDiagnostic(types.DiagIndexAccessible,
-						ref.mod, obj.Span,
+						ref.mod, item.Span,
 						fmt.Sprintf("INDEX %q of %q should be not-accessible in SMIv2", item.Object, obj.Name))
 				}
 			case types.LanguageSMIv1:
 				if idxObj.Access() == model.AccessNotAccessible {
 					ctx.EmitDiagnostic(types.DiagIndexNotAccessible,
-						ref.mod, obj.Span,
+						ref.mod, item.Span,
 						fmt.Sprintf("INDEX %q of %q should be accessible in SMIv1", item.Object, obj.Name))
 				}
 			case types.LanguageUnknown:
@@ -526,7 +526,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			// INDEX elements should not have DEFVAL (RFC 2578 s7.7).
 			if !idxObj.DefaultValue().IsZero() {
 				ctx.EmitDiagnostic(types.DiagIndexDefval,
-					ref.mod, obj.Span,
+					ref.mod, item.Span,
 					fmt.Sprintf("INDEX %q of %q has a DEFVAL", item.Object, obj.Name))
 			}
 
@@ -539,11 +539,11 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 				// Counter32 is forbidden per RFC 2578 s7.7 but used in real MIBs.
 				// Emit warning but continue - Counter32 is functionally valid for indexing.
 				ctx.EmitDiagnostic(types.DiagIndexCounterIllegal,
-					ref.mod, obj.Span,
+					ref.mod, item.Span,
 					fmt.Sprintf("INDEX %q of %q has counter base type", item.Object, obj.Name))
 			} else if !isLegalIndexBasetype(base) {
 				ctx.EmitDiagnostic(types.DiagIndexIllegalBasetype,
-					ref.mod, obj.Span,
+					ref.mod, item.Span,
 					fmt.Sprintf("INDEX %q of %q has illegal base type %s", item.Object, obj.Name, base.String()))
 				continue
 			}
@@ -552,7 +552,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			if base == model.BaseOctetString || base == model.BaseOpaque {
 				if len(idxObj.EffectiveSizes()) == 0 {
 					ctx.EmitDiagnostic(types.DiagIndexElementNoSize,
-						ref.mod, obj.Span,
+						ref.mod, item.Span,
 						fmt.Sprintf("INDEX %q of %q has no SIZE restriction", item.Object, obj.Name))
 				}
 				continue
@@ -569,7 +569,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 				for _, e := range enums {
 					if e.Value < 0 {
 						ctx.EmitDiagnostic(types.DiagIndexNegativeRange,
-							ref.mod, obj.Span,
+							ref.mod, item.Span,
 							fmt.Sprintf("INDEX %q of %q has negative enumeration value %q", item.Object, obj.Name, e.Label))
 						break
 					}
@@ -580,7 +580,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			// No range restriction on an integer index.
 			if len(ranges) == 0 {
 				ctx.EmitDiagnostic(types.DiagIndexIntegerNoRange,
-					ref.mod, obj.Span,
+					ref.mod, item.Span,
 					fmt.Sprintf("INDEX %q of %q has no range restriction", item.Object, obj.Name))
 				continue
 			}
@@ -589,7 +589,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			for _, r := range ranges {
 				if r.Min < 0 {
 					ctx.EmitDiagnostic(types.DiagIndexNegativeRange,
-						ref.mod, obj.Span,
+						ref.mod, item.Span,
 						fmt.Sprintf("INDEX %q of %q has range permitting negative values", item.Object, obj.Name))
 					break
 				}
@@ -632,7 +632,7 @@ func checkIndexOIDLength(ctx *resolverContext, ref objectTypeRef) {
 	if totalLen > 128 {
 		excess := totalLen - 128
 		ctx.EmitDiagnostic(types.DiagIndexExceedsTooLarge,
-			ref.mod, ref.obj.Span,
+			ref.mod, ref.obj.Spans.Index,
 			fmt.Sprintf("%q index OID exceeds 128 sub-identifiers by %d", ref.obj.Name, excess))
 	}
 }
@@ -663,7 +663,7 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 		// Counter32 and Counter64 must not have DEFVAL (RFC 2578 s7.9).
 		if base == model.BaseCounter32 || base == model.BaseCounter64 {
 			ctx.EmitDiagnostic(types.DiagCounterDefvalIllegal,
-				ref.mod, obj.Span,
+				ref.mod, obj.Spans.DefVal,
 				fmt.Sprintf("%q: DEFVAL not allowed for counter type", obj.Name))
 			continue
 		}
@@ -684,7 +684,7 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			if len(enums) > 0 {
 				if !findNamedValue(enums, label) {
 					ctx.EmitDiagnostic(types.DiagDefvalEnum,
-						ref.mod, obj.Span,
+						ref.mod, obj.Spans.DefVal,
 						fmt.Sprintf("%q: DEFVAL enum label %q not defined in type", obj.Name, label))
 				}
 			}
@@ -693,7 +693,7 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			for _, label := range labels {
 				if !findNamedValue(bits, label) {
 					ctx.EmitDiagnostic(types.DiagDefvalBits,
-						ref.mod, obj.Span,
+						ref.mod, obj.Spans.DefVal,
 						fmt.Sprintf("%q: DEFVAL BITS label %q not defined in type", obj.Name, label))
 				}
 			}
@@ -714,13 +714,13 @@ func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.Ob
 		if isUnsigned {
 			if uval > math.MaxInt32 {
 				ctx.EmitDiagnostic(types.DiagDefvalBasetype,
-					mod, obj.Span,
+					mod, obj.Spans.DefVal,
 					fmt.Sprintf("%q: DEFVAL %d exceeds Integer32 range", obj.Name, uval))
 			}
 		} else {
 			if ival < math.MinInt32 || ival > math.MaxInt32 {
 				ctx.EmitDiagnostic(types.DiagDefvalBasetype,
-					mod, obj.Span,
+					mod, obj.Spans.DefVal,
 					fmt.Sprintf("%q: DEFVAL %d exceeds Integer32 range", obj.Name, ival))
 			}
 		}
@@ -728,13 +728,13 @@ func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.Ob
 		if isUnsigned {
 			if uval > math.MaxUint32 {
 				ctx.EmitDiagnostic(types.DiagDefvalBasetype,
-					mod, obj.Span,
+					mod, obj.Spans.DefVal,
 					fmt.Sprintf("%q: DEFVAL %d exceeds unsigned32 range", obj.Name, uval))
 			}
 		} else {
 			if ival < 0 || ival > math.MaxUint32 {
 				ctx.EmitDiagnostic(types.DiagDefvalBasetype,
-					mod, obj.Span,
+					mod, obj.Spans.DefVal,
 					fmt.Sprintf("%q: DEFVAL %d exceeds unsigned32 range", obj.Name, ival))
 			}
 		}
@@ -754,7 +754,7 @@ func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.Ob
 				v = uval
 			}
 			ctx.EmitDiagnostic(types.DiagDefvalRange,
-				mod, obj.Span,
+				mod, obj.Spans.DefVal,
 				fmt.Sprintf("%q: DEFVAL %v outside RANGE constraint", obj.Name, v))
 		}
 	}
@@ -781,7 +781,7 @@ func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.Ob
 				v = uval
 			}
 			ctx.EmitDiagnostic(types.DiagDefvalEnum,
-				mod, obj.Span,
+				mod, obj.Spans.DefVal,
 				fmt.Sprintf("%q: DEFVAL %v does not match any enumeration value", obj.Name, v))
 		}
 	}
@@ -1060,18 +1060,18 @@ func checkAccessPerVersion(ctx *resolverContext, mod *module.Module, obj *module
 	case types.LanguageSMIv1:
 		if obj.Access == types.AccessAccessibleForNotify || obj.Access == types.AccessReadCreate {
 			ctx.EmitDiagnostic(types.DiagAccessInvalidSMIv1,
-				mod, obj.Span,
+				mod, obj.Spans.Access,
 				fmt.Sprintf("%q: invalid access %s in SMIv1", obj.Name, obj.Access.String()))
 		}
 		if obj.Access == types.AccessWriteOnly {
 			ctx.EmitDiagnostic(types.DiagAccessWriteOnlySMIv1,
-				mod, obj.Span,
+				mod, obj.Spans.Access,
 				fmt.Sprintf("%q: write-only is valid but discouraged in SMIv1", obj.Name))
 		}
 	case types.LanguageSMIv2:
 		if obj.Access == types.AccessWriteOnly {
 			ctx.EmitDiagnostic(types.DiagAccessWriteOnlySMIv2,
-				mod, obj.Span,
+				mod, obj.Spans.Access,
 				fmt.Sprintf("%q: write-only is no longer allowed in SMIv2", obj.Name))
 		}
 	case types.LanguageUnknown:
@@ -1090,13 +1090,13 @@ func checkAccessKeywordPerVersion(ctx *resolverContext, mod *module.Module, obj 
 	case types.LanguageSMIv1:
 		if obj.AccessKeyword == types.AccessKeywordMaxAccess {
 			ctx.EmitDiagnostic(types.DiagMaxAccessInSMIv1,
-				mod, obj.Span,
+				mod, obj.Spans.Access,
 				fmt.Sprintf("%q: MAX-ACCESS is SMIv2 style, use ACCESS in SMIv1", obj.Name))
 		}
 	case types.LanguageSMIv2:
 		if obj.AccessKeyword == types.AccessKeywordAccess {
 			ctx.EmitDiagnostic(types.DiagAccessInSMIv2,
-				mod, obj.Span,
+				mod, obj.Spans.Access,
 				fmt.Sprintf("%q: ACCESS is SMIv1 style, use MAX-ACCESS in SMIv2", obj.Name))
 		}
 	case types.LanguageUnknown:
@@ -1111,19 +1111,19 @@ func checkKindAccess(ctx *resolverContext, mod *module.Module, obj *module.Objec
 	case model.KindTable:
 		if obj.Access != types.AccessNotAccessible {
 			ctx.EmitDiagnostic(types.DiagAccessTableIllegal,
-				mod, obj.Span,
+				mod, obj.Spans.Access,
 				fmt.Sprintf("%q: table must be not-accessible", obj.Name))
 		}
 	case model.KindRow:
 		if obj.Access != types.AccessNotAccessible {
 			ctx.EmitDiagnostic(types.DiagAccessRowIllegal,
-				mod, obj.Span,
+				mod, obj.Spans.Access,
 				fmt.Sprintf("%q: row must be not-accessible", obj.Name))
 		}
 	case model.KindScalar:
 		if obj.Access == types.AccessReadCreate {
 			ctx.EmitDiagnostic(types.DiagScalarNotCreatable,
-				mod, obj.Span,
+				mod, obj.Spans.Access,
 				fmt.Sprintf("%q: scalar must not be read-create", obj.Name))
 		}
 	}
@@ -1146,7 +1146,7 @@ func checkCounterAccess(ctx *resolverContext, mod *module.Module, obj *module.Ob
 	base := t.EffectiveBase()
 	if base == model.BaseCounter32 || base == model.BaseCounter64 {
 		ctx.EmitDiagnostic(types.DiagAccessCounterIllegal,
-			mod, obj.Span,
+			mod, obj.Spans.Access,
 			fmt.Sprintf("%q: counter must be read-only or accessible-for-notify", obj.Name))
 	}
 }
@@ -1159,7 +1159,7 @@ func checkStatusPerVersion(ctx *resolverContext) {
 			continue
 		}
 		for _, d := range mod.ObjectTypes {
-			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
+			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Spans.Status)
 		}
 		for _, d := range mod.ObjectIdentities {
 			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
@@ -1178,7 +1178,7 @@ func checkStatusPerVersion(ctx *resolverContext) {
 			if !d.IsTextualConvention {
 				continue
 			}
-			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)
+			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Spans.Status)
 		}
 		for _, d := range mod.ObjectGroups {
 			checkDefinitionStatus(ctx, mod, d.Status, d.Name, d.Span)

@@ -364,12 +364,12 @@ func checkRowStatusDefaults(ctx *resolverContext, objRefs []objectTypeRef) {
 		if ref.mod.Language == types.LanguageSMIv2 {
 			if access != types.AccessReadCreate {
 				ctx.EmitDiagnostic(types.DiagRowStatusAccess,
-					ref.mod, ref.obj.Span,
+					ref.mod, ref.obj.Spans.Access,
 					fmt.Sprintf("%q: RowStatus should have MAX-ACCESS read-create, has %s", ref.obj.Name, access))
 			}
 		} else if access != types.AccessReadWrite {
 			ctx.EmitDiagnostic(types.DiagRowStatusAccess,
-				ref.mod, ref.obj.Span,
+				ref.mod, ref.obj.Spans.Access,
 				fmt.Sprintf("%q: RowStatus should have ACCESS read-write, has %s", ref.obj.Name, access))
 		}
 
@@ -384,7 +384,7 @@ func checkRowStatusDefaults(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 		if name, illegal := rowStatusActionValues[val]; illegal {
 			ctx.EmitDiagnostic(types.DiagRowStatusDefault,
-				ref.mod, ref.obj.Span,
+				ref.mod, ref.obj.Spans.DefVal,
 				fmt.Sprintf("%q: RowStatus DEFVAL %s(%d) is an action value, must be active(1), notInService(2), or notReady(3)", ref.obj.Name, name, val))
 		}
 	}
@@ -422,7 +422,7 @@ func checkStorageTypeDefaults(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 		if name, illegal := illegalValues[val]; illegal {
 			ctx.EmitDiagnostic(types.DiagStorageTypeDefault,
-				ref.mod, ref.obj.Span,
+				ref.mod, ref.obj.Spans.DefVal,
 				fmt.Sprintf("%q: StorageType DEFVAL %s(%d) is not a valid default, must be other(1), volatile(2), or nonVolatile(3)", ref.obj.Name, name, val))
 		}
 	}
@@ -485,7 +485,7 @@ func checkTAddressTDomain(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 		if !found {
 			ctx.EmitDiagnostic(types.DiagTAddressTDomain,
-				ref.mod, ref.obj.Span,
+				ref.mod, ref.obj.Spans.Syntax,
 				fmt.Sprintf("%q: TAddress column has no sibling with TDomain type", ref.obj.Name))
 		}
 	}
@@ -628,7 +628,7 @@ func checkAddressTypePairing(ctx *resolverContext, objRefs []objectTypeRef, cfg 
 		for _, specific := range specificTypes {
 			if isDerivedFromType(t, specific) {
 				ctx.EmitDiagnostic(cfg.diagSpecific,
-					ref.mod, ref.obj.Span,
+					ref.mod, ref.obj.Spans.Syntax,
 					fmt.Sprintf("%q: %s is a specific variant, use %s with %s",
 						ref.obj.Name, specific.Name(), cfg.addressType, cfg.addressTypeType))
 				break
@@ -651,7 +651,7 @@ func checkAddressPairingSibling(ctx *resolverContext, ref objectTypeRef, resolve
 		}
 	}
 	ctx.EmitDiagnostic(diagCode,
-		ref.mod, ref.obj.Span,
+		ref.mod, ref.obj.Spans.Syntax,
 		fmt.Sprintf("%q: %s column has no sibling with %s type", ref.obj.Name, addrName, addrTypeName))
 }
 
@@ -680,7 +680,7 @@ func checkAddressTypeSubtyped(ctx *resolverContext, ref objectTypeRef, resolved 
 			return
 		}
 		ctx.EmitDiagnostic(diagCode,
-			ref.mod, ref.obj.Span,
+			ref.mod, ref.obj.Spans.Syntax,
 			fmt.Sprintf("%q: %s is subtyped but sibling %q (%s) has no SIZE constraint",
 				ref.obj.Name, addrTypeName, col.Name(), addrName))
 		return
