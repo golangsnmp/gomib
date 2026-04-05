@@ -201,7 +201,11 @@ func (l *lowerer) lowerDefinition(def cst.DefinitionNode, m *module.Module) {
 	case *cst.AgentCapabilitiesNode:
 		m.Capabilities = append(m.Capabilities, l.lowerAgentCapabilities(d))
 	case *cst.MacroDefinitionNode:
-		// Skip macro definitions (not semantic).
+		if !module.IsBaseModule(l.moduleName) {
+			name := l.text(d.Name)
+			l.EmitDiagnostic(types.DiagMacroNotAllowed, d.Span,
+				fmt.Sprintf("MACRO definition %q not allowed outside base modules", name))
+		}
 	case *cst.ErrorNode:
 		// Skip error nodes.
 	}

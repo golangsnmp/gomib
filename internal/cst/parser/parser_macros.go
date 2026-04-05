@@ -1,11 +1,8 @@
 package parser
 
 import (
-	"fmt"
-
 	"github.com/golangsnmp/gomib/internal/cst"
 	"github.com/golangsnmp/gomib/internal/lexer"
-	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -1126,7 +1123,6 @@ func (p *Parser) parseMacroDefinition() (cst.DefinitionNode, *types.SpanDiagnost
 
 	nameTok := p.advance()
 	node.Name = nameTok
-	name := p.text(nameTok.Span)
 
 	// The lexer enters stateInMacro when it sees MACRO keyword, and skips
 	// body until END. So we won't see ::= BEGIN body in the token stream.
@@ -1151,18 +1147,6 @@ func (p *Parser) parseMacroDefinition() (cst.DefinitionNode, *types.SpanDiagnost
 		return nil, &diag
 	}
 
-	if !module.IsBaseModule(p.currentModuleName()) {
-		span := types.NewSpan(start, p.lastEnd)
-		p.EmitDiagnostic(types.DiagMacroNotAllowed, span,
-			fmt.Sprintf("MACRO definition %q not allowed outside base modules", name))
-	}
-
 	node.Span = types.NewSpan(start, p.lastEnd)
 	return node, nil
-}
-
-// currentModuleName returns the name of the module currently being parsed,
-// extracted from the first module if available.
-func (p *Parser) currentModuleName() string {
-	return p.moduleName
 }

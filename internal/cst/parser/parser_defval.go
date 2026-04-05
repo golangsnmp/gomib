@@ -33,8 +33,7 @@ func (p *Parser) parseDefValClause() (*cst.DefValClauseNode, *types.SpanDiagnost
 		}
 		if p.check(lexer.TokLBrace) {
 			depth++
-		}
-		if p.check(lexer.TokRBrace) {
+		} else if p.check(lexer.TokRBrace) {
 			depth--
 		}
 		node.Content = append(node.Content, p.advance())

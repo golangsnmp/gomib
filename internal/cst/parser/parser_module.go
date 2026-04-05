@@ -55,7 +55,6 @@ func (p *Parser) parseOneModule() (cst.ModuleNode, bool) {
 	}
 	mod.Name = nameTok
 	name := p.text(nameTok.Span)
-	p.moduleName = name
 	p.validateIdentifier(name, nameTok.Span)
 
 	// Skip obsolete module OID that some MIBs include before DEFINITIONS.

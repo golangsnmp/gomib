@@ -42,4 +42,5 @@ type ImportGroupNode struct {
 type DefinitionNode interface {
 	definitionNode()
 	DefinitionSpan() types.Span
+	WalkTokens(func(SyntaxToken))
 }

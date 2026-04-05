@@ -30,6 +30,8 @@ type SyntaxToken struct {
 }
 
 // IsZero reports whether this token is absent (zero value).
+// This relies on real tokens always having End > Start (non-zero width)
+// or a non-zero Kind (e.g. TokEOF at position 0 in an empty file).
 func (t SyntaxToken) IsZero() bool {
 	return t.Span.Start == 0 && t.Span.End == 0 && t.Kind == 0
 }

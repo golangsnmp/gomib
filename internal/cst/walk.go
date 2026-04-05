@@ -20,66 +20,6 @@ func walkInterleavedTokens(items, seps []SyntaxToken, fn func(SyntaxToken)) {
 	}
 }
 
-// walkDefinitionNode dispatches WalkTokens to the concrete definition type.
-func walkDefinitionNode(d DefinitionNode, fn func(SyntaxToken)) {
-	switch n := d.(type) {
-	case *ObjectTypeNode:
-		n.WalkTokens(fn)
-	case *ModuleIdentityNode:
-		n.WalkTokens(fn)
-	case *ObjectIdentityNode:
-		n.WalkTokens(fn)
-	case *NotificationTypeNode:
-		n.WalkTokens(fn)
-	case *TrapTypeNode:
-		n.WalkTokens(fn)
-	case *TextualConventionNode:
-		n.WalkTokens(fn)
-	case *TypeAssignmentNode:
-		n.WalkTokens(fn)
-	case *ValueAssignmentNode:
-		n.WalkTokens(fn)
-	case *ObjectGroupNode:
-		n.WalkTokens(fn)
-	case *NotificationGroupNode:
-		n.WalkTokens(fn)
-	case *ModuleComplianceNode:
-		n.WalkTokens(fn)
-	case *AgentCapabilitiesNode:
-		n.WalkTokens(fn)
-	case *MacroDefinitionNode:
-		n.WalkTokens(fn)
-	case *ErrorNode:
-		n.WalkTokens(fn)
-	}
-}
-
-// walkTypeSyntaxNode dispatches WalkTokens to the concrete type syntax node.
-func walkTypeSyntaxNode(s TypeSyntaxNode, fn func(SyntaxToken)) {
-	switch n := s.(type) {
-	case *TypeRefSyntaxNode:
-		n.WalkTokens(fn)
-	case *IntegerEnumSyntaxNode:
-		n.WalkTokens(fn)
-	case *BitsSyntaxNode:
-		n.WalkTokens(fn)
-	case *ConstrainedSyntaxNode:
-		n.WalkTokens(fn)
-	case *SequenceOfSyntaxNode:
-		n.WalkTokens(fn)
-	case *SequenceSyntaxNode:
-		n.WalkTokens(fn)
-	case *OctetStringSyntaxNode:
-		n.WalkTokens(fn)
-	case *ObjectIdentifierSyntaxNode:
-		n.WalkTokens(fn)
-	case *TaggedSyntaxNode:
-		n.WalkTokens(fn)
-	case *ChoiceSyntaxNode:
-		n.WalkTokens(fn)
-	}
-}
-
 // ReconstructText rebuilds the source text by walking all tokens in order and
 // concatenating their trivia and token text. A correct CST round-trips to the
 // original source.
@@ -117,7 +57,7 @@ func (n *ModuleNode) WalkTokens(fn func(SyntaxToken)) {
 		n.Imports.WalkTokens(fn)
 	}
 	for _, d := range n.Body {
-		walkDefinitionNode(d, fn)
+		d.WalkTokens(fn)
 	}
 	walkToken(n.End, fn)
 }
@@ -290,7 +230,7 @@ func (n *TypeAssignmentNode) WalkTokens(fn func(SyntaxToken)) {
 	walkToken(n.Name, fn)
 	walkToken(n.Assign, fn)
 	if n.Syntax != nil {
-		walkTypeSyntaxNode(n.Syntax, fn)
+		n.Syntax.WalkTokens(fn)
 	}
 }
 
@@ -414,7 +354,7 @@ func (n *MacroDefinitionNode) WalkTokens(fn func(SyntaxToken)) {
 func (n *SyntaxClauseNode) WalkTokens(fn func(SyntaxToken)) {
 	walkToken(n.Keyword, fn)
 	if n.Syntax != nil {
-		walkTypeSyntaxNode(n.Syntax, fn)
+		n.Syntax.WalkTokens(fn)
 	}
 }
 
@@ -621,7 +561,7 @@ func (n *BitsSyntaxNode) WalkTokens(fn func(SyntaxToken)) {
 // WalkTokens visits all tokens in source order.
 func (n *ConstrainedSyntaxNode) WalkTokens(fn func(SyntaxToken)) {
 	if n.Base != nil {
-		walkTypeSyntaxNode(n.Base, fn)
+		n.Base.WalkTokens(fn)
 	}
 	if n.Constraint != nil {
 		n.Constraint.WalkTokens(fn)
@@ -675,7 +615,7 @@ func (n *SequenceSyntaxNode) WalkTokens(fn func(SyntaxToken)) {
 func (n *SequenceFieldNode) WalkTokens(fn func(SyntaxToken)) {
 	walkToken(n.Name, fn)
 	if n.Syntax != nil {
-		walkTypeSyntaxNode(n.Syntax, fn)
+		n.Syntax.WalkTokens(fn)
 	}
 }
 
@@ -699,7 +639,7 @@ func (n *TaggedSyntaxNode) WalkTokens(fn func(SyntaxToken)) {
 	walkToken(n.RBracket, fn)
 	walkToken(n.Implicit, fn)
 	if n.Inner != nil {
-		walkTypeSyntaxNode(n.Inner, fn)
+		n.Inner.WalkTokens(fn)
 	}
 }
 
@@ -788,7 +728,7 @@ func (n *ComplianceObjectNode) WalkTokens(fn func(SyntaxToken)) {
 func (n *WriteSyntaxClauseNode) WalkTokens(fn func(SyntaxToken)) {
 	walkToken(n.Keyword, fn)
 	if n.Syntax != nil {
-		walkTypeSyntaxNode(n.Syntax, fn)
+		n.Syntax.WalkTokens(fn)
 	}
 }
 

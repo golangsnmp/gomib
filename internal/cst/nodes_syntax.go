@@ -6,6 +6,7 @@ import "github.com/golangsnmp/gomib/internal/types"
 type TypeSyntaxNode interface {
 	typeSyntaxNode()
 	TypeSyntaxSpan() types.Span
+	WalkTokens(func(SyntaxToken))
 }
 
 // TypeRefSyntaxNode is a reference to a named type, e.g. Integer32 or DisplayString.

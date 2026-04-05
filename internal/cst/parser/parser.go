@@ -22,11 +22,10 @@ import (
 
 // Parser converts a token stream into a lossless concrete syntax tree.
 type Parser struct {
-	source     []byte
-	tokens     []lexer.Token // full stream including comments and EOF
-	pos        int           // current position in tokens
-	lastEnd    types.ByteOffset
-	moduleName string // name of the module currently being parsed
+	source  []byte
+	tokens  []lexer.Token // full stream including comments and EOF
+	pos     int           // current position in tokens
+	lastEnd types.ByteOffset
 	types.SpanDiagnosticCollector
 	types.Logger
 }
