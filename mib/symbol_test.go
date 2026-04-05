@@ -3,7 +3,9 @@ package mib
 import (
 	"testing"
 
+	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 // buildSymbolTestMib creates a Mib with multiple entity types for testing.
@@ -292,9 +294,10 @@ func TestModulesDefiningNotFound(t *testing.T) {
 
 func TestModuleImportsSymbol(t *testing.T) {
 	mod := newModule("TEST-MIB")
-	mod.setImports([]Import{
-		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{{Name: "enterprises"}, {Name: "Counter32"}}},
-		{Module: "SNMPv2-TC", Symbols: []ImportSymbol{{Name: "DisplayString"}}},
+	mod.setRawImports([]module.Import{
+		module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
+		module.NewImport("SNMPv2-TC", "DisplayString", types.Span{}),
 	})
 
 	testutil.True(t, mod.ImportsSymbol("enterprises"), "enterprises")
@@ -310,23 +313,24 @@ func TestModulesImporting(t *testing.T) {
 	m := newMib()
 
 	mod1 := newModule("MOD-A")
-	mod1.setImports([]Import{
-		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{{Name: "enterprises"}, {Name: "Counter32"}}},
+	mod1.setRawImports([]module.Import{
+		module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
 	})
 	m.addModule(mod1)
 
 	mod2 := newModule("MOD-B")
-	mod2.setImports([]Import{
-		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{{Name: "enterprises"}}},
-		{Module: "SNMPv2-TC", Symbols: []ImportSymbol{{Name: "DisplayString"}}},
+	mod2.setRawImports([]module.Import{
+		module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
+		module.NewImport("SNMPv2-TC", "DisplayString", types.Span{}),
 	})
 	m.addModule(mod2)
 
 	// Base module should be excluded.
 	baseMod := newModule("BASE-MOD")
 	baseMod.setBase(true)
-	baseMod.setImports([]Import{
-		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{{Name: "enterprises"}}},
+	baseMod.setRawImports([]module.Import{
+		module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
 	})
 	m.addModule(baseMod)
 

@@ -356,23 +356,20 @@ func TestRegisterModules_BuilderReceivesModules(t *testing.T) {
 	testutil.NotNil(t, ctx.mib.Module("MY-MIB"), "Builder.Module(MY-MIB) returned nil")
 }
 
-func TestGroupImports(t *testing.T) {
+func TestModuleImports_Grouping(t *testing.T) {
 	t.Run("nil input", func(t *testing.T) {
-		got := groupImports(nil)
-		testutil.Len(t, got, 0, "groupImports(nil)")
-	})
-
-	t.Run("empty input", func(t *testing.T) {
-		got := groupImports([]module.Import{})
-		testutil.Len(t, got, 0, "groupImports(empty)")
+		m := newModule("TEST-MIB")
+		got := m.Imports()
+		testutil.Len(t, got, 0, "Imports() on empty module")
 	})
 
 	t.Run("single import", func(t *testing.T) {
-		raw := []module.Import{
+		m := newModule("TEST-MIB")
+		m.setRawImports([]module.Import{
 			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{Start: 10, End: 20}),
-		}
-		got := groupImports(raw)
-		testutil.Len(t, got, 1, "groupImports result")
+		})
+		got := m.Imports()
+		testutil.Len(t, got, 1, "Imports() result")
 		testutil.Equal(t, got[0].Module, "SNMPv2-SMI", "module name")
 		testutil.Len(t, got[0].Symbols, 1, "symbols")
 		testutil.Equal(t, got[0].Symbols[0].Name, "enterprises", "symbol name")
@@ -380,13 +377,14 @@ func TestGroupImports(t *testing.T) {
 	})
 
 	t.Run("multiple symbols from same module sorted", func(t *testing.T) {
-		raw := []module.Import{
+		m := newModule("TEST-MIB")
+		m.setRawImports([]module.Import{
 			module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
 			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
 			module.NewImport("SNMPv2-SMI", "enterprises", types.Span{}),
-		}
-		got := groupImports(raw)
-		testutil.Len(t, got, 1, "groupImports result")
+		})
+		got := m.Imports()
+		testutil.Len(t, got, 1, "Imports() result")
 		testutil.Len(t, got[0].Symbols, 3, "symbols")
 		// Symbols should be sorted alphabetically.
 		testutil.Equal(t, got[0].Symbols[0].Name, "Counter32", "first symbol")
@@ -395,13 +393,14 @@ func TestGroupImports(t *testing.T) {
 	})
 
 	t.Run("multiple modules preserve declaration order", func(t *testing.T) {
-		raw := []module.Import{
+		m := newModule("TEST-MIB")
+		m.setRawImports([]module.Import{
 			module.NewImport("SNMPv2-TC", "DisplayString", types.Span{}),
 			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
 			module.NewImport("SNMPv2-TC", "TruthValue", types.Span{}),
 			module.NewImport("SNMPv2-SMI", "Counter32", types.Span{}),
-		}
-		got := groupImports(raw)
+		})
+		got := m.Imports()
 		testutil.Len(t, got, 2, "grouped modules")
 		// Module order follows first occurrence.
 		testutil.Equal(t, got[0].Module, "SNMPv2-TC", "first module")

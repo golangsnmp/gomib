@@ -3,7 +3,9 @@ package mib
 import (
 	"testing"
 
+	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 // --- Notification ---
@@ -237,8 +239,8 @@ func TestModuleAccessors(t *testing.T) {
 	mod.setRevisions([]Revision{
 		{Date: "2000-06-14", Description: "Initial version"},
 	})
-	mod.setImports([]Import{
-		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{{Name: "MODULE-IDENTITY"}}},
+	mod.setRawImports([]module.Import{
+		module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
 	})
 
 	testutil.Equal(t, "IF-MIB", mod.Name(), "Name()")

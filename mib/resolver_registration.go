@@ -1,7 +1,6 @@
 package mib
 
 import (
-	"cmp"
 	"log/slog"
 	"slices"
 
@@ -33,7 +32,7 @@ func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 		resolved.setSourcePath(mod.SourcePath)
 		resolved.setBase(module.IsBaseModule(mod.Name))
 		resolved.setLanguage(mod.Language)
-		resolved.setImports(groupImports(mod.Imports))
+		resolved.setRawImports(mod.Imports)
 
 		if len(mod.ModuleIdentities) > 0 {
 			mi := mod.ModuleIdentities[0]
@@ -87,33 +86,6 @@ func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 				slog.Int("definitions", mod.DefinitionCount()))
 		}
 	}
-}
-
-// groupImports converts flat per-symbol imports into grouped-by-module form.
-func groupImports(raw []module.Import) []Import {
-	if len(raw) == 0 {
-		return nil
-	}
-	var order []string
-	grouped := make(map[string][]ImportSymbol)
-	for _, imp := range raw {
-		if _, ok := grouped[imp.Module]; !ok {
-			order = append(order, imp.Module)
-		}
-		grouped[imp.Module] = append(grouped[imp.Module], ImportSymbol{
-			Name: imp.Symbol,
-			Span: imp.Span,
-		})
-	}
-	result := make([]Import, 0, len(order))
-	for _, modName := range order {
-		syms := grouped[modName]
-		slices.SortFunc(syms, func(a, b ImportSymbol) int {
-			return cmp.Compare(a.Name, b.Name)
-		})
-		result = append(result, Import{Module: modName, Symbols: syms})
-	}
-	return result
 }
 
 func convertRevisions(revs []module.Revision) []Revision {

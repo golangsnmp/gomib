@@ -115,14 +115,9 @@ func TestModuleAvailableSymbols(t *testing.T) {
 	ownNode := &Node{name: "ownObj", obj: ownObj}
 	mod.addNode(ownNode)
 
-	mod.setImports([]Import{
-		{
-			Module: "SOURCE-MIB",
-			Symbols: []ImportSymbol{
-				{Name: "srcObj"},
-				{Name: "SrcType"},
-			},
-		},
+	mod.setRawImports([]module.Import{
+		module.NewImport("SOURCE-MIB", "srcObj", types.Span{}),
+		module.NewImport("SOURCE-MIB", "SrcType", types.Span{}),
 	})
 	mod.setResolvedImports(map[string]*Module{
 		"srcObj":  sourceMod,
@@ -160,11 +155,8 @@ func TestModuleAvailableSymbols_OwnDefPriority(t *testing.T) {
 	ownType := &Type{name: "sharedName", module: mod}
 	mod.addType(ownType)
 
-	mod.setImports([]Import{
-		{
-			Module:  "SOURCE-MIB",
-			Symbols: []ImportSymbol{{Name: "sharedName"}},
-		},
+	mod.setRawImports([]module.Import{
+		module.NewImport("SOURCE-MIB", "sharedName", types.Span{}),
 	})
 	mod.setResolvedImports(map[string]*Module{
 		"sharedName": sourceMod,

@@ -1,9 +1,11 @@
 package mib
 
 import (
+	"cmp"
 	"iter"
 	"slices"
 
+	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
 )
 
@@ -19,7 +21,7 @@ type Module struct {
 	description  string
 	lastUpdated  string
 	revisions    []Revision
-	imports      []Import
+	rawImports   []module.Import // flat per-symbol imports from parser
 
 	objects       []*Object
 	types         []*Type
@@ -99,11 +101,31 @@ func (m *Module) LastUpdated() string { return m.lastUpdated }
 // Revisions returns the REVISION clauses in declaration order.
 func (m *Module) Revisions() []Revision { return slices.Clone(m.revisions) }
 
-// Imports returns the IMPORTS declarations for this module.
+// Imports returns the IMPORTS declarations for this module, grouped by source
+// module. Symbols within each group are sorted alphabetically. Module order
+// follows first occurrence in the flat import list.
 func (m *Module) Imports() []Import {
-	result := slices.Clone(m.imports)
-	for i := range result {
-		result[i].Symbols = slices.Clone(result[i].Symbols)
+	if len(m.rawImports) == 0 {
+		return nil
+	}
+	var order []string
+	grouped := make(map[string][]ImportSymbol)
+	for _, imp := range m.rawImports {
+		if _, ok := grouped[imp.Module]; !ok {
+			order = append(order, imp.Module)
+		}
+		grouped[imp.Module] = append(grouped[imp.Module], ImportSymbol{
+			Name: imp.Symbol,
+			Span: imp.Span,
+		})
+	}
+	result := make([]Import, 0, len(order))
+	for _, modName := range order {
+		syms := grouped[modName]
+		slices.SortFunc(syms, func(a, b ImportSymbol) int {
+			return cmp.Compare(a.Name, b.Name)
+		})
+		result = append(result, Import{Module: modName, Symbols: syms})
 	}
 	return result
 }
@@ -229,11 +251,9 @@ func (m *Module) DefinesSymbol(name string) bool {
 
 // ImportsSymbol reports whether this module's IMPORTS clause includes the given name.
 func (m *Module) ImportsSymbol(name string) bool {
-	for _, imp := range m.imports {
-		for _, sym := range imp.Symbols {
-			if sym.Name == name {
-				return true
-			}
+	for _, imp := range m.rawImports {
+		if imp.Symbol == name {
+			return true
 		}
 	}
 	return false
@@ -305,23 +325,21 @@ func (m *Module) AvailableSymbols() iter.Seq[Symbol] {
 		if m.resolvedImports == nil {
 			return
 		}
-		for _, imp := range m.imports {
-			for _, is := range imp.Symbols {
-				if _, already := seen[is.Name]; already {
-					continue
-				}
-				seen[is.Name] = struct{}{}
-				sourceMod := m.resolvedImports[is.Name]
-				if sourceMod == nil {
-					continue
-				}
-				sym := sourceMod.Symbol(is.Name)
-				if sym.IsZero() {
-					continue
-				}
-				if !yield(sym) {
-					return
-				}
+		for _, imp := range m.rawImports {
+			if _, already := seen[imp.Symbol]; already {
+				continue
+			}
+			seen[imp.Symbol] = struct{}{}
+			sourceMod := m.resolvedImports[imp.Symbol]
+			if sourceMod == nil {
+				continue
+			}
+			sym := sourceMod.Symbol(imp.Symbol)
+			if sym.IsZero() {
+				continue
+			}
+			if !yield(sym) {
+				return
 			}
 		}
 	}
@@ -347,7 +365,7 @@ func (m *Module) setContactInfo(info string)               { m.contactInfo = inf
 func (m *Module) setDescription(desc string)               { m.description = desc }
 func (m *Module) setLastUpdated(s string)                  { m.lastUpdated = s }
 func (m *Module) setRevisions(revs []Revision)             { m.revisions = revs }
-func (m *Module) setImports(imports []Import)              { m.imports = imports }
+func (m *Module) setRawImports(imports []module.Import)    { m.rawImports = imports }
 
 func (m *Module) addObject(obj *Object) {
 	m.objects = append(m.objects, obj)

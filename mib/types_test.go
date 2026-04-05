@@ -3,7 +3,9 @@ package mib
 import (
 	"testing"
 
+	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func TestDefValString(t *testing.T) {
@@ -207,17 +209,16 @@ func TestBytesToHex(t *testing.T) {
 
 func TestModuleImportsDeepClone(t *testing.T) {
 	m := newModule("TEST-MIB")
-	m.setImports([]Import{
-		{Module: "SNMPv2-SMI", Symbols: []ImportSymbol{
-			{Name: "MODULE-IDENTITY"},
-			{Name: "OBJECT-TYPE"},
-		}},
+	m.setRawImports([]module.Import{
+		module.NewImport("SNMPv2-SMI", "MODULE-IDENTITY", types.Span{}),
+		module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
 	})
 
 	got := m.Imports()
 	got[0].Symbols[0] = ImportSymbol{Name: "MUTATED"}
 
-	testutil.True(t, m.imports[0].Symbols[0].Name != "MUTATED", "mutating Imports() return value should not affect module internal state")
+	// Verify rawImports are unaffected (Imports() returns a freshly built slice).
+	testutil.Equal(t, "MODULE-IDENTITY", m.rawImports[0].Symbol, "mutating Imports() return value should not affect module internal state")
 }
 
 func TestComplianceModulesDeepClone(t *testing.T) {
