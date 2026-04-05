@@ -1,4 +1,4 @@
-package gomib
+package gomib_test
 
 // resolve_corpus_test.go exercises resolver features that are absent from the
 // net-snmp fixture MIBs. The fixture set (IF-MIB, SNMPv2-MIB, IP-MIB,
@@ -10,6 +10,7 @@ package gomib
 import (
 	"testing"
 
+	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -221,7 +222,7 @@ func TestCorpusBaseModuleOwnership(t *testing.T) {
 	// Load vendor MIBs that redeclare well-known OIDs as path prefixes:
 	//   IEEE8023-LAG-MIB: { iso(1) member-body(2) us(840) ... }
 	//   RAPID-CITY: { iso org(3) dod(6) ... }
-	m := loadCorpusMIB(t, "IEEE8023-LAG-MIB", WithModules("RAPID-CITY"))
+	m := loadCorpusMIB(t, "IEEE8023-LAG-MIB", gomib.WithModules("RAPID-CITY"))
 
 	// These OIDs are defined by multiple base modules (SNMPv2-SMI and
 	// RFC1155-SMI both define org, dod, internet, etc.). Either base module

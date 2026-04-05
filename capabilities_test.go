@@ -1,9 +1,10 @@
-package gomib
+package gomib_test
 
 import (
 	"context"
 	"testing"
 
+	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -13,9 +14,9 @@ func loadCapabilityMIB(t testing.TB) *mib.Mib {
 	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
 	// Load both JNX-SNMPv2-CAPABILITY and SNMPv2-MIB so the resolver can
 	// look up variation targets in the SUPPORTS module.
-	m, err := Load(context.Background(),
-		WithSource(corpus),
-		WithModules("JNX-SNMPv2-CAPABILITY", "SNMPv2-MIB"))
+	m, err := gomib.Load(context.Background(),
+		gomib.WithSource(corpus),
+		gomib.WithModules("JNX-SNMPv2-CAPABILITY", "SNMPv2-MIB"))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}

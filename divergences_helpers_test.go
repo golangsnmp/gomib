@@ -1,4 +1,4 @@
-package gomib
+package gomib_test
 
 // Equivalence helpers for comparing gomib output against net-snmp
 // ground-truth fixtures, accounting for known benign divergences.

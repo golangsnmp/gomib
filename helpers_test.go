@@ -1,4 +1,4 @@
-package gomib
+package gomib_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -23,12 +24,12 @@ var (
 func loadTestMIB(t testing.TB) *mib.Mib {
 	t.Helper()
 	loadOnce.Do(func() {
-		src, err := Dir(testutil.PrimaryCorpusDir(t))
+		src, err := gomib.Dir(testutil.PrimaryCorpusDir(t))
 		if err != nil {
 			loadErr = err
 			return
 		}
-		loadedMib, loadErr = Load(context.Background(), WithSource(src), WithModules(fixtureModules...))
+		loadedMib, loadErr = gomib.Load(context.Background(), gomib.WithSource(src), gomib.WithModules(fixtureModules...))
 	})
 	if loadErr != nil {
 		t.Fatalf("failed to load test MIBs: %v", loadErr)
@@ -142,11 +143,11 @@ func requireGroup(t testing.TB, m *mib.Mib, name string) *mib.Group {
 }
 
 // requireDir calls Dir and fails the test on error.
-func requireDir(t testing.TB, path string) Source {
+func requireDir(t testing.TB, path string) gomib.Source {
 	t.Helper()
-	src, err := Dir(path)
+	src, err := gomib.Dir(path)
 	if err != nil {
-		t.Fatalf("Dir(%s) failed: %v", path, err)
+		t.Fatalf("gomib.Dir(%s) failed: %v", path, err)
 	}
 	return src
 }
@@ -339,13 +340,13 @@ func unresolvedSymbols(m *mib.Mib, module string, kind mib.UnresolvedKind) map[s
 // loadCorpusMIB loads a single module from the primary corpus with optional
 // Load options (e.g. WithResolverStrictness). Used for tests that need real MIBs but
 // not the synthetic problem corpus.
-func loadCorpusMIB(t testing.TB, name string, opts ...LoadOption) *mib.Mib {
+func loadCorpusMIB(t testing.TB, name string, opts ...gomib.LoadOption) *mib.Mib {
 	t.Helper()
 	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
-	allOpts := append([]LoadOption{WithSource(corpus), WithModules(name)}, opts...)
-	m, err := Load(context.Background(), allOpts...)
+	allOpts := append([]gomib.LoadOption{gomib.WithSource(corpus), gomib.WithModules(name)}, opts...)
+	m, err := gomib.Load(context.Background(), allOpts...)
 	if err != nil {
-		t.Fatalf("Load(%s) failed: %v", name, err)
+		t.Fatalf("gomib.Load(%s) failed: %v", name, err)
 	}
 	return m
 }
@@ -357,14 +358,14 @@ func loadAtStrictness(t testing.TB, name string, level mib.ResolverStrictness) *
 	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
 	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
-	m, err := Load(context.Background(),
-		WithSource(corpus, problems),
-		WithModules(name),
-		WithResolverStrictness(level),
-		WithDiagnosticConfig(diag),
+	m, err := gomib.Load(context.Background(),
+		gomib.WithSource(corpus, problems),
+		gomib.WithModules(name),
+		gomib.WithResolverStrictness(level),
+		gomib.WithDiagnosticConfig(diag),
 	)
 	if err != nil {
-		t.Fatalf("Load(%s, %s) failed: %v", name, level, err)
+		t.Fatalf("gomib.Load(%s, %s) failed: %v", name, level, err)
 	}
 	return m
 }
@@ -376,14 +377,14 @@ func loadViolationMIB(t testing.TB, name string, level mib.ResolverStrictness) *
 	corpus := requireDir(t, testutil.PrimaryCorpusDir(t))
 	violations := requireDir(t, testutil.TestdataDir(t, "strictness", "violations"))
 	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
-	m, err := Load(context.Background(),
-		WithSource(corpus, violations),
-		WithModules(name),
-		WithResolverStrictness(level),
-		WithDiagnosticConfig(diag),
+	m, err := gomib.Load(context.Background(),
+		gomib.WithSource(corpus, violations),
+		gomib.WithModules(name),
+		gomib.WithResolverStrictness(level),
+		gomib.WithDiagnosticConfig(diag),
 	)
 	if err != nil {
-		t.Fatalf("Load(%s, %s) failed: %v", name, level, err)
+		t.Fatalf("gomib.Load(%s, %s) failed: %v", name, level, err)
 	}
 	return m
 }

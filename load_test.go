@@ -1,4 +1,4 @@
-package gomib
+package gomib_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"testing"
 
+	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -14,7 +15,7 @@ func TestLoadSingleMIB(t *testing.T) {
 	src := requireDir(t, testutil.PrimaryCorpusDir(t))
 
 	ctx := context.Background()
-	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB"))
+	m, err := gomib.Load(ctx, gomib.WithSource(src), gomib.WithModules("IF-MIB"))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
@@ -38,7 +39,7 @@ func TestLoadAllCorpus(t *testing.T) {
 	src := requireDir(t, testutil.PrimaryCorpusDir(t))
 
 	ctx := context.Background()
-	m, err := Load(ctx, WithSource(src))
+	m, err := gomib.Load(ctx, gomib.WithSource(src))
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
@@ -59,7 +60,7 @@ func TestLoadAllCorpus(t *testing.T) {
 }
 
 func TestDirSource(t *testing.T) {
-	src, err := Dir(testutil.PrimaryCorpusDir(t) + "/ietf")
+	src, err := gomib.Dir(testutil.PrimaryCorpusDir(t) + "/ietf")
 	if err != nil {
 		t.Fatalf("Dir failed: %v", err)
 	}
@@ -72,7 +73,7 @@ func TestDirSource(t *testing.T) {
 }
 
 func TestDirSourceRecursive(t *testing.T) {
-	src, err := Dir(testutil.PrimaryCorpusDir(t))
+	src, err := gomib.Dir(testutil.PrimaryCorpusDir(t))
 	if err != nil {
 		t.Fatalf("Dir failed: %v", err)
 	}
@@ -89,7 +90,7 @@ func TestMultiSource(t *testing.T) {
 	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 
 	ctx := context.Background()
-	m, err := Load(ctx, WithSource(primary, problems), WithModules("IF-MIB"))
+	m, err := gomib.Load(ctx, gomib.WithSource(primary, problems), gomib.WithModules("IF-MIB"))
 	if err != nil {
 		t.Fatalf("Load from multi source failed: %v", err)
 	}
@@ -100,10 +101,10 @@ func TestLoadNonexistentModule(t *testing.T) {
 	src := requireDir(t, testutil.PrimaryCorpusDir(t))
 
 	ctx := context.Background()
-	m, err := Load(ctx, WithSource(src), WithModules("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST"))
+	m, err := gomib.Load(ctx, gomib.WithSource(src), gomib.WithModules("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST"))
 	testutil.Error(t, err, "Load should error for nonexistent module")
 	testutil.NotNil(t, m, "Load should return a Mib even for nonexistent module")
-	testutil.True(t, errors.Is(err, ErrMissingModules), "error should wrap ErrMissingModules")
+	testutil.True(t, errors.Is(err, gomib.ErrMissingModules), "error should wrap gomib.ErrMissingModules")
 
 	mod := m.Module("TOTALLY-FAKE-MIB-THAT-DOES-NOT-EXIST")
 	testutil.Nil(t, mod, "nonexistent module should not be in the result")
@@ -113,9 +114,9 @@ func TestLoadMissingModuleWithValidModule(t *testing.T) {
 	src := requireDir(t, testutil.PrimaryCorpusDir(t))
 
 	ctx := context.Background()
-	m, err := Load(ctx, WithSource(src), WithModules("IF-MIB", "NONEXISTENT-MIB"))
+	m, err := gomib.Load(ctx, gomib.WithSource(src), gomib.WithModules("IF-MIB", "NONEXISTENT-MIB"))
 	testutil.Error(t, err, "Load should error for missing module")
-	testutil.True(t, errors.Is(err, ErrMissingModules), "error should wrap ErrMissingModules")
+	testutil.True(t, errors.Is(err, gomib.ErrMissingModules), "error should wrap gomib.ErrMissingModules")
 	testutil.NotNil(t, m, "Load should return a Mib with partial results")
 	testutil.NotNil(t, m.Module("IF-MIB"), "IF-MIB should still be loaded")
 	testutil.Nil(t, m.Module("NONEXISTENT-MIB"), "NONEXISTENT-MIB should not be found")
@@ -123,7 +124,7 @@ func TestLoadMissingModuleWithValidModule(t *testing.T) {
 
 func TestLoadNoSources(t *testing.T) {
 	ctx := context.Background()
-	_, err := Load(ctx)
+	_, err := gomib.Load(ctx)
 	testutil.Error(t, err, "loading with no sources should fail")
 }
 
@@ -193,7 +194,7 @@ func TestStrictMIBsPassAtStrictLevel(t *testing.T) {
 	for _, name := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
-			m, err := Load(ctx, WithSource(corpus, strict), WithModules(name), WithResolverStrictness(mib.ResolverStrict))
+			m, err := gomib.Load(ctx, gomib.WithSource(corpus, strict), gomib.WithModules(name), gomib.WithResolverStrictness(mib.ResolverStrict))
 			if err != nil {
 				t.Fatalf("Load failed: %v", err)
 			}
@@ -241,11 +242,11 @@ func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
 	ctx := context.Background()
 	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
 
-	m, err := Load(ctx,
-		WithSource(corpus, problems),
-		WithModules("PROBLEM-NAMING-MIB"),
-		WithResolverStrictness(mib.ResolverNormal),
-		WithDiagnosticConfig(diag),
+	m, err := gomib.Load(ctx,
+		gomib.WithSource(corpus, problems),
+		gomib.WithModules("PROBLEM-NAMING-MIB"),
+		gomib.WithResolverStrictness(mib.ResolverNormal),
+		gomib.WithDiagnosticConfig(diag),
 	)
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
@@ -257,11 +258,11 @@ func TestUppercaseIdentifierEmitsDiagnostic(t *testing.T) {
 	node := m.Node("NetEngine8000SysOid")
 	testutil.NotNil(t, node, "uppercase identifier should resolve in normal mode")
 
-	m, err = Load(ctx,
-		WithSource(corpus, problems),
-		WithModules("PROBLEM-NAMING-MIB"),
-		WithResolverStrictness(mib.ResolverPermissive),
-		WithDiagnosticConfig(diag),
+	m, err = gomib.Load(ctx,
+		gomib.WithSource(corpus, problems),
+		gomib.WithModules("PROBLEM-NAMING-MIB"),
+		gomib.WithResolverStrictness(mib.ResolverPermissive),
+		gomib.WithDiagnosticConfig(diag),
 	)
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
@@ -338,14 +339,14 @@ func TestDiagnosticThresholdEnforced(t *testing.T) {
 		Reporting: mib.ReportingVerbose,
 		FailAt:    mib.SeverityError,
 	}
-	m, err := Load(ctx,
-		WithSource(corpus, violations),
-		WithModules("MISSING-IMPORT-TEST-MIB"),
-		WithResolverStrictness(mib.ResolverStrict),
-		WithDiagnosticConfig(cfg),
+	m, err := gomib.Load(ctx,
+		gomib.WithSource(corpus, violations),
+		gomib.WithModules("MISSING-IMPORT-TEST-MIB"),
+		gomib.WithResolverStrictness(mib.ResolverStrict),
+		gomib.WithDiagnosticConfig(cfg),
 	)
 	testutil.Error(t, err, "Load should error when diagnostics exceed FailAt threshold")
-	testutil.True(t, errors.Is(err, ErrDiagnosticThreshold), "error should wrap ErrDiagnosticThreshold")
+	testutil.True(t, errors.Is(err, gomib.ErrDiagnosticThreshold), "error should wrap gomib.ErrDiagnosticThreshold")
 	testutil.NotNil(t, m, "Load should return non-nil Mib even on threshold failure")
 	testutil.NotNil(t, m.Module("MISSING-IMPORT-TEST-MIB"), "module should still be loaded")
 }
@@ -357,7 +358,7 @@ func TestDiagnosticThresholdNotTriggered(t *testing.T) {
 	testutil.NotNil(t, m, "Mib should be returned")
 }
 
-// fakeSource is a test Source that returns pre-configured results.
+// fakeSource is a test gomib.Source that returns pre-configured results.
 type fakeSource struct {
 	prefix  string // path prefix (default "fake")
 	modules map[string]fakeModule
@@ -368,19 +369,19 @@ type fakeModule struct {
 	content []byte // content to return from Find (if findErr is nil)
 }
 
-func (f *fakeSource) Find(name string) (FindResult, error) {
+func (f *fakeSource) Find(name string) (gomib.FindResult, error) {
 	m, ok := f.modules[name]
 	if !ok {
-		return FindResult{}, fs.ErrNotExist
+		return gomib.FindResult{}, fs.ErrNotExist
 	}
 	if m.findErr != nil {
-		return FindResult{}, m.findErr
+		return gomib.FindResult{}, m.findErr
 	}
 	prefix := f.prefix
 	if prefix == "" {
 		prefix = "fake"
 	}
-	return FindResult{Content: m.content, Path: prefix + ":" + name}, nil
+	return gomib.FindResult{Content: m.content, Path: prefix + ":" + name}, nil
 }
 
 func (f *fakeSource) ListModules() ([]string, error) {
@@ -423,8 +424,8 @@ END
 
 	// WithModules path (loadModulesByName via findModule)
 	t.Run("WithModules", func(t *testing.T) {
-		m, err := Load(ctx, WithSource(src1, src2), WithModules("TEST-PRECEDENCE-MIB"),
-			WithDiagnosticConfig(mib.SilentConfig()))
+		m, err := gomib.Load(ctx, gomib.WithSource(src1, src2), gomib.WithModules("TEST-PRECEDENCE-MIB"),
+			gomib.WithDiagnosticConfig(mib.SilentConfig()))
 		if err != nil {
 			t.Fatalf("Load failed: %v", err)
 		}
@@ -436,8 +437,8 @@ END
 
 	// Full-load path (loadAllModules)
 	t.Run("FullLoad", func(t *testing.T) {
-		m, err := Load(ctx, WithSource(src1, src2),
-			WithDiagnosticConfig(mib.SilentConfig()))
+		m, err := gomib.Load(ctx, gomib.WithSource(src1, src2),
+			gomib.WithDiagnosticConfig(mib.SilentConfig()))
 		if err != nil {
 			t.Fatalf("Load failed: %v", err)
 		}
@@ -449,8 +450,8 @@ END
 }
 
 // findModule is a test helper that searches sources in order for the named module.
-func findModule(sources []Source, name string) (FindResult, error) {
-	return Multi(sources...).Find(name)
+func findModule(sources []gomib.Source, name string) (gomib.FindResult, error) {
+	return gomib.Multi(sources...).Find(name)
 }
 
 func TestFindModuleReturnsContent(t *testing.T) {
@@ -458,7 +459,7 @@ func TestFindModuleReturnsContent(t *testing.T) {
 	src := &fakeSource{modules: map[string]fakeModule{
 		"MOD": {content: want},
 	}}
-	got, err := findModule([]Source{src}, "MOD")
+	got, err := findModule([]gomib.Source{src}, "MOD")
 	testutil.NoError(t, err, "findModule")
 	testutil.Equal(t, string(want), string(got.Content), "content")
 }
@@ -469,14 +470,14 @@ func TestFindModuleSkipsNotExist(t *testing.T) {
 	src2 := &fakeSource{modules: map[string]fakeModule{
 		"MOD": {content: want},
 	}}
-	got, err := findModule([]Source{src1, src2}, "MOD")
+	got, err := findModule([]gomib.Source{src1, src2}, "MOD")
 	testutil.NoError(t, err, "findModule")
 	testutil.Equal(t, string(want), string(got.Content), "content from second source")
 }
 
 func TestFindModuleNotFound(t *testing.T) {
 	src := &fakeSource{modules: map[string]fakeModule{}}
-	_, err := findModule([]Source{src}, "MISSING")
+	_, err := findModule([]gomib.Source{src}, "MISSING")
 	testutil.True(t, errors.Is(err, fs.ErrNotExist), "should return fs.ErrNotExist, got %v", err)
 }
 
@@ -488,7 +489,7 @@ func TestFindModulePropagatesFindError(t *testing.T) {
 	src2 := &fakeSource{modules: map[string]fakeModule{
 		"MOD": {content: []byte("ok")},
 	}}
-	_, err := findModule([]Source{src1, src2}, "MOD")
+	_, err := findModule([]gomib.Source{src1, src2}, "MOD")
 	testutil.True(t, errors.Is(err, permErr),
 		"should propagate Find error, got %v", err)
 }
@@ -499,14 +500,14 @@ func loadInvalidMIB(t testing.TB, name string, level mib.ResolverStrictness) *mi
 	invalid := requireDir(t, testutil.TestdataDir(t, "strictness", "invalid"))
 	ctx := context.Background()
 	diag := mib.DiagnosticConfig{Reporting: mib.ReportingVerbose, FailAt: mib.SeverityFatal}
-	m, err := Load(ctx,
-		WithSource(corpus, invalid),
-		WithModules(name),
-		WithResolverStrictness(level),
-		WithDiagnosticConfig(diag),
+	m, err := gomib.Load(ctx,
+		gomib.WithSource(corpus, invalid),
+		gomib.WithModules(name),
+		gomib.WithResolverStrictness(level),
+		gomib.WithDiagnosticConfig(diag),
 	)
 	if err != nil {
-		t.Fatalf("Load(%s) failed: %v", name, err)
+		t.Fatalf("gomib.Load(%s) failed: %v", name, err)
 	}
 	return m
 }
@@ -601,7 +602,7 @@ func TestMultiModuleFileLoadAll(t *testing.T) {
 	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 
 	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus, problems))
+	m, err := gomib.Load(ctx, gomib.WithSource(corpus, problems))
 	testutil.NoError(t, err, "Load")
 
 	testutil.NotNil(t, m.Module("PROBLEM-MULTIMOD-BASE-MIB"),
@@ -617,8 +618,8 @@ func TestMultiModuleFileLoadByName(t *testing.T) {
 	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 
 	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus, problems),
-		WithModules("PROBLEM-MULTIMOD-MIB"))
+	m, err := gomib.Load(ctx, gomib.WithSource(corpus, problems),
+		gomib.WithModules("PROBLEM-MULTIMOD-MIB"))
 	testutil.NoError(t, err, "Load")
 
 	testutil.NotNil(t, m.Module("PROBLEM-MULTIMOD-MIB"),
@@ -638,8 +639,8 @@ func TestMultiModuleFileLoadBaseByName(t *testing.T) {
 	problems := requireDir(t, testutil.ProblemsCorpusDir(t))
 
 	ctx := context.Background()
-	m, err := Load(ctx, WithSource(corpus, problems),
-		WithModules("PROBLEM-MULTIMOD-BASE-MIB"))
+	m, err := gomib.Load(ctx, gomib.WithSource(corpus, problems),
+		gomib.WithModules("PROBLEM-MULTIMOD-BASE-MIB"))
 	testutil.NoError(t, err, "Load")
 
 	testutil.NotNil(t, m.Module("PROBLEM-MULTIMOD-BASE-MIB"),

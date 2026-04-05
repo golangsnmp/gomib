@@ -1,4 +1,4 @@
-package gomib
+package gomib_test
 
 // resolve_problems_test.go tests gomib's handling of real-world MIB edge cases
 // using the synthetic PROBLEM-*.mib corpus. Expected values are grounded against
@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/mib"
 )
@@ -27,14 +28,14 @@ func loadProblemMIB(t testing.TB, name string) *mib.Mib {
 		FailAt:    mib.SeverityFatal,
 		Ignore:    []string{"identifier-underscore", "identifier-length-32", "bad-identifier-case"},
 	}
-	m, err := Load(context.Background(),
-		WithSource(corpus, problems),
-		WithModules(name),
-		WithResolverStrictness(mib.ResolverPermissive),
-		WithDiagnosticConfig(diag),
+	m, err := gomib.Load(context.Background(),
+		gomib.WithSource(corpus, problems),
+		gomib.WithModules(name),
+		gomib.WithResolverStrictness(mib.ResolverPermissive),
+		gomib.WithDiagnosticConfig(diag),
 	)
 	if err != nil {
-		t.Fatalf("Load(%s) failed: %v", name, err)
+		t.Fatalf("gomib.Load(%s) failed: %v", name, err)
 	}
 	return m
 }
@@ -1248,7 +1249,7 @@ func TestHexLiteralDefval(t *testing.T) {
 
 func TestModuleIdentityPermissive(t *testing.T) {
 	t.Run("IPV6-TC", func(t *testing.T) {
-		m := loadCorpusMIB(t, "IPV6-TC", WithResolverStrictness(mib.ResolverPermissive))
+		m := loadCorpusMIB(t, "IPV6-TC", gomib.WithResolverStrictness(mib.ResolverPermissive))
 
 		for _, d := range m.Diagnostics() {
 			if d.Module == "IPV6-TC" && d.Severity <= mib.SeverityError {
@@ -1262,7 +1263,7 @@ func TestModuleIdentityPermissive(t *testing.T) {
 	})
 
 	t.Run("IPV6-MIB", func(t *testing.T) {
-		m := loadCorpusMIB(t, "IPV6-MIB", WithResolverStrictness(mib.ResolverPermissive))
+		m := loadCorpusMIB(t, "IPV6-MIB", gomib.WithResolverStrictness(mib.ResolverPermissive))
 
 		for _, d := range m.Diagnostics() {
 			if d.Module == "IPV6-MIB" && d.Severity <= mib.SeverityError {

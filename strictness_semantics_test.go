@@ -1,4 +1,4 @@
-package gomib
+package gomib_test
 
 import (
 	"testing"

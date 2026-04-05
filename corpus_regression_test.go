@@ -1,15 +1,16 @@
-package gomib
+package gomib_test
 
 import (
 	"testing"
 
+	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/internal/testutil"
 	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
 )
 
 func TestCorpusPartialImportForwardingResolvesPRVTServIndexes(t *testing.T) {
-	m := loadCorpusMIB(t, "PRVT-SERV-MIB", WithResolverStrictness(mib.ResolverNormal))
+	m := loadCorpusMIB(t, "PRVT-SERV-MIB", gomib.WithResolverStrictness(mib.ResolverNormal))
 
 	testutil.Equal(t, 0, countModuleDiagnostics(m, "PRVT-SERV-MIB", types.DiagOidOrphan),
 		"valid forwarded serviceAccessSwitch import should prevent orphaned PRVT-SERV-MIB OIDs")

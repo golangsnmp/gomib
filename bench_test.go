@@ -1,9 +1,10 @@
-package gomib
+package gomib_test
 
 import (
 	"context"
 	"testing"
 
+	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
@@ -14,7 +15,7 @@ func BenchmarkLoadAllCorpus(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		m, err := Load(ctx, WithSource(src))
+		m, err := gomib.Load(ctx, gomib.WithSource(src))
 		if err != nil {
 			b.Fatalf("Load failed: %v", err)
 		}
@@ -29,7 +30,7 @@ func BenchmarkLoadSingleMIB(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		m, err := Load(ctx, WithSource(src), WithModules("IF-MIB"))
+		m, err := gomib.Load(ctx, gomib.WithSource(src), gomib.WithModules("IF-MIB"))
 		if err != nil {
 			b.Fatalf("Load failed: %v", err)
 		}
