@@ -1,5 +1,31 @@
 package syntax
 
+// ClauseKind identifies which clause the cursor is inside within a definition.
+// The zero value (empty string) means not inside any clause.
+type ClauseKind string
+
+const (
+	ClauseSyntax         ClauseKind = "SYNTAX"
+	ClauseWriteSyntax    ClauseKind = "WRITE-SYNTAX"
+	ClauseAccess         ClauseKind = "ACCESS"
+	ClauseStatus         ClauseKind = "STATUS"
+	ClauseDescription    ClauseKind = "DESCRIPTION"
+	ClauseReference      ClauseKind = "REFERENCE"
+	ClauseIndex          ClauseKind = "INDEX"
+	ClauseAugments       ClauseKind = "AUGMENTS"
+	ClauseDefVal         ClauseKind = "DEFVAL"
+	ClauseUnits          ClauseKind = "UNITS"
+	ClauseDisplayHint    ClauseKind = "DISPLAY-HINT"
+	ClauseObjects        ClauseKind = "OBJECTS"
+	ClauseNotifications  ClauseKind = "NOTIFICATIONS"
+	ClauseLastUpdated    ClauseKind = "LAST-UPDATED"
+	ClauseOrganization   ClauseKind = "ORGANIZATION"
+	ClauseContactInfo    ClauseKind = "CONTACT-INFO"
+	ClauseEnterprise     ClauseKind = "ENTERPRISE"
+	ClauseVariables      ClauseKind = "VARIABLES"
+	ClauseProductRelease ClauseKind = "PRODUCT-RELEASE"
+)
+
 // CursorContext describes the syntactic context at a byte offset in a parsed
 // module file. It identifies the containing module, definition, and
 // sub-structures, and whether the offset falls inside a comment or string.
@@ -20,6 +46,10 @@ type CursorContext struct {
 
 	// OidValue is non-nil when the offset falls inside an OID value { ... }.
 	OidValue *OidValueNode
+
+	// Clause identifies which clause the cursor is inside (e.g. ClauseSyntax,
+	// ClauseStatus). Empty when not inside any clause.
+	Clause ClauseKind
 
 	// InComment is true when the offset falls inside comment trivia.
 	InComment bool
@@ -72,6 +102,11 @@ func CursorContextAt(file *ModuleFile, offset ByteOffset) CursorContext {
 	// Check OID values within the definition.
 	if ctx.Definition != nil {
 		ctx.OidValue = findOidValue(ctx.Definition, offset)
+	}
+
+	// Determine clause context within the definition.
+	if ctx.Definition != nil {
+		ctx.Clause = findClause(ctx.Definition, offset)
 	}
 
 	// Check whether offset falls inside comment trivia or a string token.
@@ -130,6 +165,187 @@ func definitionOid(def DefinitionNode) *OidValueNode {
 	default:
 		return nil
 	}
+}
+
+// findClause determines which clause the offset falls inside for a definition.
+func findClause(def DefinitionNode, offset ByteOffset) ClauseKind {
+	type check struct {
+		span Span
+		kind ClauseKind
+	}
+	var cc []check
+
+	add := func(span Span, kind ClauseKind) {
+		if span != (Span{}) {
+			cc = append(cc, check{span, kind})
+		}
+	}
+
+	switch d := def.(type) {
+	case *ObjectTypeNode:
+		if d.Syntax != nil {
+			add(d.Syntax.Span, ClauseSyntax)
+		}
+		if d.Units != nil {
+			add(d.Units.Span, ClauseUnits)
+		}
+		if d.Access != nil {
+			add(d.Access.Span, ClauseAccess)
+		}
+		if d.Status != nil {
+			add(d.Status.Span, ClauseStatus)
+		}
+		if d.Description != nil {
+			add(d.Description.Span, ClauseDescription)
+		}
+		if d.Reference != nil {
+			add(d.Reference.Span, ClauseReference)
+		}
+		if d.Index != nil {
+			add(d.Index.Span, ClauseIndex)
+		}
+		if d.Augments != nil {
+			add(d.Augments.Span, ClauseAugments)
+		}
+		if d.DefVal != nil {
+			add(d.DefVal.Span, ClauseDefVal)
+		}
+
+	case *TextualConventionNode:
+		if d.DisplayHint != nil {
+			add(d.DisplayHint.Span, ClauseDisplayHint)
+		}
+		if d.Status != nil {
+			add(d.Status.Span, ClauseStatus)
+		}
+		if d.Description != nil {
+			add(d.Description.Span, ClauseDescription)
+		}
+		if d.Reference != nil {
+			add(d.Reference.Span, ClauseReference)
+		}
+		if d.Syntax != nil {
+			add(d.Syntax.Span, ClauseSyntax)
+		}
+
+	case *ModuleIdentityNode:
+		if d.LastUpdated != nil {
+			add(d.LastUpdated.Span, ClauseLastUpdated)
+		}
+		if d.Organization != nil {
+			add(d.Organization.Span, ClauseOrganization)
+		}
+		if d.ContactInfo != nil {
+			add(d.ContactInfo.Span, ClauseContactInfo)
+		}
+		if d.Description != nil {
+			add(d.Description.Span, ClauseDescription)
+		}
+
+	case *ObjectIdentityNode:
+		if d.Status != nil {
+			add(d.Status.Span, ClauseStatus)
+		}
+		if d.Description != nil {
+			add(d.Description.Span, ClauseDescription)
+		}
+		if d.Reference != nil {
+			add(d.Reference.Span, ClauseReference)
+		}
+
+	case *NotificationTypeNode:
+		if d.Objects != nil {
+			add(d.Objects.Span, ClauseObjects)
+		}
+		if d.Status != nil {
+			add(d.Status.Span, ClauseStatus)
+		}
+		if d.Description != nil {
+			add(d.Description.Span, ClauseDescription)
+		}
+		if d.Reference != nil {
+			add(d.Reference.Span, ClauseReference)
+		}
+
+	case *TrapTypeNode:
+		if d.Enterprise != nil {
+			add(d.Enterprise.Span, ClauseEnterprise)
+		}
+		if d.Variables != nil {
+			add(d.Variables.Span, ClauseVariables)
+		}
+		if d.Description != nil {
+			add(d.Description.Span, ClauseDescription)
+		}
+		if d.Reference != nil {
+			add(d.Reference.Span, ClauseReference)
+		}
+
+	case *ObjectGroupNode:
+		if d.Objects != nil {
+			add(d.Objects.Span, ClauseObjects)
+		}
+		if d.Status != nil {
+			add(d.Status.Span, ClauseStatus)
+		}
+		if d.Description != nil {
+			add(d.Description.Span, ClauseDescription)
+		}
+		if d.Reference != nil {
+			add(d.Reference.Span, ClauseReference)
+		}
+
+	case *NotificationGroupNode:
+		if d.Notifications != nil {
+			add(d.Notifications.Span, ClauseNotifications)
+		}
+		if d.Status != nil {
+			add(d.Status.Span, ClauseStatus)
+		}
+		if d.Description != nil {
+			add(d.Description.Span, ClauseDescription)
+		}
+		if d.Reference != nil {
+			add(d.Reference.Span, ClauseReference)
+		}
+
+	case *ModuleComplianceNode:
+		if d.Status != nil {
+			add(d.Status.Span, ClauseStatus)
+		}
+		if d.Description != nil {
+			add(d.Description.Span, ClauseDescription)
+		}
+		if d.Reference != nil {
+			add(d.Reference.Span, ClauseReference)
+		}
+
+	case *AgentCapabilitiesNode:
+		if d.ProductRelease != nil {
+			add(d.ProductRelease.Span, ClauseProductRelease)
+		}
+		if d.Status != nil {
+			add(d.Status.Span, ClauseStatus)
+		}
+		if d.Description != nil {
+			add(d.Description.Span, ClauseDescription)
+		}
+		if d.Reference != nil {
+			add(d.Reference.Span, ClauseReference)
+		}
+
+	case *TypeAssignmentNode:
+		if d.Syntax != nil {
+			add(d.Syntax.TypeSyntaxSpan(), ClauseSyntax)
+		}
+	}
+
+	for _, c := range cc {
+		if c.span.Contains(offset) {
+			return c.kind
+		}
+	}
+	return ""
 }
 
 // checkTokenContext walks the tokens of a module to determine whether the

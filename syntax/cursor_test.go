@@ -284,3 +284,85 @@ func TestCursorContextAt_NotOidWhenOutsideBraces(t *testing.T) {
 		t.Error("expected OidValue nil on SYNTAX keyword")
 	}
 }
+
+func TestCursorContextAt_ClauseSyntax(t *testing.T) {
+	file, _ := syntax.Parse(cursorTestMIB)
+	// On "DisplayString" in the SYNTAX clause (second occurrence, first is in imports).
+	offset := findNthOffset(cursorTestMIB, "DisplayString", 2)
+	ctx := syntax.CursorContextAt(file, offset)
+	if ctx.Clause != syntax.ClauseSyntax {
+		t.Errorf("Clause = %q, want %q", ctx.Clause, syntax.ClauseSyntax)
+	}
+}
+
+func TestCursorContextAt_ClauseAccess(t *testing.T) {
+	file, _ := syntax.Parse(cursorTestMIB)
+	offset := findOffset(cursorTestMIB, "read-only")
+	ctx := syntax.CursorContextAt(file, offset)
+	if ctx.Clause != syntax.ClauseAccess {
+		t.Errorf("Clause = %q, want %q", ctx.Clause, syntax.ClauseAccess)
+	}
+}
+
+func TestCursorContextAt_ClauseStatus(t *testing.T) {
+	file, _ := syntax.Parse(cursorTestMIB)
+	offset := findOffset(cursorTestMIB, "current")
+	ctx := syntax.CursorContextAt(file, offset)
+	if ctx.Clause != syntax.ClauseStatus {
+		t.Errorf("Clause = %q, want %q", ctx.Clause, syntax.ClauseStatus)
+	}
+}
+
+func TestCursorContextAt_ClauseDescription(t *testing.T) {
+	file, _ := syntax.Parse(cursorTestMIB)
+	offset := findOffset(cursorTestMIB, "An example string object.")
+	ctx := syntax.CursorContextAt(file, offset)
+	if ctx.Clause != syntax.ClauseDescription {
+		t.Errorf("Clause = %q, want %q", ctx.Clause, syntax.ClauseDescription)
+	}
+}
+
+func TestCursorContextAt_ClauseNoneOnMacroKeyword(t *testing.T) {
+	file, _ := syntax.Parse(cursorTestMIB)
+	offset := findOffset(cursorTestMIB, "OBJECT-TYPE")
+	ctx := syntax.CursorContextAt(file, offset)
+	if ctx.Clause != "" {
+		t.Errorf("Clause = %q, want empty (on macro keyword)", ctx.Clause)
+	}
+}
+
+func TestCursorContextAt_ClauseNoneInImports(t *testing.T) {
+	file, _ := syntax.Parse(cursorTestMIB)
+	offset := findOffset(cursorTestMIB, "MODULE-IDENTITY, Integer32")
+	ctx := syntax.CursorContextAt(file, offset)
+	if ctx.Clause != "" {
+		t.Errorf("Clause = %q, want empty (in imports)", ctx.Clause)
+	}
+}
+
+func TestCursorContextAt_ClauseLastUpdated(t *testing.T) {
+	file, _ := syntax.Parse(cursorTestMIB)
+	offset := findOffset(cursorTestMIB, "200601010000Z")
+	ctx := syntax.CursorContextAt(file, offset)
+	if ctx.Clause != syntax.ClauseLastUpdated {
+		t.Errorf("Clause = %q, want %q", ctx.Clause, syntax.ClauseLastUpdated)
+	}
+}
+
+func TestCursorContextAt_ClauseOrganization(t *testing.T) {
+	file, _ := syntax.Parse(cursorTestMIB)
+	offset := findOffset(cursorTestMIB, "Example Inc.")
+	ctx := syntax.CursorContextAt(file, offset)
+	if ctx.Clause != syntax.ClauseOrganization {
+		t.Errorf("Clause = %q, want %q", ctx.Clause, syntax.ClauseOrganization)
+	}
+}
+
+func TestCursorContextAt_ClauseContactInfo(t *testing.T) {
+	file, _ := syntax.Parse(cursorTestMIB)
+	offset := findOffset(cursorTestMIB, "support@example.com")
+	ctx := syntax.CursorContextAt(file, offset)
+	if ctx.Clause != syntax.ClauseContactInfo {
+		t.Errorf("Clause = %q, want %q", ctx.Clause, syntax.ClauseContactInfo)
+	}
+}
