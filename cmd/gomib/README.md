@@ -100,7 +100,7 @@ gomib normalize -o /tmp/normalized IF-MIB SNMPv2-MIB
 
 Flags: `-o DIR` (write each module to a file in DIR), `--no-conformance` (omit conformance constructs), `--no-descriptions` (omit DESCRIPTION clauses), `--no-sequences` (omit reconstructed SEQUENCE types), `--strict` (RFC compliance), `--permissive` (vendor MIBs).
 
-When no modules are specified, synthetic base modules (SNMPv2-SMI, SNMPv2-TC, etc.) are excluded from output since consumers provide their own built-in definitions.
+When no modules are specified, base modules (SNMPv2-SMI, SNMPv2-TC, etc.) are excluded from output since consumers provide their own built-in definitions.
 
 ### lint
 

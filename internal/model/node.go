@@ -37,7 +37,7 @@ type Node struct {
 }
 
 // Span returns the source byte range of this node's definition.
-// Returns a zero-value Span for synthetic (base module) or unnamed nodes.
+// Returns a zero-value Span for base module or unnamed nodes.
 func (n *Node) Span() Span { return n.span }
 
 // Arc returns the numeric arc of this node relative to its parent.
@@ -47,7 +47,7 @@ func (n *Node) Arc() uint32 { return n.arc }
 func (n *Node) Name() string { return n.name }
 
 // Description returns the description of this node's OID assignment, or "".
-// Populated for synthetic base module OID assignments and OBJECT-IDENTITY definitions.
+// Populated for base module OID assignments and OBJECT-IDENTITY definitions.
 func (n *Node) Description() string { return n.desc }
 
 // Reference returns the reference string of this node's OID assignment, or "".

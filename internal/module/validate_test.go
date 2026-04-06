@@ -123,7 +123,7 @@ func TestValidate_MissingModuleIdentity_BaseModuleSkipped(t *testing.T) {
 }
 
 func TestValidate_MissingModuleIdentity_SNMPv2MIBNotBase(t *testing.T) {
-	// SNMPv2-MIB is NOT a synthetic base module. It should get the diagnostic.
+	// SNMPv2-MIB is NOT a base module. It should get the diagnostic.
 	mod := smiv2Module("SNMPv2-MIB",
 		testOT("sysDescr"),
 	)

@@ -196,7 +196,7 @@ mod := m.Module("IF-MIB")
 
 mod.Name()         // "IF-MIB"
 mod.Language()     // SMIv2
-mod.SourcePath()   // file path, or "" for synthetic base modules
+mod.SourcePath()   // file path, or "" for embedded base modules
 mod.IsBase()       // false for user/system modules, true for built-ins
 mod.OID()          // module identity OID
 mod.Organization() // ORGANIZATION clause

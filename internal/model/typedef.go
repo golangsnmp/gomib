@@ -30,7 +30,7 @@ type Type struct {
 }
 
 // Span returns the source byte range of this type's definition.
-// Returns a zero-value Span for synthetic (base module) definitions.
+// Returns a zero-value Span for base module definitions.
 func (t *Type) Span() Span { return t.span }
 
 // SyntaxSpan returns the source byte range of this type's SYNTAX clause.

@@ -45,7 +45,7 @@ type Module struct {
 	Capabilities       []*AgentCapabilities
 
 	// SourcePath is the file path that this module was loaded from.
-	// Empty for synthetic base modules.
+	// Empty for embedded base modules.
 	SourcePath string
 
 	// LastUpdated is the LAST-UPDATED value from MODULE-IDENTITY, if present.

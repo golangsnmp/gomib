@@ -57,14 +57,14 @@ func (m *Module) Name() string { return m.name }
 // Language returns the SMI language version of this module.
 func (m *Module) Language() Language { return m.language }
 
-// SourcePath returns the file path this module was loaded from, or "" for synthetic modules.
+// SourcePath returns the file path this module was loaded from, or "" for embedded base modules.
 func (m *Module) SourcePath() string { return m.sourcePath }
 
-// IsBase reports whether this is a synthetic base module (e.g. SNMPv2-SMI).
+// IsBase reports whether this is a base module (e.g. SNMPv2-SMI).
 func (m *Module) IsBase() bool { return m.base }
 
 // LineCol converts a byte offset into 1-based line and column numbers using
-// this module's line table. Returns (0, 0) for synthetic modules or invalid offsets.
+// this module's line table. Returns (0, 0) for embedded base modules or invalid offsets.
 func (m *Module) LineCol(offset ByteOffset) (line, col int) {
 	return types.LineColFromTable(m.lineTable, offset)
 }

@@ -26,7 +26,7 @@ type entity struct {
 }
 
 // Span returns the source byte range of this entity's definition.
-// Returns a zero-value Span for synthetic (base module) definitions.
+// Returns a zero-value Span for base module definitions.
 func (e *entity) Span() Span { return e.span }
 
 // Name returns the entity's descriptor name.

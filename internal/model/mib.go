@@ -114,7 +114,7 @@ func (m *Mib) Symbol(name string) Symbol {
 }
 
 // ModulesDefining returns all modules that define a symbol with the given name.
-// Excludes synthetic base modules.
+// Excludes base modules.
 func (m *Mib) ModulesDefining(name string) []*Module {
 	var result []*Module
 	for _, mod := range m.modules {
@@ -129,7 +129,7 @@ func (m *Mib) ModulesDefining(name string) []*Module {
 }
 
 // ModulesImporting returns all modules that import a symbol with the given name.
-// Excludes synthetic base modules.
+// Excludes base modules.
 func (m *Mib) ModulesImporting(name string) []*Module {
 	var result []*Module
 	for _, mod := range m.modules {
