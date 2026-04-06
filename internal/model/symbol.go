@@ -30,6 +30,21 @@ func (k SymbolKind) String() string {
 	return "SymbolKind(" + strconv.Itoa(int(k)) + ")"
 }
 
+var symbolKindMacroNames = [...]string{
+	"", "OBJECT-TYPE", "", "TEXTUAL-CONVENTION", "NOTIFICATION-TYPE",
+	"OBJECT-GROUP", "NOTIFICATION-GROUP", "MODULE-COMPLIANCE", "AGENT-CAPABILITIES", "",
+}
+
+// MacroName returns the SMI macro keyword for this symbol kind, e.g.
+// "OBJECT-TYPE" or "TEXTUAL-CONVENTION". Returns "" for kinds that
+// are not macro-based definitions (None, Type, Node).
+func (k SymbolKind) MacroName() string {
+	if int(k) < len(symbolKindMacroNames) {
+		return symbolKindMacroNames[k]
+	}
+	return ""
+}
+
 // Symbol wraps any resolved MIB definition. Exactly one of the internal
 // fields is non-nil. Common accessors (Name, Span, Module) work on all
 // symbol kinds without requiring callers to type-switch.

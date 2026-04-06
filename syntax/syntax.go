@@ -396,20 +396,22 @@ func IdentifierAt(source []byte, offset ByteOffset) string {
 	if off >= len(source) {
 		return ""
 	}
-	if !isIdentByte(source[off]) {
+	if !IsIdentByte(source[off]) {
 		return ""
 	}
 	start := off
-	for start > 0 && isIdentByte(source[start-1]) {
+	for start > 0 && IsIdentByte(source[start-1]) {
 		start--
 	}
 	end := off
-	for end < len(source) && isIdentByte(source[end]) {
+	for end < len(source) && IsIdentByte(source[end]) {
 		end++
 	}
 	return string(source[start:end])
 }
 
-func isIdentByte(b byte) bool {
+// IsIdentByte reports whether b is valid in an SMI identifier.
+// SMI identifiers contain ASCII letters, digits, hyphens, and underscores.
+func IsIdentByte(b byte) bool {
 	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '-' || b == '_'
 }
