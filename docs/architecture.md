@@ -110,9 +110,12 @@ gomib (root)          Public API: Load(), Source, LoadOption
   |     |
   |     +-- internal/model/     Resolved types (Mib, Node, Object, Type, etc.)
   |
-  +-- token/          Public lexer API: Tokenize(), Token, TokenKind
+  +-- syntax/          Public CST, tokens, parser, line tables
   |     |
-  |     +-- internal/lexer/     Lexer implementation
+  |     +-- internal/cst/        CST node types
+  |     +-- internal/cst/parser/ Recursive descent parser
+  |     +-- internal/lexer/      Lexer implementation
+  |     +-- internal/types/      Span, LineTable utilities
   |
   +-- internal/
         +-- cst/                CST node types
@@ -129,9 +132,12 @@ layer used by everything else.
 
 The public surface is intentionally small: callers use `gomib.Load()` to get
 a `*mib.Mib`, then query it. The `mib` package re-exports all resolved model
-types and enums so callers never import `internal/` packages. The `token`
-package is a secondary entry point for callers who want lexer-level access
-without the full pipeline.
+types and enums so callers never import `internal/` packages. The `syntax`
+package is a secondary entry point for callers who want CST-level, token-level,
+or parse-only access without the full resolution pipeline. It re-exports all
+CST node types, token types, and provides `Parse()`, `Tokenize()`,
+`ReconstructText()`, and `LineTable` for bidirectional offset/position
+conversion.
 
 
 ## Stage 1: Source Discovery and Loading
@@ -280,10 +286,14 @@ two reasons:
 - **Normalization/reformatting.** `cst.ReconstructText()` can reproduce the
   original source exactly, which is useful for testing and for future
   tooling (formatting, refactoring).
+- **Tooling support.** Language servers, linters, and formatters need
+  structural information without running the full resolution pipeline.
+  The `syntax` package exposes the CST publicly via `syntax.Parse()`.
 
 The tradeoff is that the CST is bulkier and harder to work with than a
-cleaned-up IR, which is why we lower it into a simpler Module IR immediately
-after parsing (Stage 4).
+cleaned-up IR, which is why the main `Load()` pipeline lowers it into a
+simpler Module IR immediately after parsing (Stage 4). But external tooling
+can stop at the CST level when that's all it needs.
 
 ### Approach
 
@@ -702,7 +712,10 @@ cloned copies. The Mib is safe for concurrent reads.
 - **Node** - OID tree node. Arc number, name, kind, parent/children, optional
   entity attachments (Object, Notification, Group, etc.). Lazy-computed OID.
 - **Module** - Loaded MIB module. Name, language, source path, MODULE-IDENTITY
-  metadata, per-type definition collections, import tracking.
+  metadata, per-type definition collections, import tracking. Position
+  utilities: `LineCol(offset)` converts byte offset to line/col,
+  `Offset(line, col)` converts back, `SpanContext(offset)` classifies
+  what construct is at a given position (import, OID ref, syntax, definition).
 - **Object** - OBJECT-TYPE. Type, access, status, units, description, DEFVAL,
   index entries, AUGMENTS links. Effective values (hint, sizes, ranges, enums,
   bits) computed by walking type chains.

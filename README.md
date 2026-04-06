@@ -447,18 +447,20 @@ CLI equivalents follow the same split:
 - `gomib get` and `gomib find` default to permissive resolution with silent reporting.
 - `gomib lint` is separate from resolver strictness and filters diagnostics by severity.
 
-## Tokenization
+## Syntax and Tokenization
 
-The `token` package provides direct access to the lexer for tooling, linting, or syntax highlighting:
+The `syntax` package provides direct access to the lexer, parser, and concrete syntax tree (CST) for tooling, language servers, linters, or syntax highlighting.
+
+### Tokenization
 
 ```go
-import "github.com/golangsnmp/gomib/token"
+import "github.com/golangsnmp/gomib/syntax"
 
 source := []byte(`ifIndex OBJECT-TYPE SYNTAX InterfaceIndex`)
-tokens := token.Tokenize(source)
+tokens := syntax.Tokenize(source)
 
 for _, tok := range tokens {
-    if tok.Kind == token.EOF {
+    if tok.Kind == syntax.TokEOF {
         break
     }
     text := source[tok.Span.Start:tok.Span.End]
@@ -476,6 +478,63 @@ tok.Kind.IsClauseKeyword()       // SYNTAX, MAX-ACCESS, STATUS, etc.
 tok.Kind.IsIdentifier()          // uppercase or lowercase identifier
 tok.Kind.IsStructuralKeyword()   // DEFINITIONS, BEGIN, END, IMPORTS, etc.
 tok.Kind.IsStatusAccessKeyword() // current, deprecated, read-only, etc.
+```
+
+### Parsing to CST
+
+`Parse` produces a lossless concrete syntax tree that preserves every byte of the original source, including whitespace and comments. This is useful for tooling that needs structural information without running the full resolution pipeline.
+
+```go
+file, diags := syntax.Parse(source)
+
+for _, mod := range file.Modules {
+    name := string(source[mod.Name.Span.Start:mod.Name.Span.End])
+    fmt.Printf("module %s: %d definitions\n", name, len(mod.Body))
+
+    for _, def := range mod.Body {
+        switch d := def.(type) {
+        case *syntax.ObjectTypeNode:
+            fmt.Printf("  OBJECT-TYPE %s\n", source[d.Name.Span.Start:d.Name.Span.End])
+        case *syntax.ModuleIdentityNode:
+            fmt.Printf("  MODULE-IDENTITY %s\n", source[d.Name.Span.Start:d.Name.Span.End])
+        }
+    }
+}
+
+// Round-trip: reconstructing from the CST reproduces the original source exactly
+reconstructed := syntax.ReconstructText(file, source)
+```
+
+### Line tables
+
+`LineTable` provides bidirectional conversion between byte offsets (used by spans) and line/column numbers (used by editors and LSP):
+
+```go
+lt := syntax.BuildLineTable(source)
+line, col := lt.LineCol(tok.Span.Start)       // byte offset -> line/col
+offset, ok := lt.Offset(cursorLine, cursorCol) // line/col -> byte offset
+```
+
+### Span queries on resolved modules
+
+The resolved model provides span-based queries for language server features like go-to-definition and hover:
+
+```go
+mod := m.Module("IF-MIB")
+offset, ok := mod.Offset(cursorLine, cursorCol) // line/col -> byte offset
+if ok {
+    sc := mod.SpanContext(offset)
+    switch sc.Kind {
+    case mib.SpanContextImport:
+        fmt.Printf("import %s from %s\n", sc.Name, sc.Module)
+    case mib.SpanContextOidRef:
+        fmt.Printf("OID reference to %s\n", sc.Name)
+    case mib.SpanContextSyntax:
+        fmt.Printf("SYNTAX type %s\n", sc.Name)
+    case mib.SpanContextDefinition:
+        fmt.Printf("definition %s in %s\n", sc.Name, sc.Module)
+    }
+}
 ```
 
 ## CLI
