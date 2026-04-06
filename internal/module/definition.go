@@ -138,12 +138,7 @@ type TypeDefSpans struct {
 // TypeDef represents both TEXTUAL-CONVENTION and simple type assignments.
 type TypeDef struct {
 	DefBase
-	Syntax TypeSyntax
-	// BaseType overrides the base type derived from Syntax. Some SMI base
-	// types like IpAddress are syntactically OCTET STRING (SIZE 4) but have
-	// distinct semantic base types (for index encoding, etc.). This field
-	// allows synthetic base modules to specify the correct base type.
-	BaseType            *types.BaseType
+	Syntax              TypeSyntax
 	DisplayHint         string
 	Status              types.Status
 	Description         string

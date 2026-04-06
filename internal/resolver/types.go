@@ -78,10 +78,6 @@ func createUserTypes(ctx *resolverContext) {
 			}
 
 			base, hasBase := syntaxToBaseType(td.Syntax)
-			if td.BaseType != nil {
-				base = *td.BaseType
-				hasBase = true
-			}
 			// For base modules parsed from source, APPLICATION tag information is
 			// lost during lowering. Recover the correct base type by name.
 			if module.IsBaseModule(mod.Name) {
