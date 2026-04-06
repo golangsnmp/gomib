@@ -36,6 +36,33 @@ var applicationBaseTypes = map[string]model.BaseType{
 	"NetworkAddress": model.BaseIpAddress,
 }
 
+// baseTypeDescriptions provides RFC-sourced descriptions for well-known base
+// types. These types are defined as plain type assignments in the embedded
+// SMI source, which does not support DESCRIPTION clauses. Descriptions are
+// stamped programmatically during type creation.
+//
+// Sources: RFC 2578 Section 7.1 (SMIv2), RFC 1155 Section 3.2.3 (SMIv1).
+var baseTypeDescriptions = map[string]string{
+	// ASN.1 primitives
+	"INTEGER":           "An arbitrary precision integer value.",
+	"OCTET STRING":      "An ordered sequence of zero or more octets.",
+	"OBJECT IDENTIFIER": "An administratively assigned name identifying an object type or registration point.",
+	"BITS":              "A named collection of individual bit positions.",
+	// SMIv2 application types (RFC 2578)
+	"Integer32":  "An integer-valued type restricted to the range -2147483648 to 2147483647.",
+	"IpAddress":  "A 32-bit internet address represented as an OCTET STRING of length 4 in network byte-order.",
+	"Counter32":  "A non-negative integer that monotonically increases to a maximum of 4294967295, then wraps to zero.",
+	"Gauge32":    "A non-negative integer that may increase or decrease, but never exceeds 4294967295 or falls below zero.",
+	"Unsigned32": "An unsigned integer-valued type restricted to the range 0 to 4294967295.",
+	"TimeTicks":  "A non-negative integer counting hundredths of a second between two epochs.",
+	"Opaque":     "An arbitrary ASN.1 value double-wrapped as an OCTET STRING. Provided for backward-compatibility only.",
+	"Counter64":  "A non-negative integer that monotonically increases to a maximum of 18446744073709551615, then wraps to zero.",
+	// SMIv1 application types (RFC 1155)
+	"Counter":        "A non-negative integer that monotonically increases to a maximum of 4294967295, then wraps to zero.",
+	"Gauge":          "A non-negative integer that may increase or decrease, but latches at a maximum of 4294967295.",
+	"NetworkAddress": "An address from one of possibly several protocol families.",
+}
+
 func seedPrimitiveTypes(ctx *resolverContext) {
 	if ctx.snmpv2SMIModule == nil {
 		return
@@ -48,6 +75,9 @@ func seedPrimitiveTypes(ctx *resolverContext) {
 		typ := model.NewType(name)
 		model.SetTypeModule(typ, resolved)
 		model.SetTypeBase(typ, base)
+		if desc, ok := baseTypeDescriptions[name]; ok {
+			model.SetTypeDescription(typ, desc)
+		}
 
 		model.AddMibType(ctx.mib, typ)
 		ctx.registerModuleTypeSymbol(mod, name, typ)
@@ -107,6 +137,11 @@ func createUserTypes(ctx *resolverContext) {
 			model.SetTypeStatus(typ, td.Status)
 			model.SetTypeDisplayHint(typ, td.DisplayHint)
 			model.SetTypeDescription(typ, td.Description)
+			if td.Description == "" && module.IsBaseModule(mod.Name) {
+				if desc, ok := baseTypeDescriptions[td.Name]; ok {
+					model.SetTypeDescription(typ, desc)
+				}
+			}
 			model.SetTypeReference(typ, td.Reference)
 
 			namedValues := extractNamedValues(td.Syntax)
