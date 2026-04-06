@@ -157,6 +157,21 @@ type (
 	NameRef               = model.NameRef
 )
 
+// --- Span context ---
+
+type (
+	SpanContext     = model.SpanContext
+	SpanContextKind = model.SpanContextKind
+)
+
+const (
+	SpanContextNone       = model.SpanContextNone
+	SpanContextDefinition = model.SpanContextDefinition
+	SpanContextImport     = model.SpanContextImport
+	SpanContextOidRef     = model.SpanContextOidRef
+	SpanContextSyntax     = model.SpanContextSyntax
+)
+
 // --- Resolve entry point ---
 
 // Resolve transforms normalized modules into a fully resolved [Mib].
