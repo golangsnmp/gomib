@@ -154,27 +154,8 @@ func TestObjectIdentityDescriptionPropagation(t *testing.T) {
 	testutil.Equal(t, "RFC 9999", node.Reference(), "Reference")
 }
 
-func TestValueAssignmentDescriptionPropagation(t *testing.T) {
-	// ValueAssignment descriptions should propagate to the resolved node.
-	mod := testSMIv2Module(nil,
-		&module.ValueAssignment{
-			DefBase:     module.DefBase{Name: "testBranch"},
-			Oid:         testOid("testRoot", 1),
-			Description: "A test branch.",
-			Reference:   "RFC 8888",
-		},
-	)
-
-	m := resolveStrict(mod)
-
-	node := m.Node("testBranch")
-	testutil.NotNil(t, node, "node")
-	testutil.Equal(t, "A test branch.", node.Description(), "Description")
-	testutil.Equal(t, "RFC 8888", node.Reference(), "Reference")
-}
-
 func TestValueAssignmentEmptyDescription(t *testing.T) {
-	// ValueAssignment without description should leave node description empty.
+	// ValueAssignment nodes have no description (the grammar has no DESCRIPTION clause).
 	mod := testSMIv2Module(nil,
 		&module.ValueAssignment{
 			DefBase: module.DefBase{Name: "testBranch"},

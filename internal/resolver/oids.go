@@ -479,11 +479,7 @@ func finalizeOidDefinition(ctx *resolverContext, def oidDefinition, node *model.
 		}
 		model.SetNodeName(node, label)
 		model.SetNodeSpan(node, def.def.DefinitionSpan())
-		switch d := def.def.(type) {
-		case *module.ValueAssignment:
-			model.SetNodeDescription(node, d.Description)
-			model.SetNodeReference(node, d.Reference)
-		case *module.ObjectIdentity:
+		if d, ok := def.def.(*module.ObjectIdentity); ok {
 			model.SetNodeDescription(node, d.Description)
 			model.SetNodeReference(node, d.Reference)
 			model.SetNodeObjectIdentity(node, d.Status)

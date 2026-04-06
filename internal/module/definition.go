@@ -152,9 +152,7 @@ func (d *TypeDef) DefinitionOid() *OidAssignment { return nil }
 // ValueAssignment is a plain OID value assignment.
 type ValueAssignment struct {
 	DefBase
-	Oid         OidAssignment
-	Description string
-	Reference   string
+	Oid OidAssignment
 }
 
 func (d *ValueAssignment) DefinitionOid() *OidAssignment { return &d.Oid }
