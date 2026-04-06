@@ -36,38 +36,54 @@ func TestBaseModuleTypeDescriptions(t *testing.T) {
 func TestBaseModuleNodeDescriptions(t *testing.T) {
 	m := resolveWithBase(nil, nil, nil)
 
-	// Verify that key base module nodes are present and resolvable.
-	// OID assignments in the embedded SMI files do not carry formal
-	// DESCRIPTION clauses, so we only check that the nodes exist.
-	nodesPresent := []string{
+	// Nodes converted to OBJECT-IDENTITY should have descriptions.
+	nodesWithDescs := []string{
 		"internet", "enterprises", "mgmt", "mib-2",
-		"private", "experimental", "directory",
-		"snmpV2", "snmpDomains", "snmpModules",
-		"zeroDotZero",
+		"private", "experimental", "directory", "transmission",
+		"security", "snmpV2", "snmpDomains", "snmpModules",
+		"snmpProxys", "zeroDotZero",
 	}
 
-	for _, name := range nodesPresent {
-		if m.Node(name) == nil {
+	for _, name := range nodesWithDescs {
+		node := m.Node(name)
+		if node == nil {
 			t.Errorf("node %q not found", name)
+			continue
+		}
+		if node.Description() == "" {
+			t.Errorf("node %q has empty description", name)
+		}
+	}
+
+	// ASN.1 structural arcs remain plain value assignments without descriptions.
+	structuralArcs := []string{"iso", "org", "dod"}
+	for _, name := range structuralArcs {
+		node := m.Node(name)
+		if node == nil {
+			t.Errorf("structural arc %q not found", name)
 		}
 	}
 }
 
-func TestBaseModuleNodeReferences(t *testing.T) {
+func TestBaseModuleNodeObjectIdentity(t *testing.T) {
 	m := resolveWithBase(nil, nil, nil)
 
-	// Same as TestBaseModuleNodeDescriptions: check presence only.
-	// OID value assignments in embedded SMI source lack explicit references.
-	nodesPresent := []string{
+	// Nodes defined via OBJECT-IDENTITY should report as such.
+	objIdentNodes := []string{
 		"internet", "enterprises", "mgmt", "mib-2",
-		"private", "experimental", "directory",
-		"snmpV2", "snmpDomains", "snmpModules",
-		"zeroDotZero",
+		"private", "experimental", "directory", "transmission",
+		"security", "snmpV2", "snmpDomains", "snmpModules",
+		"snmpProxys", "zeroDotZero",
 	}
 
-	for _, name := range nodesPresent {
-		if m.Node(name) == nil {
+	for _, name := range objIdentNodes {
+		node := m.Node(name)
+		if node == nil {
 			t.Errorf("node %q not found", name)
+			continue
+		}
+		if !node.IsObjectIdentity() {
+			t.Errorf("node %q should be OBJECT-IDENTITY", name)
 		}
 	}
 }
@@ -93,6 +109,43 @@ func TestBaseModuleNodeDescriptionContent(t *testing.T) {
 		}
 		if node.OID().String() != tt.oid {
 			t.Errorf("node %q OID = %q, want %q", tt.name, node.OID().String(), tt.oid)
+		}
+	}
+}
+
+func TestBaseModuleBaseTypeDescriptions(t *testing.T) {
+	m := resolveWithBase(nil, nil, nil)
+
+	// SMIv2 application types should have descriptions.
+	smiTypes := []string{
+		"Integer32", "Counter32", "Counter64", "Gauge32",
+		"Unsigned32", "TimeTicks", "IpAddress", "Opaque",
+	}
+	for _, name := range smiTypes {
+		typ := m.Type(name)
+		if typ == nil {
+			t.Errorf("type %q not found", name)
+			continue
+		}
+		if typ.Description() == "" {
+			t.Errorf("type %q has empty description", name)
+		}
+	}
+
+	// ASN.1 primitives should also have descriptions.
+	primitives := []string{"INTEGER", "OCTET STRING", "OBJECT IDENTIFIER", "BITS"}
+	smiMod := m.Module("SNMPv2-SMI")
+	if smiMod == nil {
+		t.Fatal("SNMPv2-SMI module not found")
+	}
+	for _, name := range primitives {
+		typ := smiMod.Type(name)
+		if typ == nil {
+			t.Errorf("primitive type %q not found", name)
+			continue
+		}
+		if typ.Description() == "" {
+			t.Errorf("primitive type %q has empty description", name)
 		}
 	}
 }

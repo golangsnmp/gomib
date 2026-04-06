@@ -65,6 +65,11 @@ func TestEmbeddedSNMPv2SMI_Content(t *testing.T) {
 	if len(target.ValueAssignments) == 0 {
 		t.Error("SNMPv2-SMI should have value assignments")
 	}
+
+	// Should have OBJECT-IDENTITY definitions (internet, enterprises, etc.)
+	if len(target.ObjectIdentities) == 0 {
+		t.Error("SNMPv2-SMI should have OBJECT-IDENTITY definitions")
+	}
 }
 
 func TestEmbeddedBaseModules_NoMacroWarnings(t *testing.T) {
