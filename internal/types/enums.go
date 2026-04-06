@@ -239,6 +239,25 @@ var baseTypeNames = [...]string{
 
 func (b BaseType) String() string { return enumString(b, baseTypeNames[:], "BaseType") }
 
+// syntaxBaseTypeNames lists type names valid in SYNTAX clauses.
+var syntaxBaseTypeNames = []string{
+	"INTEGER",
+	"Integer32",
+	"Unsigned32",
+	"Counter32",
+	"Counter64",
+	"Gauge32",
+	"TimeTicks",
+	"IpAddress",
+	"OCTET STRING",
+	"OBJECT IDENTIFIER",
+	"BITS",
+	"Opaque",
+}
+
+// SyntaxBaseTypeNames returns the type names valid in SYNTAX clauses.
+func SyntaxBaseTypeNames() []string { return slices.Clone(syntaxBaseTypeNames) }
+
 // IndexEncoding classifies how an INDEX component maps to instance-identifier
 // sub-identifiers per RFC 2578 s7.7.
 type IndexEncoding int

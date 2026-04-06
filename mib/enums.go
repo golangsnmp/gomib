@@ -15,6 +15,9 @@ func StatusNames() []string { return types.StatusNames() }
 // AccessNames returns the access value names in order (not-accessible..not-implemented).
 func AccessNames() []string { return types.AccessNames() }
 
+// SyntaxBaseTypeNames returns the type names valid in SYNTAX clauses.
+func SyntaxBaseTypeNames() []string { return types.SyntaxBaseTypeNames() }
+
 const (
 	SeverityFatal   = types.SeverityFatal
 	SeveritySevere  = types.SeveritySevere
