@@ -18,6 +18,24 @@ func resolveTypes(ctx *resolverContext) {
 	resolveTypeBases(ctx)
 }
 
+// applicationBaseTypes maps well-known SMI base type names to their model.BaseType.
+// These types are defined in SNMPv2-SMI using APPLICATION tags that cannot be
+// recovered from the parsed syntax alone (the tag information is lost during lowering).
+var applicationBaseTypes = map[string]model.BaseType{
+	"Integer32":  model.BaseInteger32,
+	"Counter32":  model.BaseCounter32,
+	"Counter64":  model.BaseCounter64,
+	"Gauge32":    model.BaseGauge32,
+	"Unsigned32": model.BaseUnsigned32,
+	"TimeTicks":  model.BaseTimeTicks,
+	"IpAddress":  model.BaseIpAddress,
+	"Opaque":     model.BaseOpaque,
+	// SMIv1 equivalents
+	"Counter":        model.BaseCounter32,
+	"Gauge":          model.BaseGauge32,
+	"NetworkAddress": model.BaseIpAddress,
+}
+
 func seedPrimitiveTypes(ctx *resolverContext) {
 	if ctx.snmpv2SMIModule == nil {
 		return
@@ -63,6 +81,14 @@ func createUserTypes(ctx *resolverContext) {
 			if td.BaseType != nil {
 				base = *td.BaseType
 				hasBase = true
+			}
+			// For base modules parsed from source, APPLICATION tag information is
+			// lost during lowering. Recover the correct base type by name.
+			if module.IsBaseModule(mod.Name) {
+				if b, ok := applicationBaseTypes[td.Name]; ok {
+					base = b
+					hasBase = true
+				}
 			}
 			if !hasBase {
 				// Type references (e.g., DisplayString) don't have an intrinsic

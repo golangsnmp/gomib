@@ -115,7 +115,10 @@ func Load(ctx context.Context, opts ...LoadOption) (*mib.Mib, error) {
 	if cfg.systemPaths {
 		sources = append(sources, discoverSystemSources(types.Logger{L: cfg.logger})...)
 	}
-	if len(sources) == 0 {
+	// Embedded source provides base modules when no local copy is found.
+	sources = append(sources, embeddedSource{})
+
+	if len(cfg.sources) == 0 && !cfg.systemPaths && !cfg.hasModules {
 		return nil, ErrNoSources
 	}
 

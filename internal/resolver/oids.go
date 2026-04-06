@@ -584,7 +584,21 @@ func lookupOrCreateWellKnownRoot(ctx *resolverContext, name string) (*model.Node
 	if arc < 0 {
 		return nil, false
 	}
-	return model.GetOrCreateChild(ctx.mib.Root(), uint32(arc)), true
+	node := model.GetOrCreateChild(ctx.mib.Root(), uint32(arc))
+	// Claim unowned well-known root arcs for SNMPv2-SMI so that vendor modules
+	// traversing { iso(1) ... } paths cannot take ownership via createNamedChild.
+	if node.Module() == nil && ctx.snmpv2SMIModule != nil {
+		resolved := ctx.moduleToResolved[ctx.snmpv2SMIModule]
+		if resolved != nil {
+			model.SetNodeName(node, name)
+			model.SetNodeModule(node, resolved)
+			model.SetNodeKind(node, model.KindNode)
+			model.AddModuleNode(resolved, node)
+			model.RegisterMibNode(ctx.mib, name, node)
+			ctx.registerModuleNodeSymbol(ctx.snmpv2SMIModule, name, node)
+		}
+	}
+	return node, true
 }
 
 func lookupSmiGlobalOidRoot(ctx *resolverContext, name string) (*model.Node, bool) {
@@ -656,8 +670,8 @@ func shouldPreferModule(ctx *resolverContext, currentMod *model.Module, srcMod *
 		return newIsBase
 	}
 
-	newRank := languageRank(srcMod.Language)
-	currentRank := languageRank(currentSrcMod.Language)
+	newRank := languageRankForMod(srcMod)
+	currentRank := languageRankForMod(currentSrcMod)
 
 	if ctx.TraceEnabled() {
 		ctx.Trace("module preference check",
@@ -701,4 +715,18 @@ func languageRank(lang types.Language) int {
 	default:
 		return 0
 	}
+}
+
+// languageRankForMod returns the language rank for a module.
+// For base modules, the rank is derived from the known SMI version
+// rather than the parsed language, which may be incorrect for modules
+// like SNMPv2-SMI that don't import from other SMIv2 modules.
+func languageRankForMod(m *module.Module) int {
+	if bm, ok := module.BaseModuleFromName(m.Name); ok {
+		if bm.IsSMIv2() {
+			return 2
+		}
+		return 1
+	}
+	return languageRank(m.Language)
 }

@@ -3,27 +3,69 @@ package resolver
 import (
 	"log/slog"
 	"slices"
+	"sync"
 
+	"github.com/golangsnmp/gomib/internal/cst/lower"
+	cstparser "github.com/golangsnmp/gomib/internal/cst/parser"
 	"github.com/golangsnmp/gomib/internal/model"
 	"github.com/golangsnmp/gomib/internal/module"
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
+// embeddedBaseModules holds the parsed base modules from the embedded SMI source.
+// Parsed once on first use.
+var embeddedBaseModules = sync.OnceValue(func() []*module.Module {
+	var result []*module.Module
+	cfg := types.DefaultConfig()
+	for _, name := range module.BaseModuleNames() {
+		content := module.EmbeddedContent(name)
+		if content == nil {
+			continue
+		}
+		p := cstparser.New(content, nil, cfg)
+		file := p.ParseModule()
+		mods := lower.Lower(file, content, p.Diagnostics(), cfg)
+		for _, mod := range mods {
+			if mod.Name == name {
+				result = append(result, mod)
+				break
+			}
+		}
+	}
+	return result
+})
+
 // registerModules indexes all modules and seeds the resolver context.
-// Synthetic base modules are prepended to user modules so that later
+// Base modules are separated from user modules and prepended so that later
 // phases can resolve primitives and well-known types. The result is
 // stored in ctx.modules.
 func registerModules(ctx *resolverContext, inputModules []*module.Module) {
-	baseModules := module.CreateBaseModules()
-
-	ctx.Log(slog.LevelDebug, "loaded base modules", slog.Int("count", len(baseModules)))
-
-	var userModules []*module.Module
+	// Index which base modules are already present in the input.
+	inputBaseNames := make(map[string]struct{})
 	for _, mod := range inputModules {
 		if module.IsBaseModule(mod.Name) {
-			continue
+			inputBaseNames[mod.Name] = struct{}{}
 		}
-		userModules = append(userModules, mod)
 	}
+
+	// Separate base modules from user modules.
+	var baseModules, userModules []*module.Module
+	for _, mod := range inputModules {
+		if module.IsBaseModule(mod.Name) {
+			baseModules = append(baseModules, mod)
+		} else {
+			userModules = append(userModules, mod)
+		}
+	}
+
+	// Fill in any missing base modules from the embedded source.
+	for _, mod := range embeddedBaseModules() {
+		if _, ok := inputBaseNames[mod.Name]; !ok {
+			baseModules = append(baseModules, mod)
+		}
+	}
+
+	ctx.Log(slog.LevelDebug, "loaded base modules", slog.Int("count", len(baseModules)))
 
 	ctx.modules = slices.Concat(baseModules, userModules)
 

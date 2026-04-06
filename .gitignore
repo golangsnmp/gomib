@@ -36,3 +36,6 @@ cmd/gomib-fixturegen/
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Design docs
+docs/

@@ -162,7 +162,8 @@ func (p *Parser) parseTypeSyntax() (cst.TypeSyntaxNode, *types.SpanDiagnostic) {
 
 	case lexer.TokKwCounter32, lexer.TokKwCounter64, lexer.TokKwGauge32,
 		lexer.TokKwUnsigned32, lexer.TokKwTimeTicks, lexer.TokKwIpAddress,
-		lexer.TokKwOpaque, lexer.TokKwCounter, lexer.TokKwGauge, lexer.TokKwNetworkAddress:
+		lexer.TokKwOpaque, lexer.TokKwCounter, lexer.TokKwGauge, lexer.TokKwNetworkAddress,
+		lexer.TokForbiddenKeyword:
 		tok := p.advance()
 		baseSyntax = &cst.TypeRefSyntaxNode{
 			Name: tok,

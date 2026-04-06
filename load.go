@@ -186,11 +186,6 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			return nil
 		}
 
-		if base := module.GetBaseModule(name); base != nil {
-			modules[name] = base
-			return nil
-		}
-
 		result, err := combined.Find(name)
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
@@ -240,22 +235,21 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 		}
 	}
 
+	// Ensure base modules are loaded for the resolver.
+	for _, name := range module.BaseModuleNames() {
+		if err := loadOne(name); err != nil {
+			return nil, err
+		}
+	}
+
 	mods := collectModules(modules)
 
 	m := mib.Resolve(mods, componentLogger(cfg.logger, "resolver"), &cfg.resolverStrictness, &cfg.diagConfig)
 	return m, checkLoadResult(m, cfg, names)
 }
 
-// collectModules adds missing base modules to the map and returns the
-// modules sorted by name.
+// collectModules returns the modules sorted by name.
 func collectModules(modules map[string]*module.Module) []*module.Module {
-	for _, name := range module.BaseModuleNames() {
-		if _, ok := modules[name]; !ok {
-			if base := module.GetBaseModule(name); base != nil {
-				modules[name] = base
-			}
-		}
-	}
 	mods := slices.Collect(maps.Values(modules))
 	slices.SortFunc(mods, func(a, b *module.Module) int {
 		return cmp.Compare(a.Name, b.Name)
