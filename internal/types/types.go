@@ -63,6 +63,18 @@ func NewSpan(start, end ByteOffset) Span {
 	return Span{Start: start, End: end}
 }
 
+// Contains reports whether offset falls within this span [Start, End).
+// Returns false for zero-value spans and synthetic spans.
+func (s Span) Contains(offset ByteOffset) bool {
+	if s.Start == 0 && s.End == 0 {
+		return false
+	}
+	if s == Synthetic {
+		return false
+	}
+	return offset >= s.Start && offset < s.End
+}
+
 // SpanDiagnostic is an internal diagnostic from the lexer or parser.
 // Converted to Diagnostic during parsing with module name and
 // line/column info.
@@ -105,4 +117,14 @@ func LineColFromTable(table []int, offset ByteOffset) (line, col int) {
 	// Find the last line start <= offset.
 	lo := sort.Search(len(table), func(i int) bool { return table[i] > off }) - 1
 	return lo + 1, off - table[lo] + 1
+}
+
+// OffsetFromTable converts 1-based line and column numbers to a byte offset
+// using a precomputed line table. Returns (0, false) if the table is empty
+// or the line/col is out of range.
+func OffsetFromTable(table []int, line, col int) (ByteOffset, bool) {
+	if len(table) == 0 || line < 1 || line > len(table) || col < 1 {
+		return 0, false
+	}
+	return ByteOffset(table[line-1] + col - 1), true
 }

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"math"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/testutil"
@@ -100,4 +101,83 @@ func TestLineColFromTable_PositionAtNewline(t *testing.T) {
 	line, col = LineColFromTable(table, 1) // start of line 2
 	testutil.Equal(t, 2, line, "after newline line")
 	testutil.Equal(t, 1, col, "after newline col")
+}
+
+func TestSpanContains(t *testing.T) {
+	tests := []struct {
+		name   string
+		span   Span
+		offset ByteOffset
+		want   bool
+	}{
+		{"inside", NewSpan(10, 20), 15, true},
+		{"at start", NewSpan(10, 20), 10, true},
+		{"at end (exclusive)", NewSpan(10, 20), 20, false},
+		{"before", NewSpan(10, 20), 5, false},
+		{"after", NewSpan(10, 20), 25, false},
+		{"zero span", Span{}, 0, false},
+		{"synthetic span", Synthetic, 0, false},
+		{"synthetic offset in synthetic span", Synthetic, ByteOffset(math.MaxUint32), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.span.Contains(tt.offset); got != tt.want {
+				t.Errorf("Span{%d,%d}.Contains(%d) = %v, want %v",
+					tt.span.Start, tt.span.End, tt.offset, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOffsetFromTable(t *testing.T) {
+	// Source: "abc\ndef\nghi" (lines: "abc", "def", "ghi")
+	// Line table: [0, 4, 8]
+	table := []int{0, 4, 8}
+
+	tests := []struct {
+		name   string
+		line   int
+		col    int
+		want   ByteOffset
+		wantOK bool
+	}{
+		{"first char", 1, 1, 0, true},
+		{"mid first line", 1, 3, 2, true},
+		{"first char second line", 2, 1, 4, true},
+		{"mid second line", 2, 2, 5, true},
+		{"third line", 3, 1, 8, true},
+		{"line zero", 0, 1, 0, false},
+		{"col zero", 1, 0, 0, false},
+		{"line past end", 4, 1, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := OffsetFromTable(table, tt.line, tt.col)
+			if ok != tt.wantOK || got != tt.want {
+				t.Errorf("OffsetFromTable(%d, %d) = (%d, %v), want (%d, %v)",
+					tt.line, tt.col, got, ok, tt.want, tt.wantOK)
+			}
+		})
+	}
+}
+
+func TestOffsetFromTable_EmptyTable(t *testing.T) {
+	got, ok := OffsetFromTable(nil, 1, 1)
+	if ok || got != 0 {
+		t.Errorf("OffsetFromTable(nil, 1, 1) = (%d, %v), want (0, false)", got, ok)
+	}
+}
+
+func TestOffsetFromTable_RoundTrip(t *testing.T) {
+	source := []byte("first line\nsecond line\nthird")
+	table := BuildLineTable(source)
+	offsets := []ByteOffset{0, 5, 11, 15, 22, 25}
+	for _, off := range offsets {
+		line, col := LineColFromTable(table, off)
+		got, ok := OffsetFromTable(table, line, col)
+		if !ok || got != off {
+			t.Errorf("round-trip offset %d -> (%d,%d) -> (%d, %v), want (%d, true)",
+				off, line, col, got, ok, off)
+		}
+	}
 }
