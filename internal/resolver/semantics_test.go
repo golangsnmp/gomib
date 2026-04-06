@@ -1079,11 +1079,11 @@ func TestExtractOidRefs(t *testing.T) {
 
 	t.Run("extracts named symbolic references only", func(t *testing.T) {
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNumber{Value: 1},
-			&module.OidComponentName{NameValue: "internet", Span: types.Span{Start: 1, End: 9}},
-			&module.OidComponentNamedNumber{NameValue: "private", NumberValue: 4, Span: types.Span{Start: 10, End: 20}},
-			&module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises", Span: types.Span{Start: 21, End: 36}},
-			&module.OidComponentQualifiedNamedNumber{ModuleValue: "RFC1155-SMI", NameValue: "private", NumberValue: 4, Span: types.Span{Start: 37, End: 52}},
+			{Number: 1, HasNumber: true},
+			{Name: "internet", Span: types.Span{Start: 1, End: 9}},
+			{Name: "private", Number: 4, HasNumber: true, Span: types.Span{Start: 10, End: 20}},
+			{Module: "SNMPv2-SMI", Name: "enterprises", Span: types.Span{Start: 21, End: 36}},
+			{Module: "RFC1155-SMI", Name: "private", Number: 4, HasNumber: true, Span: types.Span{Start: 37, End: 52}},
 		}, types.Span{})
 
 		refs := extractOidRefs(&oid)
@@ -1206,8 +1206,8 @@ func TestCreateResolvedObjects(t *testing.T) {
 			Units:       "chars",
 			DefVal:      &module.DefValString{Value: "public"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "testRoot"},
-				&module.OidComponentNumber{Value: 1},
+				{Name: "testRoot"},
+				{Number: 1, HasNumber: true},
 			}, types.Span{}),
 		},
 		&module.ObjectType{
@@ -1216,8 +1216,8 @@ func TestCreateResolvedObjects(t *testing.T) {
 			Access:  types.AccessNotAccessible,
 			Status:  types.StatusCurrent,
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "ifEntry"},
-				&module.OidComponentNumber{Value: 1},
+				{Name: "ifEntry"},
+				{Number: 1, HasNumber: true},
 			}, types.Span{}),
 		},
 		&module.ObjectType{
@@ -1229,8 +1229,8 @@ func TestCreateResolvedObjects(t *testing.T) {
 				{Object: "ifIndex"},
 			},
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "testRoot"},
-				&module.OidComponentNumber{Value: 2},
+				{Name: "testRoot"},
+				{Number: 2, HasNumber: true},
 			}, types.Span{}),
 		},
 	})
@@ -1323,8 +1323,8 @@ func TestCreateResolvedCapabilities(t *testing.T) {
 				},
 			},
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "testRoot"},
-				&module.OidComponentNumber{Value: 100},
+				{Name: "testRoot"},
+				{Number: 100, HasNumber: true},
 			}, types.Span{}),
 		},
 	})
@@ -1400,9 +1400,9 @@ func TestConvertDefValOidValue(t *testing.T) {
 	t.Run("resolves name with trailing numeric arcs", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
 			Components: []module.OidComponent{
-				&module.OidComponentName{NameValue: "enterprises"},
-				&module.OidComponentNumber{Value: 42},
-				&module.OidComponentNumber{Value: 1},
+				{Name: "enterprises"},
+				{Number: 42, HasNumber: true},
+				{Number: 1, HasNumber: true},
 			},
 		}, mod, nil, types.Span{})
 		testutil.NotNil(t, dv, "expected non-nil")
@@ -1416,7 +1416,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 	t.Run("resolves single name component", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
 			Components: []module.OidComponent{
-				&module.OidComponentName{NameValue: "enterprises"},
+				{Name: "enterprises"},
 			},
 		}, mod, nil, types.Span{})
 		testutil.NotNil(t, dv, "expected non-nil")
@@ -1429,8 +1429,8 @@ func TestConvertDefValOidValue(t *testing.T) {
 	t.Run("resolves named number with trailing arcs", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
 			Components: []module.OidComponent{
-				&module.OidComponentNamedNumber{NameValue: "enterprises", NumberValue: 1},
-				&module.OidComponentNumber{Value: 5},
+				{Name: "enterprises", Number: 1, HasNumber: true},
+				{Number: 5, HasNumber: true},
 			},
 		}, mod, nil, types.Span{})
 		testutil.NotNil(t, dv, "expected non-nil")
@@ -1443,7 +1443,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 	t.Run("resolves qualified name", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
 			Components: []module.OidComponent{
-				&module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"},
+				{Module: "SNMPv2-SMI", Name: "enterprises"},
 			},
 		}, mod, nil, types.Span{})
 		testutil.NotNil(t, dv, "expected non-nil")
@@ -1457,10 +1457,11 @@ func TestConvertDefValOidValue(t *testing.T) {
 	t.Run("resolves qualified named number", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
 			Components: []module.OidComponent{
-				&module.OidComponentQualifiedNamedNumber{
-					ModuleValue: "SNMPv2-SMI",
-					NameValue:   "enterprises",
-					NumberValue: 1,
+				{
+					Module:    "SNMPv2-SMI",
+					Name:      "enterprises",
+					Number:    1,
+					HasNumber: true,
 				},
 			},
 		}, mod, nil, types.Span{})
@@ -1475,7 +1476,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 	t.Run("returns nil for unresolved name", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
 			Components: []module.OidComponent{
-				&module.OidComponentName{NameValue: "nonexistent"},
+				{Name: "nonexistent"},
 			},
 		}, mod, nil, types.Span{})
 		testutil.Nil(t, dv, "expected nil for unresolved name, got")
@@ -1491,7 +1492,7 @@ func TestConvertDefValOidValue(t *testing.T) {
 	t.Run("returns nil when first component is numeric only", func(t *testing.T) {
 		dv := convertDefVal(ctx, &module.DefValOidValue{
 			Components: []module.OidComponent{
-				&module.OidComponentNumber{Value: 1},
+				{Number: 1, HasNumber: true},
 			},
 		}, mod, nil, types.Span{})
 		testutil.Nil(t, dv, "expected nil when first component is numeric, got")

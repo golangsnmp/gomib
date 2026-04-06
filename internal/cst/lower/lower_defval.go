@@ -169,17 +169,18 @@ func (l *lowerer) lowerDefValOidWithFirstIdent(content []cst.SyntaxToken) module
 			} else {
 				endOffset = numTok.Span.End
 			}
-			components = append(components, &module.OidComponentNamedNumber{
-				NameValue:   identName,
-				NumberValue: number,
-				Span:        types.NewSpan(firstTok.Span.Start, endOffset),
+			components = append(components, module.OidComponent{
+				Name:      identName,
+				Number:    number,
+				HasNumber: true,
+				Span:      types.NewSpan(firstTok.Span.Start, endOffset),
 			})
 		} else {
 			// Malformed, just add as name
-			components = append(components, &module.OidComponentName{NameValue: identName, Span: firstTok.Span})
+			components = append(components, module.OidComponent{Name: identName, Span: firstTok.Span})
 		}
 	} else {
-		components = append(components, &module.OidComponentName{NameValue: identName, Span: firstTok.Span})
+		components = append(components, module.OidComponent{Name: identName, Span: firstTok.Span})
 	}
 
 	// Parse remaining OID components.
@@ -188,7 +189,7 @@ func (l *lowerer) lowerDefValOidWithFirstIdent(content []cst.SyntaxToken) module
 		switch tok.Kind {
 		case lexer.TokNumber:
 			number := l.convertU32(tok)
-			components = append(components, &module.OidComponentNumber{Value: number, Span: tok.Span})
+			components = append(components, module.OidComponent{Number: number, HasNumber: true, Span: tok.Span})
 			i++
 
 		case lexer.TokLowercaseIdent, lexer.TokUppercaseIdent:
@@ -219,7 +220,7 @@ func (l *lowerer) parseDefValOidIdentComponent(content []cst.SyntaxToken, idx *i
 	defer func() { *idx = i }()
 
 	if i >= len(content) {
-		return &module.OidComponentName{NameValue: name, Span: nameSpan}
+		return module.OidComponent{Name: name, Span: nameSpan}
 	}
 
 	switch content[i].Kind {
@@ -240,21 +241,22 @@ func (l *lowerer) parseDefValOidIdentComponent(content []cst.SyntaxToken, idx *i
 						endOffset = content[i].Span.End
 						i++
 					}
-					return &module.OidComponentQualifiedNamedNumber{
-						ModuleValue: name,
-						NameValue:   qname,
-						NumberValue: number,
-						Span:        types.NewSpan(compStart, endOffset),
+					return module.OidComponent{
+						Module:    name,
+						Name:      qname,
+						Number:    number,
+						HasNumber: true,
+						Span:      types.NewSpan(compStart, endOffset),
 					}
 				}
 			}
-			return &module.OidComponentQualifiedName{
-				ModuleValue: name,
-				NameValue:   qname,
-				Span:        types.NewSpan(compStart, qnameEnd),
+			return module.OidComponent{
+				Module: name,
+				Name:   qname,
+				Span:   types.NewSpan(compStart, qnameEnd),
 			}
 		}
-		return &module.OidComponentName{NameValue: name, Span: nameSpan}
+		return module.OidComponent{Name: name, Span: nameSpan}
 
 	case lexer.TokLParen:
 		i++
@@ -267,15 +269,16 @@ func (l *lowerer) parseDefValOidIdentComponent(content []cst.SyntaxToken, idx *i
 				endOffset = content[i].Span.End
 				i++
 			}
-			return &module.OidComponentNamedNumber{
-				NameValue:   name,
-				NumberValue: number,
-				Span:        types.NewSpan(compStart, endOffset),
+			return module.OidComponent{
+				Name:      name,
+				Number:    number,
+				HasNumber: true,
+				Span:      types.NewSpan(compStart, endOffset),
 			}
 		}
-		return &module.OidComponentName{NameValue: name, Span: nameSpan}
+		return module.OidComponent{Name: name, Span: nameSpan}
 
 	default:
-		return &module.OidComponentName{NameValue: name, Span: nameSpan}
+		return module.OidComponent{Name: name, Span: nameSpan}
 	}
 }

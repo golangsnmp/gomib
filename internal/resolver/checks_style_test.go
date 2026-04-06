@@ -519,9 +519,9 @@ func TestCheckNodeImplicit(t *testing.T) {
 				DefBase:     module.DefBase{Name: "testMIB"},
 				Description: "test",
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "enterprises"},
-					&module.OidComponentNumber{Value: 99999},
-					&module.OidComponentNumber{Value: 1},
+					{Name: "enterprises"},
+					{Number: 99999, HasNumber: true},
+					{Number: 1, HasNumber: true},
 				}, types.Span{}),
 			},
 		})
@@ -568,12 +568,12 @@ func TestCheckModuleIdentityRegistration(t *testing.T) {
 				DefBase:     module.DefBase{Name: "testMIB"},
 				Description: "test",
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentNamedNumber{NameValue: "iso", NumberValue: 1},
-					&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
-					&module.OidComponentNamedNumber{NameValue: "dod", NumberValue: 6},
-					&module.OidComponentNamedNumber{NameValue: "internet", NumberValue: 1},
-					&module.OidComponentNamedNumber{NameValue: "mgmt", NumberValue: 2},
-					&module.OidComponentNumber{Value: 99},
+					{Name: "iso", Number: 1, HasNumber: true},
+					{Name: "org", Number: 3, HasNumber: true},
+					{Name: "dod", Number: 6, HasNumber: true},
+					{Name: "internet", Number: 1, HasNumber: true},
+					{Name: "mgmt", Number: 2, HasNumber: true},
+					{Number: 99, HasNumber: true},
 				}, types.Span{}),
 			},
 		})

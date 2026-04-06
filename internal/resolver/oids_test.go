@@ -54,13 +54,13 @@ func TestCollectOidDefinitions(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 
 	oid := module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentName{NameValue: "enterprises"},
-		&module.OidComponentNumber{Value: 42},
+		{Name: "enterprises"},
+		{Number: 42, HasNumber: true},
 	}, types.Synthetic)
 
 	trapOid := module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentName{NameValue: "enterprises"},
-		&module.OidComponentNumber{Value: 99},
+		{Name: "enterprises"},
+		{Number: 99, HasNumber: true},
 	}, types.Synthetic)
 
 	addDefs(mod, []module.Definition{
@@ -135,7 +135,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 
 	t.Run("OidComponentNumber", func(t *testing.T) {
 		def := makeOidDef([]module.OidComponent{
-			&module.OidComponentNumber{Value: 1},
+			{Number: 1, HasNumber: true},
 		})
 		_, ok := getOidParentSymbol(ctx, def)
 		testutil.False(t, ok, "expected false for numeric root")
@@ -143,7 +143,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 
 	t.Run("OidComponentName well-known root", func(t *testing.T) {
 		def := makeOidDef([]module.OidComponent{
-			&module.OidComponentName{NameValue: "iso"},
+			{Name: "iso"},
 		})
 		_, ok := getOidParentSymbol(ctx, def)
 		testutil.False(t, ok, "expected false for well-known root name")
@@ -157,7 +157,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 			&module.ValueAssignment{
 				DefBase: module.DefBase{Name: "enterprises"},
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentNumber{Value: 1},
+					{Number: 1, HasNumber: true},
 				}, types.Synthetic),
 			},
 		})
@@ -168,8 +168,8 @@ func TestGetOidParentSymbol(t *testing.T) {
 			def: &module.ValueAssignment{
 				DefBase: module.DefBase{Name: "myNode"},
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "enterprises"},
-					&module.OidComponentNumber{Value: 1},
+					{Name: "enterprises"},
+					{Number: 1, HasNumber: true},
 				}, types.Synthetic),
 			},
 			kind: defValueAssignment,
@@ -188,7 +188,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 			&module.ValueAssignment{
 				DefBase: module.DefBase{Name: "org"},
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentNumber{Value: 3},
+					{Number: 3, HasNumber: true},
 				}, types.Synthetic),
 			},
 		})
@@ -199,7 +199,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 			def: &module.ValueAssignment{
 				DefBase: module.DefBase{Name: "test"},
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+					{Name: "org", Number: 3, HasNumber: true},
 				}, types.Synthetic),
 			},
 			kind: defValueAssignment,
@@ -211,7 +211,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 
 	t.Run("OidComponentNamedNumber with well-known root", func(t *testing.T) {
 		def := makeOidDef([]module.OidComponent{
-			&module.OidComponentNamedNumber{NameValue: "iso", NumberValue: 1},
+			{Name: "iso", Number: 1, HasNumber: true},
 		})
 		_, ok := getOidParentSymbol(ctx, def)
 		testutil.False(t, ok, "expected false for well-known root named number")
@@ -219,7 +219,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 
 	t.Run("OidComponentNamedNumber unknown falls back to no dependency", func(t *testing.T) {
 		def := makeOidDef([]module.OidComponent{
-			&module.OidComponentNamedNumber{NameValue: "unknown", NumberValue: 99},
+			{Name: "unknown", Number: 99, HasNumber: true},
 		})
 		_, ok := getOidParentSymbol(ctx, def)
 		testutil.False(t, ok, "expected false for unknown named number (has numeric fallback)")
@@ -227,7 +227,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 
 	t.Run("OidComponentQualifiedName", func(t *testing.T) {
 		def := makeOidDef([]module.OidComponent{
-			&module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"},
+			{Module: "SNMPv2-SMI", Name: "enterprises"},
 		})
 		sym, ok := getOidParentSymbol(ctx, def)
 		testutil.True(t, ok, "expected true for qualified name")
@@ -237,7 +237,7 @@ func TestGetOidParentSymbol(t *testing.T) {
 
 	t.Run("OidComponentQualifiedNamedNumber", func(t *testing.T) {
 		def := makeOidDef([]module.OidComponent{
-			&module.OidComponentQualifiedNamedNumber{ModuleValue: "RFC1155-SMI", NameValue: "private", NumberValue: 4},
+			{Module: "RFC1155-SMI", Name: "private", Number: 4, HasNumber: true},
 		})
 		sym, ok := getOidParentSymbol(ctx, def)
 		testutil.True(t, ok, "expected true for qualified named number")
@@ -251,8 +251,8 @@ func TestGetOidParentSymbol(t *testing.T) {
 		normalCtx.modules = []*module.Module{vendorMod}
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "enterprises"},
-			&module.OidComponentNumber{Value: 42},
+			{Name: "enterprises"},
+			{Number: 42, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  vendorMod,
@@ -272,8 +272,8 @@ func TestGetOidParentSymbol(t *testing.T) {
 		strictCtx.modules = []*module.Module{vendorMod}
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "enterprises"},
-			&module.OidComponentNumber{Value: 42},
+			{Name: "enterprises"},
+			{Number: 42, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  vendorMod,
@@ -290,7 +290,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 	t.Run("SMIv2 with hyphen emits diagnostic", func(t *testing.T) {
 		mod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv2}
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNumber{Value: 1},
+			{Number: 1, HasNumber: true},
 		}, types.Synthetic)
 		defs := []oidDefinition{
 			{mod: mod, def: &module.ValueAssignment{DefBase: module.DefBase{Name: "my-object"}, Oid: oid}, kind: defValueAssignment},
@@ -308,7 +308,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 	t.Run("SMIv2 without hyphen emits nothing", func(t *testing.T) {
 		mod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv2}
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNumber{Value: 1},
+			{Number: 1, HasNumber: true},
 		}, types.Synthetic)
 		defs := []oidDefinition{
 			{mod: mod, def: &module.ValueAssignment{DefBase: module.DefBase{Name: "myObject"}, Oid: oid}, kind: defValueAssignment},
@@ -323,7 +323,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 	t.Run("SMIv1 with hyphen emits nothing", func(t *testing.T) {
 		mod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv1}
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNumber{Value: 1},
+			{Number: 1, HasNumber: true},
 		}, types.Synthetic)
 		defs := []oidDefinition{
 			{mod: mod, def: &module.ValueAssignment{DefBase: module.DefBase{Name: "my-object"}, Oid: oid}, kind: defValueAssignment},
@@ -338,7 +338,7 @@ func TestCheckSmiv2IdentifierHyphens(t *testing.T) {
 	t.Run("base module skipped", func(t *testing.T) {
 		mod := &module.Module{Name: "SNMPv2-SMI", Language: types.LanguageSMIv2}
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNumber{Value: 1},
+			{Number: 1, HasNumber: true},
 		}, types.Synthetic)
 		defs := []oidDefinition{
 			{mod: mod, def: &module.ValueAssignment{DefBase: module.DefBase{Name: "mib-2"}, Oid: oid}, kind: defValueAssignment},
@@ -638,7 +638,7 @@ func TestFinalizeOidDefinition(t *testing.T) {
 			node := buildOIDPath(ctx.mib.Root(), 1, 3, 6)
 
 			oid := module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentNumber{Value: 1},
+				{Number: 1, HasNumber: true},
 			}, types.Synthetic)
 			def := oidDefinition{
 				mod:  srcMod,
@@ -672,7 +672,7 @@ func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
 		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 42)
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNumber{Value: 1},
+			{Number: 1, HasNumber: true},
 		}, types.Synthetic)
 
 		// First: preferred module claims the node
@@ -710,7 +710,7 @@ func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
 		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 44)
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNumber{Value: 1},
+			{Number: 1, HasNumber: true},
 		}, types.Synthetic)
 
 		def1 := oidDefinition{
@@ -744,7 +744,7 @@ func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
 		node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4, 1, 43)
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNumber{Value: 1},
+			{Number: 1, HasNumber: true},
 		}, types.Synthetic)
 
 		// First: older module claims the node
@@ -771,7 +771,7 @@ func TestFinalizeOidDefinitionNameModuleSync(t *testing.T) {
 
 func TestOidDefinitionDefName(t *testing.T) {
 	oid := module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentNumber{Value: 1},
+		{Number: 1, HasNumber: true},
 	}, types.Synthetic)
 
 	def := oidDefinition{
@@ -786,8 +786,8 @@ func TestOidDefinitionDefName(t *testing.T) {
 func TestOidDefinitionOid(t *testing.T) {
 	t.Run("returns oid when present", func(t *testing.T) {
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNumber{Value: 1},
-			&module.OidComponentNumber{Value: 3},
+			{Number: 1, HasNumber: true},
+			{Number: 3, HasNumber: true},
 		}, types.Synthetic)
 
 		def := oidDefinition{
@@ -832,7 +832,7 @@ func TestCollectOidDefinitionsKindMapping(t *testing.T) {
 	mod := &module.Module{Name: "TEST-MIB"}
 
 	oid := module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentNumber{Value: 1},
+		{Number: 1, HasNumber: true},
 	}, types.Synthetic)
 
 	addDefs(mod, []module.Definition{
@@ -885,13 +885,13 @@ func TestResolveOids(t *testing.T) {
 			&module.ValueAssignment{
 				DefBase: module.DefBase{Name: "parentRoot"},
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "iso"},
-					&module.OidComponentNumber{Value: 3},
-					&module.OidComponentNumber{Value: 6},
-					&module.OidComponentNumber{Value: 1},
-					&module.OidComponentNumber{Value: 4},
-					&module.OidComponentNumber{Value: 1},
-					&module.OidComponentNumber{Value: 55555},
+					{Name: "iso"},
+					{Number: 3, HasNumber: true},
+					{Number: 6, HasNumber: true},
+					{Number: 1, HasNumber: true},
+					{Number: 4, HasNumber: true},
+					{Number: 1, HasNumber: true},
+					{Number: 55555, HasNumber: true},
 				}, types.Span{}),
 			},
 		})
@@ -904,8 +904,8 @@ func TestResolveOids(t *testing.T) {
 			&module.ValueAssignment{
 				DefBase: module.DefBase{Name: "childNode"},
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentQualifiedName{ModuleValue: "PARENT-MIB", NameValue: "parentRoot"},
-					&module.OidComponentNumber{Value: 7},
+					{Module: "PARENT-MIB", Name: "parentRoot"},
+					{Number: 7, HasNumber: true},
 				}, types.Span{}),
 			},
 		})
@@ -933,13 +933,13 @@ func TestResolveOids(t *testing.T) {
 			&module.ValueAssignment{
 				DefBase: module.DefBase{Name: "vendorEnterprise"},
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "iso"},
-					&module.OidComponentNumber{Value: 3},
-					&module.OidComponentNumber{Value: 6},
-					&module.OidComponentNumber{Value: 1},
-					&module.OidComponentNumber{Value: 4},
-					&module.OidComponentNumber{Value: 1},
-					&module.OidComponentNumber{Value: 424242},
+					{Name: "iso"},
+					{Number: 3, HasNumber: true},
+					{Number: 6, HasNumber: true},
+					{Number: 1, HasNumber: true},
+					{Number: 4, HasNumber: true},
+					{Number: 1, HasNumber: true},
+					{Number: 424242, HasNumber: true},
 				}, types.Span{}),
 			},
 			&module.Notification{
@@ -972,15 +972,15 @@ func TestResolveOids(t *testing.T) {
 			&module.ValueAssignment{
 				DefBase: module.DefBase{Name: "nodeA"},
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "nodeB"},
-					&module.OidComponentNumber{Value: 1},
+					{Name: "nodeB"},
+					{Number: 1, HasNumber: true},
 				}, types.Span{}),
 			},
 			&module.ValueAssignment{
 				DefBase: module.DefBase{Name: "nodeB"},
 				Oid: module.NewOidAssignment([]module.OidComponent{
-					&module.OidComponentName{NameValue: "nodeA"},
-					&module.OidComponentNumber{Value: 2},
+					{Name: "nodeA"},
+					{Number: 2, HasNumber: true},
 				}, types.Span{}),
 			},
 		})
@@ -1035,7 +1035,7 @@ func TestFinalizeModuleIdentityOIDOnlySetForPreferred(t *testing.T) {
 	node := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 2)
 
 	oid := module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentNumber{Value: 1},
+		{Number: 1, HasNumber: true},
 	}, types.Synthetic)
 
 	// First: finalize the preferred module (SMIv2) - should get OID
@@ -1251,7 +1251,7 @@ func TestResolveQualifiedNameComponent(t *testing.T) {
 		ctx.registerModuleNodeSymbol(smiMod, "enterprises", entNode)
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"},
+			{Module: "SNMPv2-SMI", Name: "enterprises"},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  defMod,
@@ -1270,7 +1270,7 @@ func TestResolveQualifiedNameComponent(t *testing.T) {
 		ctx.modules = []*module.Module{defMod}
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentQualifiedName{ModuleValue: "UNKNOWN-MIB", NameValue: "foo"},
+			{Module: "UNKNOWN-MIB", Name: "foo"},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  defMod,
@@ -1302,7 +1302,7 @@ func TestResolveQualifiedNamedNumberComponent(t *testing.T) {
 
 		parent := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4)
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentQualifiedNamedNumber{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises", NumberValue: 1},
+			{Module: "SNMPv2-SMI", Name: "enterprises", Number: 1, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  defMod,
@@ -1329,7 +1329,7 @@ func TestResolveQualifiedNamedNumberComponent(t *testing.T) {
 
 		parent := model.GetOrCreateChild(ctx.mib.Root(), 1)
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentQualifiedNamedNumber{ModuleValue: "UNKNOWN-MIB", NameValue: "foo", NumberValue: 7},
+			{Module: "UNKNOWN-MIB", Name: "foo", Number: 7, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  defMod,
@@ -1354,7 +1354,7 @@ func TestCreateNamedChild(t *testing.T) {
 
 		parent := model.GetOrCreateChild(ctx.mib.Root(), 1)
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+			{Name: "org", Number: 3, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  mod,
@@ -1384,7 +1384,7 @@ func TestCreateNamedChild(t *testing.T) {
 
 		parent := model.GetOrCreateChild(ctx.mib.Root(), 1)
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNamedNumber{NameValue: "leaf", NumberValue: 5},
+			{Name: "leaf", Number: 5, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  mod,
@@ -1412,7 +1412,7 @@ func TestCreateNamedChild(t *testing.T) {
 		model.SetNodeKind(existing, model.KindScalar)
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+			{Name: "org", Number: 3, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  mod,
@@ -1433,7 +1433,7 @@ func TestCreateNamedChild(t *testing.T) {
 		ctx.moduleToResolved[mod] = resolvedMod
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNamedNumber{NameValue: "iso", NumberValue: 1},
+			{Name: "iso", Number: 1, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  mod,
@@ -1471,7 +1471,7 @@ func TestCreateNamedChild(t *testing.T) {
 		model.SetNodeKind(existing, model.KindNode)
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+			{Name: "org", Number: 3, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  vendorMod,
@@ -1497,7 +1497,7 @@ func TestResolveOidComponentDispatch(t *testing.T) {
 
 		parent := model.GetOrCreateChild(ctx.mib.Root(), 1)
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3},
+			{Name: "org", Number: 3, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  mod,
@@ -1505,7 +1505,7 @@ func TestResolveOidComponentDispatch(t *testing.T) {
 			kind: defValueAssignment,
 		}
 
-		comp := &module.OidComponentNamedNumber{NameValue: "org", NumberValue: 3}
+		comp := module.OidComponent{Name: "org", Number: 3, HasNumber: true}
 		got, ok := resolveOidComponent(ctx, def, parent, comp, false)
 		testutil.True(t, ok, "expected ok")
 		testutil.Equal(t, uint32(3), got.Arc(), "arc")
@@ -1522,7 +1522,7 @@ func TestResolveOidComponentDispatch(t *testing.T) {
 		ctx.registerModuleNodeSymbol(smiMod, "enterprises", entNode)
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"},
+			{Module: "SNMPv2-SMI", Name: "enterprises"},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  defMod,
@@ -1530,7 +1530,7 @@ func TestResolveOidComponentDispatch(t *testing.T) {
 			kind: defValueAssignment,
 		}
 
-		comp := &module.OidComponentQualifiedName{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises"}
+		comp := module.OidComponent{Module: "SNMPv2-SMI", Name: "enterprises"}
 		got, ok := resolveOidComponent(ctx, def, nil, comp, false)
 		testutil.True(t, ok, "expected ok")
 		testutil.Equal(t, entNode, got, "expected enterprises node")
@@ -1550,7 +1550,7 @@ func TestResolveOidComponentDispatch(t *testing.T) {
 
 		parent := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 4)
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentQualifiedNamedNumber{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises", NumberValue: 1},
+			{Module: "SNMPv2-SMI", Name: "enterprises", Number: 1, HasNumber: true},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  defMod,
@@ -1558,7 +1558,7 @@ func TestResolveOidComponentDispatch(t *testing.T) {
 			kind: defValueAssignment,
 		}
 
-		comp := &module.OidComponentQualifiedNamedNumber{ModuleValue: "SNMPv2-SMI", NameValue: "enterprises", NumberValue: 1}
+		comp := module.OidComponent{Module: "SNMPv2-SMI", Name: "enterprises", Number: 1, HasNumber: true}
 		got, ok := resolveOidComponent(ctx, def, parent, comp, false)
 		testutil.True(t, ok, "expected ok")
 		testutil.Equal(t, entNode, got, "expected enterprises node")
@@ -1572,7 +1572,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 		ctx.modules = []*module.Module{mod}
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "iso"},
+			{Name: "iso"},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  mod,
@@ -1596,7 +1596,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 		ctx.registerModuleNodeSymbol(smiMod, "enterprises", entNode)
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "enterprises"},
+			{Name: "enterprises"},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  defMod,
@@ -1615,7 +1615,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 		ctx.modules = []*module.Module{defMod}
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "enterprises"},
+			{Name: "enterprises"},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  defMod,
@@ -1637,7 +1637,7 @@ func TestResolveNameComponentBranches(t *testing.T) {
 		ctx.modules = []*module.Module{defMod}
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "totallyUnknown"},
+			{Name: "totallyUnknown"},
 		}, types.Synthetic)
 		def := oidDefinition{
 			mod:  defMod,
@@ -1668,15 +1668,15 @@ func TestOidReuse_DifferentValueAssignments(t *testing.T) {
 		&module.ValueAssignment{
 			DefBase: module.DefBase{Name: "firstNode"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "enterprises"},
-				&module.OidComponentNumber{Value: 99999},
+				{Name: "enterprises"},
+				{Number: 99999, HasNumber: true},
 			}, types.Span{}),
 		},
 		&module.ValueAssignment{
 			DefBase: module.DefBase{Name: "secondNode"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "enterprises"},
-				&module.OidComponentNumber{Value: 99999},
+				{Name: "enterprises"},
+				{Number: 99999, HasNumber: true},
 			}, types.Span{}),
 		},
 	})
@@ -1701,8 +1701,8 @@ func TestOidRegistered_DifferentObjectTypes(t *testing.T) {
 		&module.ValueAssignment{
 			DefBase: module.DefBase{Name: "testRoot"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "enterprises"},
-				&module.OidComponentNumber{Value: 99999},
+				{Name: "enterprises"},
+				{Number: 99999, HasNumber: true},
 			}, types.Span{}),
 		},
 		&module.ObjectType{
@@ -1710,8 +1710,8 @@ func TestOidRegistered_DifferentObjectTypes(t *testing.T) {
 			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			Status:  types.StatusCurrent,
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "testRoot"},
-				&module.OidComponentNumber{Value: 1},
+				{Name: "testRoot"},
+				{Number: 1, HasNumber: true},
 			}, types.Span{}),
 		},
 		&module.ObjectType{
@@ -1719,8 +1719,8 @@ func TestOidRegistered_DifferentObjectTypes(t *testing.T) {
 			Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
 			Status:  types.StatusCurrent,
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "testRoot"},
-				&module.OidComponentNumber{Value: 1},
+				{Name: "testRoot"},
+				{Number: 1, HasNumber: true},
 			}, types.Span{}),
 		},
 	})
@@ -1743,8 +1743,8 @@ func TestOidReuse_SameNameNoDiagnostic(t *testing.T) {
 		&module.ValueAssignment{
 			DefBase: module.DefBase{Name: "testNode"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "enterprises"},
-				&module.OidComponentNumber{Value: 99999},
+				{Name: "enterprises"},
+				{Number: 99999, HasNumber: true},
 			}, types.Span{}),
 		},
 	})
@@ -1759,8 +1759,8 @@ func TestOidReuse_SameNameNoDiagnostic(t *testing.T) {
 		&module.ValueAssignment{
 			DefBase: module.DefBase{Name: "testNode"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "enterprises"},
-				&module.OidComponentNumber{Value: 99999},
+				{Name: "enterprises"},
+				{Number: 99999, HasNumber: true},
 			}, types.Span{}),
 		},
 	})
@@ -1779,12 +1779,12 @@ func TestResolveOidsCycleDetection(t *testing.T) {
 			},
 		}
 		oidA := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "nodeB"},
-			&module.OidComponentNumber{Value: 1},
+			{Name: "nodeB"},
+			{Number: 1, HasNumber: true},
 		}, types.Span{})
 		oidB := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "nodeA"},
-			&module.OidComponentNumber{Value: 2},
+			{Name: "nodeA"},
+			{Number: 2, HasNumber: true},
 		}, types.Span{})
 		addDefs(mod, []module.Definition{
 			&module.ValueAssignment{DefBase: module.DefBase{Name: "nodeA"}, Oid: oidA},
@@ -1807,8 +1807,8 @@ func TestResolveOidsCycleDetection(t *testing.T) {
 			Language: types.LanguageSMIv2,
 		}
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "selfNode"},
-			&module.OidComponentNumber{Value: 1},
+			{Name: "selfNode"},
+			{Number: 1, HasNumber: true},
 		}, types.Span{})
 		addDefs(mod, []module.Definition{
 			&module.ValueAssignment{DefBase: module.DefBase{Name: "selfNode"}, Oid: oid},
@@ -1834,9 +1834,9 @@ func TestLastSubidZero(t *testing.T) {
 
 		// enterprises.1.0 - last subid is zero
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "enterprises"},
-			&module.OidComponentNumber{Value: 1},
-			&module.OidComponentNumber{Value: 0},
+			{Name: "enterprises"},
+			{Number: 1, HasNumber: true},
+			{Number: 0, HasNumber: true},
 		}, types.Span{})
 
 		mod.ObjectTypes = []*module.ObjectType{
@@ -1859,9 +1859,9 @@ func TestLastSubidZero(t *testing.T) {
 		}
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "enterprises"},
-			&module.OidComponentNumber{Value: 1},
-			&module.OidComponentNumber{Value: 0},
+			{Name: "enterprises"},
+			{Number: 1, HasNumber: true},
+			{Number: 0, HasNumber: true},
 		}, types.Span{})
 
 		mod.ValueAssignments = []*module.ValueAssignment{
@@ -1883,8 +1883,8 @@ func TestLastSubidZero(t *testing.T) {
 		}
 
 		oid := module.NewOidAssignment([]module.OidComponent{
-			&module.OidComponentName{NameValue: "enterprises"},
-			&module.OidComponentNumber{Value: 1},
+			{Name: "enterprises"},
+			{Number: 1, HasNumber: true},
 		}, types.Span{})
 
 		mod.ObjectTypes = []*module.ObjectType{

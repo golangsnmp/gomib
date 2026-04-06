@@ -1185,8 +1185,8 @@ func testTransportAddressMIB() *module.Module {
 		&module.ModuleIdentity{
 			DefBase: module.DefBase{Name: "transportAddressMIB"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "mib-2"},
-				&module.OidComponentNumber{Value: 100},
+				{Name: "mib-2"},
+				{Number: 100, HasNumber: true},
 			}, types.Span{}),
 		},
 		// TransportAddressType ::= TEXTUAL-CONVENTION SYNTAX INTEGER { udpIpv4(1), ... }

@@ -920,8 +920,8 @@ func testInetAddressMIB() *module.Module {
 		&module.ModuleIdentity{
 			DefBase: module.DefBase{Name: "inetAddressMIB"},
 			Oid: module.NewOidAssignment([]module.OidComponent{
-				&module.OidComponentName{NameValue: "mib-2"},
-				&module.OidComponentNumber{Value: 76},
+				{Name: "mib-2"},
+				{Number: 76, HasNumber: true},
 			}, types.Span{}),
 		},
 		// InetAddressType ::= TEXTUAL-CONVENTION SYNTAX INTEGER { unknown(0), ipv4(1), ipv6(2), ... }

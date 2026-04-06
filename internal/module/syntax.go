@@ -54,73 +54,18 @@ func NewOidAssignment(components []OidComponent, span types.Span) OidAssignment 
 	return OidAssignment{Components: components, Span: span}
 }
 
-// OidComponent is one element of an OID assignment. Use type switches to
-// distinguish concrete types (Name, Number, NamedNumber, QualifiedName,
-// QualifiedNamedNumber).
-type OidComponent interface {
-	oidComponent()
-	ComponentSpan() types.Span
+// OidComponent is one element of an OID assignment, e.g. a single arc in
+// { iso org(3) dod(6) 1 }. Fields are orthogonal: Module is non-empty for
+// qualified references (SNMPv2-SMI.enterprises), Name is non-empty for named
+// references, and HasNumber indicates whether Number carries a valid arc value.
+// HasNumber is needed because arc 0 is valid (ccitt(0), zeroDotZero).
+type OidComponent struct {
+	Module    string     // non-empty for module-qualified references
+	Name      string     // non-empty for named references
+	Number    uint32     // arc value; valid only when HasNumber is true
+	HasNumber bool       // whether Number is meaningful
+	Span      types.Span // source location
 }
-
-// OidComponentName is a symbolic name reference, e.g. internet.
-type OidComponentName struct {
-	NameValue string
-	Span      types.Span
-}
-
-func (*OidComponentName) oidComponent() {}
-
-// ComponentSpan returns the source span of this OID component.
-func (c *OidComponentName) ComponentSpan() types.Span { return c.Span }
-
-// OidComponentNumber is a numeric arc, e.g. 1 or 31.
-type OidComponentNumber struct {
-	Value uint32
-	Span  types.Span
-}
-
-func (*OidComponentNumber) oidComponent() {}
-
-// ComponentSpan returns the source span of this OID component.
-func (c *OidComponentNumber) ComponentSpan() types.Span { return c.Span }
-
-// OidComponentNamedNumber is a name with number, e.g. org(3).
-type OidComponentNamedNumber struct {
-	NameValue   string
-	NumberValue uint32
-	Span        types.Span
-}
-
-func (*OidComponentNamedNumber) oidComponent() {}
-
-// ComponentSpan returns the source span of this OID component.
-func (c *OidComponentNamedNumber) ComponentSpan() types.Span { return c.Span }
-
-// OidComponentQualifiedName is a module-qualified name, e.g. SNMPv2-SMI.enterprises.
-type OidComponentQualifiedName struct {
-	ModuleValue string
-	NameValue   string
-	Span        types.Span
-}
-
-func (*OidComponentQualifiedName) oidComponent() {}
-
-// ComponentSpan returns the source span of this OID component.
-func (c *OidComponentQualifiedName) ComponentSpan() types.Span { return c.Span }
-
-// OidComponentQualifiedNamedNumber is a module-qualified name with number,
-// e.g. SNMPv2-SMI.enterprises(1).
-type OidComponentQualifiedNamedNumber struct {
-	ModuleValue string
-	NameValue   string
-	NumberValue uint32
-	Span        types.Span
-}
-
-func (*OidComponentQualifiedNamedNumber) oidComponent() {}
-
-// ComponentSpan returns the source span of this OID component.
-func (c *OidComponentQualifiedNamedNumber) ComponentSpan() types.Span { return c.Span }
 
 // TypeSyntax is an unresolved type representation. Use type switches to
 // dispatch on concrete types (TypeRef, IntegerEnum, Bits, Constrained,

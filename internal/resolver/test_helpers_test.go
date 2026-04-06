@@ -116,8 +116,8 @@ func resolveStrict(mods ...*module.Module) *model.Mib {
 // testOid builds an OID assignment as { parentName subid }.
 func testOid(parentName string, subid uint32) module.OidAssignment {
 	return module.NewOidAssignment([]module.OidComponent{
-		&module.OidComponentName{NameValue: parentName},
-		&module.OidComponentNumber{Value: subid},
+		{Name: parentName},
+		{Number: subid, HasNumber: true},
 	}, types.Span{})
 }
 

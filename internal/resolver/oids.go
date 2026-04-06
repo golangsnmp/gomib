@@ -105,24 +105,16 @@ func getOidParentSymbol(ctx *resolverContext, def oidDefinition) (graph.Symbol, 
 	}
 
 	first := oid.Components[0]
-	switch c := first.(type) {
-	case *module.OidComponentName:
-		return lookupNamedParentSymbol(ctx, def, c.NameValue)
-	case *module.OidComponentNumber:
-		return graph.Symbol{}, false // Numeric roots have no dependency.
-	case *module.OidComponentNamedNumber:
-		if sym, ok := lookupNamedParentSymbol(ctx, def, c.NameValue); ok {
+	if first.Module != "" {
+		return graph.Symbol{Module: first.Module, Name: first.Name}, true
+	}
+	if first.Name != "" {
+		if sym, ok := lookupNamedParentSymbol(ctx, def, first.Name); ok {
 			return sym, true
 		}
-		// Has a number, so can be resolved without the name.
 		return graph.Symbol{}, false
-	case *module.OidComponentQualifiedName:
-		return graph.Symbol{Module: c.ModuleValue, Name: c.NameValue}, true
-	case *module.OidComponentQualifiedNamedNumber:
-		return graph.Symbol{Module: c.ModuleValue, Name: c.NameValue}, true
 	}
-
-	return graph.Symbol{}, false
+	return graph.Symbol{}, false // Numeric roots have no dependency.
 }
 
 // lookupNamedParentSymbol resolves a named OID parent by checking well-known roots,
@@ -325,23 +317,18 @@ func tryResolveOidDefinition(ctx *resolverContext, def oidDefinition) bool {
 	return true
 }
 
-func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *model.Node, component module.OidComponent, isLast bool) (*model.Node, bool) {
-	switch c := component.(type) {
-	case *module.OidComponentName:
-		return resolveNameComponent(ctx, def, c.NameValue, c.ComponentSpan())
-	case *module.OidComponentNumber:
-		return resolveNumericComponent(ctx, currentNode, c.Value), true
-	case *module.OidComponentNamedNumber:
-		return resolveNamedNumberComponent(ctx, def, currentNode, c.NameValue, c.NumberValue, isLast)
-	case *module.OidComponentQualifiedName:
-		return resolveQualifiedNameComponent(ctx, def, c.ModuleValue, c.NameValue, c.ComponentSpan())
-	case *module.OidComponentQualifiedNamedNumber:
-		return resolveQualifiedNamedNumberComponent(ctx, def, currentNode, c.ModuleValue, c.NameValue, c.NumberValue, isLast)
+func resolveOidComponent(ctx *resolverContext, def oidDefinition, currentNode *model.Node, c module.OidComponent, isLast bool) (*model.Node, bool) {
+	switch {
+	case c.Module != "" && c.HasNumber:
+		return resolveQualifiedNamedNumberComponent(ctx, def, currentNode, c.Module, c.Name, c.Number, isLast)
+	case c.Module != "":
+		return resolveQualifiedNameComponent(ctx, def, c.Module, c.Name, c.Span)
+	case c.Name != "" && c.HasNumber:
+		return resolveNamedNumberComponent(ctx, def, currentNode, c.Name, c.Number, isLast)
+	case c.Name != "":
+		return resolveNameComponent(ctx, def, c.Name, c.Span)
 	default:
-		ctx.recordUnresolved(types.DiagOidOrphan, def.mod, component.ComponentSpan(),
-			fmt.Sprintf("unresolved model.OID: %q references unknown parent %q", def.defName(), ""),
-			model.UnresolvedRef{Kind: model.UnresolvedOID, Module: modName(def.mod), Reason: reasonUnknownParent})
-		return nil, false
+		return resolveNumericComponent(ctx, currentNode, c.Number), true
 	}
 }
 

@@ -281,23 +281,6 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 }
 
-// oidComponentNameAndModule extracts the symbolic name and optional module
-// qualifier from an OID component. Returns empty strings for numeric-only
-// components.
-func oidComponentNameAndModule(comp module.OidComponent) (name, qualModule string) {
-	switch c := comp.(type) {
-	case *module.OidComponentName:
-		return c.NameValue, ""
-	case *module.OidComponentNamedNumber:
-		return c.NameValue, ""
-	case *module.OidComponentQualifiedName:
-		return c.NameValue, c.ModuleValue
-	case *module.OidComponentQualifiedNamedNumber:
-		return c.NameValue, c.ModuleValue
-	}
-	return "", ""
-}
-
 // extractOidRefs extracts named symbolic references from an OID assignment.
 func extractOidRefs(oid *module.OidAssignment) []model.OidRef {
 	if oid == nil {
@@ -305,8 +288,8 @@ func extractOidRefs(oid *module.OidAssignment) []model.OidRef {
 	}
 	var refs []model.OidRef
 	for _, comp := range oid.Components {
-		if name, _ := oidComponentNameAndModule(comp); name != "" {
-			refs = append(refs, model.OidRef{Name: name, Span: comp.ComponentSpan()})
+		if comp.Name != "" {
+			refs = append(refs, model.OidRef{Name: comp.Name, Span: comp.Span})
 		}
 	}
 	return refs
@@ -1080,40 +1063,35 @@ func convertDefVal(ctx *resolverContext, defval module.DefVal, mod *module.Modul
 			emitDefvalUnresolved(ctx, mod, span, "DEFVAL OID value has no components")
 			return nil
 		}
-		name, qualModule := oidComponentNameAndModule(v.Components[0])
-		if name == "" {
+		first := v.Components[0]
+		if first.Name == "" {
 			emitDefvalUnresolved(ctx, mod, span, "DEFVAL OID value has no named root component")
 			return nil
 		}
 		var node *model.Node
 		var ok bool
-		if qualModule != "" {
-			node, ok = ctx.lookupNodeByModuleName(qualModule, name)
+		if first.Module != "" {
+			node, ok = ctx.lookupNodeByModuleName(first.Module, first.Name)
 		} else {
-			node, ok = ctx.lookupNode(mod, name)
+			node, ok = ctx.lookupNode(mod, first.Name)
 		}
 		if !ok {
-			emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID root %q could not be resolved", name))
+			emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID root %q could not be resolved", first.Name))
 			return nil
 		}
 		oid := node.OID()
 		for _, comp := range v.Components[1:] {
-			switch c := comp.(type) {
-			case *module.OidComponentNumber:
-				oid = append(oid, c.Value)
-			case *module.OidComponentNamedNumber:
-				oid = append(oid, c.NumberValue)
-			case *module.OidComponentQualifiedNamedNumber:
-				oid = append(oid, c.NumberValue)
-			case *module.OidComponentName:
-				emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID component %q has no numeric value", c.NameValue))
-				return nil
-			case *module.OidComponentQualifiedName:
-				emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID component %q has no numeric value", c.ModuleValue+"."+c.NameValue))
+			if !comp.HasNumber {
+				label := comp.Name
+				if comp.Module != "" {
+					label = comp.Module + "." + comp.Name
+				}
+				emitDefvalUnresolved(ctx, mod, span, fmt.Sprintf("DEFVAL OID component %q has no numeric value", label))
 				return nil
 			}
+			oid = append(oid, comp.Number)
 		}
-		dv := model.NewDefValOID(oid, name)
+		dv := model.NewDefValOID(oid, first.Name)
 		return &dv
 	default:
 		emitDefvalUnresolved(ctx, mod, span, "DEFVAL could not be parsed")
