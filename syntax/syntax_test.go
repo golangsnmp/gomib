@@ -97,49 +97,57 @@ func TestTokenize(t *testing.T) {
 	}
 }
 
-func TestIdentifierAt(t *testing.T) {
-	src := []byte("ifDescr OBJECT-TYPE\n    SYNTAX DisplayString\n")
+func TestTokenAt(t *testing.T) {
+	file, _ := syntax.Parse(testMIB)
 
-	tests := []struct {
-		offset int
-		want   string
-	}{
-		{0, "ifDescr"},
-		{3, "ifDescr"},
-		{6, "ifDescr"},
-		{7, ""}, // space
-		{8, "OBJECT-TYPE"},
-		{14, "OBJECT-TYPE"},              // on the hyphen
-		{len("ifDescr OBJECT-TYPE"), ""}, // newline
-		{24, "SYNTAX"},
-		{31, "DisplayString"},
-		{len(src), ""},
-		{len(src) - 1, ""}, // trailing newline
+	// "EXAMPLE-MIB" is the first token in the module.
+	tok, ok := syntax.TokenAt(file, 1) // byte 1 is inside the module name
+	if !ok {
+		t.Fatal("expected token at offset 1")
 	}
-	for _, tt := range tests {
-		got := syntax.IdentifierAt(src, syntax.ByteOffset(tt.offset))
-		if got != tt.want {
-			t.Errorf("IdentifierAt(src, %d) = %q, want %q", tt.offset, got, tt.want)
+	name := string(testMIB[tok.Span.Start:tok.Span.End])
+	if name != "EXAMPLE-MIB" {
+		t.Errorf("token text = %q, want %q", name, "EXAMPLE-MIB")
+	}
+	if tok.Kind != syntax.TokUppercaseIdent {
+		t.Errorf("token kind = %v, want TokUppercaseIdent", tok.Kind)
+	}
+
+	// Offset inside whitespace/trivia should return not-found.
+	modNode := file.Modules[0]
+	// The space between module name and DEFINITIONS keyword is trivia.
+	nameEnd := modNode.Name.Span.End
+	_, ok = syntax.TokenAt(file, nameEnd)
+	if ok {
+		t.Error("expected no token in whitespace trivia")
+	}
+}
+
+func TestTokenAt_Empty(t *testing.T) {
+	file, _ := syntax.Parse(nil)
+	_, ok := syntax.TokenAt(file, 0)
+	if ok {
+		t.Error("expected no token for empty source")
+	}
+}
+
+func TestTokenAt_IdentifiesKeywords(t *testing.T) {
+	file, _ := syntax.Parse(testMIB)
+
+	// Find the IMPORTS keyword by walking until we hit it.
+	var importsOffset syntax.ByteOffset
+	file.WalkTokens(func(tok syntax.SyntaxToken) {
+		if tok.Kind == syntax.TokKwImports {
+			importsOffset = tok.Span.Start
 		}
-	}
-}
+	})
 
-func TestIdentifierAtEmpty(t *testing.T) {
-	got := syntax.IdentifierAt(nil, 0)
-	if got != "" {
-		t.Errorf("IdentifierAt(nil, 0) = %q, want empty", got)
+	tok, ok := syntax.TokenAt(file, importsOffset)
+	if !ok {
+		t.Fatal("expected token at IMPORTS offset")
 	}
-	got = syntax.IdentifierAt([]byte{}, 0)
-	if got != "" {
-		t.Errorf("IdentifierAt(empty, 0) = %q, want empty", got)
-	}
-}
-
-func TestIdentifierAtUnderscores(t *testing.T) {
-	src := []byte("some_ident_with_underscores")
-	got := syntax.IdentifierAt(src, 5)
-	if got != "some_ident_with_underscores" {
-		t.Errorf("got %q, want full identifier with underscores", got)
+	if tok.Kind != syntax.TokKwImports {
+		t.Errorf("token kind = %v, want TokKwImports", tok.Kind)
 	}
 }
 

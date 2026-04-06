@@ -388,30 +388,32 @@ func Parse(source []byte) (file *ModuleFile, diags []SpanDiagnostic) {
 // CST round-trips to the original source.
 var ReconstructText = cst.ReconstructText
 
-// IdentifierAt returns the SMI identifier at the given byte offset in source,
-// or "" if the offset is not on an identifier character. SMI identifiers
-// contain letters, digits, hyphens, and underscores.
-func IdentifierAt(source []byte, offset ByteOffset) string {
-	off := int(offset)
-	if off >= len(source) {
-		return ""
-	}
-	if !IsIdentByte(source[off]) {
-		return ""
-	}
-	start := off
-	for start > 0 && IsIdentByte(source[start-1]) {
-		start--
-	}
-	end := off
-	for end < len(source) && IsIdentByte(source[end]) {
-		end++
-	}
-	return string(source[start:end])
-}
-
-// IsIdentByte reports whether b is valid in an SMI identifier.
-// SMI identifiers contain ASCII letters, digits, hyphens, and underscores.
-func IsIdentByte(b byte) bool {
-	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '-' || b == '_'
+// TokenAt returns the CST token at the given byte offset, walking the parsed
+// module file's token stream. Returns the token and true if found, or a zero
+// token and false if the offset falls in trivia (whitespace/comments) or is
+// out of range. Use with source bytes to extract the token text:
+//
+//	tok, ok := syntax.TokenAt(file, offset)
+//	if ok {
+//	    text := string(source[tok.Span.Start:tok.Span.End])
+//	}
+func TokenAt(file *ModuleFile, offset ByteOffset) (SyntaxToken, bool) {
+	var result SyntaxToken
+	var found bool
+	done := false
+	file.WalkTokens(func(tok SyntaxToken) {
+		if done {
+			return
+		}
+		if tok.Span.Contains(offset) {
+			result = tok
+			found = true
+			done = true
+			return
+		}
+		if tok.Span.Start > offset {
+			done = true
+		}
+	})
+	return result, found
 }

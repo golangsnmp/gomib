@@ -43,8 +43,6 @@ type (
 	OidRef            = model.OidRef
 	TrapInfo          = model.TrapInfo
 	SyntaxConstraints = model.SyntaxConstraints
-	SymbolRef         = model.SymbolRef
-	RefKind           = model.RefKind
 )
 
 // --- DefVal ---
@@ -52,12 +50,6 @@ type (
 type (
 	DefValKind = model.DefValKind
 	DefVal     = model.DefVal
-)
-
-const (
-	RefImport   = model.RefImport
-	RefOidValue = model.RefOidValue
-	RefIndex    = model.RefIndex
 )
 
 const (

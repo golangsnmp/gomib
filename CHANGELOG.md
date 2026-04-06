@@ -22,11 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Parse()` produces a full lossless concrete syntax tree (`ModuleFile`)
   - `Tokenize()` lexes source into token stream (moved from `token/`)
   - `CursorContextAt()` classifies syntactic context at a byte offset (module, definition, clause, imports, comment, string)
-  - `IdentifierAt()` extracts the identifier at a byte offset
-  - `IsIdentByte()` checks whether a byte is valid in an SMI identifier
+  - `TokenAt()` finds the CST token at a byte offset (for precise identifier extraction)
   - `BuildLineTable()` / `LineTable.LineCol()` / `LineTable.Offset()` for line/column mapping
   - `ClauseKind` enum for SYNTAX, STATUS, DESCRIPTION, INDEX, etc.
-  - `SymbolReferences()` collects all symbol references from a parsed module
   - `MacroName()` returns the macro keyword for a definition node
   - `SyntaxBaseTypeNames` lists valid SYNTAX clause base type names
   - All CST node types exported (modules, definitions, clauses, type syntax, OID components, conformance)
