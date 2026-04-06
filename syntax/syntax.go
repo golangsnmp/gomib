@@ -387,3 +387,29 @@ func Parse(source []byte) (file *ModuleFile, diags []SpanDiagnostic) {
 // in order and concatenating their trivia and token text. A correct
 // CST round-trips to the original source.
 var ReconstructText = cst.ReconstructText
+
+// IdentifierAt returns the SMI identifier at the given byte offset in source,
+// or "" if the offset is not on an identifier character. SMI identifiers
+// contain letters, digits, hyphens, and underscores.
+func IdentifierAt(source []byte, offset ByteOffset) string {
+	off := int(offset)
+	if off < 0 || off >= len(source) {
+		return ""
+	}
+	if !isIdentByte(source[off]) {
+		return ""
+	}
+	start := off
+	for start > 0 && isIdentByte(source[start-1]) {
+		start--
+	}
+	end := off
+	for end < len(source) && isIdentByte(source[end]) {
+		end++
+	}
+	return string(source[start:end])
+}
+
+func isIdentByte(b byte) bool {
+	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '-' || b == '_'
+}

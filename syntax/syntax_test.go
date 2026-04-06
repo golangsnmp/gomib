@@ -97,6 +97,53 @@ func TestTokenize(t *testing.T) {
 	}
 }
 
+func TestIdentifierAt(t *testing.T) {
+	src := []byte("ifDescr OBJECT-TYPE\n    SYNTAX DisplayString\n")
+
+	tests := []struct {
+		offset int
+		want   string
+	}{
+		{0, "ifDescr"},
+		{3, "ifDescr"},
+		{6, "ifDescr"},
+		{7, ""},                                  // space
+		{8, "OBJECT-TYPE"},
+		{14, "OBJECT-TYPE"},                       // on the hyphen
+		{len("ifDescr OBJECT-TYPE"), ""},           // newline
+		{24, "SYNTAX"},
+		{31, "DisplayString"},
+		{-1, ""},
+		{len(src), ""},
+		{len(src) - 1, ""},                        // trailing newline
+	}
+	for _, tt := range tests {
+		got := syntax.IdentifierAt(src, syntax.ByteOffset(tt.offset))
+		if got != tt.want {
+			t.Errorf("IdentifierAt(src, %d) = %q, want %q", tt.offset, got, tt.want)
+		}
+	}
+}
+
+func TestIdentifierAtEmpty(t *testing.T) {
+	got := syntax.IdentifierAt(nil, 0)
+	if got != "" {
+		t.Errorf("IdentifierAt(nil, 0) = %q, want empty", got)
+	}
+	got = syntax.IdentifierAt([]byte{}, 0)
+	if got != "" {
+		t.Errorf("IdentifierAt(empty, 0) = %q, want empty", got)
+	}
+}
+
+func TestIdentifierAtUnderscores(t *testing.T) {
+	src := []byte("some_ident_with_underscores")
+	got := syntax.IdentifierAt(src, 5)
+	if got != "some_ident_with_underscores" {
+		t.Errorf("got %q, want full identifier with underscores", got)
+	}
+}
+
 func TestParse_DefinitionNodeTypes(t *testing.T) {
 	file, _ := syntax.Parse(testMIB)
 	mod := file.Modules[0]
