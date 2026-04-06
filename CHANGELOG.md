@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-04-07
+
+### Breaking Changes
+
+- Remove `token/` package; all token types, constants, and `Tokenize()` now live in the new `syntax/` package
+- `Module.Definitions()` now returns `iter.Seq[Symbol]` instead of a slice
+- Remove `DropModules` method
+- Remove `Module.Definitions` field from internal IR (replaced by typed slices: Objects, Types, Notifications, Groups, Compliances, Capabilities)
+
+### Added
+
+- Add `syntax/` package with lossless CST, token types, and source-level query APIs
+  - `Parse()` produces a full lossless concrete syntax tree (`ModuleFile`)
+  - `Tokenize()` lexes source into token stream (moved from `token/`)
+  - `CursorContextAt()` classifies syntactic context at a byte offset (module, definition, clause, imports, comment, string)
+  - `IdentifierAt()` extracts the identifier at a byte offset
+  - `IsIdentByte()` checks whether a byte is valid in an SMI identifier
+  - `BuildLineTable()` / `LineTable.LineCol()` / `LineTable.Offset()` for line/column mapping
+  - `ClauseKind` enum for SYNTAX, STATUS, DESCRIPTION, INDEX, etc.
+  - `SymbolReferences()` collects all symbol references from a parsed module
+  - `MacroName()` returns the macro keyword for a definition node
+  - `SyntaxBaseTypeNames` lists valid SYNTAX clause base type names
+  - All CST node types exported (modules, definitions, clauses, type syntax, OID components, conformance)
+  - `SyntaxToken` and `Trivia` types for whitespace/comment-preserving round-trips via `ReconstructText()`
+- Add `SymbolKind` type and constants to `mib/` package (Object, Type, TextualConvention, Notification, Group, NotificationGroup, Compliance, Capability, Node)
+- Add `SpanContext` and `SpanContextKind` types to `mib/` package (Definition, Import, OidRef, Syntax)
+- Add `Module.SpanContext()` for offset-based span classification
+- Add `Module.Offset()` for line/col to byte offset conversion
+- Add RFC-sourced descriptions and references to all base module types and OID nodes
+- Add `Node.Descendants()` iterator
+- Add per-item spans in resolved model for INCLUDES and CREATION-REQUIRES clauses
+- Add source context to load errors from `fsSource` and `loadAllModules`
+
+### Changed
+
+- Replace direct-to-IR parser with lossless CST pipeline (parse -> lower -> validate)
+- Replace hand-constructed base module IR with embedded SMI source files
+- Split `mib/` into `internal/model` and `internal/resolver` (public re-exports in `mib/` preserved)
+- Eliminate AST package and lowering pass (CST lowers directly to Module IR)
+- Replace `OidComponent` interface hierarchy with flat struct
+- Downgrade conformance diagnostics (`DiagGroupMemberUnresolved`, `DiagGroupObjectsNotification`, `DiagGroupNotificationsObject`) from Error to Minor severity
+- Use per-clause spans for resolver diagnostics (ACCESS, DEFVAL, SYNTAX, DISPLAY-HINT, STATUS, INDEX now point at the specific clause, not the whole definition)
+- Use per-member spans for group and notification diagnostics (individual member names instead of whole definition)
+- Convert SNMP administrative OID nodes to OBJECT-IDENTITY with RFC descriptions
+- Use windowed 2-digit year interpretation in date parsing (>= 70 maps to 19xx, < 70 maps to 20xx)
+- Thread stdout/stderr through CLI struct, removing global mutation from tests
+- Unify Node() and Symbol() name-collision priority logic
+- Simplify import format to flat storage
+
+### Fixed
+
+- Fix parser recovery to stop at lowercase type assignments (was skipping valid definitions during error recovery)
+- Fix CLI pipe deadlock on Windows (concurrent pipe draining instead of sequential)
+- Fix `resolveUltimateDefiner` silently returning wrong module on broken import chains
+- Fix span loss during lowering for OCTET STRING and OBJECT IDENTIFIER type syntax
+- Fix `Notification.TrapInfo()` returning internal struct instead of clone
+- Fix hex/binary string error spans not including the bad suffix character
+- Fix `BaseSequence` missing from schema export
+
 ## [0.10.0] - 2026-03-19
 
 ### Added
@@ -86,7 +145,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix path traversal in normalize output path
 - Fix godoc link to mib.DiagnosticConfig
 
-[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/golangsnmp/gomib/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/golangsnmp/gomib/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/golangsnmp/gomib/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/golangsnmp/gomib/compare/v0.7.1...v0.8.0

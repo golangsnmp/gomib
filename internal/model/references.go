@@ -5,8 +5,8 @@ type RefKind int
 
 const (
 	RefImport   RefKind = iota + 1 // IMPORTS clause reference
-	RefOidValue                     // OID value assignment parent reference
-	RefIndex                        // INDEX clause reference
+	RefOidValue                    // OID value assignment parent reference
+	RefIndex                       // INDEX clause reference
 )
 
 // SymbolRef is a source-level reference to a named symbol.

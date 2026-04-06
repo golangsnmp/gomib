@@ -107,14 +107,14 @@ func TestIdentifierAt(t *testing.T) {
 		{0, "ifDescr"},
 		{3, "ifDescr"},
 		{6, "ifDescr"},
-		{7, ""},                                  // space
+		{7, ""}, // space
 		{8, "OBJECT-TYPE"},
-		{14, "OBJECT-TYPE"},                       // on the hyphen
-		{len("ifDescr OBJECT-TYPE"), ""},           // newline
+		{14, "OBJECT-TYPE"},              // on the hyphen
+		{len("ifDescr OBJECT-TYPE"), ""}, // newline
 		{24, "SYNTAX"},
 		{31, "DisplayString"},
 		{len(src), ""},
-		{len(src) - 1, ""},                        // trailing newline
+		{len(src) - 1, ""}, // trailing newline
 	}
 	for _, tt := range tests {
 		got := syntax.IdentifierAt(src, syntax.ByteOffset(tt.offset))
