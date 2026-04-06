@@ -45,7 +45,7 @@ func TestIsBareTypeIndex(t *testing.T) {
 func TestIsOIDType(t *testing.T) {
 	// Build a resolver context with base modules so type lookups work.
 	ctx := newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
-	registerModules(ctx, nil)
+	registerModules(ctx, testBaseModules())
 	resolveTypes(ctx)
 	// Use SNMPv2-TC module for lookups (where AutonomousType etc. are defined).
 	var tcMod *module.Module

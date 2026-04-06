@@ -45,7 +45,7 @@ func FuzzFormatOID(f *testing.F) {
 	mod := mods[0]
 	module.ValidateModule(mod, src, nil, cfg)
 	resolverCfg := model.DefaultConfig()
-	mibTree := Resolve([]*module.Module{mod}, nil, nil, &resolverCfg)
+	mibTree := resolveWithBase([]*module.Module{mod}, nil, &resolverCfg)
 
 	f.Fuzz(func(t *testing.T, s string) {
 		oid, err := model.ParseOID(s)

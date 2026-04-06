@@ -48,6 +48,7 @@ func TestConvertRevisions(t *testing.T) {
 
 func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 	baseNames := module.BaseModuleNames()
+	base := testBaseModules()
 
 	t.Run("with user modules", func(t *testing.T) {
 		userMod := &module.Module{Name: "MY-MIB", Language: types.LanguageSMIv2}
@@ -56,7 +57,7 @@ func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 		})
 		ctx := newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
 
-		registerModules(ctx, []*module.Module{userMod})
+		registerModules(ctx, append(base, userMod))
 
 		testutil.Equal(t, len(baseNames)+1, len(ctx.modules), "module count (base=%d + user=1)", len(baseNames))
 		for i, name := range baseNames {
@@ -69,7 +70,7 @@ func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 	t.Run("no user modules", func(t *testing.T) {
 		ctx := newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
 
-		registerModules(ctx, nil)
+		registerModules(ctx, base)
 
 		testutil.Len(t, ctx.modules, len(baseNames), "modules")
 		for i, name := range baseNames {
@@ -78,64 +79,26 @@ func TestRegisterModules_BaseModulesPrepended(t *testing.T) {
 	})
 }
 
-func TestRegisterModules_UserBaseNamesFiltered(t *testing.T) {
-	t.Run("single base name shadowed", func(t *testing.T) {
-		userSNMP := &module.Module{
-			Name:     "SNMPv2-SMI",
-			Language: types.LanguageSMIv2,
-		}
-		userMod := &module.Module{
-			Name:     "MY-MIB",
-			Language: types.LanguageSMIv2,
-		}
-		ctx := newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
+func TestRegisterModules_BaseModulesOrdered(t *testing.T) {
+	// Base modules should appear before user modules regardless of input order.
+	base := testBaseModules()
+	baseNames := module.BaseModuleNames()
+	userMod := &module.Module{
+		Name:     "MY-MIB",
+		Language: types.LanguageSMIv2,
+	}
+	// Prepend user module before base modules.
+	input := append([]*module.Module{userMod}, base...)
+	ctx := newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
 
-		registerModules(ctx, []*module.Module{userSNMP, userMod})
+	registerModules(ctx, input)
 
-		count := 0
-		for _, mod := range ctx.modules {
-			if mod.Name == "SNMPv2-SMI" {
-				count++
-			}
-		}
-		testutil.Equal(t, 1, count, "found")
-
-		found := false
-		for _, mod := range ctx.modules {
-			if mod.Name == "MY-MIB" {
-				found = true
-				break
-			}
-		}
-		testutil.True(t, found, "MY-MIB not found in ctx.modules")
-	})
-
-	t.Run("all base names shadowed", func(t *testing.T) {
-		baseNames := module.BaseModuleNames()
-		var userMods []*module.Module
-		for _, name := range baseNames {
-			userMods = append(userMods, &module.Module{
-				Name:     name,
-				Language: types.LanguageSMIv2,
-			})
-		}
-		userMods = append(userMods, &module.Module{
-			Name:     "REAL-MIB",
-			Language: types.LanguageSMIv2,
-		})
-
-		ctx := newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
-		registerModules(ctx, userMods)
-
-		nameCounts := make(map[string]int)
-		for _, mod := range ctx.modules {
-			nameCounts[mod.Name]++
-		}
-		for _, name := range baseNames {
-			testutil.Equal(t, 1, nameCounts[name], "module")
-		}
-		testutil.Equal(t, 1, nameCounts["REAL-MIB"], "REAL-MIB appears")
-	})
+	// Base modules should still come first.
+	for i, name := range baseNames {
+		testutil.Equal(t, name, ctx.modules[i].Name, "Modules[].Name")
+	}
+	last := ctx.modules[len(ctx.modules)-1]
+	testutil.Equal(t, "MY-MIB", last.Name, "last module")
 }
 
 func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
@@ -145,7 +108,7 @@ func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
 	}
 	ctx := newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
 
-	registerModules(ctx, []*module.Module{userMod})
+	registerModules(ctx, append(testBaseModules(), userMod))
 
 	// Every module should be indexed by name
 	for _, mod := range ctx.modules {
@@ -158,7 +121,7 @@ func TestRegisterModules_ModuleIndexPopulated(t *testing.T) {
 func TestRegisterModules_BaseModulePointersCached(t *testing.T) {
 	ctx := newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
 
-	registerModules(ctx, nil)
+	registerModules(ctx, testBaseModules())
 
 	testutil.NotNil(t, ctx.snmpv2SMIModule, "Snmpv2SMIModule")
 	testutil.Equal(t, "SNMPv2-SMI", ctx.snmpv2SMIModule.Name, "Snmpv2SMIModule.Name")
@@ -203,7 +166,7 @@ func TestRegisterModules_DefinitionNamesCached(t *testing.T) {
 	t.Run("base module", func(t *testing.T) {
 		ctx := newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
 
-		registerModules(ctx, nil)
+		registerModules(ctx, testBaseModules())
 
 		var snmpv2smi *module.Module
 		for _, mod := range ctx.modules {
@@ -344,7 +307,7 @@ func TestRegisterModules_BuilderReceivesModules(t *testing.T) {
 	}
 	ctx := newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
 
-	registerModules(ctx, []*module.Module{userMod})
+	registerModules(ctx, append(testBaseModules(), userMod))
 
 	baseNames := module.BaseModuleNames()
 	wantCount := len(baseNames) + 1

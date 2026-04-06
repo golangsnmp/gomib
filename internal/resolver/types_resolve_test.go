@@ -844,7 +844,7 @@ func TestCreateUserTypes_Reference(t *testing.T) {
 		},
 	})
 
-	m := Resolve([]*module.Module{mod}, nil, nil, nil)
+	m := resolveWithBase([]*module.Module{mod}, nil, nil)
 	testutil.NotNil(t, m, "Resolve returned nil Mib")
 
 	typ := m.Type("MyTC")

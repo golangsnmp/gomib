@@ -47,7 +47,7 @@ func TestResolvePreservesImportMap(t *testing.T) {
 		Status:  types.StatusCurrent,
 	})
 
-	m := Resolve([]*module.Module{sourceMod, testMod}, nil, nil, nil)
+	m := resolveWithBase([]*module.Module{sourceMod, testMod}, nil, nil)
 
 	resolvedTest := m.Module("TEST-MIB")
 	testutil.NotNil(t, resolvedTest, "TEST-MIB not found")
@@ -128,7 +128,7 @@ func TestModulesDefiningCrossModule(t *testing.T) {
 	})
 
 	cfg := model.VerboseConfig()
-	m := Resolve([]*module.Module{mod1, mod2}, nil, nil, &cfg)
+	m := resolveWithBase([]*module.Module{mod1, mod2}, nil, &cfg)
 
 	mods := m.ModulesDefining("sharedName")
 	testutil.Equal(t, 2, len(mods), "ModulesDefining count")

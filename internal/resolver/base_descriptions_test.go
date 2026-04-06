@@ -9,7 +9,7 @@ import (
 )
 
 func TestBaseModuleTypeDescriptions(t *testing.T) {
-	m := Resolve(nil, nil, nil, nil)
+	m := resolveWithBase(nil, nil, nil)
 
 	// Textual conventions in SNMPv2-TC carry DESCRIPTION clauses.
 	// SMIv2 base types (Integer32, Counter32, etc.) in SNMPv2-SMI are
@@ -34,7 +34,7 @@ func TestBaseModuleTypeDescriptions(t *testing.T) {
 }
 
 func TestBaseModuleNodeDescriptions(t *testing.T) {
-	m := Resolve(nil, nil, nil, nil)
+	m := resolveWithBase(nil, nil, nil)
 
 	// Verify that key base module nodes are present and resolvable.
 	// OID assignments in the embedded SMI files do not carry formal
@@ -54,7 +54,7 @@ func TestBaseModuleNodeDescriptions(t *testing.T) {
 }
 
 func TestBaseModuleNodeReferences(t *testing.T) {
-	m := Resolve(nil, nil, nil, nil)
+	m := resolveWithBase(nil, nil, nil)
 
 	// Same as TestBaseModuleNodeDescriptions: check presence only.
 	// OID value assignments in embedded SMI source lack explicit references.
@@ -73,7 +73,7 @@ func TestBaseModuleNodeReferences(t *testing.T) {
 }
 
 func TestBaseModuleNodeDescriptionContent(t *testing.T) {
-	m := Resolve(nil, nil, nil, nil)
+	m := resolveWithBase(nil, nil, nil)
 
 	// Verify nodes exist and have the correct OIDs.
 	tests := []struct {

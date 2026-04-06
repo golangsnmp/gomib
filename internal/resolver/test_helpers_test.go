@@ -3,12 +3,38 @@ package resolver
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/golangsnmp/gomib/internal/cst/lower"
+	cstparser "github.com/golangsnmp/gomib/internal/cst/parser"
 	"github.com/golangsnmp/gomib/internal/model"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/types"
 )
+
+// testBaseModules returns parsed base modules for use in resolver tests.
+// Parsed once and cached.
+var testBaseModules = sync.OnceValue(func() []*module.Module {
+	var result []*module.Module
+	cfg := types.DefaultConfig()
+	for _, name := range module.BaseModuleNames() {
+		content := module.EmbeddedContent(name)
+		if content == nil {
+			continue
+		}
+		p := cstparser.New(content, nil, cfg)
+		file := p.ParseModule()
+		mods := lower.Lower(file, content, p.Diagnostics(), cfg)
+		for _, mod := range mods {
+			if mod.Name == name {
+				result = append(result, mod)
+				break
+			}
+		}
+	}
+	return result
+})
 
 func newTestContext() *resolverContext {
 	return newResolverContext(nil, model.ResolverNormal, model.DefaultConfig())
@@ -74,10 +100,17 @@ func buildOIDPath(root *model.Node, arcs ...uint32) *model.Node {
 	return n
 }
 
+// resolveWithBase prepends embedded base modules and resolves with
+// the given config. Mirrors what the load pipeline does.
+func resolveWithBase(mods []*module.Module, strictness *model.ResolverStrictness, diagConfig *model.DiagnosticConfig) *model.Mib {
+	all := append(testBaseModules(), mods...)
+	return Resolve(all, nil, strictness, diagConfig)
+}
+
 func resolveStrict(mods ...*module.Module) *model.Mib {
 	cfg := model.VerboseConfig()
 	strictness := model.ResolverStrict
-	return Resolve(mods, nil, &strictness, &cfg)
+	return resolveWithBase(mods, &strictness, &cfg)
 }
 
 // testOid builds an OID assignment as { parentName subid }.
