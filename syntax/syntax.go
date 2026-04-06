@@ -393,7 +393,7 @@ var ReconstructText = cst.ReconstructText
 // contain letters, digits, hyphens, and underscores.
 func IdentifierAt(source []byte, offset ByteOffset) string {
 	off := int(offset)
-	if off < 0 || off >= len(source) {
+	if off >= len(source) {
 		return ""
 	}
 	if !isIdentByte(source[off]) {

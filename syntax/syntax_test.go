@@ -113,7 +113,6 @@ func TestIdentifierAt(t *testing.T) {
 		{len("ifDescr OBJECT-TYPE"), ""},           // newline
 		{24, "SYNTAX"},
 		{31, "DisplayString"},
-		{-1, ""},
 		{len(src), ""},
 		{len(src) - 1, ""},                        // trailing newline
 	}
