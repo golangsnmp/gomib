@@ -21,6 +21,7 @@ type (
 	Compliance   = model.Compliance
 	Capability   = model.Capability
 	Symbol       = model.Symbol
+	SymbolKind   = model.SymbolKind
 	OidLookup    = model.OidLookup
 )
 
@@ -49,6 +50,19 @@ type (
 type (
 	DefValKind = model.DefValKind
 	DefVal     = model.DefVal
+)
+
+const (
+	SymbolKindNone              = model.SymbolKindNone
+	SymbolKindObject            = model.SymbolKindObject
+	SymbolKindType              = model.SymbolKindType
+	SymbolKindTextualConvention = model.SymbolKindTextualConvention
+	SymbolKindNotification      = model.SymbolKindNotification
+	SymbolKindGroup             = model.SymbolKindGroup
+	SymbolKindNotificationGroup = model.SymbolKindNotificationGroup
+	SymbolKindCompliance        = model.SymbolKindCompliance
+	SymbolKindCapability        = model.SymbolKindCapability
+	SymbolKindNode              = model.SymbolKindNode
 )
 
 const (

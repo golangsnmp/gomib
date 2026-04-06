@@ -87,6 +87,88 @@ func buildSymbolTestMib() *Mib {
 	return m
 }
 
+func TestSymbolKind(t *testing.T) {
+	m := buildSymbolTestMib()
+
+	tests := []struct {
+		name string
+		want SymbolKind
+	}{
+		{"ifDescr", SymbolKindObject},
+		{"linkDown", SymbolKindNotification},
+		{"ifGroup", SymbolKindGroup},
+		{"ifCompliance", SymbolKindCompliance},
+		{"ifCap", SymbolKindCapability},
+		{"system", SymbolKindNode},
+		{"DisplayString", SymbolKindType},
+	}
+	for _, tt := range tests {
+		sym := m.Symbol(tt.name)
+		testutil.Equal(t, tt.want, sym.Kind(), tt.name)
+	}
+
+	// Zero symbol.
+	var zero Symbol
+	testutil.Equal(t, SymbolKindNone, zero.Kind(), "zero")
+}
+
+func TestSymbolKindTextualConvention(t *testing.T) {
+	m := NewMib()
+	mod := NewModule("TC-MIB")
+	m.addModule(mod)
+
+	tc := NewType("MyTC")
+	tc.setModule(mod)
+	tc.setIsTC(true)
+	mod.addType(tc)
+	m.addType(tc)
+
+	sym := m.Symbol("MyTC")
+	testutil.Equal(t, SymbolKindTextualConvention, sym.Kind(), "TC kind")
+}
+
+func TestSymbolKindNotificationGroup(t *testing.T) {
+	m := NewMib()
+	mod := NewModule("NG-MIB")
+	m.addModule(mod)
+
+	nd := m.root.getOrCreateChild(1).getOrCreateChild(2)
+	nd.setName("testNotifGroup")
+	nd.setModule(mod)
+	nd.setSpan(Span{Start: 10, End: 20})
+	m.registerNode("testNotifGroup", nd)
+	mod.addNode(nd)
+
+	grp := &Group{entity: entity{name: "testNotifGroup", module: mod, node: nd, span: Span{Start: 10, End: 20}}, isNotificationGroup: true}
+	nd.setGroup(grp)
+	mod.addGroup(grp)
+	m.addGroup(grp)
+
+	sym := m.Symbol("testNotifGroup")
+	testutil.Equal(t, SymbolKindNotificationGroup, sym.Kind(), "notification group kind")
+}
+
+func TestSymbolKindString(t *testing.T) {
+	tests := []struct {
+		kind SymbolKind
+		want string
+	}{
+		{SymbolKindNone, "none"},
+		{SymbolKindObject, "object"},
+		{SymbolKindType, "type"},
+		{SymbolKindTextualConvention, "textual-convention"},
+		{SymbolKindNotification, "notification"},
+		{SymbolKindGroup, "group"},
+		{SymbolKindNotificationGroup, "notification-group"},
+		{SymbolKindCompliance, "compliance"},
+		{SymbolKindCapability, "capability"},
+		{SymbolKindNode, "node"},
+	}
+	for _, tt := range tests {
+		testutil.Equal(t, tt.want, tt.kind.String(), tt.want)
+	}
+}
+
 func TestSymbolLookupObject(t *testing.T) {
 	m := buildSymbolTestMib()
 	sym := m.Symbol("ifDescr")

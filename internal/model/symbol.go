@@ -1,5 +1,35 @@
 package model
 
+import "strconv"
+
+// SymbolKind classifies what type of MIB definition a Symbol represents.
+type SymbolKind int
+
+const (
+	SymbolKindNone              SymbolKind = iota // zero value, empty Symbol
+	SymbolKindObject                              // OBJECT-TYPE
+	SymbolKindType                                // plain type assignment
+	SymbolKindTextualConvention                   // TEXTUAL-CONVENTION
+	SymbolKindNotification                        // NOTIFICATION-TYPE or TRAP-TYPE
+	SymbolKindGroup                               // OBJECT-GROUP
+	SymbolKindNotificationGroup                   // NOTIFICATION-GROUP
+	SymbolKindCompliance                          // MODULE-COMPLIANCE
+	SymbolKindCapability                          // AGENT-CAPABILITIES
+	SymbolKindNode                                // plain node (value assignment, MODULE-IDENTITY, etc.)
+)
+
+var symbolKindNames = [...]string{
+	"none", "object", "type", "textual-convention", "notification",
+	"group", "notification-group", "compliance", "capability", "node",
+}
+
+func (k SymbolKind) String() string {
+	if int(k) < len(symbolKindNames) {
+		return symbolKindNames[k]
+	}
+	return "SymbolKind(" + strconv.Itoa(int(k)) + ")"
+}
+
 // Symbol wraps any resolved MIB definition. Exactly one of the internal
 // fields is non-nil. Common accessors (Name, Span, Module) work on all
 // symbol kinds without requiring callers to type-switch.
@@ -25,6 +55,34 @@ func SymbolFromNode(n *Node) Symbol                 { return Symbol{node: n} }
 func (s Symbol) IsZero() bool {
 	return s.object == nil && s.notification == nil && s.group == nil &&
 		s.compliance == nil && s.capability == nil && s.typ == nil && s.node == nil
+}
+
+// Kind returns the classification of this symbol.
+func (s Symbol) Kind() SymbolKind {
+	switch {
+	case s.object != nil:
+		return SymbolKindObject
+	case s.notification != nil:
+		return SymbolKindNotification
+	case s.group != nil:
+		if s.group.IsNotificationGroup() {
+			return SymbolKindNotificationGroup
+		}
+		return SymbolKindGroup
+	case s.compliance != nil:
+		return SymbolKindCompliance
+	case s.capability != nil:
+		return SymbolKindCapability
+	case s.typ != nil:
+		if s.typ.IsTextualConvention() {
+			return SymbolKindTextualConvention
+		}
+		return SymbolKindType
+	case s.node != nil:
+		return SymbolKindNode
+	default:
+		return SymbolKindNone
+	}
 }
 
 // Name returns the definition's name, or "" for a zero Symbol.
