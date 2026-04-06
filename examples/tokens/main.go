@@ -1,10 +1,9 @@
-// Tokenize a small MIB snippet and print each token's kind and text.
 package main
 
 import (
 	"fmt"
 
-	"github.com/golangsnmp/gomib/token"
+	"github.com/golangsnmp/gomib/syntax"
 )
 
 func main() {
@@ -34,19 +33,17 @@ exampleString OBJECT-TYPE
 END
 `)
 
-	tokens := token.Tokenize(source)
+	tokens := syntax.Tokenize(source)
 
-	// Print all tokens
 	fmt.Println("=== All tokens ===")
 	for _, tok := range tokens {
-		if tok.Kind == token.EOF {
+		if tok.Kind == syntax.TokEOF {
 			break
 		}
 		text := source[tok.Span.Start:tok.Span.End]
 		fmt.Printf("  %-22s %q\n", tok.Kind.LibsmiName(), text)
 	}
 
-	// Filter: only macro keywords (OBJECT-TYPE, MODULE-IDENTITY, etc.)
 	fmt.Println("\n=== Macro keywords ===")
 	for _, tok := range tokens {
 		if tok.Kind.IsMacroKeyword() {
@@ -54,7 +51,6 @@ END
 		}
 	}
 
-	// Filter: only identifiers
 	fmt.Println("\n=== Identifiers ===")
 	for _, tok := range tokens {
 		if tok.Kind.IsIdentifier() {
