@@ -69,6 +69,16 @@ func (m *Module) LineCol(offset ByteOffset) (line, col int) {
 	return types.LineColFromTable(m.lineTable, offset)
 }
 
+// Offset converts 1-based line and column numbers to a byte offset using
+// this module's line table. Returns (0, false) for embedded base modules
+// or out-of-range positions.
+func (m *Module) Offset(line, col int) (ByteOffset, bool) {
+	if m.base {
+		return 0, false
+	}
+	return types.OffsetFromTable(m.lineTable, line, col)
+}
+
 // OID returns the MODULE-IDENTITY OID, or nil if not declared.
 func (m *Module) OID() OID { return slices.Clone(m.oid) }
 

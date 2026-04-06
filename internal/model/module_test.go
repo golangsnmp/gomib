@@ -5,6 +5,7 @@ import (
 
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/internal/types"
 )
 
 func TestModuleSymbol(t *testing.T) {
@@ -222,3 +223,56 @@ func TestModuleAvailableSymbols_NoImports(t *testing.T) {
 }
 
 // TestResolvePreservesImportMap moved to internal/resolver/module_test.go
+
+func TestModuleOffset(t *testing.T) {
+	m := &Module{
+		lineTable: []int{0, 4, 8},
+	}
+	tests := []struct {
+		name   string
+		line   int
+		col    int
+		want   ByteOffset
+		wantOK bool
+	}{
+		{"first char", 1, 1, 0, true},
+		{"second line", 2, 1, 4, true},
+		{"third line col 2", 3, 2, 9, true},
+		{"line zero", 0, 1, 0, false},
+		{"col zero", 1, 0, 0, false},
+		{"past end", 4, 1, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := m.Offset(tt.line, tt.col)
+			if ok != tt.wantOK || got != tt.want {
+				t.Errorf("Offset(%d, %d) = (%d, %v), want (%d, %v)",
+					tt.line, tt.col, got, ok, tt.want, tt.wantOK)
+			}
+		})
+	}
+}
+
+func TestModuleOffset_BaseModule(t *testing.T) {
+	m := &Module{base: true}
+	got, ok := m.Offset(1, 1)
+	if ok || got != 0 {
+		t.Errorf("base module Offset(1,1) = (%d, %v), want (0, false)", got, ok)
+	}
+}
+
+func TestModuleOffset_RoundTrip(t *testing.T) {
+	source := []byte("EXAMPLE-MIB DEFINITIONS ::= BEGIN\nIMPORTS\n    foo FROM Bar;\nEND\n")
+	m := &Module{
+		lineTable: types.BuildLineTable(source),
+	}
+	offsets := []ByteOffset{0, 10, 35, 40, 55}
+	for _, off := range offsets {
+		line, col := m.LineCol(off)
+		got, ok := m.Offset(line, col)
+		if !ok || got != off {
+			t.Errorf("round-trip offset %d -> (%d,%d) -> (%d, %v)",
+				off, line, col, got, ok)
+		}
+	}
+}
