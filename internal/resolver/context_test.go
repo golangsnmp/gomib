@@ -249,7 +249,7 @@ func TestEmitDiagnostic_Fields(t *testing.T) {
 		Name:      "TEST-MIB",
 		LineTable: types.BuildLineTable(source),
 	}
-	span := types.NewSpan(94, 95) // line 10, column 5
+	span := types.NewSpan(94, 95) // line 10, columns 5-6
 	ctx.EmitDiagnostic(types.DiagGroupNotAccessible, mod, span, "something happened")
 
 	diags := ctx.Diagnostics()
@@ -260,7 +260,26 @@ func TestEmitDiagnostic_Fields(t *testing.T) {
 	testutil.Equal(t, "TEST-MIB", d.Module, "Module")
 	testutil.Equal(t, 10, d.Line, "Line")
 	testutil.Equal(t, 5, d.Column, "Column")
+	testutil.Equal(t, 10, d.EndLine, "EndLine")
+	testutil.Equal(t, 6, d.EndColumn, "EndColumn")
 	testutil.Equal(t, "something happened", d.Message, "Message")
+}
+
+func TestEmitDiagnostic_NoUsableEnd(t *testing.T) {
+	ctx := newTestContext()
+	mod := &module.Module{
+		Name:      "TEST-MIB",
+		LineTable: types.BuildLineTable([]byte("first\nsecond\n")),
+	}
+	ctx.EmitDiagnostic(types.DiagGroupNotAccessible, mod, types.NewSpan(8, 8), "point diagnostic")
+
+	diags := ctx.Diagnostics()
+	testutil.Len(t, diags, 1, "expected 1 diagnostic, got")
+	d := diags[0]
+	testutil.Equal(t, 2, d.Line, "Line")
+	testutil.Equal(t, 3, d.Column, "Column")
+	testutil.Equal(t, 0, d.EndLine, "EndLine")
+	testutil.Equal(t, 0, d.EndColumn, "EndColumn")
 }
 
 func TestRecordUnresolved_WritesToMib(t *testing.T) {
