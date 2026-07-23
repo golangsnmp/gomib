@@ -50,8 +50,8 @@ func registerModules(ctx *resolverContext, inputModules []*module.Module) {
 		ctx.resolvedToModule[resolved] = mod
 
 		// Collect diagnostics from parsing and validation
-		for _, d := range mod.Diagnostics {
-			model.AddMibDiagnostic(ctx.mib, d)
+		for i := range mod.Diagnostics {
+			model.AddMibDiagnostic(ctx.mib, &mod.Diagnostics[i])
 		}
 
 		// Cache pointers to base modules used by the type resolution

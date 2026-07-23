@@ -119,6 +119,18 @@ func LineColFromTable(table []int, offset ByteOffset) (line, col int) {
 	return lo + 1, off - table[lo] + 1
 }
 
+// LineColRangeFromTable converts a span to 1-based start and end positions.
+// The start is inclusive and the end is exclusive. A zero-length, reversed,
+// synthetic, or otherwise unavailable end is returned as (0, 0).
+func LineColRangeFromTable(table []int, span Span) (line, col, endLine, endCol int) {
+	line, col = LineColFromTable(table, span.Start)
+	if span.End <= span.Start {
+		return line, col, 0, 0
+	}
+	endLine, endCol = LineColFromTable(table, span.End)
+	return line, col, endLine, endCol
+}
+
 // OffsetFromTable converts 1-based line and column numbers to a byte offset
 // using a precomputed line table. Returns (0, false) if the table is empty
 // or the line/col is out of range.
