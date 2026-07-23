@@ -2,7 +2,9 @@ package mib
 
 import "github.com/golangsnmp/gomib/internal/types"
 
-// Diagnostic represents an issue found during parsing or resolution.
+// Diagnostic represents an issue found during parsing or resolution. Source
+// positions are 1-based; Line/Column are inclusive and EndLine/EndColumn are
+// exclusive. Zero end fields indicate a point diagnostic without a usable end.
 type Diagnostic = types.Diagnostic
 
 // DiagnosticConfig controls diagnostic reporting and failure policy.
