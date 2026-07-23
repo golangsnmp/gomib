@@ -8,13 +8,21 @@ import (
 )
 
 // Diagnostic represents an issue found during parsing or resolution.
+//
+// Line/Column mark the inclusive start of the offending region. EndLine/EndColumn
+// mark the exclusive end (i.e. the line/column of the byte just past the region),
+// matching the [Start, End) semantics of [Span]. Both end fields are 0 when no
+// useful end position is available, in which case consumers should treat the
+// region as point-sized at Line/Column.
 type Diagnostic struct {
-	Severity Severity
-	Code     string // e.g., "identifier-underscore", "import-not-found"
-	Message  string
-	Module   string // source module name
-	Line     int    // 1-based line number, 0 if not applicable
-	Column   int    // 1-based column, 0 if not applicable
+	Severity  Severity
+	Code      string // e.g., "identifier-underscore", "import-not-found"
+	Message   string
+	Module    string // source module name
+	Line      int    // 1-based start line, 0 if not applicable
+	Column    int    // 1-based start column, 0 if not applicable
+	EndLine   int    // 1-based end line (exclusive), 0 if not applicable
+	EndColumn int    // 1-based end column (exclusive), 0 if not applicable
 }
 
 // String returns a human-readable representation of the diagnostic.

@@ -90,8 +90,8 @@ func (c *cli) cmdLoad(args []string) int {
 	if len(diags) > 0 {
 		fmt.Fprintln(c.stderr)
 		fmt.Fprintln(c.stderr, "Diagnostics:")
-		for _, d := range diags {
-			c.printDiagnostic(d)
+		for i := range diags {
+			c.printDiagnostic(&diags[i])
 		}
 	}
 
@@ -136,7 +136,7 @@ func (c *cli) cmdLoad(args []string) int {
 	return exitOK
 }
 
-func (c *cli) printDiagnostic(d mib.Diagnostic) {
+func (c *cli) printDiagnostic(d *mib.Diagnostic) {
 	prefix := "  " + d.Severity.String() + ": "
 	if d.Code != "" {
 		prefix += "[" + d.Code + "] "
