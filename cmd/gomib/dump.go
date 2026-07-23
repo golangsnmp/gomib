@@ -76,8 +76,8 @@ func (c *cli) cmdDump(args []string) int {
 	if len(diags) > 0 {
 		fmt.Fprintln(c.stderr)
 		fmt.Fprintln(c.stderr, "Diagnostics:")
-		for _, d := range diags {
-			c.printDiagnostic(d)
+		for i := range diags {
+			c.printDiagnostic(&diags[i])
 		}
 	}
 

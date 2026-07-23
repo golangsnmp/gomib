@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add exclusive end line and column positions to diagnostics when a source range is available
+
 ## [0.11.0] - 2026-04-07
 
 ### Breaking Changes
