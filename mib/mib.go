@@ -133,6 +133,10 @@ func FormatInteger(hint string, value int64, hexCase HexCase) (string, bool) {
 	return model.FormatInteger(hint, value, hexCase)
 }
 func ScaleInteger(hint string, value int64) (float64, bool) { return model.ScaleInteger(hint, value) }
+
+// FormatOctets formats an octet string according to an RFC 2579 display hint.
+// Hexadecimal (x) segments produce exactly two digits per byte, including
+// leading zeroes, and support segment lengths above eight bytes.
 func FormatOctets(hint string, data []byte, hexCase HexCase) (string, bool) {
 	return model.FormatOctets(hint, data, hexCase)
 }

@@ -181,6 +181,13 @@ func TestFormatOctetsMacAddressLower(t *testing.T) {
 	}
 }
 
+func TestFormatOctetsMultiByteHexFixedWidth(t *testing.T) {
+	got, ok := FormatOctets("2x", []byte{0x00, 0x01}, HexUpper)
+	if !ok || got != "0001" {
+		t.Errorf("got %q, %v; want 0001", got, ok)
+	}
+}
+
 func TestFormatOctetsIPv6(t *testing.T) {
 	data := []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01}
 	got, ok := FormatOctets("2x:2x:2x:2x:2x:2x:2x:2x", data, HexUpper)

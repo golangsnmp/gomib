@@ -350,8 +350,10 @@ func ScaleInteger(hint string, value int64) (float64, bool) {
 }
 
 // FormatOctets formats an octet string according to an RFC 2579 octet-string
-// display hint. Returns the formatted string and true, or "" and false if the
-// hint is malformed or data is empty.
+// display hint. Hexadecimal (x) segments are byte-oriented and fixed-width:
+// each consumed octet produces exactly two digits, including leading zeroes,
+// and segment lengths above eight octets are supported. Returns the formatted
+// string and true, or "" and false if the hint is malformed or data is empty.
 func FormatOctets(hint string, data []byte, hexCase HexCase) (string, bool) {
 	if hint == "" || len(data) == 0 {
 		return "", false
