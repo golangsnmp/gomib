@@ -34,6 +34,31 @@ func hasDiag(mods []*module.Module, code string) bool {
 	return false
 }
 
+func TestWholeFileLexerDiagnosticAssignedByAbsoluteSpan(t *testing.T) {
+	const source = "FIRST-MIB DEFINITIONS ::= BEGIN\nEND\n" +
+		"SECOND-MIB DEFINITIONS ::= BEGIN\n@\nEND\n"
+
+	mods := parseMods(t, source)
+	if len(mods) != 2 {
+		t.Fatalf("got %d modules, want 2", len(mods))
+	}
+	if mods[0].Name != "FIRST-MIB" || mods[1].Name != "SECOND-MIB" {
+		t.Fatalf("module names = %q, %q, want FIRST-MIB, SECOND-MIB", mods[0].Name, mods[1].Name)
+	}
+	if len(mods[0].Diagnostics) != 0 {
+		t.Fatalf("FIRST-MIB diagnostics = %v, want none", mods[0].Diagnostics)
+	}
+	if len(mods[1].Diagnostics) != 1 {
+		t.Fatalf("SECOND-MIB diagnostics = %v, want one lexer diagnostic", mods[1].Diagnostics)
+	}
+
+	got := mods[1].Diagnostics[0]
+	if got.Code != types.DiagUnexpectedCharacter || got.Module != "SECOND-MIB" ||
+		got.Line != 4 || got.Column != 1 {
+		t.Errorf("SECOND-MIB diagnostic = %#v, want unexpected-character at SECOND-MIB:4:1", got)
+	}
+}
+
 func TestEmptyDescriptionObjectType(t *testing.T) {
 	mods := parseMods(t, `
 TEST-MIB DEFINITIONS ::= BEGIN
