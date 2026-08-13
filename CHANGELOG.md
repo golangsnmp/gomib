@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-08-13
+
+### Fixed
+
+- Use native path separators for `Dir` source result paths on Windows while preserving slash-separated paths for `FS` source labels
+- Make cross-platform CI checks independent of host-installed net-snmp directories and compatible with the current Go 1.26 lint baseline
+
 ## [0.13.0] - 2026-08-13
 
 ### Breaking Changes
@@ -178,7 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix path traversal in normalize output path
 - Fix godoc link to mib.DiagnosticConfig
 
-[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/golangsnmp/gomib/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/golangsnmp/gomib/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/golangsnmp/gomib/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/golangsnmp/gomib/compare/v0.10.0...v0.11.0
