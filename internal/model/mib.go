@@ -525,8 +525,8 @@ func (m *Mib) registerNode(name string, n *Node) {
 	}
 }
 
-func (m *Mib) addDiagnostic(d Diagnostic) {
-	m.diagnostics = append(m.diagnostics, d)
+func (m *Mib) addDiagnostic(d *Diagnostic) {
+	m.diagnostics = append(m.diagnostics, *d)
 }
 
 func (m *Mib) addUnresolved(ref UnresolvedRef) {

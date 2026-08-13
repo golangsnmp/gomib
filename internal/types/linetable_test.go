@@ -90,6 +90,31 @@ func TestLineColFromTable_MultipleLines(t *testing.T) {
 	}
 }
 
+func TestLineColRangeFromTable(t *testing.T) {
+	table := BuildLineTable([]byte("ab\ncd\nef"))
+
+	tests := []struct {
+		name                       string
+		span                       Span
+		line, col, endLine, endCol int
+	}{
+		{name: "same line", span: NewSpan(0, 2), line: 1, col: 1, endLine: 1, endCol: 3},
+		{name: "multiple lines", span: NewSpan(1, 7), line: 1, col: 2, endLine: 3, endCol: 2},
+		{name: "point", span: NewSpan(4, 4), line: 2, col: 2},
+		{name: "zero value", span: Span{}, line: 1, col: 1},
+		{name: "synthetic", span: Synthetic},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			line, col, endLine, endCol := LineColRangeFromTable(table, tt.span)
+			testutil.Equal(t, tt.line, line, "line")
+			testutil.Equal(t, tt.col, col, "column")
+			testutil.Equal(t, tt.endLine, endLine, "end line")
+			testutil.Equal(t, tt.endCol, endCol, "end column")
+		})
+	}
+}
+
 func TestLineColFromTable_PositionAtNewline(t *testing.T) {
 	// "\n" - just a newline: table = [0, 1]
 	table := BuildLineTable([]byte("\n"))

@@ -13,7 +13,7 @@ func AddMibGroup(m *Mib, g *Group)                 { m.addGroup(g) }
 func AddMibCompliance(m *Mib, c *Compliance)       { m.addCompliance(c) }
 func AddMibCapability(m *Mib, c *Capability)       { m.addCapability(c) }
 func RegisterMibNode(m *Mib, name string, n *Node) { m.registerNode(name, n) }
-func AddMibDiagnostic(m *Mib, d Diagnostic)        { m.addDiagnostic(d) }
+func AddMibDiagnostic(m *Mib, d *Diagnostic)       { m.addDiagnostic(d) }
 func AddMibUnresolved(m *Mib, ref UnresolvedRef)   { m.addUnresolved(ref) }
 
 // --- Node setters ---

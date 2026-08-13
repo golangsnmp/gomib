@@ -660,9 +660,9 @@ Diagnostics are collected at every pipeline stage:
 ```
 Lexer -> SpanDiagnostic (byte offsets)
 Parser -> SpanDiagnostic (byte offsets)
-  [lowering converts spans to line/col via LineTable]
-Validator -> Diagnostic (line/col)
-Resolver -> Diagnostic (line/col)
+  [lowering converts spans to line/column ranges via LineTable]
+Validator -> Diagnostic (line/column range)
+Resolver -> Diagnostic (line/column range)
   -> Mib.Diagnostics() (aggregated)
   -> filtered by DiagnosticConfig
   -> checked against FailAt threshold
@@ -695,6 +695,11 @@ DiagnosticConfig {
 
 Presets: `DefaultConfig()` (report Minor+, fail on Severe),
 `VerboseConfig()`, `QuietConfig()`, `SilentConfig()`.
+
+Diagnostic positions are 1-based. `Line` and `Column` identify the inclusive
+start of the offending source region; `EndLine` and `EndColumn` identify its
+exclusive end. When no useful end position is available, both end fields are
+zero and consumers should treat the diagnostic as a point at its start.
 
 ### Diagnostic Codes
 

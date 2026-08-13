@@ -190,14 +190,16 @@ func convertDiagnostics(spanDiags []types.SpanDiagnostic, moduleName string, lin
 		if !config.ShouldRetain(sd.Code) {
 			continue
 		}
-		line, col := types.LineColFromTable(lineTable, sd.Span.Start)
+		line, col, endLine, endCol := types.LineColRangeFromTable(lineTable, sd.Span)
 		diags = append(diags, types.Diagnostic{
-			Severity: config.EffectiveSeverity(sd.Code),
-			Code:     sd.Code,
-			Message:  sd.Message,
-			Module:   moduleName,
-			Line:     line,
-			Column:   col,
+			Severity:  config.EffectiveSeverity(sd.Code),
+			Code:      sd.Code,
+			Message:   sd.Message,
+			Module:    moduleName,
+			Line:      line,
+			Column:    col,
+			EndLine:   endLine,
+			EndColumn: endCol,
 		})
 	}
 	return diags

@@ -140,18 +140,20 @@ func (c *resolverContext) EmitDiagnostic(code string, mod *module.Module, span t
 		return
 	}
 	var moduleName string
-	var line, col int
+	var line, col, endLine, endCol int
 	if mod != nil {
 		moduleName = mod.Name
-		line, col = module.LineColFromLineTable(mod.LineTable, span)
+		line, col, endLine, endCol = types.LineColRangeFromTable(mod.LineTable, span)
 	}
 	c.diagnostics = append(c.diagnostics, model.Diagnostic{
-		Severity: c.diagConfig.EffectiveSeverity(code),
-		Code:     code,
-		Message:  message,
-		Module:   moduleName,
-		Line:     line,
-		Column:   col,
+		Severity:  c.diagConfig.EffectiveSeverity(code),
+		Code:      code,
+		Message:   message,
+		Module:    moduleName,
+		Line:      line,
+		Column:    col,
+		EndLine:   endLine,
+		EndColumn: endCol,
 	})
 }
 
@@ -211,7 +213,7 @@ func (c *resolverContext) recordUnresolved(code string, mod *module.Module, span
 
 // FinalizeDiagnostics copies collected diagnostics into the Mib.
 func (c *resolverContext) FinalizeDiagnostics() {
-	for _, d := range c.diagnostics {
-		model.AddMibDiagnostic(c.mib, d)
+	for i := range c.diagnostics {
+		model.AddMibDiagnostic(c.mib, &c.diagnostics[i])
 	}
 }

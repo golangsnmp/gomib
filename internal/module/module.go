@@ -167,13 +167,6 @@ type Import struct {
 	Span   types.Span
 }
 
-// LineColFromLineTable converts a span to line/col using a module's precomputed
-// line table. Used by the resolver for diagnostics when source bytes are no
-// longer available.
-func LineColFromLineTable(lineTable []int, span types.Span) (line, col int) {
-	return types.LineColFromTable(lineTable, span.Start)
-}
-
 // NewImport returns an Import for the given symbol from the given module.
 func NewImport(module, symbol string, span types.Span) Import {
 	return Import{

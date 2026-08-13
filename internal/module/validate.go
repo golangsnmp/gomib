@@ -55,14 +55,16 @@ func (ctx *validateContext) emitDiagnostic(code string, span types.Span, message
 	if !ctx.diagConfig.ShouldRetain(code) {
 		return
 	}
-	line, col := types.LineColFromTable(ctx.lineTable, span.Start)
+	line, col, endLine, endCol := types.LineColRangeFromTable(ctx.lineTable, span)
 	ctx.diagnostics = append(ctx.diagnostics, types.Diagnostic{
-		Severity: ctx.diagConfig.EffectiveSeverity(code),
-		Code:     code,
-		Message:  message,
-		Module:   ctx.moduleName,
-		Line:     line,
-		Column:   col,
+		Severity:  ctx.diagConfig.EffectiveSeverity(code),
+		Code:      code,
+		Message:   message,
+		Module:    ctx.moduleName,
+		Line:      line,
+		Column:    col,
+		EndLine:   endLine,
+		EndColumn: endCol,
 	})
 }
 

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/golangsnmp/gomib/mib"
 )
 
 const testCLIMIB = `TEST-MIB DEFINITIONS ::= BEGIN
@@ -296,6 +298,26 @@ func TestListFormatJSON(t *testing.T) {
 }
 
 // --- dump command ---
+
+func TestBuildExportDiagnosticRange(t *testing.T) {
+	d := mib.Diagnostic{
+		Code:      "parse-error",
+		Severity:  mib.SeverityError,
+		Module:    "TEST-MIB",
+		Line:      2,
+		Column:    3,
+		EndLine:   4,
+		EndColumn: 5,
+		Message:   "bad syntax",
+	}
+	got := buildExportDiagnostic(&d)
+	if got.EndLine == nil || *got.EndLine != 4 {
+		t.Errorf("EndLine = %v, want 4", got.EndLine)
+	}
+	if got.EndColumn == nil || *got.EndColumn != 5 {
+		t.Errorf("EndColumn = %v, want 5", got.EndColumn)
+	}
+}
 
 func TestDumpBasicJSON(t *testing.T) {
 	dir := writeTestMIB(t)

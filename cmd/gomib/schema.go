@@ -248,13 +248,15 @@ type ExportNotificationVariation struct {
 }
 
 type ExportDiagnostic struct {
-	Phase    string  `json:"phase"`
-	Code     string  `json:"code"`
-	Severity string  `json:"severity"`
-	Module   *string `json:"module"`
-	Line     *int    `json:"line"`
-	Column   *int    `json:"column"`
-	Message  string  `json:"message"`
+	Phase     string  `json:"phase"`
+	Code      string  `json:"code"`
+	Severity  string  `json:"severity"`
+	Module    *string `json:"module"`
+	Line      *int    `json:"line"`
+	Column    *int    `json:"column"`
+	EndLine   *int    `json:"endLine"`
+	EndColumn *int    `json:"endColumn"`
+	Message   string  `json:"message"`
 }
 
 // exportBaseType maps BaseType to the export schema vocabulary.
@@ -764,8 +766,9 @@ func buildExportPayload(m *mib.Mib, strictness string) *ExportPayload {
 	})
 
 	// Diagnostics - sorted canonically
-	for _, d := range m.Diagnostics() {
-		export.Diagnostics = append(export.Diagnostics, buildExportDiagnostic(d))
+	diagnostics := m.Diagnostics()
+	for i := range diagnostics {
+		export.Diagnostics = append(export.Diagnostics, buildExportDiagnostic(&diagnostics[i]))
 	}
 	sort.Slice(export.Diagnostics, func(i, j int) bool {
 		a, b := export.Diagnostics[i], export.Diagnostics[j]
@@ -1241,15 +1244,17 @@ func buildExportCapability(cap *mib.Capability, m *mib.Mib) ExportCapability {
 	return c
 }
 
-func buildExportDiagnostic(d mib.Diagnostic) ExportDiagnostic {
+func buildExportDiagnostic(d *mib.Diagnostic) ExportDiagnostic {
 	return ExportDiagnostic{
-		Phase:    exportDiagPhase(d.Code),
-		Code:     d.Code,
-		Severity: exportSeverity(d.Severity),
-		Module:   strPtr(d.Module),
-		Line:     intPtr(d.Line),
-		Column:   intPtr(d.Column),
-		Message:  d.Message,
+		Phase:     exportDiagPhase(d.Code),
+		Code:      d.Code,
+		Severity:  exportSeverity(d.Severity),
+		Module:    strPtr(d.Module),
+		Line:      intPtr(d.Line),
+		Column:    intPtr(d.Column),
+		EndLine:   intPtr(d.EndLine),
+		EndColumn: intPtr(d.EndColumn),
+		Message:   d.Message,
 	}
 }
 
