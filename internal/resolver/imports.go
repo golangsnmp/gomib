@@ -314,9 +314,11 @@ func extractLastUpdated(mod *module.Module) string {
 }
 
 // normalizeTimestamp validates and converts an ASCII ExtUTCTime value to a
-// sortable form. The 2-digit-year form YYMMDDHHmmZ is expanded by prepending
-// "19" for years >= 70 and "20" otherwise. Invalid values return an empty
-// string so they do not influence module preference.
+// sortable form. For vendor compatibility, the 2-digit-year form YYMMDDHHMMZ
+// maps 00..69 to 2000..2069 and 70..99 to 1970..1999. This permissive window is
+// not conventional ASN.1 UTCTime interpretation or strict RFC behavior.
+// Invalid values return an empty string so they do not influence module
+// preference.
 func normalizeTimestamp(ts string) string {
 	if len(ts) != 11 && len(ts) != 13 {
 		return ""

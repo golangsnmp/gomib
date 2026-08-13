@@ -244,7 +244,10 @@ func validateRevisionLastUpdated(ctx *validateContext, mi *ModuleIdentity) {
 }
 
 // validateDate validates a single SMI date string (ExtUTCTime format).
-// Format: YYMMDDHHMMZ (11 chars) or YYYYMMDDHHMMZ (13 chars).
+// Format: YYMMDDHHMMZ (11 chars) or YYYYMMDDHHMMZ (13 chars). For vendor
+// compatibility, 2-digit years map 00..69 to 2000..2069 and 70..99 to
+// 1970..1999. This permissive window is not conventional ASN.1 UTCTime
+// interpretation or strict RFC behavior; the 2-digit-year diagnostic remains.
 // Returns the parsed time and whether the date is structurally valid.
 func validateDate(ctx *validateContext, date string, span types.Span, now time.Time) (time.Time, bool) {
 	if date == "" {

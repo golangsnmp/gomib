@@ -434,7 +434,10 @@ handle them.
   definition (multiple MODULE-IDENTITY definitions produce a warning)
 - SMIv2 macro keywords (OBJECT-TYPE, etc.) should be imported
 - LAST-UPDATED and REVISION dates validated for format, ranges, and calendar
-  correctness
+  correctness. As a permissive vendor-compatibility policy, 2-digit ExtUTCTime
+  years map `00..69` to `2000..2069` and `70..99` to `1970..1999`; this is not
+  conventional ASN.1 UTCTime interpretation or strict RFC behavior, and still
+  produces the 2-digit-year diagnostic.
 - Revisions must be in reverse chronological order
 - LAST-UPDATED must have a matching REVISION entry
 - Module naming conventions (SMIv2 modules should end with `-MIB`)

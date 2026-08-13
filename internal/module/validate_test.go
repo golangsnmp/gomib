@@ -428,32 +428,28 @@ func TestValidate_DateValue_Feb29Leap(t *testing.T) {
 	testutil.Nil(t, d, "Feb 29 in leap year should not trigger %s", types.DiagDateValue)
 }
 
-func TestValidate_DateYear2Digits(t *testing.T) {
-	// 11-char format: "9501010000Z" = year 1995 (>=70 maps to 19xx)
-	mod := smiv2Module("DATE-TEST-MIB",
-		testMI("dateTest", "9501010000Z",
-			Revision{Date: "9501010000Z", Description: "Test", Span: types.Span{Start: 20, End: 40}},
-		),
-	)
+func TestValidate_DateYear2Digits_RolloverBoundary(t *testing.T) {
+	tests := []struct {
+		date string
+		year string
+	}{
+		{date: "6901010000Z", year: "2069"},
+		{date: "7001010000Z", year: "1970"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.date[:2], func(t *testing.T) {
+			mod := smiv2Module("DATE-TEST-MIB",
+				testMI("dateTest", tt.date,
+					Revision{Date: tt.date, Description: "Test", Span: types.Span{Start: 20, End: 40}},
+				),
+			)
 
-	d := validateAndFindDiagnostic(t, mod, types.VerboseConfig(), types.DiagDateYear2Digits)
-	testutil.NotNil(t, d, "expected %s diagnostic for 2-digit year", types.DiagDateYear2Digits)
-	testutil.Equal(t, types.SeverityWarning, d.Severity, "severity")
-	testutil.True(t, strings.Contains(d.Message, "1995"), "message should mention interpreted year: %s", d.Message)
-}
-
-func TestValidate_DateYear2Digits_Post2000(t *testing.T) {
-	// 11-char format: "0501010000Z" = year 2005 (<70 maps to 20xx)
-	mod := smiv2Module("DATE-TEST-MIB",
-		testMI("dateTest", "0501010000Z",
-			Revision{Date: "0501010000Z", Description: "Test", Span: types.Span{Start: 20, End: 40}},
-		),
-	)
-
-	d := validateAndFindDiagnostic(t, mod, types.VerboseConfig(), types.DiagDateYear2Digits)
-	testutil.NotNil(t, d, "expected %s diagnostic for 2-digit year", types.DiagDateYear2Digits)
-	testutil.Equal(t, types.SeverityWarning, d.Severity, "severity")
-	testutil.True(t, strings.Contains(d.Message, "2005"), "message should mention interpreted year: %s", d.Message)
+			d := validateAndFindDiagnostic(t, mod, types.VerboseConfig(), types.DiagDateYear2Digits)
+			testutil.NotNil(t, d, "expected %s diagnostic for 2-digit year", types.DiagDateYear2Digits)
+			testutil.Equal(t, types.SeverityWarning, d.Severity, "severity")
+			testutil.True(t, strings.Contains(d.Message, tt.year), "message should mention interpreted year: %s", d.Message)
+		})
+	}
 }
 
 func TestValidate_DateInPast(t *testing.T) {
