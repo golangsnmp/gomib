@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"os"
+	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/golangsnmp/gomib"
@@ -496,6 +499,173 @@ func (f *fakeSource) ListModules() ([]string, error) {
 		names = append(names, name)
 	}
 	return names, nil
+}
+
+func TestPhantomSourceAdvertisementDoesNotShadowLaterSource(t *testing.T) {
+	phantom := []byte(`OTHER-MIB DEFINITIONS ::= BEGIN
+END
+`)
+	valid := []byte(`PHANTOM-SHADOW-MIB DEFINITIONS ::= BEGIN
+END
+`)
+
+	for _, samePath := range []bool{false, true} {
+		name := "different paths"
+		secondPrefix := "valid"
+		if samePath {
+			name = "same path"
+			secondPrefix = "phantom"
+		}
+		t.Run(name, func(t *testing.T) {
+			src1 := &fakeSource{prefix: "phantom", modules: map[string]fakeModule{
+				"PHANTOM-SHADOW-MIB": {content: phantom},
+			}}
+			src2 := &fakeSource{prefix: secondPrefix, modules: map[string]fakeModule{
+				"PHANTOM-SHADOW-MIB": {content: valid},
+			}}
+
+			for _, explicit := range []bool{true, false} {
+				mode := "all"
+				opts := []gomib.LoadOption{gomib.WithSource(src1, src2), gomib.WithDiagnosticConfig(mib.SilentConfig())}
+				if explicit {
+					mode = "named"
+					opts = append(opts, gomib.WithModules("PHANTOM-SHADOW-MIB"))
+				}
+				t.Run(mode, func(t *testing.T) {
+					m, err := gomib.Load(context.Background(), opts...)
+					testutil.NoError(t, err, "Load")
+					mod := m.Module("PHANTOM-SHADOW-MIB")
+					testutil.NotNil(t, mod, "later valid module should load")
+					testutil.Equal(t, secondPrefix+":PHANTOM-SHADOW-MIB", mod.SourcePath(), "valid source path")
+				})
+			}
+		})
+	}
+}
+
+func TestDirPhantomAdvertisementDoesNotShadowLaterPath(t *testing.T) {
+	dir := t.TempDir()
+	phantomPath := filepath.Join(dir, "a-phantom.mib")
+	validPath := filepath.Join(dir, "b-valid.mib")
+	testutil.NoError(t, os.WriteFile(phantomPath, []byte(`LEADING-TOKEN DIR-PHANTOM-MIB DEFINITIONS ::= BEGIN
+END
+`), 0o644), "write phantom")
+	testutil.NoError(t, os.WriteFile(validPath, []byte(`DIR-PHANTOM-MIB DEFINITIONS ::= BEGIN
+END
+`), 0o644), "write valid")
+
+	src, err := gomib.Dir(dir)
+	testutil.NoError(t, err, "Dir")
+	for _, explicit := range []bool{true, false} {
+		mode := "all"
+		opts := []gomib.LoadOption{gomib.WithSource(src), gomib.WithDiagnosticConfig(mib.SilentConfig())}
+		if explicit {
+			mode = "named"
+			opts = append(opts, gomib.WithModules("DIR-PHANTOM-MIB"))
+		}
+		t.Run(mode, func(t *testing.T) {
+			m, err := gomib.Load(context.Background(), opts...)
+			testutil.NoError(t, err, "Load")
+			mod := m.Module("DIR-PHANTOM-MIB")
+			testutil.NotNil(t, mod, "later directory path should load")
+			testutil.Equal(t, validPath, mod.SourcePath(), "valid file path")
+		})
+	}
+}
+
+func TestFilesPhantomAdvertisementDoesNotShadowLaterPath(t *testing.T) {
+	dir := t.TempDir()
+	phantomPath := filepath.Join(dir, "a-phantom.mib")
+	validPath := filepath.Join(dir, "b-valid.mib")
+	testutil.NoError(t, os.WriteFile(phantomPath, []byte(`LEADING-TOKEN FILES-PHANTOM-MIB DEFINITIONS ::= BEGIN
+END
+`), 0o644), "write phantom")
+	testutil.NoError(t, os.WriteFile(validPath, []byte(`FILES-PHANTOM-MIB DEFINITIONS ::= BEGIN
+END
+`), 0o644), "write valid")
+
+	src, err := gomib.Files(phantomPath, validPath)
+	testutil.NoError(t, err, "Files")
+	for _, explicit := range []bool{true, false} {
+		mode := "all"
+		opts := []gomib.LoadOption{gomib.WithSource(src), gomib.WithDiagnosticConfig(mib.SilentConfig())}
+		if explicit {
+			mode = "named"
+			opts = append(opts, gomib.WithModules("FILES-PHANTOM-MIB"))
+		}
+		t.Run(mode, func(t *testing.T) {
+			m, err := gomib.Load(context.Background(), opts...)
+			testutil.NoError(t, err, "Load")
+			mod := m.Module("FILES-PHANTOM-MIB")
+			testutil.NotNil(t, mod, "later Files path should load")
+			testutil.Equal(t, validPath, mod.SourcePath(), "valid file path")
+		})
+	}
+}
+
+func TestPhantomAdvertisementInsideMultiDoesNotShadowLaterChild(t *testing.T) {
+	phantom := []byte(`OTHER-MIB DEFINITIONS ::= BEGIN
+END
+`)
+	valid := []byte(`MULTI-PHANTOM-MIB DEFINITIONS ::= BEGIN
+END
+`)
+
+	for _, explicit := range []bool{true, false} {
+		mode := "all"
+		src := gomib.Multi(
+			&fakeSource{prefix: "phantom", modules: map[string]fakeModule{
+				"MULTI-PHANTOM-MIB": {content: phantom},
+			}},
+			&fakeSource{prefix: "valid", modules: map[string]fakeModule{
+				"MULTI-PHANTOM-MIB": {content: valid},
+			}},
+		)
+		opts := []gomib.LoadOption{gomib.WithSource(src), gomib.WithDiagnosticConfig(mib.SilentConfig())}
+		if explicit {
+			mode = "named"
+			opts = append(opts, gomib.WithModules("MULTI-PHANTOM-MIB"))
+		}
+		t.Run(mode, func(t *testing.T) {
+			m, err := gomib.Load(context.Background(), opts...)
+			testutil.NoError(t, err, "Load")
+			mod := m.Module("MULTI-PHANTOM-MIB")
+			testutil.NotNil(t, mod, "later Multi child should load")
+			testutil.Equal(t, "valid:MULTI-PHANTOM-MIB", mod.SourcePath(), "valid source path")
+		})
+	}
+}
+
+func TestLoadAllDeduplicatesSameSourceModuleAdvertisement(t *testing.T) {
+	content := []byte(`DUPLICATE-ADVERTISEMENT-MIB DEFINITIONS ::= BEGIN
+END
+`)
+	src := &duplicateListSource{
+		fakeSource: fakeSource{modules: map[string]fakeModule{
+			"DUPLICATE-ADVERTISEMENT-MIB": {content: content},
+		}},
+		list: []string{"DUPLICATE-ADVERTISEMENT-MIB", "DUPLICATE-ADVERTISEMENT-MIB"},
+	}
+
+	m, err := gomib.Load(context.Background(), gomib.WithSource(src), gomib.WithDiagnosticConfig(mib.SilentConfig()))
+	testutil.NoError(t, err, "Load")
+	testutil.NotNil(t, m.Module("DUPLICATE-ADVERTISEMENT-MIB"), "module should load once")
+	testutil.Equal(t, 1, src.findCalls, "duplicate source advertisements should be queried once")
+}
+
+type duplicateListSource struct {
+	fakeSource
+	list      []string
+	findCalls int
+}
+
+func (s *duplicateListSource) Find(name string) (gomib.FindResult, error) {
+	s.findCalls++
+	return s.fakeSource.Find(name)
+}
+
+func (s *duplicateListSource) ListModules() ([]string, error) {
+	return slices.Clone(s.list), nil
 }
 
 func TestSourcePrecedenceDeterministic(t *testing.T) {

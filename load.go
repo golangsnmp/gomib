@@ -6,11 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"maps"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -32,25 +32,38 @@ func componentLogger(logger *slog.Logger, component string) *slog.Logger {
 func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mib.Mib, error) {
 	log := types.Logger{L: cfg.logger}
 
-	type sourceModule struct {
+	type sourceCandidate struct {
 		source Source
-		name   string
+		index  int
+	}
+	type sourceModule struct {
+		name       string
+		candidates []sourceCandidate
 	}
 
-	// Deduplicate module names across sources: first source wins, matching
-	// the precedence used by Multi.Find().
-	seen := make(map[string]struct{})
+	// Keep every source advertising a name until its content has been decoded.
+	// Precedence is committed only when a candidate actually contains the module.
+	moduleIndex := make(map[string]int)
 	var allModules []sourceModule
-	for _, src := range sources {
+	for sourceIndex, src := range sources {
 		names, err := src.ListModules()
 		if err != nil {
 			return nil, fmt.Errorf("listing modules: %w", err)
 		}
+		seenInSource := make(map[string]struct{})
 		for _, name := range names {
-			if _, ok := seen[name]; !ok {
-				seen[name] = struct{}{}
-				allModules = append(allModules, sourceModule{source: src, name: name})
+			if _, ok := seenInSource[name]; ok {
+				continue
 			}
+			seenInSource[name] = struct{}{}
+
+			candidate := sourceCandidate{source: src, index: sourceIndex}
+			if i, ok := moduleIndex[name]; ok {
+				allModules[i].candidates = append(allModules[i].candidates, candidate)
+				continue
+			}
+			moduleIndex[name] = len(allModules)
+			allModules = append(allModules, sourceModule{name: name, candidates: []sourceCandidate{candidate}})
 		}
 	}
 
@@ -66,14 +79,18 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 
 	results := make(chan *module.Module, len(allModules))
 
-	// Cache decoded files by path so multi-module files are only
-	// parsed once even when multiple goroutines request different
-	// module names from the same file.
+	// Cache decoded files by source and path so multi-module files are only
+	// parsed once without conflating identical diagnostic paths from different
+	// sources.
+	type cacheKey struct {
+		source string
+		path   string
+	}
 	type cachedDecode struct {
 		once sync.Once
 		mods []*module.Module
 	}
-	var pathCache sync.Map // result.Path -> *cachedDecode
+	var pathCache sync.Map // cacheKey -> *cachedDecode
 
 	var wg sync.WaitGroup
 	var firstErr error
@@ -96,13 +113,26 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 				return
 			}
 
-			result, err := sm.source.Find(sm.name)
-			if err != nil {
-				if errors.Is(err, fs.ErrNotExist) {
-					log.Log(slog.LevelDebug, "module not found",
+			for _, candidate := range sm.candidates {
+				found, err := visitSourceCandidates(candidate.source, sm.name, strconv.Itoa(candidate.index), func(result FindResult, sourceID string) bool {
+					key := cacheKey{source: sourceID, path: result.Path}
+					entry, _ := pathCache.LoadOrStore(key, &cachedDecode{})
+					cd := entry.(*cachedDecode)
+					cd.once.Do(func() {
+						cd.mods = decodeModules(result.Content, result.Path, cfg)
+					})
+					for _, mod := range cd.mods {
+						if mod.Name == sm.name {
+							results <- mod
+							return true
+						}
+					}
+					log.Log(slog.LevelDebug, "module not found in decoded file",
 						slog.String("module", sm.name),
-						slog.Any("error", err))
-				} else {
+						slog.String("path", result.Path))
+					return false
+				})
+				if err != nil {
 					log.Log(slog.LevelWarn, "module read error",
 						slog.String("module", sm.name),
 						slog.Any("error", err))
@@ -110,29 +140,13 @@ func loadAllModules(ctx context.Context, sources []Source, cfg *loadConfig) (*mi
 						firstErr = err
 						cancel()
 					})
+					return
 				}
-				return
-			}
-
-			entry, _ := pathCache.LoadOrStore(result.Path, &cachedDecode{})
-			cd := entry.(*cachedDecode)
-			cd.once.Do(func() {
-				cd.mods = decodeModules(result.Content, result.Path, cfg)
-			})
-			// Send only this goroutine's module to avoid N^2 sends
-			// for multi-module files. The consumer deduplicates by name.
-			found := false
-			for _, mod := range cd.mods {
-				if mod.Name == sm.name {
-					results <- mod
-					found = true
-					break
+				if found {
+					return
 				}
-			}
-			if !found {
-				slog.Debug("module not found in decoded file",
-					slog.String("module", sm.name),
-					slog.String("path", result.Path))
+				log.Log(slog.LevelDebug, "module not found",
+					slog.String("module", sm.name))
 			}
 		}(sm)
 	}
@@ -169,12 +183,14 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 	log := types.Logger{L: cfg.logger}
 
 	modules := make(map[string]*module.Module)
-	combined := Multi(sources...)
 
-	// Cache decoded files by path so multi-module files are only
-	// parsed once. Sibling modules are found through Find (which
-	// respects source precedence) rather than eagerly cached.
-	fileCache := make(map[string][]*module.Module) // path -> decoded modules
+	// Cache decoded files by source and path so multi-module files are only
+	// parsed once without conflating identical paths from different sources.
+	type cacheKey struct {
+		source string
+		path   string
+	}
+	fileCache := make(map[cacheKey][]*module.Module)
 
 	var loadOne func(name string) error
 	loadOne = func(name string) error {
@@ -186,38 +202,44 @@ func loadModulesByName(ctx context.Context, sources []Source, names []string, cf
 			return nil
 		}
 
-		result, err := combined.Find(name)
-		if err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
+		// A Source.Find result is only a candidate until decoding confirms that
+		// its content contains the requested module. Phantom advertisements do
+		// not shadow later files or sources.
+		var target *module.Module
+		for sourceIndex, source := range sources {
+			found, err := visitSourceCandidates(source, name, strconv.Itoa(sourceIndex), func(result FindResult, sourceID string) bool {
+				key := cacheKey{source: sourceID, path: result.Path}
+				mods, ok := fileCache[key]
+				if !ok {
+					mods = decodeModules(result.Content, result.Path, cfg)
+					fileCache[key] = mods
+				}
+				for _, mod := range mods {
+					if mod.Name == name {
+						target = mod
+						return true
+					}
+				}
+				log.Log(slog.LevelDebug, "module not found in decoded file",
+					slog.String("module", name),
+					slog.String("path", result.Path))
+				return false
+			})
+			if err != nil {
 				return err
 			}
+			if found {
+				break
+			}
+		}
+		if target == nil {
 			log.Log(slog.LevelDebug, "module not found",
 				slog.String("module", name))
 			return nil // skip missing modules
 		}
 
-		mods, ok := fileCache[result.Path]
-		if !ok {
-			mods = decodeModules(result.Content, result.Path, cfg)
-			fileCache[result.Path] = mods
-		}
-		if len(mods) == 0 {
-			return nil
-		}
-
-		// Store only the requested module. Sibling modules from the
-		// same file are loaded through Find when needed, so source
-		// precedence is respected per-module.
-		var target *module.Module
-		for _, mod := range mods {
-			if mod.Name == name {
-				target = mod
-				break
-			}
-		}
-		if target == nil {
-			return nil
-		}
+		// Store only the requested module. Sibling modules from the same file
+		// are loaded through Find so source precedence remains per-module.
 		modules[name] = target
 
 		for _, imp := range target.Imports {

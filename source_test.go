@@ -379,8 +379,12 @@ func TestScanModuleNames(t *testing.T) {
 		{"inline comment terminated", "-- MY-MIB DEFINITIONS -- REAL-MIB DEFINITIONS ::= BEGIN\nEND", []string{"REAL-MIB"}},
 		{"no assign", "MY-MIB DEFINITIONS but no assign here", nil},
 		{"DEFINITIONS in description", "MY-MIB DEFINITIONS ::= BEGIN\nDESCRIPTION \"see DEFINITIONS\"\nEND", []string{"MY-MIB"}},
+		{"quoted module header", "DESCRIPTION \"PHANTOM-MIB DEFINITIONS ::= BEGIN\"\nREAL-MIB DEFINITIONS ::= BEGIN\nEND", []string{"REAL-MIB"}},
+		{"longer DEFINITIONS identifier", "PHANTOM-MIB MY-DEFINITIONS ::= BEGIN\nREAL-MIB DEFINITIONS ::= BEGIN\nEND", []string{"REAL-MIB"}},
+		{"longer assignment identifier", "PHANTOM-MIB DEFINITIONS MYASSIGN::= BEGIN\nREAL-MIB DEFINITIONS ::= BEGIN\nEND", []string{"REAL-MIB"}},
 		{"comment before DEFINITIONS", "FROG-MIB\n\n-- -*- mib -*-\n\nDEFINITIONS ::= BEGIN\nEND", []string{"FROG-MIB"}},
 		{"multiple comments before DEFINITIONS", "FROG-MIB\n-- line 1\n-- line 2\nDEFINITIONS ::= BEGIN\nEND", []string{"FROG-MIB"}},
+		{"obsolete module OID", "OLD-MIB { iso 3 } DEFINITIONS ::= BEGIN\nEND", []string{"OLD-MIB"}},
 	}
 
 	for _, tt := range tests {
@@ -406,6 +410,28 @@ func TestScanModuleNamesMultiFile(t *testing.T) {
 	testutil.Equal(t, 2, len(names), "should find two module names")
 	testutil.Equal(t, "PROBLEM-MULTIMOD-BASE-MIB", names[0], "first module name")
 	testutil.Equal(t, "PROBLEM-MULTIMOD-MIB", names[1], "second module name")
+}
+
+func TestDirSourceSkipsStaleCandidateBeforeDuplicatePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	valid := []byte(`DUPLICATE-MIB DEFINITIONS ::= BEGIN
+END
+`)
+	firstPath := filepath.Join(tmpDir, "a-first.mib")
+	secondPath := filepath.Join(tmpDir, "b-second.mib")
+	testutil.NoError(t, os.WriteFile(firstPath, valid, 0o644), "write first")
+	testutil.NoError(t, os.WriteFile(secondPath, valid, 0o644), "write second")
+
+	src, err := Dir(tmpDir)
+	testutil.NoError(t, err, "Dir")
+	// Dir has indexed both duplicate paths. Make the first advertisement stale
+	// before Find validates the candidate content.
+	stale := []byte("OTHER-MIB DEFINITIONS ::= BEGIN\nEND\n")
+	testutil.NoError(t, os.WriteFile(firstPath, stale, 0o644), "replace first")
+
+	result, err := src.Find("DUPLICATE-MIB")
+	testutil.NoError(t, err, "Find DUPLICATE-MIB")
+	testutil.Equal(t, secondPath, result.Path, "later duplicate path should be tried")
 }
 
 func TestContentBasedIndexing(t *testing.T) {
