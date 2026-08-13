@@ -6,10 +6,121 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/mib"
 )
+
+// TestDuplicateOIDNamesReturnDefinitionMetadata exercises duplicate-OID
+// lookups through the public API.
+func TestDuplicateOIDNamesReturnDefinitionMetadata(t *testing.T) {
+	src := gomib.FS("duplicate-oids", fstest.MapFS{
+		"preferred.mib": &fstest.MapFile{Data: []byte(`
+PREFERRED-MIB DEFINITIONS ::= BEGIN
+IMPORTS MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises FROM SNMPv2-SMI;
+
+preferredMIB MODULE-IDENTITY
+    LAST-UPDATED "202501010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Preferred module"
+    REVISION "202501010000Z"
+    DESCRIPTION "Preferred revision"
+    ::= { enterprises 99999 }
+
+preferredObject OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "preferred metadata"
+    ::= { enterprises 99999 1 }
+END
+`)},
+		"legacy.mib": &fstest.MapFile{Data: []byte(`
+LEGACY-MIB DEFINITIONS ::= BEGIN
+IMPORTS MODULE-IDENTITY, OBJECT-TYPE, Integer32, enterprises FROM SNMPv2-SMI;
+
+legacyMIB MODULE-IDENTITY
+    LAST-UPDATED "200001010000Z"
+    ORGANIZATION "Test"
+    CONTACT-INFO "Test"
+    DESCRIPTION "Legacy module"
+    REVISION "200001010000Z"
+    DESCRIPTION "Legacy revision"
+    ::= { enterprises 99998 }
+
+legacyObject OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS deprecated
+    DESCRIPTION "legacy metadata"
+    ::= { enterprises 99999 1 }
+END
+`)},
+	})
+
+	diagConfig := mib.DefaultConfig()
+	diagConfig.FailAt = mib.SeverityFatal
+	m, err := gomib.Load(context.Background(),
+		gomib.WithSource(src),
+		gomib.WithModules("PREFERRED-MIB", "LEGACY-MIB"),
+		gomib.WithDiagnosticConfig(diagConfig),
+	)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	preferred := m.Object("preferredObject")
+	legacy := m.Object("legacyObject")
+	if preferred == nil || legacy == nil {
+		t.Fatalf("global objects: preferred=%v legacy=%v", preferred, legacy)
+	}
+	if preferred.Description() != "preferred metadata" {
+		t.Errorf("preferred description = %q", preferred.Description())
+	}
+	if legacy.Description() != "legacy metadata" {
+		t.Errorf("legacy description = %q", legacy.Description())
+	}
+	if preferred.Node() != legacy.Node() {
+		t.Error("duplicate-OID objects should share a node")
+	}
+
+	preferredMod := m.Module("PREFERRED-MIB")
+	legacyMod := m.Module("LEGACY-MIB")
+	if preferredMod == nil || legacyMod == nil {
+		t.Fatal("defining modules not found")
+	}
+	if preferredMod.Object("preferredObject") != preferred {
+		t.Error("preferred module lookup did not return its definition")
+	}
+	if legacyMod.Object("legacyObject") != legacy {
+		t.Error("legacy module lookup did not return its definition")
+	}
+	if m.Symbol("preferredObject").Object() != preferred || m.Symbol("legacyObject").Object() != legacy {
+		t.Error("global symbol lookup did not return exact-name object metadata")
+	}
+	if m.Resolve("PREFERRED-MIB::preferredObject") != preferred.Node() ||
+		m.Resolve("LEGACY-MIB::legacyObject") != legacy.Node() {
+		t.Error("qualified node lookup did not return the shared node")
+	}
+	if legacyMod.Node("preferredObject") != nil || !legacyMod.Symbol("preferredObject").IsZero() ||
+		m.Resolve("LEGACY-MIB::preferredObject") != nil {
+		t.Error("legacy module exposed the preferred module's definition name")
+	}
+	if preferredMod.Node("legacyObject") != nil || !preferredMod.Symbol("legacyObject").IsZero() ||
+		m.Resolve("PREFERRED-MIB::legacyObject") != nil {
+		t.Error("preferred module exposed the legacy module's definition name")
+	}
+
+	sharedNode := preferred.Node()
+	if sharedNode.Object() != preferred {
+		t.Error("tree node did not retain the preferred object")
+	}
+	if sharedNode.Name() != "preferredObject" || sharedNode.Module() != preferredMod {
+		t.Errorf("preferred tree metadata = %s::%s", sharedNode.Module().Name(), sharedNode.Name())
+	}
+}
 
 // TestLoadAndQueryMib is an end-to-end test exercising the public API from
 // an external package perspective. It verifies that Load, Module, Object,

@@ -266,9 +266,11 @@ func TestSymbolPriorityObjectOverNode(t *testing.T) {
 	m.addModule(mod)
 
 	bare := &Node{name: "foo"}
-	withObj := &Node{name: "foo", obj: &Object{entity: entity{name: "foo", module: mod}}}
+	obj := &Object{entity: entity{name: "foo", module: mod}}
+	withObj := &Node{name: "foo", obj: obj}
 	m.registerNode("foo", bare)
 	m.registerNode("foo", withObj)
+	m.addObject(obj)
 
 	sym := m.Symbol("foo")
 	testutil.NotNil(t, sym.Object(), "should prefer Object")

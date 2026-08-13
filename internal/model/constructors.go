@@ -3,10 +3,15 @@ package model
 // NewMib returns an empty, initialized Mib.
 func NewMib() *Mib {
 	return &Mib{
-		root:         &Node{kind: KindInternal},
-		moduleByName: make(map[string]*Module),
-		nameToNodes:  make(map[string][]*Node),
-		typeByName:   make(map[string]*Type),
+		root:               &Node{kind: KindInternal},
+		moduleByName:       make(map[string]*Module),
+		nameToNodes:        make(map[string][]*Node),
+		objectByName:       make(map[string]*Object),
+		typeByName:         make(map[string]*Type),
+		notificationByName: make(map[string]*Notification),
+		groupByName:        make(map[string]*Group),
+		complianceByName:   make(map[string]*Compliance),
+		capabilityByName:   make(map[string]*Capability),
 	}
 }
 

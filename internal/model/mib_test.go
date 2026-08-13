@@ -6,6 +6,174 @@ import (
 	"github.com/golangsnmp/gomib/internal/testutil"
 )
 
+func TestGlobalEntityLookupsUseDefinitionNames(t *testing.T) {
+	m := NewMib()
+	legacyMod := NewModule("LEGACY-MIB")
+	preferredMod := NewModule("PREFERRED-MIB")
+	m.addModule(legacyMod)
+	m.addModule(preferredMod)
+
+	sharedNode := m.root.getOrCreateChild(1).getOrCreateChild(3).getOrCreateChild(6)
+	sharedNode.setName("preferredObject")
+	sharedNode.setModule(preferredMod)
+
+	legacyObject := NewObject("legacyObject")
+	legacyObject.setNode(sharedNode)
+	legacyObject.setModule(legacyMod)
+	legacyObject.setDescription("legacy object metadata")
+	preferredObject := NewObject("preferredObject")
+	preferredObject.setNode(sharedNode)
+	preferredObject.setModule(preferredMod)
+	preferredObject.setDescription("preferred object metadata")
+	sharedNode.setObject(preferredObject)
+	m.addObject(legacyObject)
+	m.addObject(preferredObject)
+	legacyMod.addObject(legacyObject)
+	preferredMod.addObject(preferredObject)
+
+	legacyNotification := NewNotification("legacyNotification")
+	legacyNotification.setNode(sharedNode)
+	legacyNotification.setModule(legacyMod)
+	legacyNotification.setDescription("legacy notification metadata")
+	preferredNotification := NewNotification("preferredNotification")
+	preferredNotification.setNode(sharedNode)
+	preferredNotification.setModule(preferredMod)
+	preferredNotification.setDescription("preferred notification metadata")
+	sharedNode.setNotification(preferredNotification)
+	m.addNotification(legacyNotification)
+	m.addNotification(preferredNotification)
+	legacyMod.addNotification(legacyNotification)
+	preferredMod.addNotification(preferredNotification)
+
+	legacyGroup := NewGroup("legacyGroup")
+	legacyGroup.setNode(sharedNode)
+	legacyGroup.setModule(legacyMod)
+	legacyGroup.setDescription("legacy group metadata")
+	preferredGroup := NewGroup("preferredGroup")
+	preferredGroup.setNode(sharedNode)
+	preferredGroup.setModule(preferredMod)
+	preferredGroup.setDescription("preferred group metadata")
+	sharedNode.setGroup(preferredGroup)
+	m.addGroup(legacyGroup)
+	m.addGroup(preferredGroup)
+	legacyMod.addGroup(legacyGroup)
+	preferredMod.addGroup(preferredGroup)
+
+	legacyCompliance := NewCompliance("legacyCompliance")
+	legacyCompliance.setNode(sharedNode)
+	legacyCompliance.setModule(legacyMod)
+	legacyCompliance.setDescription("legacy compliance metadata")
+	preferredCompliance := NewCompliance("preferredCompliance")
+	preferredCompliance.setNode(sharedNode)
+	preferredCompliance.setModule(preferredMod)
+	preferredCompliance.setDescription("preferred compliance metadata")
+	sharedNode.setCompliance(preferredCompliance)
+	m.addCompliance(legacyCompliance)
+	m.addCompliance(preferredCompliance)
+	legacyMod.addCompliance(legacyCompliance)
+	preferredMod.addCompliance(preferredCompliance)
+
+	legacyCapability := NewCapability("legacyCapability")
+	legacyCapability.setNode(sharedNode)
+	legacyCapability.setModule(legacyMod)
+	legacyCapability.setDescription("legacy capability metadata")
+	preferredCapability := NewCapability("preferredCapability")
+	preferredCapability.setNode(sharedNode)
+	preferredCapability.setModule(preferredMod)
+	preferredCapability.setDescription("preferred capability metadata")
+	sharedNode.setCapability(preferredCapability)
+	m.addCapability(legacyCapability)
+	m.addCapability(preferredCapability)
+	legacyMod.addCapability(legacyCapability)
+	preferredMod.addCapability(preferredCapability)
+	legacyMod.addNodeNamed("legacyObject", sharedNode)
+	preferredMod.addNodeNamed("preferredObject", sharedNode)
+
+	t.Run("global exact-name lookup", func(t *testing.T) {
+		testutil.Equal(t, legacyObject, m.Object("legacyObject"), "legacy object")
+		testutil.Equal(t, preferredObject, m.Object("preferredObject"), "preferred object")
+		testutil.Equal(t, legacyNotification, m.Notification("legacyNotification"), "legacy notification")
+		testutil.Equal(t, preferredNotification, m.Notification("preferredNotification"), "preferred notification")
+		testutil.Equal(t, legacyGroup, m.Group("legacyGroup"), "legacy group")
+		testutil.Equal(t, preferredGroup, m.Group("preferredGroup"), "preferred group")
+		testutil.Equal(t, legacyCompliance, m.Compliance("legacyCompliance"), "legacy compliance")
+		testutil.Equal(t, preferredCompliance, m.Compliance("preferredCompliance"), "preferred compliance")
+		testutil.Equal(t, legacyCapability, m.Capability("legacyCapability"), "legacy capability")
+		testutil.Equal(t, preferredCapability, m.Capability("preferredCapability"), "preferred capability")
+	})
+
+	t.Run("global symbol lookup", func(t *testing.T) {
+		testutil.Equal(t, legacyObject, m.Symbol("legacyObject").Object(), "legacy object symbol")
+		testutil.Equal(t, legacyNotification, m.Symbol("legacyNotification").Notification(), "legacy notification symbol")
+		testutil.Equal(t, legacyGroup, m.Symbol("legacyGroup").Group(), "legacy group symbol")
+		testutil.Equal(t, legacyCompliance, m.Symbol("legacyCompliance").Compliance(), "legacy compliance symbol")
+		testutil.Equal(t, legacyCapability, m.Symbol("legacyCapability").Capability(), "legacy capability symbol")
+	})
+
+	t.Run("module-scoped lookup", func(t *testing.T) {
+		testutil.Equal(t, legacyObject, legacyMod.Object("legacyObject"), "legacy module object")
+		testutil.Equal(t, preferredObject, preferredMod.Object("preferredObject"), "preferred module object")
+		testutil.Equal(t, legacyNotification, legacyMod.Notification("legacyNotification"), "legacy module notification")
+		testutil.Equal(t, legacyGroup, legacyMod.Group("legacyGroup"), "legacy module group")
+		testutil.Equal(t, legacyCompliance, legacyMod.Compliance("legacyCompliance"), "legacy module compliance")
+		testutil.Equal(t, legacyCapability, legacyMod.Capability("legacyCapability"), "legacy module capability")
+		testutil.Equal(t, sharedNode, legacyMod.Node("legacyObject"), "legacy qualified node")
+		testutil.Equal(t, sharedNode, preferredMod.Node("preferredObject"), "preferred qualified node")
+		testutil.Nil(t, legacyMod.Node("preferredObject"), "legacy cross-module node")
+		testutil.True(t, legacyMod.Symbol("preferredObject").IsZero(), "legacy cross-module symbol")
+		testutil.Nil(t, preferredMod.Node("legacyObject"), "preferred cross-module node")
+		testutil.True(t, preferredMod.Symbol("legacyObject").IsZero(), "preferred cross-module symbol")
+	})
+
+	t.Run("shared node keeps preferred metadata", func(t *testing.T) {
+		testutil.Equal(t, sharedNode, legacyObject.Node(), "legacy object node")
+		testutil.Equal(t, sharedNode, preferredObject.Node(), "preferred object node")
+		testutil.Equal(t, preferredObject, sharedNode.Object(), "node object")
+		testutil.Equal(t, preferredNotification, sharedNode.Notification(), "node notification")
+		testutil.Equal(t, preferredGroup, sharedNode.Group(), "node group")
+		testutil.Equal(t, preferredCompliance, sharedNode.Compliance(), "node compliance")
+		testutil.Equal(t, preferredCapability, sharedNode.Capability(), "node capability")
+	})
+}
+
+func TestGlobalEntitySameNameUsesNodePreference(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		register func(*Mib, *Node, *Object, *Object)
+	}{
+		{
+			name: "preferred registered last",
+			register: func(m *Mib, node *Node, legacy, preferred *Object) {
+				m.addObject(legacy)
+				node.setObject(preferred)
+				m.addObject(preferred)
+			},
+		},
+		{
+			name: "preferred registered first",
+			register: func(m *Mib, node *Node, legacy, preferred *Object) {
+				node.setObject(preferred)
+				m.addObject(preferred)
+				m.addObject(legacy)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := NewMib()
+			sharedNode := &Node{}
+			legacy := NewObject("duplicateName")
+			legacy.setNode(sharedNode)
+			preferred := NewObject("duplicateName")
+			preferred.setNode(sharedNode)
+
+			tc.register(m, sharedNode, legacy, preferred)
+
+			testutil.Equal(t, preferred, m.Object("duplicateName"), "preferred same-name object")
+			testutil.Equal(t, preferred, m.Symbol("duplicateName").Object(), "preferred same-name symbol")
+		})
+	}
+}
+
 func TestNodeLookupPriority(t *testing.T) {
 	m := NewMib()
 

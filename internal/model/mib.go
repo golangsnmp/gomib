@@ -24,9 +24,14 @@ type Mib struct {
 	compliances   []*Compliance
 	capabilities  []*Capability
 
-	moduleByName map[string]*Module
-	nameToNodes  map[string][]*Node
-	typeByName   map[string]*Type
+	moduleByName       map[string]*Module
+	nameToNodes        map[string][]*Node
+	objectByName       map[string]*Object
+	typeByName         map[string]*Type
+	notificationByName map[string]*Notification
+	groupByName        map[string]*Group
+	complianceByName   map[string]*Compliance
+	capabilityByName   map[string]*Capability
 
 	nodeCount   int
 	diagnostics []Diagnostic
@@ -70,9 +75,9 @@ func (m *Mib) Node(name string) *Node {
 	return bestNode(m.nameToNodes[name])
 }
 
-// Object returns the object with the given name, or nil if not found.
+// Object returns the object with the given definition name, or nil if not found.
 func (m *Mib) Object(name string) *Object {
-	return findEntity(m, name, func(nd *Node) *Object { return nd.obj })
+	return m.objectByName[name]
 }
 
 // Type returns the type with the given name, or nil if not found.
@@ -80,32 +85,47 @@ func (m *Mib) Type(name string) *Type {
 	return m.typeByName[name]
 }
 
-// Notification returns the notification with the given name, or nil if not found.
+// Notification returns the notification with the given definition name, or nil if not found.
 func (m *Mib) Notification(name string) *Notification {
-	return findEntity(m, name, func(nd *Node) *Notification { return nd.notif })
+	return m.notificationByName[name]
 }
 
-// Group returns the group with the given name, or nil if not found.
+// Group returns the group with the given definition name, or nil if not found.
 func (m *Mib) Group(name string) *Group {
-	return findEntity(m, name, func(nd *Node) *Group { return nd.group })
+	return m.groupByName[name]
 }
 
-// Compliance returns the compliance with the given name, or nil if not found.
+// Compliance returns the compliance with the given definition name, or nil if not found.
 func (m *Mib) Compliance(name string) *Compliance {
-	return findEntity(m, name, func(nd *Node) *Compliance { return nd.compliance })
+	return m.complianceByName[name]
 }
 
-// Capability returns the capability with the given name, or nil if not found.
+// Capability returns the capability with the given definition name, or nil if not found.
 func (m *Mib) Capability(name string) *Capability {
-	return findEntity(m, name, func(nd *Node) *Capability { return nd.capability })
+	return m.capabilityByName[name]
 }
 
 // Symbol returns the resolved definition for name. Lookup priority:
-// node entities (object > notification > group > compliance > capability > plain node),
-// then Type. Returns a zero Symbol if not found.
+// object > notification > group > compliance > capability > plain node > type.
+// Returns a zero Symbol if not found.
 func (m *Mib) Symbol(name string) Symbol {
+	if o := m.objectByName[name]; o != nil {
+		return SymbolFromObject(o)
+	}
+	if n := m.notificationByName[name]; n != nil {
+		return SymbolFromNotification(n)
+	}
+	if g := m.groupByName[name]; g != nil {
+		return SymbolFromGroup(g)
+	}
+	if c := m.complianceByName[name]; c != nil {
+		return SymbolFromCompliance(c)
+	}
+	if c := m.capabilityByName[name]; c != nil {
+		return SymbolFromCapability(c)
+	}
 	if nd := bestNode(m.nameToNodes[name]); nd != nil {
-		return nd.symbol()
+		return SymbolFromNode(nd)
 	}
 	if t := m.typeByName[name]; t != nil {
 		return SymbolFromType(t)
@@ -451,6 +471,10 @@ func (m *Mib) addModule(mod *Module) {
 
 func (m *Mib) addObject(obj *Object) {
 	m.objects = append(m.objects, obj)
+	current := m.objectByName[obj.name]
+	if obj.name != "" && (current == nil || obj.node != nil && current.node == obj.node && obj.node.obj == obj) {
+		m.objectByName[obj.name] = obj
+	}
 }
 
 // addType uses first-write-wins for the name index. Types are seeded in
@@ -465,18 +489,34 @@ func (m *Mib) addType(t *Type) {
 
 func (m *Mib) addNotification(n *Notification) {
 	m.notifications = append(m.notifications, n)
+	current := m.notificationByName[n.name]
+	if n.name != "" && (current == nil || n.node != nil && current.node == n.node && n.node.notif == n) {
+		m.notificationByName[n.name] = n
+	}
 }
 
 func (m *Mib) addGroup(g *Group) {
 	m.groups = append(m.groups, g)
+	current := m.groupByName[g.name]
+	if g.name != "" && (current == nil || g.node != nil && current.node == g.node && g.node.group == g) {
+		m.groupByName[g.name] = g
+	}
 }
 
 func (m *Mib) addCompliance(c *Compliance) {
 	m.compliances = append(m.compliances, c)
+	current := m.complianceByName[c.name]
+	if c.name != "" && (current == nil || c.node != nil && current.node == c.node && c.node.compliance == c) {
+		m.complianceByName[c.name] = c
+	}
 }
 
 func (m *Mib) addCapability(c *Capability) {
 	m.capabilities = append(m.capabilities, c)
+	current := m.capabilityByName[c.name]
+	if c.name != "" && (current == nil || c.node != nil && current.node == c.node && c.node.capability == c) {
+		m.capabilityByName[c.name] = c
+	}
 }
 
 func (m *Mib) registerNode(name string, n *Node) {
@@ -491,12 +531,6 @@ func (m *Mib) addDiagnostic(d Diagnostic) {
 
 func (m *Mib) addUnresolved(ref UnresolvedRef) {
 	m.unresolved = append(m.unresolved, ref)
-}
-
-// nodeEntity constrains the entity types that can be attached to a Node.
-type nodeEntity interface {
-	comparable
-	*Object | *Notification | *Group | *Compliance | *Capability
 }
 
 // bestNode returns the highest-priority node from a name-collision set.
@@ -526,15 +560,4 @@ func bestNode(nodes []*Node) *Node {
 		}
 	}
 	return best
-}
-
-// findEntity looks up a node-attached entity by name.
-func findEntity[T nodeEntity](m *Mib, name string, fromNode func(*Node) T) T {
-	var zero T
-	for _, nd := range m.nameToNodes[name] {
-		if v := fromNode(nd); v != zero {
-			return v
-		}
-	}
-	return zero
 }

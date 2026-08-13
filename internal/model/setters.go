@@ -155,6 +155,7 @@ func AddModuleGroup(m *Module, g *Group)                        { m.addGroup(g) 
 func AddModuleCompliance(m *Module, c *Compliance)              { m.addCompliance(c) }
 func AddModuleCapability(m *Module, c *Capability)              { m.addCapability(c) }
 func AddModuleNode(m *Module, n *Node)                          { m.addNode(n) }
+func AddModuleNodeNamed(m *Module, name string, n *Node)        { m.addNodeNamed(name, n) }
 
 // --- Type setters ---
 

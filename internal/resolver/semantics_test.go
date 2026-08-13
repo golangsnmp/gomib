@@ -1215,6 +1215,129 @@ func TestResolveSyntaxConstraints(t *testing.T) {
 	})
 }
 
+func TestDuplicateOIDSameObjectNameUsesPreferredDefinition(t *testing.T) {
+	legacySrc := &module.Module{Name: "LEGACY-MIB", Language: types.LanguageSMIv1}
+	preferredSrc := &module.Module{Name: "PREFERRED-MIB", Language: types.LanguageSMIv2}
+	sharedOID := module.NewOidAssignment([]module.OidComponent{
+		{Number: 1, HasNumber: true},
+		{Number: 3, HasNumber: true},
+		{Number: 6, HasNumber: true},
+		{Number: 1, HasNumber: true},
+		{Number: 4, HasNumber: true},
+		{Number: 1, HasNumber: true},
+		{Number: 99999, HasNumber: true},
+		{Number: 2, HasNumber: true},
+	}, types.Synthetic)
+	addDefs(legacySrc, []module.Definition{
+		&module.ObjectType{
+			DefBase:     module.DefBase{Name: "duplicateObject"},
+			Syntax:      &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+			Access:      types.AccessReadOnly,
+			Status:      types.StatusDeprecated,
+			Description: "legacy metadata",
+			Oid:         sharedOID,
+		},
+	})
+	addDefs(preferredSrc, []module.Definition{
+		&module.ObjectType{
+			DefBase:     module.DefBase{Name: "duplicateObject"},
+			Syntax:      &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+			Access:      types.AccessReadOnly,
+			Status:      types.StatusCurrent,
+			Description: "preferred metadata",
+			Oid:         sharedOID,
+		},
+	})
+
+	// Process the lower-priority definition first. The later preferred
+	// definition must replace it in both tree metadata and global indexes.
+	m := resolveWithBase([]*module.Module{legacySrc, preferredSrc}, nil, nil)
+
+	preferredMod := m.Module("PREFERRED-MIB")
+	legacyMod := m.Module("LEGACY-MIB")
+	preferred := preferredMod.Object("duplicateObject")
+	legacy := legacyMod.Object("duplicateObject")
+	testutil.NotNil(t, preferred, "preferred qualified object")
+	testutil.NotNil(t, legacy, "legacy qualified object")
+	testutil.Equal(t, "preferred metadata", preferred.Description(), "preferred qualified metadata")
+	testutil.Equal(t, "legacy metadata", legacy.Description(), "legacy qualified metadata")
+	testutil.Equal(t, preferred.Node(), legacy.Node(), "definitions should share node")
+	testutil.Equal(t, preferred, m.Object("duplicateObject"), "global preferred object")
+	testutil.Equal(t, preferred, m.Symbol("duplicateObject").Object(), "global preferred symbol")
+	testutil.Equal(t, preferred, preferred.Node().Object(), "preferred tree object")
+	testutil.Equal(t, preferred.Node(), m.Resolve("PREFERRED-MIB::duplicateObject"), "preferred qualified node")
+	testutil.Equal(t, legacy.Node(), m.Resolve("LEGACY-MIB::duplicateObject"), "legacy qualified node")
+}
+
+func TestDuplicateOIDObjectNamesKeepDefinitionMetadata(t *testing.T) {
+	preferredSrc := &module.Module{Name: "PREFERRED-MIB", Language: types.LanguageSMIv2}
+	legacySrc := &module.Module{Name: "LEGACY-MIB", Language: types.LanguageSMIv1}
+	sharedOID := module.NewOidAssignment([]module.OidComponent{
+		{Number: 1, HasNumber: true},
+		{Number: 3, HasNumber: true},
+		{Number: 6, HasNumber: true},
+		{Number: 1, HasNumber: true},
+		{Number: 4, HasNumber: true},
+		{Number: 1, HasNumber: true},
+		{Number: 99999, HasNumber: true},
+		{Number: 1, HasNumber: true},
+	}, types.Synthetic)
+	addDefs(preferredSrc, []module.Definition{
+		&module.ObjectType{
+			DefBase:     module.DefBase{Name: "preferredObject"},
+			Syntax:      &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+			Access:      types.AccessReadOnly,
+			Status:      types.StatusCurrent,
+			Description: "preferred metadata",
+			Oid:         sharedOID,
+		},
+	})
+	addDefs(legacySrc, []module.Definition{
+		&module.ObjectType{
+			DefBase:     module.DefBase{Name: "legacyObject"},
+			Syntax:      &module.TypeSyntaxTypeRef{Name: "INTEGER"},
+			Access:      types.AccessReadOnly,
+			Status:      types.StatusDeprecated,
+			Description: "legacy metadata",
+			Oid:         sharedOID,
+		},
+	})
+
+	// Register the preferred definition first, then the lower-priority one.
+	// This makes creation order oppose any last-write preference behavior.
+	m := resolveWithBase([]*module.Module{preferredSrc, legacySrc}, nil, nil)
+
+	preferred := m.Object("preferredObject")
+	legacy := m.Object("legacyObject")
+	testutil.NotNil(t, preferred, "preferred global object")
+	testutil.NotNil(t, legacy, "legacy global object")
+	testutil.Equal(t, "preferred metadata", preferred.Description(), "preferred global metadata")
+	testutil.Equal(t, "legacy metadata", legacy.Description(), "legacy global metadata")
+	testutil.Equal(t, types.StatusCurrent, preferred.Status(), "preferred global status")
+	testutil.Equal(t, types.StatusDeprecated, legacy.Status(), "legacy global status")
+	testutil.Equal(t, preferred.Node(), legacy.Node(), "definitions should share node")
+
+	preferredMod := m.Module("PREFERRED-MIB")
+	legacyMod := m.Module("LEGACY-MIB")
+	testutil.NotNil(t, preferredMod, "preferred module")
+	testutil.NotNil(t, legacyMod, "legacy module")
+	testutil.Equal(t, preferred, preferredMod.Object("preferredObject"), "preferred qualified object")
+	testutil.Equal(t, legacy, legacyMod.Object("legacyObject"), "legacy qualified object")
+	testutil.Equal(t, preferred, m.Symbol("preferredObject").Object(), "preferred global symbol")
+	testutil.Equal(t, legacy, m.Symbol("legacyObject").Object(), "legacy global symbol")
+	testutil.Nil(t, legacyMod.Node("preferredObject"), "legacy module preferred-name node")
+	testutil.True(t, legacyMod.Symbol("preferredObject").IsZero(), "legacy module preferred-name symbol")
+	testutil.Nil(t, m.Resolve("LEGACY-MIB::preferredObject"), "cross-module preferred qualified node")
+	testutil.Nil(t, preferredMod.Node("legacyObject"), "preferred module legacy-name node")
+	testutil.True(t, preferredMod.Symbol("legacyObject").IsZero(), "preferred module legacy-name symbol")
+	testutil.Nil(t, m.Resolve("PREFERRED-MIB::legacyObject"), "cross-module legacy qualified node")
+
+	sharedNode := preferred.Node()
+	testutil.Equal(t, preferred, sharedNode.Object(), "tree should retain preferred object metadata")
+	testutil.Equal(t, preferredMod, sharedNode.Module(), "tree should retain preferred module metadata")
+	testutil.Equal(t, "preferredObject", sharedNode.Name(), "tree should retain preferred name")
+}
+
 func TestCreateResolvedObjects(t *testing.T) {
 	mod := &module.Module{
 		Name: "TEST-MIB",
@@ -1634,6 +1757,40 @@ func TestInferNodeKinds(t *testing.T) {
 		testutil.Equal(t, model.KindRow, rowNode.Kind(), "row kind")
 		testutil.Equal(t, model.KindColumn, col1.Kind(), "col1 kind")
 		testutil.Equal(t, model.KindColumn, col2.Kind(), "col2 kind")
+	})
+
+	t.Run("does not reclassify children of stale row candidate", func(t *testing.T) {
+		legacyMod := &module.Module{Name: "LEGACY-MIB", Language: types.LanguageSMIv1}
+		preferredMod := &module.Module{Name: "PREFERRED-MIB", Language: types.LanguageSMIv2}
+		ctx := newTestContextForModules(model.DefaultConfig(), legacyMod, preferredMod)
+
+		root := ctx.mib.Root()
+		sharedNode := buildOIDPath(root, 1, 1)
+		childNode := buildOIDPath(root, 1, 1, 1)
+		ctx.registerModuleNodeSymbol(legacyMod, "sharedObject", sharedNode)
+		ctx.registerModuleNodeSymbol(preferredMod, "sharedObject", sharedNode)
+		ctx.registerModuleNodeSymbol(preferredMod, "childObject", childNode)
+
+		objRefs := []objectTypeRef{
+			{mod: legacyMod, obj: &module.ObjectType{
+				DefBase: module.DefBase{Name: "sharedObject"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "LegacyEntry"},
+				Index:   []module.IndexItem{{Object: "childObject"}},
+			}},
+			{mod: preferredMod, obj: &module.ObjectType{
+				DefBase: module.DefBase{Name: "sharedObject"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			}},
+			{mod: preferredMod, obj: &module.ObjectType{
+				DefBase: module.DefBase{Name: "childObject"},
+				Syntax:  &module.TypeSyntaxTypeRef{Name: "Integer32"},
+			}},
+		}
+
+		inferNodeKinds(ctx, objRefs)
+
+		testutil.Equal(t, model.KindScalar, sharedNode.Kind(), "preferred shared-node kind")
+		testutil.Equal(t, model.KindScalar, childNode.Kind(), "stale row child kind")
 	})
 
 	t.Run("skips objects with unresolved nodes", func(_ *testing.T) {

@@ -110,6 +110,9 @@ func inferNodeKinds(ctx *resolverContext, objRefs []objectTypeRef) {
 			continue
 		}
 		seen[row] = struct{}{}
+		if row.Kind() != model.KindRow {
+			continue
+		}
 		for _, child := range row.Children() {
 			if child.Kind() == model.KindScalar {
 				model.SetNodeKind(child, model.KindColumn)
@@ -260,10 +263,10 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 			}
 		}
 
-		model.AddMibObject(ctx.mib, resolved)
-
 		// Prefer SMIv2 modules when multiple modules define the same model.OID
-		// (e.g., IF-MIB and RFC1213-MIB both define ifEntry).
+		// (e.g., IF-MIB and RFC1213-MIB both define ifEntry). Select the node's
+		// preferred object before updating the global name index so same-name
+		// collisions use the same deterministic preference.
 		currentObj := node.Object()
 		var currentMod *model.Module
 		if currentObj != nil {
@@ -272,11 +275,12 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 		if shouldPreferModule(ctx, currentMod, ref.mod) {
 			model.SetNodeObject(node, resolved)
 		}
+		model.AddMibObject(ctx.mib, resolved)
 		created++
 
 		if resolvedMod := ctx.moduleToResolved[ref.mod]; resolvedMod != nil {
 			model.AddModuleObject(resolvedMod, resolved)
-			model.AddModuleNode(resolvedMod, node)
+			model.AddModuleNodeNamed(resolvedMod, obj.Name, node)
 		}
 	}
 
@@ -632,12 +636,14 @@ func createResolvedGroups(ctx *resolverContext) {
 }
 
 // registerResolvedEntity handles the common pattern for registering a resolved entity:
-// add to global Mib, conditionally set on node (preferring newer modules), add to per-module collection.
+// conditionally set it on the node (preferring newer modules), add it to the global
+// Mib, then add it to the per-module collection. Node selection precedes global
+// indexing so same-name collisions follow the node's deterministic preference.
 func registerResolvedEntity[T any](ctx *resolverContext, mod *module.Module, currentMod *model.Module, resolved T, addToMib, setOnNode func(T), addToModule func(*model.Module, T)) {
-	addToMib(resolved)
 	if shouldPreferModule(ctx, currentMod, mod) {
 		setOnNode(resolved)
 	}
+	addToMib(resolved)
 	if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
 		addToModule(resolvedMod, resolved)
 	}
@@ -653,7 +659,7 @@ func registerNotification(ctx *resolverContext, mod *module.Module, node *model.
 		func(n *model.Notification) { model.SetNodeNotification(node, n) },
 		func(m *model.Module, n *model.Notification) { model.AddModuleNotification(m, n) })
 	if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
-		model.AddModuleNode(resolvedMod, node)
+		model.AddModuleNodeNamed(resolvedMod, resolved.Name(), node)
 	}
 }
 
@@ -667,7 +673,7 @@ func registerGroup(ctx *resolverContext, mod *module.Module, node *model.Node, r
 		func(g *model.Group) { model.SetNodeGroup(node, g) },
 		func(m *model.Module, g *model.Group) { model.AddModuleGroup(m, g) })
 	if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
-		model.AddModuleNode(resolvedMod, node)
+		model.AddModuleNodeNamed(resolvedMod, resolved.Name(), node)
 	}
 }
 
@@ -681,7 +687,7 @@ func registerCompliance(ctx *resolverContext, mod *module.Module, node *model.No
 		func(c *model.Compliance) { model.SetNodeCompliance(node, c) },
 		func(m *model.Module, c *model.Compliance) { model.AddModuleCompliance(m, c) })
 	if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
-		model.AddModuleNode(resolvedMod, node)
+		model.AddModuleNodeNamed(resolvedMod, resolved.Name(), node)
 	}
 }
 
@@ -695,7 +701,7 @@ func registerCapability(ctx *resolverContext, mod *module.Module, node *model.No
 		func(c *model.Capability) { model.SetNodeCapability(node, c) },
 		func(m *model.Module, c *model.Capability) { model.AddModuleCapability(m, c) })
 	if resolvedMod := ctx.moduleToResolved[mod]; resolvedMod != nil {
-		model.AddModuleNode(resolvedMod, node)
+		model.AddModuleNodeNamed(resolvedMod, resolved.Name(), node)
 	}
 }
 

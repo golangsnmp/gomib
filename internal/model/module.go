@@ -159,8 +159,24 @@ func (m *Module) Columns() []*Object { return objectsByKind(m.objects, KindColum
 // Rows returns the OBJECT-TYPE definitions classified as table rows.
 func (m *Module) Rows() []*Object { return objectsByKind(m.objects, KindRow) }
 
-// Node returns the node with the given name in this module, or nil if not found.
+// Node returns the node for the definition with the given name in this module,
+// or nil if not found.
 func (m *Module) Node(name string) *Node {
+	if o := m.objectsByName[name]; o != nil {
+		return o.node
+	}
+	if n := m.notificationsByName[name]; n != nil {
+		return n.node
+	}
+	if g := m.groupsByName[name]; g != nil {
+		return g.node
+	}
+	if c := m.compliancesByName[name]; c != nil {
+		return c.node
+	}
+	if c := m.capabilitiesByName[name]; c != nil {
+		return c.node
+	}
 	return m.nodesByName[name]
 }
 
@@ -410,8 +426,12 @@ func (m *Module) addCapability(c *Capability) {
 }
 
 func (m *Module) addNode(n *Node) {
+	m.addNodeNamed(n.name, n)
+}
+
+func (m *Module) addNodeNamed(name string, n *Node) {
 	m.nodes = append(m.nodes, n)
-	if m.nodesByName[n.name] == nil {
-		m.nodesByName[n.name] = n
+	if name != "" && m.nodesByName[name] == nil {
+		m.nodesByName[name] = n
 	}
 }
