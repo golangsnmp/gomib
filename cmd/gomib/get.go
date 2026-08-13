@@ -254,11 +254,15 @@ func (c *cli) printObjectDetails(obj *mib.Object, descLimit int) {
 		}
 		ranges := obj.EffectiveRanges()
 		if len(ranges) > 0 {
-			typeDesc += " (" + ranges[0].String() + ")"
+			typeDesc += " (" + formatRangeList(ranges) + ")"
+		} else if obj.EffectiveRangesConstrained() {
+			typeDesc += " (empty RANGE intersection)"
 		}
 		sizes := obj.EffectiveSizes()
 		if len(sizes) > 0 {
-			typeDesc += " (SIZE(" + sizes[0].String() + "))"
+			typeDesc += " (SIZE(" + formatRangeList(sizes) + "))"
+		} else if obj.EffectiveSizesConstrained() {
+			typeDesc += " (empty SIZE intersection)"
 		}
 		fmt.Fprintf(c.stdout, "Type:    %s\n", typeDesc)
 	} else {

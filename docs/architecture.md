@@ -570,8 +570,12 @@ Key operations:
   node has SEQUENCE OF syntax, its single child is the row, the row's children
   are columns).
 - **Object creation:** Attach resolved Objects to nodes with type, access,
-  units, constraints. Compute effective values by walking type chains
-  (display hints, sizes, ranges, enums, bits - first non-empty value in chain wins)
+  units, constraints. Compute effective values by walking type chains. Sizes
+  and ranges intersect declared constraints with inherited constraints; an
+  empty effective constraint remains distinguished from no constraint.
+  Unresolved endpoints are preserved conservatively when an intersection
+  cannot be determined. Display hints, enums, and bits use inherited values
+  when the object does not declare their replacement.
 - **Index resolution:** Link INDEX entries to resolved Objects, classify
   encoding (integer, fixed-string, length-prefixed, implied, ipaddress).
   Index encoding classification matters because SNMP encodes table index

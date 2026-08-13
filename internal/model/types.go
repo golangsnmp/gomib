@@ -1,6 +1,7 @@
 package model
 
 import (
+	"cmp"
 	"encoding/hex"
 	"slices"
 	"strconv"
@@ -27,28 +28,158 @@ type NameRef struct {
 	Span Span
 }
 
-// Range represents a min..max constraint for sizes or values. RawMin and
-// RawMax preserve endpoints that could not be resolved to integers.
-type Range struct {
-	Min, Max       int64
-	RawMin, RawMax string
-	Span           Span
+// RangeBoundKind identifies the representation of a range endpoint.
+type RangeBoundKind uint8
+
+const (
+	// RangeBoundSigned is a signed integer literal.
+	RangeBoundSigned RangeBoundKind = iota
+	// RangeBoundUnsigned is an unsigned integer literal.
+	RangeBoundUnsigned
+	// RangeBoundMin is the symbolic MIN keyword.
+	RangeBoundMin
+	// RangeBoundMax is the symbolic MAX keyword.
+	RangeBoundMax
+	// RangeBoundRaw is an endpoint that could not be parsed numerically.
+	RangeBoundRaw
+)
+
+func (k RangeBoundKind) String() string {
+	switch k {
+	case RangeBoundSigned:
+		return "signed"
+	case RangeBoundUnsigned:
+		return "unsigned"
+	case RangeBoundMin:
+		return "min"
+	case RangeBoundMax:
+		return "max"
+	case RangeBoundRaw:
+		return "raw"
+	default:
+		return "unknown"
+	}
 }
 
-// IsResolved reports whether both range endpoints have numeric values.
-func (r Range) IsResolved() bool { return r.RawMin == "" && r.RawMax == "" }
+// RangeBound is one endpoint of a resolved SIZE or value constraint.
+// Endpoint kinds remain distinct so unsigned values above MaxInt64 and the
+// symbolic MIN and MAX keywords are represented without sentinels or clamping.
+type RangeBound struct {
+	Kind     RangeBoundKind
+	Signed   int64
+	Unsigned uint64
+	Raw      string
+}
 
-// String returns the range as "min..max" or just "value" for equal or raw
-// single-value endpoints.
+// NewSignedRangeBound returns a signed numeric endpoint.
+func NewSignedRangeBound(value int64) RangeBound {
+	return RangeBound{Kind: RangeBoundSigned, Signed: value}
+}
+
+// NewUnsignedRangeBound returns an unsigned numeric endpoint.
+func NewUnsignedRangeBound(value uint64) RangeBound {
+	return RangeBound{Kind: RangeBoundUnsigned, Unsigned: value}
+}
+
+// NewRawRangeBound returns an unresolved endpoint preserving its source text.
+func NewRawRangeBound(value string) RangeBound {
+	return RangeBound{Kind: RangeBoundRaw, Raw: value}
+}
+
+// AsInt64 returns the concrete endpoint as int64 when representable.
+func (b RangeBound) AsInt64() (int64, bool) {
+	switch b.Kind {
+	case RangeBoundSigned:
+		return b.Signed, true
+	case RangeBoundUnsigned:
+		if b.Unsigned <= uint64(^uint64(0)>>1) {
+			return int64(b.Unsigned), true
+		}
+	}
+	return 0, false
+}
+
+// AsUint64 returns the concrete endpoint as uint64 when non-negative.
+func (b RangeBound) AsUint64() (uint64, bool) {
+	switch b.Kind {
+	case RangeBoundSigned:
+		if b.Signed >= 0 {
+			return uint64(b.Signed), true
+		}
+	case RangeBoundUnsigned:
+		return b.Unsigned, true
+	}
+	return 0, false
+}
+
+// IsConcrete reports whether the endpoint is a signed or unsigned number.
+func (b RangeBound) IsConcrete() bool {
+	return b.Kind == RangeBoundSigned || b.Kind == RangeBoundUnsigned
+}
+
+// Compare orders concrete and symbolic endpoints by numeric value, with MIN
+// below and MAX above all concrete values. Raw endpoints are not comparable.
+func (b RangeBound) Compare(other RangeBound) (int, bool) {
+	if b.Kind == RangeBoundRaw || other.Kind == RangeBoundRaw {
+		return 0, false
+	}
+	if b.Kind == other.Kind {
+		switch b.Kind {
+		case RangeBoundSigned:
+			return cmp.Compare(b.Signed, other.Signed), true
+		case RangeBoundUnsigned:
+			return cmp.Compare(b.Unsigned, other.Unsigned), true
+		default:
+			return 0, true
+		}
+	}
+	if b.Kind == RangeBoundMin || other.Kind == RangeBoundMax {
+		return -1, true
+	}
+	if b.Kind == RangeBoundMax || other.Kind == RangeBoundMin {
+		return 1, true
+	}
+	if b.Kind == RangeBoundSigned {
+		if b.Signed < 0 {
+			return -1, true
+		}
+		return cmp.Compare(uint64(b.Signed), other.Unsigned), true
+	}
+	if other.Signed < 0 {
+		return 1, true
+	}
+	return cmp.Compare(b.Unsigned, uint64(other.Signed)), true
+}
+
+func (b RangeBound) String() string {
+	switch b.Kind {
+	case RangeBoundSigned:
+		return strconv.FormatInt(b.Signed, 10)
+	case RangeBoundUnsigned:
+		return strconv.FormatUint(b.Unsigned, 10)
+	case RangeBoundMin:
+		return "MIN"
+	case RangeBoundMax:
+		return "MAX"
+	case RangeBoundRaw:
+		return b.Raw
+	default:
+		return ""
+	}
+}
+
+// Range represents an inclusive min..max constraint for sizes or values.
+type Range struct {
+	Min, Max RangeBound
+	Span     Span
+}
+
+// IsResolved reports whether both endpoints are concrete numeric values.
+func (r Range) IsResolved() bool { return r.Min.IsConcrete() && r.Max.IsConcrete() }
+
+// String returns the range as "min..max" or just "value" for equal endpoints.
 func (r Range) String() string {
-	min := r.RawMin
-	if min == "" {
-		min = strconv.FormatInt(r.Min, 10)
-	}
-	max := r.RawMax
-	if max == "" {
-		max = strconv.FormatInt(r.Max, 10)
-	}
+	min, max := r.Min.String(), r.Max.String()
 	if min == max {
 		return min
 	}
@@ -137,7 +268,8 @@ func (e IndexEntry) FixedSize() (int, bool) {
 		return 4, true
 	case IndexEncodingFixedString:
 		if e.Object != nil && isFixedSize(e.Object.sizes) {
-			return int(e.Object.sizes[0].Max), true
+			value, _ := e.Object.sizes[0].Max.AsUint64()
+			return int(value), true
 		}
 		return 0, false
 	default:
@@ -148,7 +280,12 @@ func (e IndexEntry) FixedSize() (int, bool) {
 // isFixedSize reports whether sizes contains exactly one constraint with
 // min == max (and > 0), indicating a fixed-length string.
 func isFixedSize(sizes []Range) bool {
-	return len(sizes) == 1 && sizes[0].IsResolved() && sizes[0].Min == sizes[0].Max && sizes[0].Min > 0
+	if len(sizes) != 1 {
+		return false
+	}
+	comparison, comparable := sizes[0].Min.Compare(sizes[0].Max)
+	value, unsigned := sizes[0].Min.AsUint64()
+	return comparable && comparison == 0 && unsigned && value > 0
 }
 
 // DefValKind identifies the type of default value.
@@ -397,11 +534,15 @@ type NotificationVariation struct {
 // constraints from a VARIATION SYNTAX/WRITE-SYNTAX clause or
 // MODULE-COMPLIANCE OBJECT SYNTAX/WRITE-SYNTAX refinement.
 type SyntaxConstraints struct {
-	Type   *Type
-	Sizes  []Range
-	Ranges []Range
-	Enums  []NamedValue
-	Bits   []NamedValue
+	Type              *Type
+	Sizes             []Range
+	Ranges            []Range
+	DeclaredSizes     []Range
+	DeclaredRanges    []Range
+	SizesConstrained  bool
+	RangesConstrained bool
+	Enums             []NamedValue
+	Bits              []NamedValue
 }
 
 // clone returns a deep copy of sc, or nil if sc is nil.
@@ -412,6 +553,8 @@ func (sc *SyntaxConstraints) clone() *SyntaxConstraints {
 	c := *sc
 	c.Sizes = slices.Clone(sc.Sizes)
 	c.Ranges = slices.Clone(sc.Ranges)
+	c.DeclaredSizes = slices.Clone(sc.DeclaredSizes)
+	c.DeclaredRanges = slices.Clone(sc.DeclaredRanges)
 	c.Enums = slices.Clone(sc.Enums)
 	c.Bits = slices.Clone(sc.Bits)
 	return &c

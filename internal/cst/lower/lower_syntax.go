@@ -217,12 +217,20 @@ func (l *lowerer) lowerRangeValue(tok cst.SyntaxToken) module.RangeValue {
 		if value, err := strconv.ParseUint(text, 10, 64); err == nil {
 			return &module.RangeValueUnsigned{Value: value}
 		}
-		value, _ := strconv.ParseInt(text, 10, 64)
-		return &module.RangeValueSigned{Value: value}
+		if value, err := strconv.ParseInt(text, 10, 64); err == nil {
+			return &module.RangeValueSigned{Value: value}
+		}
+		l.EmitDiagnostic(types.DiagUnknownRangeValue, tok.Span,
+			fmt.Sprintf("range value %q is outside the supported integer range", text))
+		return &module.RangeValueRaw{Value: text}
 
 	case lexer.TokNegativeNumber:
-		value, _ := strconv.ParseInt(text, 10, 64)
-		return &module.RangeValueSigned{Value: value}
+		if value, err := strconv.ParseInt(text, 10, 64); err == nil {
+			return &module.RangeValueSigned{Value: value}
+		}
+		l.EmitDiagnostic(types.DiagUnknownRangeValue, tok.Span,
+			fmt.Sprintf("range value %q is outside the supported integer range", text))
+		return &module.RangeValueRaw{Value: text}
 
 	case lexer.TokHexString:
 		hexPart := stripQuotedLiteral(text)
@@ -243,15 +251,23 @@ func (l *lowerer) lowerRangeValue(tok cst.SyntaxToken) module.RangeValue {
 	case lexer.TokUppercaseIdent, lexer.TokForbiddenKeyword:
 		switch text {
 		case "MIN":
+			l.EmitDiagnostic(types.DiagMinMaxRange, tok.Span,
+				"MIN is not valid in SMI constraints; preserving it as an open endpoint")
 			return &module.RangeValueMin{}
 		case "MAX":
+			l.EmitDiagnostic(types.DiagMinMaxRange, tok.Span,
+				"MAX is not valid in SMI constraints; preserving it as an open endpoint")
 			return &module.RangeValueMax{}
 		default:
-			return &module.RangeValueUnsigned{Value: 0}
+			l.EmitDiagnostic(types.DiagUnknownRangeValue, tok.Span,
+				fmt.Sprintf("unknown symbolic range value %q", text))
+			return &module.RangeValueRaw{Value: text}
 		}
 	}
 
-	return &module.RangeValueUnsigned{Value: 0}
+	l.EmitDiagnostic(types.DiagUnknownRangeValue, tok.Span,
+		fmt.Sprintf("unknown range value %q", text))
+	return &module.RangeValueRaw{Value: text}
 }
 
 func (l *lowerer) lowerSequenceOf(n *cst.SequenceOfSyntaxNode) module.TypeSyntax {

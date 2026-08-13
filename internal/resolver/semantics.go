@@ -233,8 +233,14 @@ func createResolvedObjects(ctx *resolverContext, objRefs []objectTypeRef) {
 		}
 
 		sizes, ranges := extractConstraints(obj.Syntax)
-		model.SetObjectEffectiveSizes(resolved, sizes)
-		model.SetObjectEffectiveRanges(resolved, ranges)
+		if len(sizes) > 0 {
+			model.SetObjectDeclaredSizes(resolved, sizes)
+			model.SetObjectEffectiveSizes(resolved, sizes)
+		}
+		if len(ranges) > 0 {
+			model.SetObjectDeclaredRanges(resolved, ranges)
+			model.SetObjectEffectiveRanges(resolved, ranges)
+		}
 		if _, isBits := obj.Syntax.(*module.TypeSyntaxBits); isBits {
 			model.SetObjectEffectiveBits(resolved, extractNamedValues(obj.Syntax))
 		} else {
@@ -371,11 +377,9 @@ func checkAugmentsNesting(ctx *resolverContext, objRefs []objectTypeRef) {
 	}
 }
 
-// computeEffectiveValues fills in display hints, size/range constraints,
-// enums, and bits on the object by walking the type chain from child to root.
-// Object-level values (set from the OBJECT-TYPE syntax) take precedence;
-// only missing values are inherited from ancestor types. The first non-empty
-// value found in the chain wins.
+// computeEffectiveValues fills in display hints and effective constraints.
+// Inline object constraints narrow the type's effective constraints rather
+// than replacing them.
 func computeEffectiveValues(obj *model.Object) {
 	t := obj.Type()
 	if t == nil {
@@ -385,11 +389,41 @@ func computeEffectiveValues(obj *model.Object) {
 	if obj.EffectiveDisplayHint() == "" {
 		model.SetObjectEffectiveHint(obj, t.EffectiveDisplayHint())
 	}
-	if len(obj.EffectiveSizes()) == 0 {
+	if obj.EffectiveSizesConstrained() {
+		parent := t.EffectiveSizes()
+		parentConstrained := t.EffectiveSizesConstrained()
+		if !parentConstrained {
+			if base, ok := model.BaseConstraint(t.EffectiveBase(), true, obj.SyntaxSpan()); ok {
+				parent = []model.Range{base}
+				parentConstrained = true
+			}
+		}
+		if parentConstrained && len(parent) == 0 {
+			model.SetObjectEffectiveSizes(obj, nil)
+		} else {
+			model.SetObjectEffectiveSizes(obj, model.IntersectRanges(obj.EffectiveSizes(), parent))
+		}
+	} else {
 		model.SetObjectEffectiveSizes(obj, t.EffectiveSizes())
+		model.SetObjectEffectiveSizesConstrained(obj, t.EffectiveSizesConstrained())
 	}
-	if len(obj.EffectiveRanges()) == 0 {
+	if obj.EffectiveRangesConstrained() {
+		parent := t.EffectiveRanges()
+		parentConstrained := t.EffectiveRangesConstrained()
+		if !parentConstrained {
+			if base, ok := model.BaseConstraint(t.EffectiveBase(), false, obj.SyntaxSpan()); ok {
+				parent = []model.Range{base}
+				parentConstrained = true
+			}
+		}
+		if parentConstrained && len(parent) == 0 {
+			model.SetObjectEffectiveRanges(obj, nil)
+		} else {
+			model.SetObjectEffectiveRanges(obj, model.IntersectRanges(obj.EffectiveRanges(), parent))
+		}
+	} else {
 		model.SetObjectEffectiveRanges(obj, t.EffectiveRanges())
+		model.SetObjectEffectiveRangesConstrained(obj, t.EffectiveRangesConstrained())
 	}
 	if len(obj.EffectiveEnums()) == 0 {
 		model.SetObjectEffectiveEnums(obj, t.EffectiveEnums())
@@ -920,6 +954,42 @@ func resolveSyntaxConstraints(ctx *resolverContext, syntax module.TypeSyntax, mo
 		sc.Type = t
 	}
 	sc.Sizes, sc.Ranges = extractConstraints(syntax)
+	sc.DeclaredSizes = slices.Clone(sc.Sizes)
+	sc.DeclaredRanges = slices.Clone(sc.Ranges)
+	sc.SizesConstrained = len(sc.Sizes) > 0
+	sc.RangesConstrained = len(sc.Ranges) > 0
+	if sc.Type != nil {
+		if sc.SizesConstrained {
+			parent := sc.Type.EffectiveSizes()
+			parentConstrained := sc.Type.EffectiveSizesConstrained()
+			if !parentConstrained {
+				if base, ok := model.BaseConstraint(sc.Type.EffectiveBase(), true, syntaxSpan); ok {
+					parent = []model.Range{base}
+					parentConstrained = true
+				}
+			}
+			if parentConstrained && len(parent) == 0 {
+				sc.Sizes = nil
+			} else {
+				sc.Sizes = model.IntersectRanges(sc.Sizes, parent)
+			}
+		}
+		if sc.RangesConstrained {
+			parent := sc.Type.EffectiveRanges()
+			parentConstrained := sc.Type.EffectiveRangesConstrained()
+			if !parentConstrained {
+				if base, ok := model.BaseConstraint(sc.Type.EffectiveBase(), false, syntaxSpan); ok {
+					parent = []model.Range{base}
+					parentConstrained = true
+				}
+			}
+			if parentConstrained && len(parent) == 0 {
+				sc.Ranges = nil
+			} else {
+				sc.Ranges = model.IntersectRanges(sc.Ranges, parent)
+			}
+		}
+	}
 	if _, isBits := syntax.(*module.TypeSyntaxBits); isBits {
 		sc.Bits = extractNamedValues(syntax)
 	} else {

@@ -67,15 +67,19 @@ type ExportType struct {
 }
 
 type ExportConstraints struct {
-	Sizes  []ExportRange     `json:"sizes"`
-	Ranges []ExportRange     `json:"ranges"`
-	Enums  []ExportEnumEntry `json:"enums"`
-	Bits   []ExportBitEntry  `json:"bits"`
+	Sizes             []ExportRange     `json:"sizes"`
+	Ranges            []ExportRange     `json:"ranges"`
+	SizesConstrained  bool              `json:"sizesConstrained"`
+	RangesConstrained bool              `json:"rangesConstrained"`
+	Enums             []ExportEnumEntry `json:"enums"`
+	Bits              []ExportBitEntry  `json:"bits"`
 }
 
 type ExportRange struct {
-	Min string `json:"min"`
-	Max string `json:"max"`
+	Min     string `json:"min"`
+	Max     string `json:"max"`
+	MinKind string `json:"minKind"`
+	MaxKind string `json:"maxKind"`
 }
 
 type ExportEnumEntry struct {
@@ -414,14 +418,10 @@ func exportNodeRef(node *mib.Node) ExportObjRef {
 func exportRanges(ranges []mib.Range) []ExportRange {
 	result := make([]ExportRange, 0, len(ranges))
 	for _, r := range ranges {
-		min, max := r.RawMin, r.RawMax
-		if min == "" {
-			min = strconv.FormatInt(r.Min, 10)
-		}
-		if max == "" {
-			max = strconv.FormatInt(r.Max, 10)
-		}
-		result = append(result, ExportRange{Min: min, Max: max})
+		result = append(result, ExportRange{
+			Min: r.Min.String(), Max: r.Max.String(),
+			MinKind: r.Min.Kind.String(), MaxKind: r.Max.Kind.String(),
+		})
 	}
 	return result
 }
@@ -442,12 +442,14 @@ func exportBits(bits []mib.NamedValue) []ExportBitEntry {
 	return result
 }
 
-func exportConstraints(sizes, ranges []mib.Range, enums, bits []mib.NamedValue) ExportConstraints {
+func exportConstraints(sizes, ranges []mib.Range, sizesConstrained, rangesConstrained bool, enums, bits []mib.NamedValue) ExportConstraints {
 	return ExportConstraints{
-		Sizes:  exportRanges(sizes),
-		Ranges: exportRanges(ranges),
-		Enums:  exportEnums(enums),
-		Bits:   exportBits(bits),
+		Sizes:             exportRanges(sizes),
+		Ranges:            exportRanges(ranges),
+		SizesConstrained:  sizesConstrained,
+		RangesConstrained: rangesConstrained,
+		Enums:             exportEnums(enums),
+		Bits:              exportBits(bits),
 	}
 }
 
@@ -462,6 +464,8 @@ func exportEffectiveSyntax(obj *mib.Object) *ExportEffectiveSyntax {
 		Constraints: exportConstraints(
 			obj.EffectiveSizes(),
 			obj.EffectiveRanges(),
+			obj.EffectiveSizesConstrained(),
+			obj.EffectiveRangesConstrained(),
 			obj.EffectiveEnums(),
 			obj.EffectiveBits(),
 		),
@@ -483,7 +487,7 @@ func exportSyntaxConstraints(sc *mib.SyntaxConstraints) *ExportEffectiveSyntax {
 	}
 	syn := &ExportEffectiveSyntax{
 		Base:        "Unknown",
-		Constraints: exportConstraints(sc.Sizes, sc.Ranges, sc.Enums, sc.Bits),
+		Constraints: exportConstraints(sc.Sizes, sc.Ranges, sc.SizesConstrained, sc.RangesConstrained, sc.Enums, sc.Bits),
 	}
 	if sc.Type != nil {
 		syn.Base = exportBaseType(sc.Type.EffectiveBase())
@@ -564,7 +568,9 @@ func exportIndexEntries(m *mib.Mib, indexes []mib.IndexEntry) []ExportIndexEntry
 					ref := exportKey(modName, t.Name())
 					syn.TypeRef = &ref
 					syn.Constraints = exportConstraints(
-						t.Sizes(), t.Ranges(), t.Enums(), t.Bits(),
+						t.EffectiveSizes(), t.EffectiveRanges(),
+						t.EffectiveSizesConstrained(), t.EffectiveRangesConstrained(),
+						t.EffectiveEnums(), t.EffectiveBits(),
 					)
 				}
 			}
@@ -863,7 +869,7 @@ func buildExportType(typ *mib.Type) ExportType {
 		Base:                exportBaseType(typ.EffectiveBase()),
 		IsTextualConvention: typ.IsTextualConvention(),
 		Constraints: exportConstraints(
-			typ.Sizes(), typ.Ranges(), typ.Enums(), typ.Bits(),
+			typ.Sizes(), typ.Ranges(), len(typ.Sizes()) > 0, len(typ.Ranges()) > 0, typ.Enums(), typ.Bits(),
 		),
 	}
 

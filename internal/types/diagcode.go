@@ -52,6 +52,7 @@ const (
 	DiagUnknownTypeSyntax      = "unknown-type-syntax"
 	DiagUnknownConstraintType  = "unknown-constraint-type"
 	DiagUnknownRangeValue      = "unknown-range-value"
+	DiagMinMaxRange            = "min-max-range"
 	DiagUnknownOidComponent    = "unknown-oid-component-type"
 	DiagUnknownDefvalType      = "unknown-defval-type"
 	DiagBitsNumberNegative     = "bits-number-negative"
@@ -117,6 +118,7 @@ const (
 	DiagRangeExchanged               = "range-exchanged"
 	DiagRangeOverlap                 = "range-overlap"
 	DiagRangeAscending               = "range-ascending"
+	DiagConstraintEmptyIntersection  = "constraint-empty-intersection"
 	DiagSizeIllegal                  = "size-illegal"
 	DiagRangeIllegal                 = "range-illegal"
 	DiagCounterRangeIllegal          = "counter-range-illegal"
@@ -262,6 +264,7 @@ var validateDiagCodes = []codeEntry{
 	{DiagUnknownTypeSyntax, SeverityWarning},
 	{DiagUnknownConstraintType, SeverityWarning},
 	{DiagUnknownRangeValue, SeverityWarning},
+	{DiagMinMaxRange, SeverityWarning},
 	{DiagUnknownOidComponent, SeverityWarning},
 	{DiagUnknownDefvalType, SeverityWarning},
 	{DiagBitsNumberNegative, SeverityError},
@@ -326,6 +329,7 @@ var resolverDiagCodes = []codeEntry{
 	{DiagRangeExchanged, SeverityError},
 	{DiagRangeOverlap, SeverityError},
 	{DiagRangeAscending, SeverityWarning},
+	{DiagConstraintEmptyIntersection, SeverityWarning},
 	{DiagSizeIllegal, SeverityError},
 	{DiagRangeIllegal, SeverityError},
 	{DiagCounterRangeIllegal, SeverityError},

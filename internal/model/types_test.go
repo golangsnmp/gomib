@@ -172,13 +172,13 @@ func TestRangeString(t *testing.T) {
 		r    Range
 		want string
 	}{
-		{"single value", Range{Min: 5, Max: 5}, "5"},
-		{"range", Range{Min: 0, Max: 255}, "0..255"},
-		{"negative", Range{Min: -1, Max: 100}, "-1..100"},
-		{"zero range", Range{Min: 0, Max: 0}, "0"},
-		{"raw single value", Range{RawMin: "'0G'H", RawMax: "'0G'H"}, "'0G'H"},
-		{"raw range", Range{RawMin: "'0G'H", RawMax: "'1G'H"}, "'0G'H..'1G'H"},
-		{"raw lower endpoint", Range{RawMin: "'0G'H", Max: 10}, "'0G'H..10"},
+		{"single value", Range{Min: NewSignedRangeBound(5), Max: NewSignedRangeBound(5)}, "5"},
+		{"range", Range{Min: NewSignedRangeBound(0), Max: NewSignedRangeBound(255)}, "0..255"},
+		{"negative", Range{Min: NewSignedRangeBound(-1), Max: NewSignedRangeBound(100)}, "-1..100"},
+		{"zero range", Range{Min: NewSignedRangeBound(0), Max: NewSignedRangeBound(0)}, "0"},
+		{"raw single value", Range{Min: NewRawRangeBound("'0G'H"), Max: NewRawRangeBound("'0G'H")}, "'0G'H"},
+		{"raw range", Range{Min: NewRawRangeBound("'0G'H"), Max: NewRawRangeBound("'1G'H")}, "'0G'H..'1G'H"},
+		{"raw lower endpoint", Range{Min: NewRawRangeBound("'0G'H"), Max: NewSignedRangeBound(10)}, "'0G'H..10"},
 	}
 
 	for _, tt := range tests {
@@ -234,8 +234,8 @@ func TestComplianceModulesDeepClone(t *testing.T) {
 			Groups:          []ComplianceGroup{{Group: "ifGroup", Description: "desc"}},
 			Objects: []ComplianceObject{{
 				Object:      "ifType",
-				Syntax:      &SyntaxConstraints{Sizes: []Range{{Min: 1, Max: 255}}},
-				WriteSyntax: &SyntaxConstraints{Ranges: []Range{{Min: 0, Max: 100}}},
+				Syntax:      &SyntaxConstraints{Sizes: []Range{{Min: NewSignedRangeBound(1), Max: NewSignedRangeBound(255)}}},
+				WriteSyntax: &SyntaxConstraints{Ranges: []Range{{Min: NewSignedRangeBound(0), Max: NewSignedRangeBound(100)}}},
 				MinAccess:   &access,
 				Description: "obj desc",
 			}},
@@ -264,13 +264,13 @@ func TestComplianceModulesDeepClone(t *testing.T) {
 		},
 		{
 			"Syntax",
-			func(m []ComplianceModule) { m[0].Objects[0].Syntax.Sizes[0].Min = 999 },
-			func() bool { return c.modules[0].Objects[0].Syntax.Sizes[0].Min == 999 },
+			func(m []ComplianceModule) { m[0].Objects[0].Syntax.Sizes[0].Min = NewSignedRangeBound(999) },
+			func() bool { return c.modules[0].Objects[0].Syntax.Sizes[0].Min == NewSignedRangeBound(999) },
 		},
 		{
 			"WriteSyntax",
-			func(m []ComplianceModule) { m[0].Objects[0].WriteSyntax.Ranges[0].Min = 999 },
-			func() bool { return c.modules[0].Objects[0].WriteSyntax.Ranges[0].Min == 999 },
+			func(m []ComplianceModule) { m[0].Objects[0].WriteSyntax.Ranges[0].Min = NewSignedRangeBound(999) },
+			func() bool { return c.modules[0].Objects[0].WriteSyntax.Ranges[0].Min == NewSignedRangeBound(999) },
 		},
 	}
 	for _, tt := range tests {
@@ -349,10 +349,12 @@ func TestCapabilitySupportsDeepClone(t *testing.T) {
 
 func TestSyntaxConstraintsClone(t *testing.T) {
 	orig := &SyntaxConstraints{
-		Sizes:  []Range{{Min: 1, Max: 10}},
-		Ranges: []Range{{Min: 0, Max: 255}},
-		Enums:  []NamedValue{{Label: "up", Value: 1}},
-		Bits:   []NamedValue{{Label: "bit0", Value: 0}},
+		Sizes:          []Range{{Min: NewSignedRangeBound(1), Max: NewSignedRangeBound(10)}},
+		Ranges:         []Range{{Min: NewSignedRangeBound(0), Max: NewSignedRangeBound(255)}},
+		DeclaredSizes:  []Range{{Min: NewSignedRangeBound(2), Max: NewSignedRangeBound(9)}},
+		DeclaredRanges: []Range{{Min: NewSignedRangeBound(1), Max: NewSignedRangeBound(254)}},
+		Enums:          []NamedValue{{Label: "up", Value: 1}},
+		Bits:           []NamedValue{{Label: "bit0", Value: 0}},
 	}
 
 	cloned := orig.clone()
@@ -360,6 +362,8 @@ func TestSyntaxConstraintsClone(t *testing.T) {
 	// Verify cloned values match original
 	testutil.SliceEqual(t, orig.Sizes, cloned.Sizes, "cloned Sizes should equal original")
 	testutil.SliceEqual(t, orig.Ranges, cloned.Ranges, "cloned Ranges should equal original")
+	testutil.SliceEqual(t, orig.DeclaredSizes, cloned.DeclaredSizes, "cloned DeclaredSizes should equal original")
+	testutil.SliceEqual(t, orig.DeclaredRanges, cloned.DeclaredRanges, "cloned DeclaredRanges should equal original")
 
 	// Verify mutations to clone don't propagate to original
 	tests := []struct {
@@ -369,8 +373,18 @@ func TestSyntaxConstraintsClone(t *testing.T) {
 	}{
 		{
 			"Sizes",
-			func(c *SyntaxConstraints) { c.Sizes[0].Min = 999 },
-			func() bool { return orig.Sizes[0].Min == 999 },
+			func(c *SyntaxConstraints) { c.Sizes[0].Min = NewSignedRangeBound(999) },
+			func() bool { return orig.Sizes[0].Min == NewSignedRangeBound(999) },
+		},
+		{
+			"DeclaredSizes",
+			func(c *SyntaxConstraints) { c.DeclaredSizes[0].Min = NewSignedRangeBound(999) },
+			func() bool { return orig.DeclaredSizes[0].Min == NewSignedRangeBound(999) },
+		},
+		{
+			"DeclaredRanges",
+			func(c *SyntaxConstraints) { c.DeclaredRanges[0].Min = NewSignedRangeBound(999) },
+			func() bool { return orig.DeclaredRanges[0].Min == NewSignedRangeBound(999) },
 		},
 		{
 			"Enums",

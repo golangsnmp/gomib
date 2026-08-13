@@ -215,15 +215,15 @@ func TestVariationSyntaxWithRangeAndDefVal(t *testing.T) {
 	testutil.NotNil(t, valueVar.Syntax, "syntax should be resolved")
 	testutil.NotNil(t, valueVar.Syntax.Type, "syntax should have resolved type")
 	testutil.Equal(t, 1, len(valueVar.Syntax.Ranges), "syntax should have 1 range")
-	testutil.Equal(t, int64(0), valueVar.Syntax.Ranges[0].Min, "syntax range min")
-	testutil.Equal(t, int64(50), valueVar.Syntax.Ranges[0].Max, "syntax range max")
+	testutil.Equal(t, mib.NewUnsignedRangeBound(0), valueVar.Syntax.Ranges[0].Min, "syntax range min")
+	testutil.Equal(t, mib.NewUnsignedRangeBound(50), valueVar.Syntax.Ranges[0].Max, "syntax range max")
 
 	// WRITE-SYNTAX Integer32 (1..25)
 	testutil.NotNil(t, valueVar.WriteSyntax, "write_syntax should be resolved")
 	testutil.NotNil(t, valueVar.WriteSyntax.Type, "write_syntax should have resolved type")
 	testutil.Equal(t, 1, len(valueVar.WriteSyntax.Ranges), "write_syntax should have 1 range")
-	testutil.Equal(t, int64(1), valueVar.WriteSyntax.Ranges[0].Min, "write_syntax range min")
-	testutil.Equal(t, int64(25), valueVar.WriteSyntax.Ranges[0].Max, "write_syntax range max")
+	testutil.Equal(t, mib.NewUnsignedRangeBound(1), valueVar.WriteSyntax.Ranges[0].Min, "write_syntax range min")
+	testutil.Equal(t, mib.NewUnsignedRangeBound(25), valueVar.WriteSyntax.Ranges[0].Max, "write_syntax range max")
 
 	// DEFVAL { 10 }
 	testutil.False(t, valueVar.DefVal.IsZero(), "defval should be set")

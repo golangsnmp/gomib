@@ -83,8 +83,8 @@ func TestTypeChainSizeInheritance(t *testing.T) {
 		sizes := obj.EffectiveSizes()
 		testutil.NotEmpty(t, sizes, "EffectiveSizes()")
 		testutil.Equal(t, 1, len(sizes), "should have 1 size range")
-		testutil.Equal(t, int64(0), sizes[0].Min, "size min")
-		testutil.Equal(t, int64(64), sizes[0].Max, "size max")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(0), sizes[0].Min, "size min")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(64), sizes[0].Max, "size max")
 	})
 
 	t.Run("inherited through chain", func(t *testing.T) {
@@ -93,8 +93,8 @@ func TestTypeChainSizeInheritance(t *testing.T) {
 		sizes := obj.EffectiveSizes()
 		testutil.NotEmpty(t, sizes, "EffectiveSizes()")
 		testutil.Equal(t, 1, len(sizes), "should have 1 size range")
-		testutil.Equal(t, int64(1), sizes[0].Min, "size min from MySizedString")
-		testutil.Equal(t, int64(100), sizes[0].Max, "size max from MySizedString")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(1), sizes[0].Min, "size min from MySizedString")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(100), sizes[0].Max, "size max from MySizedString")
 	})
 }
 
@@ -463,11 +463,11 @@ func TestShadowedTypeSizeConstraint(t *testing.T) {
 
 	testutil.Equal(t, 1, len(sizes), "should have 1 size range")
 	// Local: SIZE (0..128), Base: SIZE (0..64)
-	if sizes[0].Max == 64 {
+	if sizes[0].Max == mib.NewUnsignedRangeBound(64) {
 		t.Error("got base module size max 64 - import is NOT being shadowed by local definition")
 	}
-	testutil.Equal(t, int64(0), sizes[0].Min, "size min")
-	testutil.Equal(t, int64(128), sizes[0].Max, "size max should be 128 (local), not 64 (base)")
+	testutil.Equal(t, mib.NewUnsignedRangeBound(0), sizes[0].Min, "size min")
+	testutil.Equal(t, mib.NewUnsignedRangeBound(128), sizes[0].Max, "size max should be 128 (local), not 64 (base)")
 }
 
 func TestShadowedTypeBaseType(t *testing.T) {
@@ -567,13 +567,13 @@ func TestTypeRawVsEffectiveSizes(t *testing.T) {
 		}
 		sizes := typ.Sizes()
 		testutil.Equal(t, 1, len(sizes), "raw Sizes() should have 1 range")
-		testutil.Equal(t, int64(0), sizes[0].Min, "size min")
-		testutil.Equal(t, int64(64), sizes[0].Max, "size max")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(0), sizes[0].Min, "size min")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(64), sizes[0].Max, "size max")
 
 		effective := typ.EffectiveSizes()
 		testutil.Equal(t, 1, len(effective), "EffectiveSizes() should match direct")
-		testutil.Equal(t, int64(0), effective[0].Min, "effective size min")
-		testutil.Equal(t, int64(64), effective[0].Max, "effective size max")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(0), effective[0].Min, "effective size min")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(64), effective[0].Max, "effective size max")
 	})
 
 	t.Run("type with own sizes overriding parent", func(t *testing.T) {
@@ -584,12 +584,12 @@ func TestTypeRawVsEffectiveSizes(t *testing.T) {
 		}
 		sizes := typ.Sizes()
 		testutil.Equal(t, 1, len(sizes), "raw Sizes() should have 1 range")
-		testutil.Equal(t, int64(0), sizes[0].Min, "size min")
-		testutil.Equal(t, int64(32), sizes[0].Max, "size max")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(0), sizes[0].Min, "size min")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(32), sizes[0].Max, "size max")
 
 		// EffectiveSizes returns first non-empty in chain, which is this type's own
 		effective := typ.EffectiveSizes()
-		testutil.Equal(t, int64(0), effective[0].Min, "effective size min")
-		testutil.Equal(t, int64(32), effective[0].Max, "effective size max")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(0), effective[0].Min, "effective size min")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(32), effective[0].Max, "effective size max")
 	})
 }

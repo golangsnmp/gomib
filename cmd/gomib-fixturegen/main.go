@@ -325,10 +325,18 @@ func extractNodes(m *mib.Mib) map[string]*NormalizedNode {
 			}
 
 			for _, r := range obj.EffectiveRanges() {
-				n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
+				low, lowOK := r.Min.AsInt64()
+				high, highOK := r.Max.AsInt64()
+				if lowOK && highOK {
+					n.Ranges = append(n.Ranges, RangeInfo{Low: low, High: high})
+				}
 			}
 			for _, r := range obj.EffectiveSizes() {
-				n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
+				low, lowOK := r.Min.AsInt64()
+				high, highOK := r.Max.AsInt64()
+				if lowOK && highOK {
+					n.Ranges = append(n.Ranges, RangeInfo{Low: low, High: high})
+				}
 			}
 
 			if dv := obj.DefaultValue(); !dv.IsZero() {
@@ -496,7 +504,11 @@ func normalizeSyntaxConstraints(sc *mib.SyntaxConstraints) *NormalizedSyntaxCons
 func normalizeRanges(ranges []mib.Range) []RangeInfo {
 	out := make([]RangeInfo, 0, len(ranges))
 	for _, r := range ranges {
-		out = append(out, RangeInfo{Low: r.Min, High: r.Max})
+		low, lowOK := r.Min.AsInt64()
+		high, highOK := r.Max.AsInt64()
+		if lowOK && highOK {
+			out = append(out, RangeInfo{Low: low, High: high})
+		}
 	}
 	return out
 }

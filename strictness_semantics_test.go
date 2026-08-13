@@ -49,8 +49,8 @@ func TestStrictForwardedAugmentsAndIndexResolution(t *testing.T) {
 	sizes := idxObj.EffectiveSizes()
 	testutil.Len(t, sizes, 1, "forwarded MacAddress size constraints")
 	if len(sizes) == 1 {
-		testutil.Equal(t, int64(6), sizes[0].Min, "MacAddress size min")
-		testutil.Equal(t, int64(6), sizes[0].Max, "MacAddress size max")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(6), sizes[0].Min, "MacAddress size min")
+		testutil.Equal(t, mib.NewUnsignedRangeBound(6), sizes[0].Max, "MacAddress size max")
 	}
 }
 

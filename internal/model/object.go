@@ -20,12 +20,16 @@ type Object struct {
 	defValSpan   Span
 	index        []IndexEntry
 
-	hint             string
-	sizes            []Range
-	ranges           []Range
-	enums            []NamedValue
-	bits             []NamedValue
-	sequenceTypeName string
+	hint              string
+	sizes             []Range
+	ranges            []Range
+	declaredSizes     []Range
+	declaredRanges    []Range
+	sizesConstrained  bool
+	rangesConstrained bool
+	enums             []NamedValue
+	bits              []NamedValue
+	sequenceTypeName  string
 }
 
 // Type returns the resolved type of this object, or nil if unresolved.
@@ -118,11 +122,25 @@ func (o *Object) FormatOctets(data []byte, hexCase HexCase) (string, bool) {
 	return FormatOctets(o.hint, data, hexCase)
 }
 
+// Sizes returns the SIZE constraints declared directly on this object.
+func (o *Object) Sizes() []Range { return slices.Clone(o.declaredSizes) }
+
+// Ranges returns the range constraints declared directly on this object.
+func (o *Object) Ranges() []Range { return slices.Clone(o.declaredRanges) }
+
 // EffectiveSizes returns size constraints resolved through the type chain.
 func (o *Object) EffectiveSizes() []Range { return slices.Clone(o.sizes) }
 
+// EffectiveSizesConstrained reports whether this object has an effective SIZE
+// constraint, including an empty intersection.
+func (o *Object) EffectiveSizesConstrained() bool { return o.sizesConstrained }
+
 // EffectiveRanges returns range constraints resolved through the type chain.
 func (o *Object) EffectiveRanges() []Range { return slices.Clone(o.ranges) }
+
+// EffectiveRangesConstrained reports whether this object has an effective
+// value constraint, including an empty intersection.
+func (o *Object) EffectiveRangesConstrained() bool { return o.rangesConstrained }
 
 // EffectiveEnums returns enumeration values resolved through the type chain.
 func (o *Object) EffectiveEnums() []NamedValue { return slices.Clone(o.enums) }
@@ -281,24 +299,34 @@ func (o *Object) IsIndex() bool {
 	return false
 }
 
-func (o *Object) setType(t *Type)                  { o.typ = t }
-func (o *Object) setAccess(a Access)               { o.access = a }
-func (o *Object) setUnits(u string)                { o.units = u }
-func (o *Object) setDefaultValue(d *DefVal)        { o.defVal = d }
-func (o *Object) setAugments(a *Object)            { o.augments = a }
-func (o *Object) addAugmentedBy(a *Object)         { o.augmentedBy = append(o.augmentedBy, a) }
-func (o *Object) setIndex(idx []IndexEntry)        { o.index = idx }
-func (o *Object) setEffectiveHint(h string)        { o.hint = h }
-func (o *Object) setEffectiveSizes(s []Range)      { o.sizes = s }
-func (o *Object) setEffectiveRanges(r []Range)     { o.ranges = r }
-func (o *Object) setEffectiveEnums(e []NamedValue) { o.enums = e }
-func (o *Object) setEffectiveBits(b []NamedValue)  { o.bits = b }
-func (o *Object) setSequenceTypeName(s string)     { o.sequenceTypeName = s }
-func (o *Object) setSyntaxSpan(s Span)             { o.syntaxSpan = s }
-func (o *Object) setAccessSpan(s Span)             { o.accessSpan = s }
-func (o *Object) setUnitsSpan(s Span)              { o.unitsSpan = s }
-func (o *Object) setAugmentsSpan(s Span)           { o.augmentsSpan = s }
-func (o *Object) setDefaultValueSpan(s Span)       { o.defValSpan = s }
+func (o *Object) setType(t *Type)             { o.typ = t }
+func (o *Object) setAccess(a Access)          { o.access = a }
+func (o *Object) setUnits(u string)           { o.units = u }
+func (o *Object) setDefaultValue(d *DefVal)   { o.defVal = d }
+func (o *Object) setAugments(a *Object)       { o.augments = a }
+func (o *Object) addAugmentedBy(a *Object)    { o.augmentedBy = append(o.augmentedBy, a) }
+func (o *Object) setIndex(idx []IndexEntry)   { o.index = idx }
+func (o *Object) setEffectiveHint(h string)   { o.hint = h }
+func (o *Object) setDeclaredSizes(s []Range)  { o.declaredSizes = s }
+func (o *Object) setDeclaredRanges(r []Range) { o.declaredRanges = r }
+func (o *Object) setEffectiveSizes(s []Range) {
+	o.sizes = s
+	o.sizesConstrained = true
+}
+func (o *Object) setEffectiveRanges(r []Range) {
+	o.ranges = r
+	o.rangesConstrained = true
+}
+func (o *Object) setEffectiveSizesConstrained(v bool)  { o.sizesConstrained = v }
+func (o *Object) setEffectiveRangesConstrained(v bool) { o.rangesConstrained = v }
+func (o *Object) setEffectiveEnums(e []NamedValue)     { o.enums = e }
+func (o *Object) setEffectiveBits(b []NamedValue)      { o.bits = b }
+func (o *Object) setSequenceTypeName(s string)         { o.sequenceTypeName = s }
+func (o *Object) setSyntaxSpan(s Span)                 { o.syntaxSpan = s }
+func (o *Object) setAccessSpan(s Span)                 { o.accessSpan = s }
+func (o *Object) setUnitsSpan(s Span)                  { o.unitsSpan = s }
+func (o *Object) setAugmentsSpan(s Span)               { o.augmentsSpan = s }
+func (o *Object) setDefaultValueSpan(s Span)           { o.defValSpan = s }
 
 func objectsByKind(objs []*Object, kind Kind) []*Object {
 	var result []*Object

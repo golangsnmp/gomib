@@ -260,7 +260,7 @@ func TestCheckIndexElementNoSize(t *testing.T) {
 		typ := model.NewType("DisplayString")
 		model.SetTypeBase(typ, model.BaseOctetString)
 		model.SetObjectType(idxObj, typ)
-		model.SetObjectEffectiveSizes(idxObj, []model.Range{{Min: 0, Max: 255}})
+		model.SetObjectEffectiveSizes(idxObj, []model.Range{{Min: model.NewSignedRangeBound(0), Max: model.NewSignedRangeBound(255)}})
 		model.AddModuleObject(resolvedMod, idxObj)
 
 		root := ctx.mib.Root()
@@ -280,6 +280,82 @@ func TestCheckIndexElementNoSize(t *testing.T) {
 
 		noDiag(t, ctx.Diagnostics(), types.DiagIndexElementNoSize)
 	})
+}
+
+func TestCheckIndexMissingConstraintDistinguishesEmptyIntersection(t *testing.T) {
+	tests := []struct {
+		name        string
+		base        model.BaseType
+		constrained bool
+		diagCode    string
+	}{
+		{
+			name:     "OCTET STRING without SIZE",
+			base:     model.BaseOctetString,
+			diagCode: types.DiagIndexElementNoSize,
+		},
+		{
+			name:        "OCTET STRING with empty effective SIZE intersection",
+			base:        model.BaseOctetString,
+			constrained: true,
+			diagCode:    types.DiagIndexElementNoSize,
+		},
+		{
+			name:     "INTEGER without range",
+			base:     model.BaseInteger32,
+			diagCode: types.DiagIndexIntegerNoRange,
+		},
+		{
+			name:        "INTEGER with empty effective range intersection",
+			base:        model.BaseInteger32,
+			constrained: true,
+			diagCode:    types.DiagIndexIntegerNoRange,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := newTestContext()
+			mod := &module.Module{Name: "TEST-MIB"}
+			ctx.modules = append(ctx.modules, mod)
+			resolvedMod := model.NewModule(mod.Name)
+			ctx.moduleToResolved[mod] = resolvedMod
+
+			idxObj := model.NewObject("testIndex")
+			typ := model.NewType("IndexType")
+			model.SetTypeBase(typ, tt.base)
+			model.SetObjectType(idxObj, typ)
+			if tt.constrained {
+				if tt.base == model.BaseInteger32 {
+					model.SetObjectEffectiveRanges(idxObj, nil)
+				} else {
+					model.SetObjectEffectiveSizes(idxObj, nil)
+				}
+			}
+			model.AddModuleObject(resolvedMod, idxObj)
+
+			idxNode := buildOIDPath(ctx.mib.Root(), 1, 1, 1, 1)
+			model.SetNodeName(idxNode, "testIndex")
+			model.SetNodeObject(idxNode, idxObj)
+			ctx.registerModuleNodeSymbol(mod, "testIndex", idxNode)
+
+			objRefs := []objectTypeRef{{
+				mod: mod,
+				obj: &module.ObjectType{
+					DefBase: module.DefBase{Name: "testEntry"},
+					Index:   []module.IndexItem{{Object: "testIndex"}},
+				},
+			}}
+
+			checkIndexConstraints(ctx, objRefs)
+
+			if tt.constrained {
+				noDiag(t, ctx.Diagnostics(), tt.diagCode)
+			} else {
+				hasDiag(t, ctx.Diagnostics(), tt.diagCode)
+			}
+		})
+	}
 }
 
 func TestIsLegalIndexBasetype(t *testing.T) {
@@ -347,7 +423,7 @@ func TestCheckIndexOIDLength(t *testing.T) {
 		typ := model.NewType("BigString")
 		model.SetTypeBase(typ, model.BaseOctetString)
 		model.SetObjectType(idxObj, typ)
-		model.SetObjectEffectiveSizes(idxObj, []model.Range{{Min: 0, Max: 255}})
+		model.SetObjectEffectiveSizes(idxObj, []model.Range{{Min: model.NewSignedRangeBound(0), Max: model.NewSignedRangeBound(255)}})
 		model.AddModuleObject(resolvedMod, idxObj)
 
 		root := ctx.mib.Root()
@@ -394,7 +470,7 @@ func TestCheckIndexOIDLength(t *testing.T) {
 		typ := model.NewType("IntIdx")
 		model.SetTypeBase(typ, model.BaseInteger32)
 		model.SetObjectType(idxObj, typ)
-		model.SetObjectEffectiveRanges(idxObj, []model.Range{{Min: 0, Max: 255}})
+		model.SetObjectEffectiveRanges(idxObj, []model.Range{{Min: model.NewSignedRangeBound(0), Max: model.NewSignedRangeBound(255)}})
 		model.AddModuleObject(resolvedMod, idxObj)
 
 		root := ctx.mib.Root()
@@ -451,19 +527,19 @@ func TestIndexElementSubIds(t *testing.T) {
 		},
 		{
 			name:   "fixed string SIZE 8",
-			entry:  model.IndexEntry{Object: makeTypedObject(model.BaseOctetString, &[]model.Range{{Min: 8, Max: 8}}), Encoding: model.IndexEncodingFixedString},
+			entry:  model.IndexEntry{Object: makeTypedObject(model.BaseOctetString, &[]model.Range{{Min: model.NewSignedRangeBound(8), Max: model.NewSignedRangeBound(8)}}), Encoding: model.IndexEncodingFixedString},
 			want:   8,
 			wantOK: true,
 		},
 		{
 			name:   "variable string SIZE 0..32",
-			entry:  model.IndexEntry{Object: makeTypedObject(model.BaseOctetString, &[]model.Range{{Min: 0, Max: 32}}), Encoding: model.IndexEncodingLengthPrefixed},
+			entry:  model.IndexEntry{Object: makeTypedObject(model.BaseOctetString, &[]model.Range{{Min: model.NewSignedRangeBound(0), Max: model.NewSignedRangeBound(32)}}), Encoding: model.IndexEncodingLengthPrefixed},
 			want:   33,
 			wantOK: true,
 		},
 		{
 			name:   "implied string SIZE 0..32",
-			entry:  model.IndexEntry{Object: makeTypedObject(model.BaseOctetString, &[]model.Range{{Min: 0, Max: 32}}), Encoding: model.IndexEncodingImplied},
+			entry:  model.IndexEntry{Object: makeTypedObject(model.BaseOctetString, &[]model.Range{{Min: model.NewSignedRangeBound(0), Max: model.NewSignedRangeBound(32)}}), Encoding: model.IndexEncodingImplied},
 			want:   32,
 			wantOK: true,
 		},
@@ -856,7 +932,7 @@ func TestCheckIndexAccessAndDefval(t *testing.T) {
 			model.SetTypeBase(typ, model.BaseInteger32)
 			model.SetObjectType(idxObj, typ)
 			model.SetObjectAccess(idxObj, tt.access)
-			model.SetObjectEffectiveRanges(idxObj, []model.Range{{Min: 1, Max: 100}})
+			model.SetObjectEffectiveRanges(idxObj, []model.Range{{Min: model.NewSignedRangeBound(1), Max: model.NewSignedRangeBound(100)}})
 			if tt.defval {
 				dv := model.NewDefValInt(1, "1")
 				model.SetObjectDefaultValue(idxObj, &dv)

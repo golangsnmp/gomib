@@ -6,16 +6,67 @@ import (
 	"testing/fstest"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/internal/model"
 	"github.com/golangsnmp/gomib/mib"
 )
 
+func TestExportRangesPreservesEndpointSemantics(t *testing.T) {
+	bounds := exportRanges([]mib.Range{
+		{Min: mib.RangeBound{Kind: mib.RangeBoundMin}, Max: mib.RangeBound{Kind: mib.RangeBoundMax}},
+		{Min: mib.NewUnsignedRangeBound(0), Max: mib.NewUnsignedRangeBound(^uint64(0))},
+	})
+	if bounds[0].Min != "MIN" || bounds[0].Max != "MAX" || bounds[0].MinKind != "min" || bounds[0].MaxKind != "max" {
+		t.Fatalf("symbolic export = %#v", bounds[0])
+	}
+	if bounds[1].Max != "18446744073709551615" || bounds[1].MaxKind != "unsigned" {
+		t.Fatalf("unsigned export = %#v", bounds[1])
+	}
+}
+
 func TestExportRangesPreservesRawEndpoints(t *testing.T) {
-	got := exportRanges([]mib.Range{{RawMin: "'0G'H", RawMax: "'10000000000000000'H"}})
+	got := exportRanges([]mib.Range{{Min: mib.NewRawRangeBound("'0G'H"), Max: mib.NewRawRangeBound("'10000000000000000'H")}})
 	if len(got) != 1 {
 		t.Fatalf("exported ranges = %d, want 1", len(got))
 	}
 	if got[0].Min != "'0G'H" || got[0].Max != "'10000000000000000'H" {
 		t.Errorf("exported range = %#v, want raw endpoints", got[0])
+	}
+}
+
+func TestExportTypeBackedIndexUsesEffectiveConstraints(t *testing.T) {
+	m := model.NewMib()
+	parent := model.NewType("ParentRange")
+	model.SetTypeBase(parent, model.BaseInteger32)
+	model.SetTypeRanges(parent, []model.Range{{
+		Min: model.NewSignedRangeBound(1),
+		Max: model.NewSignedRangeBound(10),
+	}})
+	model.AddMibType(m, parent)
+
+	inherited := model.NewType("InheritedRange")
+	model.SetTypeParent(inherited, parent)
+	model.AddMibType(m, inherited)
+
+	disjoint := model.NewType("DisjointRange")
+	model.SetTypeParent(disjoint, parent)
+	model.SetTypeRanges(disjoint, []model.Range{{
+		Min: model.NewSignedRangeBound(20),
+		Max: model.NewSignedRangeBound(30),
+	}})
+	model.AddMibType(m, disjoint)
+
+	got := exportIndexEntries(m, []mib.IndexEntry{
+		{TypeName: "InheritedRange"},
+		{TypeName: "DisjointRange"},
+	})
+	inheritedConstraints := got[0].Syntax.Constraints
+	if !inheritedConstraints.RangesConstrained || len(inheritedConstraints.Ranges) != 1 ||
+		inheritedConstraints.Ranges[0].Min != "1" || inheritedConstraints.Ranges[0].Max != "10" {
+		t.Errorf("inherited index constraints = %#v", inheritedConstraints)
+	}
+	disjointConstraints := got[1].Syntax.Constraints
+	if !disjointConstraints.RangesConstrained || len(disjointConstraints.Ranges) != 0 {
+		t.Errorf("disjoint index constraints = %#v, want constrained empty range", disjointConstraints)
 	}
 }
 

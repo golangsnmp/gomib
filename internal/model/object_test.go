@@ -237,9 +237,9 @@ func TestClassifyIndexEncoding(t *testing.T) {
 		{"TimeTicks", makeObj(BaseTimeTicks, nil), false, IndexEncodingInteger},
 		{"Counter32", makeObj(BaseCounter32, nil), false, IndexEncodingInteger},
 		{"IpAddress", makeObj(BaseIpAddress, nil), false, IndexEncodingIpAddress},
-		{"fixed size OCTET STRING", makeObj(BaseOctetString, []Range{{Min: 6, Max: 6}}), false, IndexEncodingFixedString},
+		{"fixed size OCTET STRING", makeObj(BaseOctetString, []Range{{Min: NewSignedRangeBound(6), Max: NewSignedRangeBound(6)}}), false, IndexEncodingFixedString},
 		{"variable OCTET STRING", makeObj(BaseOctetString, nil), false, IndexEncodingLengthPrefixed},
-		{"variable OCTET STRING with size range", makeObj(BaseOctetString, []Range{{Min: 0, Max: 255}}), false, IndexEncodingLengthPrefixed},
+		{"variable OCTET STRING with size range", makeObj(BaseOctetString, []Range{{Min: NewSignedRangeBound(0), Max: NewSignedRangeBound(255)}}), false, IndexEncodingLengthPrefixed},
 		{"OCTET STRING with IMPLIED", makeObj(BaseOctetString, nil), true, IndexEncodingImplied},
 		{"OBJECT IDENTIFIER", makeObj(BaseObjectIdentifier, nil), false, IndexEncodingLengthPrefixed},
 		{"OBJECT IDENTIFIER with IMPLIED", makeObj(BaseObjectIdentifier, nil), true, IndexEncodingImplied},
@@ -272,7 +272,7 @@ func TestIndexEntryFixedSize(t *testing.T) {
 	}{
 		{"integer", IndexEntry{Object: makeObj(BaseInteger32, nil), Encoding: IndexEncodingInteger}, 1, true},
 		{"ip address", IndexEntry{Object: makeObj(BaseIpAddress, nil), Encoding: IndexEncodingIpAddress}, 4, true},
-		{"fixed string SIZE 6", IndexEntry{Object: makeObj(BaseOctetString, []Range{{Min: 6, Max: 6}}), Encoding: IndexEncodingFixedString}, 6, true},
+		{"fixed string SIZE 6", IndexEntry{Object: makeObj(BaseOctetString, []Range{{Min: NewSignedRangeBound(6), Max: NewSignedRangeBound(6)}}), Encoding: IndexEncodingFixedString}, 6, true},
 		{"length prefixed", IndexEntry{Object: makeObj(BaseOctetString, nil), Encoding: IndexEncodingLengthPrefixed}, 0, false},
 		{"implied", IndexEntry{Object: makeObj(BaseOctetString, nil), Encoding: IndexEncodingImplied}, 0, false},
 		{"unknown", IndexEntry{Encoding: IndexEncodingUnknown}, 0, false},
@@ -296,10 +296,10 @@ func TestIsFixedSize(t *testing.T) {
 	}{
 		{"nil", nil, false},
 		{"empty", []Range{}, false},
-		{"fixed", []Range{{Min: 6, Max: 6}}, true},
-		{"range", []Range{{Min: 0, Max: 255}}, false},
-		{"zero fixed", []Range{{Min: 0, Max: 0}}, false},
-		{"multiple", []Range{{Min: 4, Max: 4}, {Min: 6, Max: 6}}, false},
+		{"fixed", []Range{{Min: NewSignedRangeBound(6), Max: NewSignedRangeBound(6)}}, true},
+		{"range", []Range{{Min: NewSignedRangeBound(0), Max: NewSignedRangeBound(255)}}, false},
+		{"zero fixed", []Range{{Min: NewSignedRangeBound(0), Max: NewSignedRangeBound(0)}}, false},
+		{"multiple", []Range{{Min: NewSignedRangeBound(4), Max: NewSignedRangeBound(4)}, {Min: NewSignedRangeBound(6), Max: NewSignedRangeBound(6)}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -47,16 +47,24 @@ func SetObjectOidRefs(o *Object, refs []OidRef)  { o.setOidRefs(refs) }
 
 // Object-specific setters
 
-func SetObjectType(o *Object, t *Type)                  { o.setType(t) }
-func SetObjectAccess(o *Object, a Access)               { o.setAccess(a) }
-func SetObjectUnits(o *Object, u string)                { o.setUnits(u) }
-func SetObjectDefaultValue(o *Object, d *DefVal)        { o.setDefaultValue(d) }
-func SetObjectAugments(o, a *Object)                    { o.setAugments(a) }
-func AddObjectAugmentedBy(o, a *Object)                 { o.addAugmentedBy(a) }
-func SetObjectIndex(o *Object, idx []IndexEntry)        { o.setIndex(idx) }
-func SetObjectEffectiveHint(o *Object, h string)        { o.setEffectiveHint(h) }
-func SetObjectEffectiveSizes(o *Object, s []Range)      { o.setEffectiveSizes(s) }
-func SetObjectEffectiveRanges(o *Object, r []Range)     { o.setEffectiveRanges(r) }
+func SetObjectType(o *Object, t *Type)              { o.setType(t) }
+func SetObjectAccess(o *Object, a Access)           { o.setAccess(a) }
+func SetObjectUnits(o *Object, u string)            { o.setUnits(u) }
+func SetObjectDefaultValue(o *Object, d *DefVal)    { o.setDefaultValue(d) }
+func SetObjectAugments(o, a *Object)                { o.setAugments(a) }
+func AddObjectAugmentedBy(o, a *Object)             { o.addAugmentedBy(a) }
+func SetObjectIndex(o *Object, idx []IndexEntry)    { o.setIndex(idx) }
+func SetObjectEffectiveHint(o *Object, h string)    { o.setEffectiveHint(h) }
+func SetObjectDeclaredSizes(o *Object, s []Range)   { o.setDeclaredSizes(s) }
+func SetObjectDeclaredRanges(o *Object, r []Range)  { o.setDeclaredRanges(r) }
+func SetObjectEffectiveSizes(o *Object, s []Range)  { o.setEffectiveSizes(s) }
+func SetObjectEffectiveRanges(o *Object, r []Range) { o.setEffectiveRanges(r) }
+func SetObjectEffectiveSizesConstrained(o *Object, v bool) {
+	o.setEffectiveSizesConstrained(v)
+}
+func SetObjectEffectiveRangesConstrained(o *Object, v bool) {
+	o.setEffectiveRangesConstrained(v)
+}
 func SetObjectEffectiveEnums(o *Object, e []NamedValue) { o.setEffectiveEnums(e) }
 func SetObjectEffectiveBits(o *Object, b []NamedValue)  { o.setEffectiveBits(b) }
 func SetObjectSequenceTypeName(o *Object, s string)     { o.setSequenceTypeName(s) }

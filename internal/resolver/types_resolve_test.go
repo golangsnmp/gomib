@@ -275,8 +275,8 @@ func TestExtractConstraints(t *testing.T) {
 		}
 		sizes, ranges := extractConstraints(syntax)
 		testutil.Len(t, sizes, 1, "sizes")
-		testutil.Equal(t, int64(0), sizes[0].Min, "min")
-		testutil.Equal(t, int64(255), sizes[0].Max, "max")
+		testutil.Equal(t, model.NewUnsignedRangeBound(0), sizes[0].Min, "min")
+		testutil.Equal(t, model.NewUnsignedRangeBound(255), sizes[0].Max, "max")
 		testutil.Nil(t, ranges, "ranges")
 	})
 
@@ -292,8 +292,8 @@ func TestExtractConstraints(t *testing.T) {
 		sizes, ranges := extractConstraints(syntax)
 		testutil.Nil(t, sizes, "sizes")
 		testutil.Len(t, ranges, 1, "ranges")
-		testutil.Equal(t, int64(-128), ranges[0].Min, "min")
-		testutil.Equal(t, int64(127), ranges[0].Max, "max")
+		testutil.Equal(t, model.NewSignedRangeBound(-128), ranges[0].Min, "min")
+		testutil.Equal(t, model.NewSignedRangeBound(127), ranges[0].Max, "max")
 	})
 
 	t.Run("multiple size ranges", func(t *testing.T) {
@@ -309,10 +309,10 @@ func TestExtractConstraints(t *testing.T) {
 		sizes, ranges := extractConstraints(syntax)
 		testutil.Len(t, sizes, 2, "sizes")
 		// Single value: max = min
-		testutil.Equal(t, int64(0), sizes[0].Min, "sizes[0] min")
-		testutil.Equal(t, int64(0), sizes[0].Max, "sizes[0] max")
-		testutil.Equal(t, int64(4), sizes[1].Min, "sizes[1] min")
-		testutil.Equal(t, int64(255), sizes[1].Max, "sizes[1] max")
+		testutil.Equal(t, model.NewUnsignedRangeBound(0), sizes[0].Min, "sizes[0] min")
+		testutil.Equal(t, model.NewUnsignedRangeBound(0), sizes[0].Max, "sizes[0] max")
+		testutil.Equal(t, model.NewUnsignedRangeBound(4), sizes[1].Min, "sizes[1] min")
+		testutil.Equal(t, model.NewUnsignedRangeBound(255), sizes[1].Max, "sizes[1] max")
 		testutil.Nil(t, ranges, "ranges")
 	})
 
@@ -336,8 +336,8 @@ func TestRangesToConstraint(t *testing.T) {
 		}
 		got := rangesToConstraint(ranges)
 		testutil.Len(t, got, 1, "ranges")
-		testutil.Equal(t, int64(-100), got[0].Min, "min")
-		testutil.Equal(t, int64(100), got[0].Max, "max")
+		testutil.Equal(t, model.NewSignedRangeBound(-100), got[0].Min, "min")
+		testutil.Equal(t, model.NewSignedRangeBound(100), got[0].Max, "max")
 	})
 
 	t.Run("single value range", func(t *testing.T) {
@@ -347,8 +347,8 @@ func TestRangesToConstraint(t *testing.T) {
 		got := rangesToConstraint(ranges)
 		testutil.Len(t, got, 1, "ranges")
 		// Single value: Max is nil, so max = min
-		testutil.Equal(t, int64(42), got[0].Min, "min")
-		testutil.Equal(t, int64(42), got[0].Max, "max")
+		testutil.Equal(t, model.NewSignedRangeBound(42), got[0].Min, "min")
+		testutil.Equal(t, model.NewSignedRangeBound(42), got[0].Max, "max")
 	})
 
 	t.Run("multiple ranges", func(t *testing.T) {
@@ -358,10 +358,10 @@ func TestRangesToConstraint(t *testing.T) {
 		}
 		got := rangesToConstraint(ranges)
 		testutil.Len(t, got, 2, "ranges")
-		testutil.Equal(t, int64(0), got[0].Min, "got[0] min")
-		testutil.Equal(t, int64(10), got[0].Max, "got[0] max")
-		testutil.Equal(t, int64(100), got[1].Min, "got[1] min")
-		testutil.Equal(t, int64(200), got[1].Max, "got[1] max")
+		testutil.Equal(t, model.NewSignedRangeBound(0), got[0].Min, "got[0] min")
+		testutil.Equal(t, model.NewSignedRangeBound(10), got[0].Max, "got[0] max")
+		testutil.Equal(t, model.NewSignedRangeBound(100), got[1].Min, "got[1] min")
+		testutil.Equal(t, model.NewSignedRangeBound(200), got[1].Max, "got[1] max")
 	})
 
 	t.Run("raw endpoints", func(t *testing.T) {
@@ -371,8 +371,8 @@ func TestRangesToConstraint(t *testing.T) {
 		}}
 		got := rangesToConstraint(ranges)
 		testutil.Len(t, got, 1, "ranges")
-		testutil.Equal(t, "'0G'H", got[0].RawMin, "raw min")
-		testutil.Equal(t, "'10000000000000000'H", got[0].RawMax, "raw max")
+		testutil.Equal(t, model.NewRawRangeBound("'0G'H"), got[0].Min, "raw min")
+		testutil.Equal(t, model.NewRawRangeBound("'10000000000000000'H"), got[0].Max, "raw max")
 		testutil.False(t, got[0].IsResolved(), "raw range should remain unresolved")
 	})
 
@@ -396,14 +396,14 @@ END
 
 	valid := m.Module("TEST-MIB").Type("Valid").Ranges()
 	testutil.Len(t, valid, 1, "valid ranges")
-	testutil.Equal(t, int64(0x7fff), valid[0].Min, "valid min")
-	testutil.Equal(t, int64(0x8000), valid[0].Max, "valid max")
+	testutil.Equal(t, model.NewUnsignedRangeBound(0x7fff), valid[0].Min, "valid min")
+	testutil.Equal(t, model.NewUnsignedRangeBound(0x8000), valid[0].Max, "valid max")
 	testutil.True(t, valid[0].IsResolved(), "valid range should resolve")
 
 	invalid := m.Module("TEST-MIB").Type("Invalid").Ranges()
 	testutil.Len(t, invalid, 1, "invalid ranges")
-	testutil.Equal(t, "'0G'H", invalid[0].RawMin, "invalid raw min")
-	testutil.Equal(t, "'10000000000000000'H", invalid[0].RawMax, "overflow raw max")
+	testutil.Equal(t, model.NewRawRangeBound("'0G'H"), invalid[0].Min, "invalid raw min")
+	testutil.Equal(t, model.NewRawRangeBound("'10000000000000000'H"), invalid[0].Max, "overflow raw max")
 	testutil.False(t, invalid[0].IsResolved(), "invalid range should remain unresolved")
 
 	var invalidDiags int
@@ -415,36 +415,80 @@ END
 	testutil.Equal(t, 2, invalidDiags, "invalid hex range diagnostics")
 }
 
-func TestRangeValueToI64(t *testing.T) {
+func TestRangeValueToConstraintPreservesKind(t *testing.T) {
 	tests := []struct {
 		name string
 		val  module.RangeValue
-		want int64
+		want model.RangeBound
 	}{
-		{"signed positive", &module.RangeValueSigned{Value: 42}, 42},
-		{"signed zero", &module.RangeValueSigned{Value: 0}, 0},
-		{"signed negative", &module.RangeValueSigned{Value: -100}, -100},
-		{"signed max int64", &module.RangeValueSigned{Value: math.MaxInt64}, math.MaxInt64},
-		{"signed min int64", &module.RangeValueSigned{Value: math.MinInt64}, math.MinInt64},
-
-		{"unsigned small", &module.RangeValueUnsigned{Value: 255}, 255},
-		{"unsigned zero", &module.RangeValueUnsigned{Value: 0}, 0},
-		{"unsigned max safe", &module.RangeValueUnsigned{Value: uint64(math.MaxInt64)}, math.MaxInt64},
-		{"unsigned overflow", &module.RangeValueUnsigned{Value: uint64(math.MaxInt64) + 1}, math.MaxInt64},
-		{"unsigned max uint64", &module.RangeValueUnsigned{Value: math.MaxUint64}, math.MaxInt64},
-
-		{"MIN", &module.RangeValueMin{}, math.MinInt64},
-		{"MAX", &module.RangeValueMax{}, math.MaxInt64},
-
-		{"nil", nil, 0},
+		{"signed", &module.RangeValueSigned{Value: -100}, model.NewSignedRangeBound(-100)},
+		{"unsigned", &module.RangeValueUnsigned{Value: math.MaxUint64}, model.NewUnsignedRangeBound(math.MaxUint64)},
+		{"MIN", &module.RangeValueMin{}, model.RangeBound{Kind: model.RangeBoundMin}},
+		{"MAX", &module.RangeValueMax{}, model.RangeBound{Kind: model.RangeBoundMax}},
+		{"raw", &module.RangeValueRaw{Value: "vendor"}, model.NewRawRangeBound("vendor")},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := rangeValueToI64(tt.val)
-			testutil.Equal(t, tt.want, got, "rangeValueToI64()")
+			testutil.Equal(t, tt.want, rangeValueToConstraint(tt.val), "rangeValueToConstraint()")
 		})
 	}
+}
+
+func TestEffectiveRangeSemantics(t *testing.T) {
+	min := model.RangeBound{Kind: model.RangeBoundMin}
+	max := model.RangeBound{Kind: model.RangeBoundMax}
+	span := types.Span{}
+	parent := model.NewType("Parent")
+	model.SetTypeBase(parent, model.BaseInteger32)
+	model.SetTypeRanges(parent, []model.Range{{
+		Min: model.NewSignedRangeBound(-10), Max: model.NewSignedRangeBound(20), Span: span,
+	}})
+	child := model.NewType("Child")
+	model.SetTypeBase(child, model.BaseInteger32)
+	model.SetTypeParent(child, parent)
+	model.SetTypeRanges(child, []model.Range{{Min: min, Max: max, Span: span}})
+
+	direct := child.Ranges()
+	testutil.Equal(t, min, direct[0].Min, "direct MIN")
+	testutil.Equal(t, max, direct[0].Max, "direct MAX")
+	effective := child.EffectiveRanges()
+	testutil.Len(t, effective, 1, "effective intersection")
+	testutil.Equal(t, model.NewSignedRangeBound(-10), effective[0].Min, "effective min")
+	testutil.Equal(t, model.NewSignedRangeBound(20), effective[0].Max, "effective max")
+
+	disjoint := model.NewType("Disjoint")
+	model.SetTypeBase(disjoint, model.BaseInteger32)
+	model.SetTypeParent(disjoint, parent)
+	model.SetTypeRanges(disjoint, []model.Range{{
+		Min: model.NewSignedRangeBound(30), Max: model.NewSignedRangeBound(40), Span: span,
+	}})
+	testutil.Len(t, disjoint.EffectiveRanges(), 0, "disjoint intersection")
+	testutil.True(t, disjoint.EffectiveRangesConstrained(), "disjoint remains constrained")
+
+	descendant := model.NewType("Descendant")
+	model.SetTypeBase(descendant, model.BaseInteger32)
+	model.SetTypeParent(descendant, disjoint)
+	model.SetTypeRanges(descendant, []model.Range{{
+		Min: model.NewSignedRangeBound(35), Max: model.NewSignedRangeBound(36), Span: span,
+	}})
+	testutil.Len(t, descendant.EffectiveRanges(), 0, "empty ancestor intersection remains empty")
+	testutil.True(t, descendant.EffectiveRangesConstrained(), "empty descendant remains constrained")
+
+	multi := model.NewType("Multi")
+	model.SetTypeBase(multi, model.BaseInteger32)
+	model.SetTypeRanges(multi, []model.Range{
+		{Min: model.NewSignedRangeBound(0), Max: model.NewSignedRangeBound(10), Span: span},
+		{Min: model.NewSignedRangeBound(20), Max: model.NewSignedRangeBound(30), Span: span},
+	})
+	maxOnly := model.NewType("MaxOnly")
+	model.SetTypeBase(maxOnly, model.BaseInteger32)
+	model.SetTypeParent(maxOnly, multi)
+	model.SetTypeRanges(maxOnly, []model.Range{{Min: max, Max: max, Span: span}})
+	effective = maxOnly.EffectiveRanges()
+	testutil.Len(t, effective, 1, "MAX is not a false exact sentinel match")
+	testutil.Equal(t, model.NewSignedRangeBound(30), effective[0].Min, "MAX resolves to parent maximum")
+	testutil.Equal(t, model.NewSignedRangeBound(30), effective[0].Max, "MAX resolves to parent maximum")
 }
 
 func TestResolveBaseFromChain(t *testing.T) {

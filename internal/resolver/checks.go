@@ -284,6 +284,14 @@ func checkRangeConstraints(ctx *resolverContext) {
 			sizes, ranges := extractConstraints(d.Syntax)
 			checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Spans.Syntax)
 			checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Spans.Syntax)
+			if len(ranges) > 0 && typ.EffectiveRangesConstrained() && len(typ.EffectiveRanges()) == 0 {
+				ctx.EmitDiagnostic(types.DiagConstraintEmptyIntersection, mod, d.Spans.Syntax,
+					fmt.Sprintf("%q: range constraint has an empty intersection with its parent", d.Name))
+			}
+			if len(sizes) > 0 && typ.EffectiveSizesConstrained() && len(typ.EffectiveSizes()) == 0 {
+				ctx.EmitDiagnostic(types.DiagConstraintEmptyIntersection, mod, d.Spans.Syntax,
+					fmt.Sprintf("%q: SIZE constraint has an empty intersection with its parent", d.Name))
+			}
 		}
 		for _, d := range mod.ObjectTypes {
 			sizes, ranges := extractConstraints(d.Syntax)
@@ -297,6 +305,14 @@ func checkRangeConstraints(ctx *resolverContext) {
 			base := resolved.Type().EffectiveBase()
 			checkRangeList(ctx, ranges, base, false, d.Name, mod, d.Spans.Syntax)
 			checkRangeList(ctx, sizes, base, true, d.Name, mod, d.Spans.Syntax)
+			if len(ranges) > 0 && resolved.EffectiveRangesConstrained() && len(resolved.EffectiveRanges()) == 0 {
+				ctx.EmitDiagnostic(types.DiagConstraintEmptyIntersection, mod, d.Spans.Syntax,
+					fmt.Sprintf("%q: range constraint has an empty intersection with its parent", d.Name))
+			}
+			if len(sizes) > 0 && resolved.EffectiveSizesConstrained() && len(resolved.EffectiveSizes()) == 0 {
+				ctx.EmitDiagnostic(types.DiagConstraintEmptyIntersection, mod, d.Spans.Syntax,
+					fmt.Sprintf("%q: SIZE constraint has an empty intersection with its parent", d.Name))
+			}
 		}
 	}
 }
@@ -340,23 +356,14 @@ func checkRangeList(ctx *resolverContext, ranges []model.Range, base model.BaseT
 		return
 	}
 
-	var boundsMin, boundsMax int64
-	var hasBounds bool
-	if isSize {
-		boundsMin, boundsMax, hasBounds = 0, 65535, true
-	} else {
-		boundsMin, boundsMax, hasBounds = basetypeBounds(base)
-	}
+	bounds, hasBounds := model.BaseConstraint(base, isSize, span)
 
 	var previous *model.Range
 	for i := range ranges {
 		r := &ranges[i]
-		if !r.IsResolved() {
-			continue
-		}
-
 		// Exchanged limits (min > max).
-		if r.Min > r.Max {
+		comparison, comparable := r.Min.Compare(r.Max)
+		if comparable && comparison > 0 {
 			ctx.EmitDiagnostic(types.DiagRangeExchanged,
 				mod, span,
 				fmt.Sprintf("%q: range %s has exchanged limits", name, r.String()))
@@ -364,18 +371,18 @@ func checkRangeList(ctx *resolverContext, ranges []model.Range, base model.BaseT
 
 		// Bounds checking against basetype.
 		if hasBounds {
-			checkRangeBound(ctx, r.Min, boundsMin, boundsMax, name, "lower", mod, span)
-			checkRangeBound(ctx, r.Max, boundsMin, boundsMax, name, "upper", mod, span)
+			checkRangeBound(ctx, r.Min, bounds.Min, bounds.Max, name, "lower", mod, span)
+			checkRangeBound(ctx, r.Max, bounds.Min, bounds.Max, name, "upper", mod, span)
 		}
 
 		// Multi-range checks against the previous resolved range.
 		if previous != nil {
-			if r.Min < previous.Min {
+			if comparison, ok := r.Min.Compare(previous.Min); ok && comparison < 0 {
 				ctx.EmitDiagnostic(types.DiagRangeAscending,
 					mod, span,
 					fmt.Sprintf("%q: ranges not in ascending order", name))
 			}
-			if r.Min <= previous.Max {
+			if comparison, ok := r.Min.Compare(previous.Max); ok && comparison <= 0 {
 				ctx.EmitDiagnostic(types.DiagRangeOverlap,
 					mod, span,
 					fmt.Sprintf("%q: range %s overlaps with %s", name, r.String(), previous.String()))
@@ -385,39 +392,24 @@ func checkRangeList(ctx *resolverContext, ranges []model.Range, base model.BaseT
 	}
 }
 
-// checkRangeBound emits a range-bounds diagnostic if v falls outside
-// boundsMin..boundsMax. Values equal to MinInt64 or MaxInt64 are skipped
-// because they represent the MIN/MAX keywords.
-func checkRangeBound(ctx *resolverContext, v, boundsMin, boundsMax int64, name, which string, mod *module.Module, span types.Span) {
-	if v == math.MinInt64 || v == math.MaxInt64 {
+// checkRangeBound emits a range-bounds diagnostic for a concrete endpoint
+// outside the base type. Symbolic and raw endpoints are preserved and skipped.
+func checkRangeBound(ctx *resolverContext, value, boundsMin, boundsMax model.RangeBound, name, which string, mod *module.Module, span types.Span) {
+	if !value.IsConcrete() {
 		return
 	}
-	if v < boundsMin || v > boundsMax {
+	below, belowOK := value.Compare(boundsMin)
+	above, aboveOK := value.Compare(boundsMax)
+	if (belowOK && below < 0) || (aboveOK && above > 0) {
 		ctx.EmitDiagnostic(types.DiagRangeBounds,
 			mod, span,
-			fmt.Sprintf("%q: range %s bound %d exceeds basetype", name, which, v))
-	}
-}
-
-// basetypeBounds returns the valid min/max range for a basetype.
-func basetypeBounds(base model.BaseType) (min, max int64, ok bool) {
-	switch base {
-	case model.BaseInteger32:
-		return math.MinInt32, math.MaxInt32, true
-	case model.BaseUnsigned32, model.BaseGauge32, model.BaseTimeTicks, model.BaseCounter32:
-		return 0, math.MaxUint32, true
-	case model.BaseCounter64:
-		// Bounds are never used (counter range/DEFVAL checks reject earlier),
-		// but Counter64 must return ok=true so isNumericBase reports correctly.
-		return 0, math.MaxInt64, true
-	default:
-		return 0, 0, false
+			fmt.Sprintf("%q: range %s bound %s exceeds basetype", name, which, value.String()))
 	}
 }
 
 // isNumericBase reports whether the base type supports value range constraints.
 func isNumericBase(base model.BaseType) bool {
-	_, _, ok := basetypeBounds(base)
+	_, ok := model.BaseConstraint(base, false, types.Span{})
 	return ok
 }
 
@@ -438,8 +430,8 @@ func isLegalIndexBasetype(base model.BaseType) bool {
 func maxSizeFromRanges(sizes []model.Range) int64 {
 	m := int64(-1)
 	for _, r := range sizes {
-		if r.IsResolved() && r.Max > m {
-			m = r.Max
+		if value, ok := r.Max.AsInt64(); ok && value > m {
+			m = value
 		}
 	}
 	return m
@@ -553,7 +545,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			// OCTET STRING/Opaque index elements must have a SIZE constraint
 			// so the encoding length is bounded.
 			if base == model.BaseOctetString || base == model.BaseOpaque {
-				if len(idxObj.EffectiveSizes()) == 0 {
+				if !idxObj.EffectiveSizesConstrained() {
 					ctx.EmitDiagnostic(types.DiagIndexElementNoSize,
 						ref.mod, item.Span,
 						fmt.Sprintf("INDEX %q of %q has no SIZE restriction", item.Object, obj.Name))
@@ -581,7 +573,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 			}
 
 			// No range restriction on an integer index.
-			if len(ranges) == 0 {
+			if !idxObj.EffectiveRangesConstrained() {
 				ctx.EmitDiagnostic(types.DiagIndexIntegerNoRange,
 					ref.mod, item.Span,
 					fmt.Sprintf("INDEX %q of %q has no range restriction", item.Object, obj.Name))
@@ -590,7 +582,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 
 			// model.Range includes negative values.
 			for _, r := range ranges {
-				if r.IsResolved() && r.Min < 0 {
+				if comparison, ok := r.Min.Compare(model.NewSignedRangeBound(0)); ok && comparison < 0 {
 					ctx.EmitDiagnostic(types.DiagIndexNegativeRange,
 						ref.mod, item.Span,
 						fmt.Sprintf("INDEX %q of %q has range permitting negative values", item.Object, obj.Name))
@@ -678,10 +670,10 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 		switch dv.Kind() {
 		case model.DefValKindInt:
 			v, _ := model.DefValAs[int64](dv)
-			checkDefvalNumeric(ctx, ref.mod, obj, v, 0, false, base, ranges, enums)
+			checkDefvalNumeric(ctx, ref.mod, obj, v, 0, false, base, ranges, resolved.EffectiveRangesConstrained(), enums)
 		case model.DefValKindUint:
 			v, _ := model.DefValAs[uint64](dv)
-			checkDefvalNumeric(ctx, ref.mod, obj, 0, v, true, base, ranges, enums)
+			checkDefvalNumeric(ctx, ref.mod, obj, 0, v, true, base, ranges, resolved.EffectiveRangesConstrained(), enums)
 		case model.DefValKindEnum:
 			label, _ := model.DefValAs[string](dv)
 			if len(enums) > 0 {
@@ -710,7 +702,7 @@ func checkDefvalConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 // RANGE constraints, and enum membership. Works for both signed and unsigned
 // values: signed values have isUnsigned=false and uval=0, unsigned values have
 // isUnsigned=true and ival=0.
-func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.ObjectType, ival int64, uval uint64, isUnsigned bool, base model.BaseType, ranges []model.Range, enums []model.NamedValue) {
+func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.ObjectType, ival int64, uval uint64, isUnsigned bool, base model.BaseType, ranges []model.Range, rangesConstrained bool, enums []model.NamedValue) {
 	// Check basetype limits.
 	switch base {
 	case model.BaseInteger32:
@@ -745,14 +737,14 @@ func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.Ob
 
 	// Check RANGE constraints. An unresolved endpoint makes non-membership
 	// unknowable, so only diagnose when every range is resolved.
-	if len(ranges) > 0 {
+	if rangesConstrained {
 		var inRange bool
 		if isUnsigned {
 			inRange = uvalueInRanges(uval, ranges)
 		} else {
 			inRange = valueInRanges(ival, ranges)
 		}
-		if !inRange && !hasUnresolvedRange(ranges) {
+		if !inRange && (len(ranges) == 0 || !hasUnresolvedRange(ranges)) {
 			v := any(ival)
 			if isUnsigned {
 				v = uval
@@ -802,7 +794,7 @@ func hasUnresolvedRange(ranges []model.Range) bool {
 
 func valueInRanges(v int64, ranges []model.Range) bool {
 	for _, r := range ranges {
-		if r.IsResolved() && v >= r.Min && v <= r.Max {
+		if model.RangeContainsInt64(r, v) {
 			return true
 		}
 	}
@@ -821,23 +813,7 @@ func findNamedValue(values []model.NamedValue, label string) bool {
 
 func uvalueInRanges(v uint64, ranges []model.Range) bool {
 	for _, r := range ranges {
-		if !r.IsResolved() {
-			continue
-		}
-		// model.Range Min/Max are int64. A uint64 value can only fall within a range
-		// if it fits in int64 (i.e. v <= MaxInt64) and the range bound is non-negative.
-		if r.Max < 0 {
-			continue
-		}
-		min := uint64(0)
-		if r.Min > 0 {
-			min = uint64(r.Min)
-		}
-		if v > math.MaxInt64 {
-			// v exceeds int64 range, so it can't match any model.Range (which uses int64).
-			continue
-		}
-		if v >= min && int64(v) <= r.Max {
+		if model.RangeContainsUint64(r, v) {
 			return true
 		}
 	}

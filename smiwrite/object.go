@@ -132,20 +132,10 @@ func formatObjectSyntax(obj *mib.Object) string {
 		return "INTEGER" // fallback
 	}
 
-	// The resolver stores effective enums/bits/ranges/sizes on the object.
-	// Enums and bits are always passed for inline formatting. Ranges and sizes
-	// are only passed when they differ from the type's own constraints, meaning
-	// they came from an inline subtype constraint on the OBJECT-TYPE rather
-	// than being inherited from the type definition.
-	var inlineRanges, inlineSizes []mib.Range
-	if objRanges := obj.EffectiveRanges(); !rangesEqual(objRanges, t.EffectiveRanges()) {
-		inlineRanges = objRanges
-	}
-	if objSizes := obj.EffectiveSizes(); !rangesEqual(objSizes, t.EffectiveSizes()) {
-		inlineSizes = objSizes
-	}
-
-	return formatObjectTypeSyntax(t, obj.EffectiveEnums(), obj.EffectiveBits(), inlineRanges, inlineSizes)
+	// Preserve the declared inline constraints rather than reconstructing them
+	// from effective values. Effective intersections can be empty or can differ
+	// syntactically (for example MIN..MAX) from the source constraint.
+	return formatObjectTypeSyntax(t, obj.EffectiveEnums(), obj.EffectiveBits(), obj.Ranges(), obj.Sizes())
 }
 
 // formatObjectTypeSyntax formats the SYNTAX clause for an OBJECT-TYPE.
@@ -195,19 +185,6 @@ func formatObjectTypeSyntax(t *mib.Type, enums, bits []mib.NamedValue, inlineRan
 	}
 
 	return prefix
-}
-
-// rangesEqual reports whether two Range slices are identical.
-func rangesEqual(a, b []mib.Range) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 // sequenceTypeName converts a row entry name to the conventional SEQUENCE type name.

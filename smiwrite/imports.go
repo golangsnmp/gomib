@@ -255,15 +255,18 @@ func collectObjectSyntaxImports(it *importTracker, obj *mib.Object) {
 	collectBaseTypeImport(it, t.EffectiveBase())
 }
 
-// collectTypeSyntaxImports adds imports for the effective base type of a TC.
-// TCs with enums or bits use the INTEGER/BITS keywords directly, so no
-// base type import is needed.
+// collectTypeSyntaxImports adds imports for the type named in a TC's SYNTAX.
+// TCs with enums or bits use the INTEGER/BITS keywords directly, so no type
+// import is needed.
 func collectTypeSyntaxImports(it *importTracker, t *mib.Type) {
 	if len(t.Enums()) > 0 || len(t.Bits()) > 0 {
 		return
 	}
-	base := t.EffectiveBase()
-	collectBaseTypeImport(it, base)
+	if parent := t.Parent(); parent != nil && parent.Name() != "" {
+		it.addType(parent)
+		return
+	}
+	collectBaseTypeImport(it, t.EffectiveBase())
 }
 
 // collectBaseTypeImport imports base SMI types that aren't built-in keywords.

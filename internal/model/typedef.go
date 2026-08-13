@@ -171,16 +171,70 @@ func (t *Type) ParsedDisplayHint() *DisplayHint {
 	return ParseDisplayHint(h)
 }
 
-// EffectiveSizes walks the parent type chain and returns the first non-empty
-// size constraint list.
+// EffectiveSizes returns SIZE constraints intersected across the parent chain.
+// An empty result can mean either no constraint or a disjoint intersection;
+// use EffectiveSizesConstrained to distinguish those cases.
 func (t *Type) EffectiveSizes() []Range {
-	return walkTypeChainSlice(t, func(t *Type) []Range { return t.sizes })
+	values, _ := effectiveTypeConstraints(t, true)
+	return values
 }
 
-// EffectiveRanges walks the parent type chain and returns the first non-empty
-// range constraint list.
+// EffectiveSizesConstrained reports whether any SIZE constraint is declared in
+// the type chain. It remains true when the effective intersection is empty.
+func (t *Type) EffectiveSizesConstrained() bool {
+	_, constrained := effectiveTypeConstraints(t, true)
+	return constrained
+}
+
+// EffectiveRanges returns value constraints intersected across the parent
+// chain. An empty result can mean either no constraint or a disjoint
+// intersection; use EffectiveRangesConstrained to distinguish those cases.
 func (t *Type) EffectiveRanges() []Range {
-	return walkTypeChainSlice(t, func(t *Type) []Range { return t.ranges })
+	values, _ := effectiveTypeConstraints(t, false)
+	return values
+}
+
+// EffectiveRangesConstrained reports whether any range constraint is declared
+// in the type chain. It remains true when the effective intersection is empty.
+func (t *Type) EffectiveRangesConstrained() bool {
+	_, constrained := effectiveTypeConstraints(t, false)
+	return constrained
+}
+
+func effectiveTypeConstraints(t *Type, sizes bool) ([]Range, bool) {
+	chain := make([]*Type, 0, 8)
+	for current, depth := t, 0; current != nil && depth < maxTypeChainDepth; current, depth = current.parent, depth+1 {
+		chain = append(chain, current)
+	}
+	var effective []Range
+	var constrained bool
+	for i := len(chain) - 1; i >= 0; i-- {
+		own := chain[i].ranges
+		if sizes {
+			own = chain[i].sizes
+		}
+		if len(own) == 0 {
+			continue
+		}
+		if !constrained {
+			if base, ok := BaseConstraint(chain[i].EffectiveBase(), sizes, own[0].Span); ok {
+				effective = []Range{base}
+				constrained = true
+			}
+		}
+		if constrained {
+			// Once an ancestor intersection is empty, every descendant remains
+			// empty. A nil effective slice here means an impossible constraint,
+			// not an unconstrained parent.
+			if len(effective) > 0 {
+				effective = IntersectRanges(own, effective)
+			}
+		} else {
+			effective = slices.Clone(own)
+			constrained = true
+		}
+	}
+	return effective, constrained
 }
 
 // EffectiveEnums walks the parent type chain and returns the first non-empty

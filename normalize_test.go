@@ -78,9 +78,13 @@ func normalizeRanges(rs []mib.Range) []testutil.RangeInfo {
 	if len(rs) == 0 {
 		return nil
 	}
-	result := make([]testutil.RangeInfo, len(rs))
-	for i, r := range rs {
-		result[i] = testutil.RangeInfo{Low: r.Min, High: r.Max}
+	result := make([]testutil.RangeInfo, 0, len(rs))
+	for _, r := range rs {
+		low, lowOK := r.Min.AsInt64()
+		high, highOK := r.Max.AsInt64()
+		if lowOK && highOK {
+			result = append(result, testutil.RangeInfo{Low: low, High: high})
+		}
 	}
 	return result
 }

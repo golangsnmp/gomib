@@ -592,7 +592,7 @@ func TestComputeEffectiveValues(t *testing.T) {
 
 	t.Run("inherits sizes from type chain", func(t *testing.T) {
 		parentType := model.NewType("OCTET STRING")
-		model.SetTypeSizes(parentType, []model.Range{{Min: 0, Max: 255}})
+		model.SetTypeSizes(parentType, []model.Range{{Min: model.NewSignedRangeBound(0), Max: model.NewSignedRangeBound(255)}})
 
 		childType := model.NewType("DisplayString")
 		model.SetTypeParent(childType, parentType)
@@ -603,28 +603,28 @@ func TestComputeEffectiveValues(t *testing.T) {
 
 		sizes := obj.EffectiveSizes()
 		testutil.Len(t, sizes, 1, "sizes len")
-		testutil.Equal(t, int64(0), sizes[0].Min, "sizes[0].Min")
-		testutil.Equal(t, int64(255), sizes[0].Max, "sizes[0].Max")
+		testutil.Equal(t, model.NewSignedRangeBound(0), sizes[0].Min, "sizes[0].Min")
+		testutil.Equal(t, model.NewSignedRangeBound(255), sizes[0].Max, "sizes[0].Max")
 	})
 
 	t.Run("object sizes take precedence", func(t *testing.T) {
 		typ := model.NewType("DisplayString")
-		model.SetTypeSizes(typ, []model.Range{{Min: 0, Max: 255}})
+		model.SetTypeSizes(typ, []model.Range{{Min: model.NewSignedRangeBound(0), Max: model.NewSignedRangeBound(255)}})
 
 		obj := model.NewObject("testObj")
 		model.SetObjectType(obj, typ)
-		model.SetObjectEffectiveSizes(obj, []model.Range{{Min: 1, Max: 32}})
+		model.SetObjectEffectiveSizes(obj, []model.Range{{Min: model.NewSignedRangeBound(1), Max: model.NewSignedRangeBound(32)}})
 		computeEffectiveValues(obj)
 
 		sizes := obj.EffectiveSizes()
 		testutil.Len(t, sizes, 1, "sizes len")
-		testutil.Equal(t, int64(1), sizes[0].Min, "sizes[0].Min")
-		testutil.Equal(t, int64(32), sizes[0].Max, "sizes[0].Max")
+		testutil.Equal(t, model.NewSignedRangeBound(1), sizes[0].Min, "sizes[0].Min")
+		testutil.Equal(t, model.NewSignedRangeBound(32), sizes[0].Max, "sizes[0].Max")
 	})
 
 	t.Run("inherits ranges from ancestor", func(t *testing.T) {
 		grandparent := model.NewType("INTEGER")
-		model.SetTypeRanges(grandparent, []model.Range{{Min: -128, Max: 127}})
+		model.SetTypeRanges(grandparent, []model.Range{{Min: model.NewSignedRangeBound(-128), Max: model.NewSignedRangeBound(127)}})
 
 		parent := model.NewType("Integer32")
 		model.SetTypeParent(parent, grandparent)
@@ -638,8 +638,8 @@ func TestComputeEffectiveValues(t *testing.T) {
 
 		ranges := obj.EffectiveRanges()
 		testutil.Len(t, ranges, 1, "ranges len")
-		testutil.Equal(t, int64(-128), ranges[0].Min, "ranges[0].Min")
-		testutil.Equal(t, int64(127), ranges[0].Max, "ranges[0].Max")
+		testutil.Equal(t, model.NewSignedRangeBound(-128), ranges[0].Min, "ranges[0].Min")
+		testutil.Equal(t, model.NewSignedRangeBound(127), ranges[0].Max, "ranges[0].Max")
 	})
 
 	t.Run("inherits enums from type", func(t *testing.T) {
@@ -795,12 +795,12 @@ func TestConvertComplianceModules(t *testing.T) {
 		testutil.NotNil(t, obj.Syntax, "expected non-nil Syntax")
 		testutil.Equal(t, intType, obj.Syntax.Type, "Syntax.Type does not match")
 		testutil.Len(t, obj.Syntax.Ranges, 1, "Syntax.Ranges len")
-		testutil.Equal(t, int64(0), obj.Syntax.Ranges[0].Min, "Syntax.Ranges[0].Min")
-		testutil.Equal(t, int64(100), obj.Syntax.Ranges[0].Max, "Syntax.Ranges[0].Max")
+		testutil.Equal(t, model.NewSignedRangeBound(0), obj.Syntax.Ranges[0].Min, "Syntax.Ranges[0].Min")
+		testutil.Equal(t, model.NewSignedRangeBound(100), obj.Syntax.Ranges[0].Max, "Syntax.Ranges[0].Max")
 		testutil.NotNil(t, obj.WriteSyntax, "expected non-nil WriteSyntax")
 		testutil.Len(t, obj.WriteSyntax.Ranges, 1, "WriteSyntax.Ranges len")
-		testutil.Equal(t, int64(1), obj.WriteSyntax.Ranges[0].Min, "WriteSyntax.Ranges[0].Min")
-		testutil.Equal(t, int64(50), obj.WriteSyntax.Ranges[0].Max, "WriteSyntax.Ranges[0].Max")
+		testutil.Equal(t, model.NewSignedRangeBound(1), obj.WriteSyntax.Ranges[0].Min, "WriteSyntax.Ranges[0].Min")
+		testutil.Equal(t, model.NewSignedRangeBound(50), obj.WriteSyntax.Ranges[0].Max, "WriteSyntax.Ranges[0].Max")
 	})
 }
 
@@ -952,8 +952,8 @@ func TestConvertSupportsModules(t *testing.T) {
 		testutil.NotNil(t, v.Syntax, "expected non-nil Syntax")
 		testutil.Equal(t, intType, v.Syntax.Type, "Syntax.Type does not match")
 		testutil.Len(t, v.Syntax.Ranges, 1, "Syntax.Ranges len")
-		testutil.Equal(t, int64(1), v.Syntax.Ranges[0].Min, "Syntax.Ranges[0].Min")
-		testutil.Equal(t, int64(2), v.Syntax.Ranges[0].Max, "Syntax.Ranges[0].Max")
+		testutil.Equal(t, model.NewSignedRangeBound(1), v.Syntax.Ranges[0].Min, "Syntax.Ranges[0].Min")
+		testutil.Equal(t, model.NewSignedRangeBound(2), v.Syntax.Ranges[0].Max, "Syntax.Ranges[0].Max")
 		testutil.NotNil(t, v.WriteSyntax, "expected non-nil WriteSyntax")
 		testutil.Equal(t, intType, v.WriteSyntax.Type, "WriteSyntax.Type does not match")
 		testutil.Len(t, v.CreationRequires, 2, "CreationRequires len")
@@ -1168,8 +1168,36 @@ func TestResolveSyntaxConstraints(t *testing.T) {
 		testutil.NotNil(t, sc, "syntax constraints")
 		testutil.Equal(t, intType, sc.Type, "constraint type")
 		testutil.Len(t, sc.Ranges, 1, "ranges len")
-		testutil.Equal(t, int64(1), sc.Ranges[0].Min, "range min")
-		testutil.Equal(t, int64(10), sc.Ranges[0].Max, "range max")
+		testutil.Equal(t, model.NewSignedRangeBound(1), sc.Ranges[0].Min, "range min")
+		testutil.Equal(t, model.NewSignedRangeBound(10), sc.Ranges[0].Max, "range max")
+		testutil.Len(t, sc.DeclaredRanges, 1, "declared ranges len")
+		testutil.Equal(t, model.NewSignedRangeBound(1), sc.DeclaredRanges[0].Min, "declared range min")
+	})
+
+	t.Run("empty parent intersection stays empty", func(t *testing.T) {
+		parent := model.NewType("Impossible")
+		model.SetTypeBase(parent, model.BaseInteger32)
+		model.SetTypeRanges(parent, []model.Range{{
+			Min: model.NewSignedRangeBound(30), Max: model.NewSignedRangeBound(40),
+		}})
+		base := model.NewType("Base")
+		model.SetTypeBase(base, model.BaseInteger32)
+		model.SetTypeRanges(base, []model.Range{{
+			Min: model.NewSignedRangeBound(0), Max: model.NewSignedRangeBound(10),
+		}})
+		model.SetTypeParent(parent, base)
+		ctx.registerModuleTypeSymbol(mod, "Impossible", parent)
+
+		sc := resolveSyntaxConstraints(ctx, &module.TypeSyntaxConstrained{
+			Base: &module.TypeSyntaxTypeRef{Name: "Impossible"},
+			Constraint: &module.ConstraintRange{
+				Ranges: []module.Range{module.NewRangeSigned(35, 36, types.Span{})},
+			},
+		}, mod, "testObj", types.Span{})
+
+		testutil.Len(t, sc.Ranges, 0, "effective ranges remain empty")
+		testutil.Len(t, sc.DeclaredRanges, 1, "declared range preserved")
+		testutil.Equal(t, model.NewSignedRangeBound(35), sc.DeclaredRanges[0].Min, "declared range min")
 	})
 
 	t.Run("bits syntax keeps bit labels", func(t *testing.T) {
@@ -1240,7 +1268,7 @@ func TestCreateResolvedObjects(t *testing.T) {
 	displayType := model.NewType("DisplayString")
 	model.SetTypeBase(displayType, model.BaseOctetString)
 	model.SetTypeDisplayHint(displayType, "255a")
-	model.SetTypeSizes(displayType, []model.Range{{Min: 0, Max: 255}})
+	model.SetTypeSizes(displayType, []model.Range{{Min: model.NewSignedRangeBound(0), Max: model.NewSignedRangeBound(255)}})
 	ctx.registerModuleTypeSymbol(mod, "DisplayString", displayType)
 
 	intType := model.NewType("Integer32")

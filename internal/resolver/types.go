@@ -3,7 +3,6 @@ package resolver
 import (
 	"fmt"
 	"log/slog"
-	"math"
 
 	"github.com/golangsnmp/gomib/internal/graph"
 	"github.com/golangsnmp/gomib/internal/model"
@@ -466,38 +465,30 @@ func syntaxToBaseType(syntax module.TypeSyntax) (model.BaseType, bool) {
 func rangesToConstraint(ranges []module.Range) []model.Range {
 	out := make([]model.Range, 0, len(ranges))
 	for _, r := range ranges {
-		lo, rawLo := rangeValueToConstraint(r.Min)
-		hi, rawHi := lo, rawLo
+		lo := rangeValueToConstraint(r.Min)
+		hi := lo
 		if r.Max != nil {
-			hi, rawHi = rangeValueToConstraint(r.Max)
+			hi = rangeValueToConstraint(r.Max)
 		}
-		out = append(out, model.Range{Min: lo, Max: hi, RawMin: rawLo, RawMax: rawHi, Span: r.Span})
+		out = append(out, model.Range{Min: lo, Max: hi, Span: r.Span})
 	}
 	return out
 }
 
-func rangeValueToConstraint(value module.RangeValue) (int64, string) {
-	if raw, ok := value.(*module.RangeValueRaw); ok {
-		return 0, raw.Value
-	}
-	return rangeValueToI64(value), ""
-}
-
-func rangeValueToI64(value module.RangeValue) int64 {
+func rangeValueToConstraint(value module.RangeValue) model.RangeBound {
 	switch v := value.(type) {
 	case *module.RangeValueSigned:
-		return v.Value
+		return model.NewSignedRangeBound(v.Value)
 	case *module.RangeValueUnsigned:
-		if v.Value > uint64(math.MaxInt64) {
-			return math.MaxInt64
-		}
-		return int64(v.Value)
+		return model.NewUnsignedRangeBound(v.Value)
 	case *module.RangeValueMin:
-		return math.MinInt64
+		return model.RangeBound{Kind: model.RangeBoundMin}
 	case *module.RangeValueMax:
-		return math.MaxInt64
+		return model.RangeBound{Kind: model.RangeBoundMax}
+	case *module.RangeValueRaw:
+		return model.NewRawRangeBound(v.Value)
 	default:
-		return 0
+		return model.NewRawRangeBound("")
 	}
 }
 

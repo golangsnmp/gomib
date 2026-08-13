@@ -35,6 +35,8 @@ func ParseOID(s string) (OID, error) { return model.ParseOID(s) }
 
 type (
 	Range             = model.Range
+	RangeBound        = model.RangeBound
+	RangeBoundKind    = model.RangeBoundKind
 	NamedValue        = model.NamedValue
 	Revision          = model.Revision
 	IndexEntry        = model.IndexEntry
@@ -44,6 +46,18 @@ type (
 	TrapInfo          = model.TrapInfo
 	SyntaxConstraints = model.SyntaxConstraints
 )
+
+const (
+	RangeBoundSigned   = model.RangeBoundSigned
+	RangeBoundUnsigned = model.RangeBoundUnsigned
+	RangeBoundMin      = model.RangeBoundMin
+	RangeBoundMax      = model.RangeBoundMax
+	RangeBoundRaw      = model.RangeBoundRaw
+)
+
+func NewSignedRangeBound(value int64) RangeBound    { return model.NewSignedRangeBound(value) }
+func NewUnsignedRangeBound(value uint64) RangeBound { return model.NewUnsignedRangeBound(value) }
+func NewRawRangeBound(value string) RangeBound      { return model.NewRawRangeBound(value) }
 
 // --- DefVal ---
 

@@ -304,6 +304,68 @@ func TestHexRangeLiteralLowering(t *testing.T) {
 	}
 }
 
+func TestInvalidRangeEndpointsPreserveRawSource(t *testing.T) {
+	const source = `
+TEST-MIB DEFINITIONS ::= BEGIN
+Overflow ::= INTEGER (18446744073709551616)
+Underflow ::= INTEGER (-9223372036854775809)
+Symbolic ::= INTEGER (VENDOR-MIN)
+END
+`
+	mods := parseMods(t, source)
+	if len(mods) != 1 {
+		t.Fatalf("modules = %d, want 1", len(mods))
+	}
+	if len(mods[0].TypeDefs) != 3 {
+		t.Fatalf("type definitions = %d, want 3", len(mods[0].TypeDefs))
+	}
+
+	want := []string{"18446744073709551616", "-9223372036854775809", "VENDOR-MIN"}
+	for i, raw := range want {
+		syntax, ok := mods[0].TypeDefs[i].Syntax.(*module.TypeSyntaxConstrained)
+		if !ok {
+			t.Fatalf("type %d syntax = %T, want constrained", i, mods[0].TypeDefs[i].Syntax)
+		}
+		got, ok := syntax.Constraint.(*module.ConstraintRange).Ranges[0].Min.(*module.RangeValueRaw)
+		if !ok || got.Value != raw {
+			t.Errorf("type %d endpoint = %#v, want raw %q", i, got, raw)
+		}
+	}
+
+	var unknown int
+	for _, diag := range mods[0].Diagnostics {
+		if diag.Code == types.DiagUnknownRangeValue {
+			unknown++
+		}
+	}
+	if unknown != len(want) {
+		t.Errorf("got %d unknown range diagnostics, want %d", unknown, len(want))
+	}
+}
+
+func TestInvalidRangeEndpointDiagnosticConfig(t *testing.T) {
+	const source = `
+TEST-MIB DEFINITIONS ::= BEGIN
+Unknown ::= INTEGER (VENDOR-MIN)
+END
+`
+	if hasDiag(parseModsWithConfig(t, source, types.DefaultConfig()), types.DiagUnknownRangeValue) {
+		t.Error("default reporting should suppress warning-level unknown range diagnostic")
+	}
+
+	overridden := types.DefaultConfig()
+	overridden.Overrides = map[string]types.Severity{types.DiagUnknownRangeValue: types.SeverityMinor}
+	if !hasDiag(parseModsWithConfig(t, source, overridden), types.DiagUnknownRangeValue) {
+		t.Error("severity override should enable unknown range diagnostic")
+	}
+
+	ignored := types.VerboseConfig()
+	ignored.Ignore = []string{types.DiagUnknownRangeValue}
+	if hasDiag(parseModsWithConfig(t, source, ignored), types.DiagUnknownRangeValue) {
+		t.Error("ignore configuration should suppress unknown range diagnostic")
+	}
+}
+
 func TestBitsNameRedefinition(t *testing.T) {
 	mods := parseMods(t, `
 TEST-MIB DEFINITIONS ::= BEGIN

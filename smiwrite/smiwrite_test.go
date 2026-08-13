@@ -3,11 +3,13 @@ package smiwrite
 import (
 	"bytes"
 	"context"
+	"math"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/golangsnmp/gomib"
+	"github.com/golangsnmp/gomib/internal/model"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -102,10 +104,12 @@ func TestFormatRanges(t *testing.T) {
 		want  string
 	}{
 		{nil, ""},
-		{[]mib.Range{{Min: 0, Max: 255}}, "(0..255)"},
-		{[]mib.Range{{Min: 1, Max: 1}}, "(1)"},
-		{[]mib.Range{{Min: 0, Max: 10}, {Min: 20, Max: 30}}, "(0..10 | 20..30)"},
-		{[]mib.Range{{RawMin: "'0G'H", RawMax: "'10000000000000000'H"}}, "('0G'H..'10000000000000000'H)"},
+		{[]mib.Range{{Min: mib.NewSignedRangeBound(0), Max: mib.NewSignedRangeBound(255)}}, "(0..255)"},
+		{[]mib.Range{{Min: mib.NewSignedRangeBound(1), Max: mib.NewSignedRangeBound(1)}}, "(1)"},
+		{[]mib.Range{{Min: mib.NewSignedRangeBound(0), Max: mib.NewSignedRangeBound(10)}, {Min: mib.NewSignedRangeBound(20), Max: mib.NewSignedRangeBound(30)}}, "(0..10 | 20..30)"},
+		{[]mib.Range{{Min: mib.NewRawRangeBound("'0G'H"), Max: mib.NewRawRangeBound("'10000000000000000'H")}}, "('0G'H..'10000000000000000'H)"},
+		{[]mib.Range{{Min: mib.RangeBound{Kind: mib.RangeBoundMin}, Max: mib.RangeBound{Kind: mib.RangeBoundMax}}}, "(MIN..MAX)"},
+		{[]mib.Range{{Min: mib.NewUnsignedRangeBound(0), Max: mib.NewUnsignedRangeBound(math.MaxUint64)}}, "(0..18446744073709551615)"},
 	}
 	for _, tt := range tests {
 		got := formatRanges(tt.input)
@@ -115,14 +119,87 @@ func TestFormatRanges(t *testing.T) {
 	}
 }
 
+func TestFormatTypeSyntaxPreservesDeclaredParent(t *testing.T) {
+	parentModule := model.NewModule("PARENT-MIB")
+	parent := model.NewType("ParentRange")
+	model.SetTypeModule(parent, parentModule)
+	model.SetTypeBase(parent, model.BaseInteger32)
+	model.SetTypeRanges(parent, []model.Range{{
+		Min: model.NewSignedRangeBound(1),
+		Max: model.NewSignedRangeBound(10),
+	}})
+
+	child := model.NewType("ChildRange")
+	model.SetTypeParent(child, parent)
+	model.SetTypeRanges(child, []model.Range{{
+		Min: model.RangeBound{Kind: model.RangeBoundMin},
+		Max: model.RangeBound{Kind: model.RangeBoundMax},
+	}})
+
+	if got, want := formatTypeSyntax(child), "ParentRange (MIN..MAX)"; got != want {
+		t.Errorf("formatTypeSyntax() = %q, want %q", got, want)
+	}
+
+	imports := newImportTracker("CHILD-MIB")
+	collectTypeSyntaxImports(imports, child)
+	if _, ok := imports.imports["PARENT-MIB"]["ParentRange"]; !ok {
+		t.Errorf("imports = %#v, want PARENT-MIB::ParentRange", imports.imports)
+	}
+	if _, ok := imports.imports["SNMPv2-SMI"]["Integer32"]; ok {
+		t.Errorf("imports = %#v, should not import effective base Integer32", imports.imports)
+	}
+}
+
+func TestFormatObjectSyntaxPreservesDeclaredDisjointRange(t *testing.T) {
+	typ := model.NewType("ParentRange")
+	model.SetTypeBase(typ, model.BaseInteger32)
+	obj := model.NewObject("disjointObject")
+	model.SetObjectType(obj, typ)
+	model.SetObjectDeclaredRanges(obj, []model.Range{{
+		Min: model.NewSignedRangeBound(30),
+		Max: model.NewSignedRangeBound(40),
+	}})
+	model.SetObjectEffectiveRanges(obj, nil)
+
+	if got, want := formatObjectSyntax(obj), "ParentRange (30..40)"; got != want {
+		t.Errorf("formatObjectSyntax() = %q, want %q", got, want)
+	}
+}
+
+func TestFormatSyntaxConstraintsPreservesDeclaredDisjointRange(t *testing.T) {
+	typ := model.NewType("ParentRange")
+	disjoint := &mib.SyntaxConstraints{
+		Type:              typ,
+		RangesConstrained: true,
+		DeclaredRanges: []mib.Range{{
+			Min: mib.NewSignedRangeBound(30),
+			Max: mib.NewSignedRangeBound(40),
+		}},
+	}
+	if got, want := formatSyntaxConstraints(disjoint), "ParentRange (30..40)"; got != want {
+		t.Errorf("formatSyntaxConstraints() = %q, want %q", got, want)
+	}
+
+	legacy := &mib.SyntaxConstraints{
+		Type: typ,
+		Ranges: []mib.Range{{
+			Min: mib.NewSignedRangeBound(1),
+			Max: mib.NewSignedRangeBound(10),
+		}},
+	}
+	if got, want := formatSyntaxConstraints(legacy), "ParentRange (1..10)"; got != want {
+		t.Errorf("formatSyntaxConstraints() legacy = %q, want %q", got, want)
+	}
+}
+
 func TestFormatSizes(t *testing.T) {
 	tests := []struct {
 		input []mib.Range
 		want  string
 	}{
 		{nil, ""},
-		{[]mib.Range{{Min: 0, Max: 255}}, "(SIZE (0..255))"},
-		{[]mib.Range{{Min: 6, Max: 6}}, "(SIZE (6))"},
+		{[]mib.Range{{Min: mib.NewSignedRangeBound(0), Max: mib.NewSignedRangeBound(255)}}, "(SIZE (0..255))"},
+		{[]mib.Range{{Min: mib.NewSignedRangeBound(6), Max: mib.NewSignedRangeBound(6)}}, "(SIZE (6))"},
 	}
 	for _, tt := range tests {
 		got := formatSizes(tt.input)

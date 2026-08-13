@@ -44,7 +44,7 @@ func (e *emitter) emitTextualConvention(t *mib.Type) error {
 }
 
 // formatTypeSyntax formats the SYNTAX clause for a TEXTUAL-CONVENTION.
-// Uses EffectiveBase() keyword plus direct constraints on this type.
+// Uses the declared parent type plus direct constraints on this type.
 func formatTypeSyntax(t *mib.Type) string {
 	var b strings.Builder
 
@@ -63,8 +63,11 @@ func formatTypeSyntax(t *mib.Type) string {
 		return b.String()
 	}
 
-	base := t.EffectiveBase()
-	b.WriteString(baseTypeSyntax(base))
+	if parent := t.Parent(); parent != nil && parent.Name() != "" {
+		b.WriteString(parent.Name())
+	} else {
+		b.WriteString(baseTypeSyntax(t.EffectiveBase()))
+	}
 
 	if sizes := t.Sizes(); len(sizes) > 0 {
 		b.WriteString(" ")

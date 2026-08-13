@@ -1214,8 +1214,8 @@ func TestHexLiteralRanges(t *testing.T) {
 	ranges := typ.Ranges()
 	testutil.Equal(t, len(ranges), 1, "MessageSize should have 1 range")
 	if len(ranges) == 1 {
-		testutil.Equal(t, ranges[0].Min, int64(0), "MessageSize range min")
-		testutil.Equal(t, ranges[0].Max, int64(2147483647), "MessageSize range max")
+		testutil.Equal(t, ranges[0].Min, mib.NewUnsignedRangeBound(0), "MessageSize range min")
+		testutil.Equal(t, ranges[0].Max, mib.NewUnsignedRangeBound(2147483647), "MessageSize range max")
 	}
 
 	for _, name := range []string{"BitRate", "BurstSize"} {
@@ -1225,8 +1225,8 @@ func TestHexLiteralRanges(t *testing.T) {
 		ranges := typ.Ranges()
 		testutil.Equal(t, len(ranges), 1, "%s should have 1 range", name)
 		if len(ranges) == 1 {
-			testutil.Equal(t, ranges[0].Min, int64(0), "%s range min", name)
-			testutil.Equal(t, ranges[0].Max, int64(2147483647), "%s range max", name)
+			testutil.Equal(t, ranges[0].Min, mib.NewUnsignedRangeBound(0), "%s range min", name)
+			testutil.Equal(t, ranges[0].Max, mib.NewUnsignedRangeBound(2147483647), "%s range max", name)
 		}
 	}
 }

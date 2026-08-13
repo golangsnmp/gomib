@@ -213,11 +213,19 @@ func formatSyntaxConstraints(sc *mib.SyntaxConstraints) string {
 		}
 	}
 
-	if len(sc.Sizes) > 0 {
-		return typeName + " " + formatSizes(sc.Sizes)
+	declaredSizes := sc.DeclaredSizes
+	if len(declaredSizes) == 0 {
+		declaredSizes = sc.Sizes
 	}
-	if len(sc.Ranges) > 0 {
-		return typeName + " " + formatRanges(sc.Ranges)
+	if len(declaredSizes) > 0 {
+		return typeName + " " + formatSizes(declaredSizes)
+	}
+	declaredRanges := sc.DeclaredRanges
+	if len(declaredRanges) == 0 {
+		declaredRanges = sc.Ranges
+	}
+	if len(declaredRanges) > 0 {
+		return typeName + " " + formatRanges(declaredRanges)
 	}
 
 	return typeName

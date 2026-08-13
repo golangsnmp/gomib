@@ -279,8 +279,8 @@ func TestStrictImportedMetadataPreserved(t *testing.T) {
 		sizes := display.EffectiveSizes()
 		testutil.Len(t, sizes, 1, "DisplayString sizes")
 		if len(sizes) == 1 {
-			testutil.Equal(t, int64(0), sizes[0].Min, "DisplayString size min")
-			testutil.Equal(t, int64(255), sizes[0].Max, "DisplayString size max")
+			testutil.Equal(t, mib.NewUnsignedRangeBound(0), sizes[0].Min, "DisplayString size min")
+			testutil.Equal(t, mib.NewUnsignedRangeBound(255), sizes[0].Max, "DisplayString size max")
 		}
 	}
 
@@ -308,8 +308,8 @@ func TestStrictImportedMetadataPreserved(t *testing.T) {
 		sizes := mac.EffectiveSizes()
 		testutil.Len(t, sizes, 1, "MacAddress sizes")
 		if len(sizes) == 1 {
-			testutil.Equal(t, int64(6), sizes[0].Min, "MacAddress size min")
-			testutil.Equal(t, int64(6), sizes[0].Max, "MacAddress size max")
+			testutil.Equal(t, mib.NewUnsignedRangeBound(6), sizes[0].Min, "MacAddress size min")
+			testutil.Equal(t, mib.NewUnsignedRangeBound(6), sizes[0].Max, "MacAddress size max")
 		}
 	}
 
@@ -319,8 +319,8 @@ func TestStrictImportedMetadataPreserved(t *testing.T) {
 		sizes := bridgeID.EffectiveSizes()
 		testutil.Len(t, sizes, 1, "BridgeId sizes")
 		if len(sizes) == 1 {
-			testutil.Equal(t, int64(8), sizes[0].Min, "BridgeId size min")
-			testutil.Equal(t, int64(8), sizes[0].Max, "BridgeId size max")
+			testutil.Equal(t, mib.NewUnsignedRangeBound(8), sizes[0].Min, "BridgeId size min")
+			testutil.Equal(t, mib.NewUnsignedRangeBound(8), sizes[0].Max, "BridgeId size max")
 		}
 	}
 
@@ -331,8 +331,8 @@ func TestStrictImportedMetadataPreserved(t *testing.T) {
 		ranges := timeout.EffectiveRanges()
 		testutil.Len(t, ranges, 1, "Timeout ranges")
 		if len(ranges) == 1 {
-			testutil.Equal(t, int64(100), ranges[0].Min, "Timeout range min")
-			testutil.Equal(t, int64(1000), ranges[0].Max, "Timeout range max")
+			testutil.Equal(t, mib.NewUnsignedRangeBound(100), ranges[0].Min, "Timeout range min")
+			testutil.Equal(t, mib.NewUnsignedRangeBound(1000), ranges[0].Max, "Timeout range max")
 		}
 	}
 }
