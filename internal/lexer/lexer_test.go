@@ -164,6 +164,46 @@ func TestMacroSkip(t *testing.T) {
 	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
+func TestMacroSkipQuotedEND(t *testing.T) {
+	source := `OBJECT-TYPE MACRO ::= BEGIN
+    TYPE NOTATION ::= "END"
+END
+
+ifIndex OBJECT-TYPE`
+
+	kinds := tokenKinds(source)
+	expected := []TokenKind{
+		TokKwObjectType,
+		TokKwMacro,
+		TokKwEnd,
+		TokLowercaseIdent,
+		TokKwObjectType,
+		TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "quoted END in macro body")
+}
+
+func TestMacroSkipMultilineQuotedEND(t *testing.T) {
+	source := `OBJECT-TYPE MACRO ::= BEGIN
+    TYPE NOTATION ::= "first line
+END
+last line"
+END
+
+ifIndex OBJECT-TYPE`
+
+	kinds := tokenKinds(source)
+	expected := []TokenKind{
+		TokKwObjectType,
+		TokKwMacro,
+		TokKwEnd,
+		TokLowercaseIdent,
+		TokKwObjectType,
+		TokEOF,
+	}
+	testutil.SliceEqual(t, expected, kinds, "multiline quoted END in macro body")
+}
+
 func TestMacroSkipENDInsideIdentifier(t *testing.T) {
 	// END appearing as a suffix of an identifier (e.g. PRETEND) must not
 	// terminate the macro body early.

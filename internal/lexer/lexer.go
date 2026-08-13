@@ -299,6 +299,8 @@ func (l *Lexer) emitComment() Token {
 }
 
 func (l *Lexer) skipMacroBody() Token {
+	inQuotedString := false
+
 	for {
 		l.skipWhitespace()
 
@@ -306,6 +308,17 @@ func (l *Lexer) skipMacroBody() Token {
 			start := l.pos
 			l.state = stateNormal
 			return l.token(TokEOF, start)
+		}
+
+		if b, _ := l.peek(); b == '"' {
+			inQuotedString = !inQuotedString
+			l.advance()
+			continue
+		}
+
+		if inQuotedString {
+			l.advance()
+			continue
 		}
 
 		if l.matchesKeyword([]byte("END")) {
