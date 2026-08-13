@@ -8,6 +8,7 @@ import (
 
 	"github.com/golangsnmp/gomib"
 	"github.com/golangsnmp/gomib/internal/testutil"
+	"github.com/golangsnmp/gomib/internal/types"
 	"github.com/golangsnmp/gomib/mib"
 )
 
@@ -356,6 +357,111 @@ func TestDiagnosticThresholdNotTriggered(t *testing.T) {
 	// Error-level diagnostics should not trigger failure.
 	m := loadViolationMIB(t, "MISSING-IMPORT-TEST-MIB", mib.ResolverStrict)
 	testutil.NotNil(t, m, "Mib should be returned")
+}
+
+func TestDiagnosticOverridePromotionCausesLoadFailure(t *testing.T) {
+	const source = `
+OVERRIDE-PROMOTION-MIB DEFINITIONS ::= BEGIN
+VendorEnum ::= INTEGER { vendorSentinel(4294967295) }
+END
+`
+	src := &fakeSource{modules: map[string]fakeModule{
+		"OVERRIDE-PROMOTION-MIB": {content: []byte(source)},
+	}}
+	cfg := mib.DefaultConfig()
+	cfg.Overrides = map[string]mib.Severity{types.DiagEnumValueOutOfRange: mib.SeveritySevere}
+
+	m, err := gomib.Load(context.Background(),
+		gomib.WithSource(src),
+		gomib.WithModules("OVERRIDE-PROMOTION-MIB"),
+		gomib.WithDiagnosticConfig(cfg),
+	)
+	testutil.True(t, errors.Is(err, gomib.ErrDiagnosticThreshold), "promotion should cause threshold failure, got %v", err)
+	testutil.NotNil(t, m, "Load should return the Mib on threshold failure")
+	diags := moduleDiagnostics(m, "OVERRIDE-PROMOTION-MIB")
+	for _, d := range diags {
+		if d.Code == types.DiagEnumValueOutOfRange {
+			testutil.Equal(t, mib.SeveritySevere, d.Severity, "promoted severity")
+			return
+		}
+	}
+	t.Fatal("expected promoted enum bounds diagnostic")
+}
+
+func TestDiagnosticOverrideRetainedDemotionAvoidsLoadFailure(t *testing.T) {
+	const source = `
+OVERRIDE-DEMOTION-MIB DEFINITIONS ::= BEGIN
+BadEnum ::= INTEGER { duplicate(1), duplicate(2) }
+END
+`
+	src := &fakeSource{modules: map[string]fakeModule{
+		"OVERRIDE-DEMOTION-MIB": {content: []byte(source)},
+	}}
+	cfg := mib.QuietConfig()
+	cfg.FailAt = mib.SeverityError
+	cfg.Overrides = map[string]mib.Severity{types.DiagEnumNameRedefinition: mib.SeverityInfo}
+
+	m, err := gomib.Load(context.Background(),
+		gomib.WithSource(src),
+		gomib.WithModules("OVERRIDE-DEMOTION-MIB"),
+		gomib.WithDiagnosticConfig(cfg),
+	)
+	testutil.NoError(t, err, "retained demotion should avoid threshold failure")
+	for _, d := range moduleDiagnostics(m, "OVERRIDE-DEMOTION-MIB") {
+		if d.Code == types.DiagEnumNameRedefinition {
+			testutil.Equal(t, mib.SeverityInfo, d.Severity, "demoted severity")
+			return
+		}
+	}
+	t.Fatal("expected demoted diagnostic to be retained")
+}
+
+func TestDiagnosticOverrideIgnoreAndFatalPolicies(t *testing.T) {
+	const source = `
+OVERRIDE-POLICY-MIB DEFINITIONS ::= BEGIN
+VendorEnum ::= INTEGER { vendorSentinel(4294967295) }
+END
+`
+	src := &fakeSource{modules: map[string]fakeModule{
+		"OVERRIDE-POLICY-MIB": {content: []byte(source)},
+	}}
+
+	t.Run("ignore suppresses non-fatal promotion", func(t *testing.T) {
+		cfg := mib.VerboseConfig()
+		cfg.FailAt = mib.SeveritySevere
+		cfg.Overrides = map[string]mib.Severity{types.DiagEnumValueOutOfRange: mib.SeveritySevere}
+		cfg.Ignore = []string{types.DiagEnumValueOutOfRange}
+		m, err := gomib.Load(context.Background(),
+			gomib.WithSource(src),
+			gomib.WithModules("OVERRIDE-POLICY-MIB"),
+			gomib.WithDiagnosticConfig(cfg),
+		)
+		testutil.NoError(t, err, "ignored non-fatal diagnostic should not fail")
+		for _, d := range m.Diagnostics() {
+			if d.Code == types.DiagEnumValueOutOfRange {
+				t.Fatal("ignored diagnostic should not be retained")
+			}
+		}
+	})
+
+	t.Run("effective fatal bypasses ignore and reporting", func(t *testing.T) {
+		cfg := mib.SilentConfig()
+		cfg.Overrides = map[string]mib.Severity{types.DiagEnumValueOutOfRange: mib.SeverityFatal}
+		cfg.Ignore = []string{types.DiagEnumValueOutOfRange}
+		m, err := gomib.Load(context.Background(),
+			gomib.WithSource(src),
+			gomib.WithModules("OVERRIDE-POLICY-MIB"),
+			gomib.WithDiagnosticConfig(cfg),
+		)
+		testutil.True(t, errors.Is(err, gomib.ErrDiagnosticThreshold), "fatal diagnostic should fail, got %v", err)
+		for _, d := range m.Diagnostics() {
+			if d.Code == types.DiagEnumValueOutOfRange {
+				testutil.Equal(t, mib.SeverityFatal, d.Severity, "fatal severity")
+				return
+			}
+		}
+		t.Fatal("effective fatal diagnostic should be retained")
+	})
 }
 
 // fakeSource is a test gomib.Source that returns pre-configured results.

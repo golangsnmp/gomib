@@ -50,15 +50,14 @@ func newValidateContext(source []byte, logger *slog.Logger, diagConfig types.Dia
 	}
 }
 
-// emitDiagnostic records a diagnostic if the current config allows it.
+// emitDiagnostic records a diagnostic if the current config retains it.
 func (ctx *validateContext) emitDiagnostic(code string, span types.Span, message string) {
-	sev := types.SeverityForCode(code)
-	if !ctx.diagConfig.ShouldReport(code, sev) {
+	if !ctx.diagConfig.ShouldRetain(code) {
 		return
 	}
 	line, col := types.LineColFromTable(ctx.lineTable, span.Start)
 	ctx.diagnostics = append(ctx.diagnostics, types.Diagnostic{
-		Severity: sev,
+		Severity: ctx.diagConfig.EffectiveSeverity(code),
 		Code:     code,
 		Message:  message,
 		Module:   ctx.moduleName,

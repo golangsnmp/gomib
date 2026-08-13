@@ -237,8 +237,14 @@ END
 
 	overridden := types.DefaultConfig()
 	overridden.Overrides = map[string]types.Severity{types.DiagEnumValueOutOfRange: types.SeverityMinor}
-	if !hasDiag(parseModsWithConfig(t, source, overridden), types.DiagEnumValueOutOfRange) {
+	mods := parseModsWithConfig(t, source, overridden)
+	if !hasDiag(mods, types.DiagEnumValueOutOfRange) {
 		t.Error("severity override should enable enum bounds diagnostic at default reporting")
+	}
+	for _, diag := range mods[0].Diagnostics {
+		if diag.Code == types.DiagEnumValueOutOfRange && diag.Severity != types.SeverityMinor {
+			t.Errorf("overridden severity = %v, want %v", diag.Severity, types.SeverityMinor)
+		}
 	}
 
 	ignored := types.VerboseConfig()

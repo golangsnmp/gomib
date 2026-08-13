@@ -29,6 +29,22 @@ func TestSpanDiagnosticCollector_EmitDiagnostic(t *testing.T) {
 	}
 }
 
+func TestSpanDiagnosticCollector_EmitDiagnosticEffectiveSeverity(t *testing.T) {
+	config := DefaultConfig()
+	config.Overrides = map[string]Severity{DiagIdentifierUnderscore: SeverityMinor}
+	c := NewSpanDiagnosticCollector(config)
+
+	c.EmitDiagnostic(DiagIdentifierUnderscore, NewSpan(0, 5), "has underscore")
+
+	diags := c.Diagnostics()
+	if len(diags) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %d", len(diags))
+	}
+	if diags[0].Severity != SeverityMinor {
+		t.Errorf("severity = %v, want %v", diags[0].Severity, SeverityMinor)
+	}
+}
+
 func TestSpanDiagnosticCollector_EmitFiltered(t *testing.T) {
 	config := SilentConfig()
 	c := NewSpanDiagnosticCollector(config)
@@ -43,11 +59,12 @@ func TestSpanDiagnosticCollector_EmitFiltered(t *testing.T) {
 
 func TestSpanDiagnosticCollector_RecordDiagnostic(t *testing.T) {
 	config := SilentConfig()
+	config.Overrides = map[string]Severity{DiagIdentifierUnderscore: SeverityFatal}
 	c := NewSpanDiagnosticCollector(config)
 
-	// RecordDiagnostic bypasses filtering.
+	// RecordDiagnostic bypasses filtering but still persists effective severity.
 	diag := SpanDiagnostic{
-		Severity: SeverityMinor,
+		Severity: SeverityStyle,
 		Code:     DiagIdentifierUnderscore,
 		Span:     NewSpan(0, 5),
 		Message:  "has underscore",
@@ -58,8 +75,8 @@ func TestSpanDiagnosticCollector_RecordDiagnostic(t *testing.T) {
 		t.Fatalf("expected 1 diagnostic, got %d", c.DiagnosticCount())
 	}
 	got := c.Diagnostics()
-	if got[0] != diag {
-		t.Errorf("expected %v, got %v", diag, got[0])
+	if got[0].Severity != SeverityFatal {
+		t.Errorf("severity = %v, want %v", got[0].Severity, SeverityFatal)
 	}
 }
 

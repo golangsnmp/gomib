@@ -15,22 +15,23 @@ func NewSpanDiagnosticCollector(config DiagnosticConfig) SpanDiagnosticCollector
 	return SpanDiagnosticCollector{DiagConfig: config}
 }
 
-// EmitDiagnostic records a diagnostic if the config reports it.
+// EmitDiagnostic records a diagnostic if the config retains it.
 func (c *SpanDiagnosticCollector) EmitDiagnostic(code string, span Span, message string) {
-	sev := SeverityForCode(code)
-	if !c.DiagConfig.ShouldReport(code, sev) {
+	if !c.DiagConfig.ShouldRetain(code) {
 		return
 	}
 	c.diagnostics = append(c.diagnostics, SpanDiagnostic{
-		Severity: sev,
+		Severity: c.DiagConfig.EffectiveSeverity(code),
 		Code:     code,
 		Span:     span,
 		Message:  message,
 	})
 }
 
-// RecordDiagnostic appends a pre-built diagnostic without filtering.
+// RecordDiagnostic appends a pre-built diagnostic without filtering, storing
+// the configured effective severity.
 func (c *SpanDiagnosticCollector) RecordDiagnostic(diag SpanDiagnostic) {
+	diag.Severity = c.DiagConfig.EffectiveSeverity(diag.Code)
 	c.diagnostics = append(c.diagnostics, diag)
 }
 

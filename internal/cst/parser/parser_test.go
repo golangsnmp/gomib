@@ -705,6 +705,25 @@ func TestExportsCommentSemicolonsPreserveFollowingDefinition(t *testing.T) {
 	}
 }
 
+func TestParseErrorPersistsEffectiveSeverity(t *testing.T) {
+	const source = `TEST-MIB DEFINITIONS ::= BEGIN
+BROKEN
+END
+`
+	cfg := types.VerboseConfig()
+	cfg.Overrides = map[string]types.Severity{types.DiagParseError: types.SeveritySevere}
+	p := New([]byte(source), nil, cfg)
+	p.ParseModule()
+
+	diags := p.Diagnostics()
+	if len(diags) != 1 {
+		t.Fatalf("expected one parse error, got %v", diags)
+	}
+	if diags[0].Severity != types.SeveritySevere {
+		t.Errorf("parse error severity = %v, want %v", diags[0].Severity, types.SeveritySevere)
+	}
+}
+
 func TestExportsSkippingPreservesRecovery(t *testing.T) {
 	source := `TEST-MIB DEFINITIONS ::= BEGIN
 EXPORTS;

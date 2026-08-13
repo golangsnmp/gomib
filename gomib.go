@@ -46,9 +46,11 @@ func WithLogger(logger *slog.Logger) LoadOption {
 
 // WithDiagnosticConfig sets the diagnostic reporting and failure configuration.
 //
-// DiagnosticConfig controls two independent concerns:
-//   - Reporting: which diagnostics appear in [mib.Mib.Diagnostics] (verbosity filter).
-//   - FailAt: which severity level causes [Load] to return [ErrDiagnosticThreshold].
+// DiagnosticConfig controls independent diagnostic policies:
+//   - Reporting: the baseline severity retained in [mib.Mib.Diagnostics].
+//   - Overrides: the effective severity stored on matching diagnostics.
+//   - Ignore: which non-fatal diagnostics are suppressed entirely.
+//   - FailAt: which stored severity causes [Load] to return [ErrDiagnosticThreshold].
 //
 // This is separate from [WithResolverStrictness], which controls how the
 // resolver handles ambiguous or missing references. A permissive resolver

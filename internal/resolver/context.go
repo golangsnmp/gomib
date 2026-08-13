@@ -133,11 +133,10 @@ func (c *resolverContext) registerModuleTypeSymbol(mod *module.Module, name stri
 	c.typeSymbols.set(mod, name, t)
 }
 
-// EmitDiagnostic records a diagnostic, filtered by the current config's severity and code rules.
+// EmitDiagnostic records a diagnostic, filtered by the current config's retention rules.
 // If mod is non-nil and has a line table, the span is converted to line/column numbers.
 func (c *resolverContext) EmitDiagnostic(code string, mod *module.Module, span types.Span, message string) {
-	sev := types.SeverityForCode(code)
-	if !c.diagConfig.ShouldReport(code, sev) {
+	if !c.diagConfig.ShouldRetain(code) {
 		return
 	}
 	var moduleName string
@@ -147,7 +146,7 @@ func (c *resolverContext) EmitDiagnostic(code string, mod *module.Module, span t
 		line, col = module.LineColFromLineTable(mod.LineTable, span)
 	}
 	c.diagnostics = append(c.diagnostics, model.Diagnostic{
-		Severity: sev,
+		Severity: c.diagConfig.EffectiveSeverity(code),
 		Code:     code,
 		Message:  message,
 		Module:   moduleName,

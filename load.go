@@ -320,7 +320,7 @@ func checkLoadResult(m *mib.Mib, cfg *loadConfig, requestedModules []string) err
 		}
 	}
 
-	// Check FailAt threshold
+	// Check stored effective severities against the independent FailAt threshold.
 	for _, d := range m.Diagnostics() {
 		if cfg.diagConfig.ShouldFail(d.Severity) {
 			errs = append(errs, fmt.Errorf("%w: %s", ErrDiagnosticThreshold, d))

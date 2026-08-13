@@ -111,6 +111,17 @@ func TestValidate_MissingModuleIdentity(t *testing.T) {
 	testutil.Equal(t, types.SeverityWarning, d.Severity, "severity")
 }
 
+func TestValidate_PersistsEffectiveSeverity(t *testing.T) {
+	mod := smiv2Module("NO-IDENTITY-MIB", testOT("someObject"))
+	mod.Imports = append(mod.Imports, Import{Module: "SNMPv2-SMI", Symbol: "OBJECT-TYPE"})
+	config := types.DefaultConfig()
+	config.Overrides = map[string]types.Severity{types.DiagMissingModuleIdentity: types.SeverityMinor}
+
+	d := validateAndFindDiagnostic(t, mod, config, types.DiagMissingModuleIdentity)
+	testutil.NotNil(t, d, "expected %s diagnostic", types.DiagMissingModuleIdentity)
+	testutil.Equal(t, types.SeverityMinor, d.Severity, "effective severity")
+}
+
 func TestValidate_MissingModuleIdentity_BaseModuleSkipped(t *testing.T) {
 	// Actual base modules (SNMPv2-SMI) should NOT get the missing-module-identity check.
 	mod := &Module{

@@ -57,6 +57,18 @@ func TestMatchGlob(t *testing.T) {
 	}
 }
 
+func TestEffectiveSeverity(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Overrides = map[string]Severity{DiagMacroNotImported: SeveritySevere}
+
+	if got := cfg.EffectiveSeverity(DiagMacroNotImported); got != SeveritySevere {
+		t.Errorf("EffectiveSeverity() = %v, want %v", got, SeveritySevere)
+	}
+	if got := cfg.EffectiveSeverity(DiagParseError); got != SeverityError {
+		t.Errorf("EffectiveSeverity() without override = %v, want %v", got, SeverityError)
+	}
+}
+
 func TestShouldReport(t *testing.T) {
 	tests := []struct {
 		name string
@@ -165,6 +177,16 @@ func TestShouldReport(t *testing.T) {
 				t.Errorf("ShouldReport(%q, %v) = %v, want %v", tt.code, tt.sev, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestShouldRetainDemotion(t *testing.T) {
+	cfg := DiagnosticConfig{
+		Reporting: ReportingQuiet,
+		Overrides: map[string]Severity{DiagParseError: SeverityInfo},
+	}
+	if !cfg.ShouldRetain(DiagParseError) {
+		t.Error("demotion should retain a diagnostic selected by its registered severity")
 	}
 }
 

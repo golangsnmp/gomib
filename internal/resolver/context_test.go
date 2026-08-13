@@ -233,6 +233,17 @@ func TestEmitDiagnostic_IgnoredCode(t *testing.T) {
 	testutil.Len(t, ctx.Diagnostics(), 1, "expected non-ignored code to produce a diagnostic")
 }
 
+func TestEmitDiagnostic_PersistsEffectiveSeverity(t *testing.T) {
+	config := model.QuietConfig()
+	config.Overrides = map[string]model.Severity{types.DiagGroupNotAccessible: model.SeveritySevere}
+	ctx := newResolverContext(nil, model.ResolverNormal, config)
+	ctx.EmitDiagnostic(types.DiagGroupNotAccessible, &module.Module{Name: "MOD"}, types.Span{}, "promoted")
+
+	diags := ctx.Diagnostics()
+	testutil.Len(t, diags, 1, "expected promoted diagnostic")
+	testutil.Equal(t, model.SeveritySevere, diags[0].Severity, "effective severity")
+}
+
 func TestEmitDiagnostic_Fields(t *testing.T) {
 	ctx := newTestContext()
 	// Build a source with 10 lines of 10 bytes each (9 chars + newline).

@@ -156,12 +156,12 @@ func convertDiagnostics(spanDiags []types.SpanDiagnostic, moduleName string, lin
 	}
 	diags := make([]types.Diagnostic, 0, len(spanDiags))
 	for _, sd := range spanDiags {
-		if !config.ShouldReport(sd.Code, sd.Severity) {
+		if !config.ShouldRetain(sd.Code) {
 			continue
 		}
 		line, col := types.LineColFromTable(lineTable, sd.Span.Start)
 		diags = append(diags, types.Diagnostic{
-			Severity: sd.Severity,
+			Severity: config.EffectiveSeverity(sd.Code),
 			Code:     sd.Code,
 			Message:  sd.Message,
 			Module:   moduleName,

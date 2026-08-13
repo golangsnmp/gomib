@@ -42,10 +42,11 @@ func (d Diagnostic) String() string {
 // DiagnosticConfig controls diagnostic reporting and failure policy.
 //
 // This is independent of [ResolverStrictness], which controls resolver
-// fallback behavior. DiagnosticConfig determines which diagnostics are
-// reported and which cause loading to fail, regardless of how permissive
-// the resolver is. For best-effort loading of vendor MIB sets, configure
-// both permissive resolution and FailAt = SeverityFatal.
+// fallback behavior. Reporting, Overrides, Ignore, and FailAt are independent
+// policies for retaining diagnostics, storing their effective severity,
+// suppressing them, and deciding whether loading fails. For best-effort loading
+// of vendor MIB sets, configure both permissive resolution and
+// FailAt = SeverityFatal.
 type DiagnosticConfig struct {
 	// Reporting controls baseline diagnostic output verbosity.
 	Reporting ReportingLevel
@@ -58,8 +59,9 @@ type DiagnosticConfig struct {
 	// loading that only fails on unrecoverable parse errors.
 	FailAt Severity
 
-	// Overrides change severity for specific diagnostic codes.
-	// Use to upgrade/downgrade specific checks.
+	// Overrides change severity for specific diagnostic codes. The effective
+	// severity is stored on emitted diagnostics and used by failure checks.
+	// Demoting a diagnostic does not suppress it; use Ignore for suppression.
 	Overrides map[string]Severity
 
 	// Ignore lists diagnostic codes to suppress entirely.
@@ -117,37 +119,57 @@ func SilentConfig() DiagnosticConfig {
 	}
 }
 
-// ShouldReport returns true if a diagnostic with the given code and severity
-// should be reported under this configuration.
-//
-// Evaluation order: Overrides are applied first, then fatal check, then
-// Ignore, then Reporting. Fatal diagnostics are always reported regardless of
-// Ignore list or Reporting (unless overridden to a non-fatal severity).
-//
-// Reporting controls the reporting threshold:
-//   - Verbose: report all diagnostics (sev 0-6)
-//   - Default: report Minor and above (sev 0-3)
-//   - Quiet: report Error and above (sev 0-2)
-//   - Silent: report nothing (except fatal, handled above)
-//
-// Lower severity numbers are more severe (Fatal=0, Info=6).
-func (c DiagnosticConfig) ShouldReport(code string, sev Severity) bool {
-	if override, ok := c.Overrides[code]; ok {
-		sev = override
-	}
+// EffectiveSeverity returns the configured severity for a registered
+// diagnostic code.
+func (c DiagnosticConfig) EffectiveSeverity(code string) Severity {
+	return c.effectiveSeverity(code, SeverityForCode(code))
+}
 
-	// Fatal diagnostics are always reported regardless of Ignore or Level.
-	if sev <= SeverityFatal {
+func (c DiagnosticConfig) effectiveSeverity(code string, registered Severity) Severity {
+	if override, ok := c.Overrides[code]; ok {
+		return override
+	}
+	return registered
+}
+
+// IsIgnored reports whether code matches an Ignore pattern.
+func (c DiagnosticConfig) IsIgnored(code string) bool {
+	return slices.ContainsFunc(c.Ignore, func(pattern string) bool {
+		return MatchGlob(pattern, code)
+	})
+}
+
+// ReportsSeverity reports whether the reporting level includes sev. Fatal
+// diagnostics are always reported, including at ReportingSilent.
+func (c DiagnosticConfig) ReportsSeverity(sev Severity) bool {
+	return sev <= SeverityFatal || int(sev) <= c.maxReportedSeverity()
+}
+
+// ShouldRetain reports whether a diagnostic should be stored. Promotions can
+// bring diagnostics into the reporting level, while demotions do not discard
+// diagnostics included by their registered severity. Effective fatal
+// diagnostics are retained even when ignored or reporting is silent.
+func (c DiagnosticConfig) ShouldRetain(code string) bool {
+	registered := SeverityForCode(code)
+	effective := c.effectiveSeverity(code, registered)
+	if effective <= SeverityFatal {
 		return true
 	}
-
-	if slices.ContainsFunc(c.Ignore, func(pattern string) bool {
-		return MatchGlob(pattern, code)
-	}) {
+	if c.IsIgnored(code) {
 		return false
 	}
+	return c.ReportsSeverity(registered) || c.ReportsSeverity(effective)
+}
 
-	return int(sev) <= c.maxReportedSeverity()
+// ShouldReport reports whether the configured reporting and ignore policies
+// select a diagnostic at its effective severity. It accepts an explicit
+// registered severity for compatibility with callers using custom codes.
+func (c DiagnosticConfig) ShouldReport(code string, registered Severity) bool {
+	effective := c.effectiveSeverity(code, registered)
+	if effective <= SeverityFatal {
+		return true
+	}
+	return !c.IsIgnored(code) && c.ReportsSeverity(effective)
 }
 
 // maxReportedSeverity returns the maximum severity number (least severe)

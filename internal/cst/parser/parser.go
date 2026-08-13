@@ -246,7 +246,7 @@ func (p *Parser) expectEnumLabel() (cst.SyntaxToken, *types.SpanDiagnostic) {
 
 func (p *Parser) makeError(message string) types.SpanDiagnostic {
 	return types.SpanDiagnostic{
-		Severity: types.SeverityForCode(types.DiagParseError),
+		Severity: p.DiagConfig.EffectiveSeverity(types.DiagParseError),
 		Code:     types.DiagParseError,
 		Span:     p.currentSpan(),
 		Message:  message,
