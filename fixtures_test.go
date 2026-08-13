@@ -193,6 +193,7 @@ func TestResolveNotifications(t *testing.T) {
 		notif := m.Notification(fn.Name)
 		if notif == nil {
 			t.Fatalf("divergence: gomib does not have notification %q", fn.Name)
+			return
 		}
 
 		gotOID := notif.OID().String()

@@ -106,7 +106,8 @@ func netsnmpDefaults() []string {
 	if home, err := os.UserHomeDir(); err == nil {
 		paths = append(paths, filepath.Join(home, ".snmp", "mibs"))
 	}
-	paths = append(paths,
+	paths = append(
+		paths,
 		"/usr/share/snmp/mibs",
 		"/usr/share/snmp/mibs/iana",
 		"/usr/share/snmp/mibs/ietf",
@@ -219,7 +220,7 @@ func parseColonSemantic(value string) (op pathOp, paths []string) {
 	return pathReplace, splitPaths(value)
 }
 
-func parseNetSNMPEnv(value string) (pathOp, []string) {
+func parseNetSNMPEnv(value string) (op pathOp, paths []string) {
 	if strings.HasPrefix(value, "+") {
 		return pathAppend, splitPaths(value[1:])
 	}

@@ -38,6 +38,7 @@ func TestParse_BasicStructure(t *testing.T) {
 	file, diags := syntax.Parse(testMIB)
 	if file == nil {
 		t.Fatal("Parse returned nil ModuleFile")
+		return
 	}
 	if len(file.Modules) != 1 {
 		t.Fatalf("expected 1 module, got %d", len(file.Modules))

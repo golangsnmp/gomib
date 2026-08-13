@@ -62,6 +62,7 @@ func SetObjectEffectiveRanges(o *Object, r []Range) { o.setEffectiveRanges(r) }
 func SetObjectEffectiveSizesConstrained(o *Object, v bool) {
 	o.setEffectiveSizesConstrained(v)
 }
+
 func SetObjectEffectiveRangesConstrained(o *Object, v bool) {
 	o.setEffectiveRangesConstrained(v)
 }

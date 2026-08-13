@@ -326,7 +326,7 @@ func normalizeTimestamp(ts string) string {
 	if ts[len(ts)-1] != 'Z' {
 		return ""
 	}
-	for i := 0; i < len(ts)-1; i++ {
+	for i := range len(ts) - 1 {
 		if ts[i] < '0' || ts[i] > '9' {
 			return ""
 		}

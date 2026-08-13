@@ -39,7 +39,8 @@ func IntersectRanges(child, parent []Range) []Range {
 	globalMaxLowerBounds, globalMinUpperBounds := unionExtremeWitnesses(parent)
 	result := make([]Range, 0, len(child)*len(parent))
 	for _, c := range child {
-		for i, p := range parent {
+		for i := range parent {
+			p := &parent[i]
 			childMin, possible := resolveChildRangeBound(c.Min, p, parent, i, true)
 			if !possible {
 				continue
@@ -93,7 +94,7 @@ func unionExtremeWitnesses(ranges []Range) (maxLower, minUpper []RangeBound) {
 // alternative. A lower MIN and upper MAX do not constrain an alternative. A
 // lower MAX or upper MIN only applies to alternatives which could contain the
 // corresponding global extreme of the complete parent union.
-func resolveChildRangeBound(bound RangeBound, alternative Range, parent []Range, index int, lower bool) (RangeBound, bool) {
+func resolveChildRangeBound(bound RangeBound, alternative *Range, parent []Range, index int, lower bool) (RangeBound, bool) {
 	if lower {
 		switch bound.Kind {
 		case RangeBoundMin:
@@ -103,6 +104,8 @@ func resolveChildRangeBound(bound RangeBound, alternative Range, parent []Range,
 				return RangeBound{}, false
 			}
 			return alternative.Max, true
+		case RangeBoundSigned, RangeBoundUnsigned, RangeBoundRaw:
+			return bound, true
 		}
 	} else {
 		switch bound.Kind {
@@ -113,6 +116,8 @@ func resolveChildRangeBound(bound RangeBound, alternative Range, parent []Range,
 				return RangeBound{}, false
 			}
 			return alternative.Min, true
+		case RangeBoundSigned, RangeBoundUnsigned, RangeBoundRaw:
+			return bound, true
 		}
 	}
 	return bound, true
@@ -196,7 +201,7 @@ func unresolvedRangeBound(a, b RangeBound) RangeBound {
 }
 
 // RangeContainsInt64 reports whether a signed value is within a range.
-func RangeContainsInt64(r Range, value int64) bool {
+func RangeContainsInt64(r *Range, value int64) bool {
 	v := NewSignedRangeBound(value)
 	lower, lok := r.Min.Compare(v)
 	upper, uok := r.Max.Compare(v)
@@ -204,7 +209,7 @@ func RangeContainsInt64(r Range, value int64) bool {
 }
 
 // RangeContainsUint64 reports whether an unsigned value is within a range.
-func RangeContainsUint64(r Range, value uint64) bool {
+func RangeContainsUint64(r *Range, value uint64) bool {
 	v := NewUnsignedRangeBound(value)
 	lower, lok := r.Min.Compare(v)
 	upper, uok := r.Max.Compare(v)

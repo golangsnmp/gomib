@@ -83,14 +83,15 @@ func TestScopedExportRefsDoNotFallBackGlobally(t *testing.T) {
 	}
 	if compliance == nil {
 		t.Fatal("scopedCompliance not exported")
+		return
 	}
 	if len(compliance.Modules) != 1 {
 		t.Fatalf("compliance modules = %d, want 1", len(compliance.Modules))
 	}
 	cm := compliance.Modules[0]
-	assertUnresolvedScopedRef(t, cm.MandatoryGroups[0], "TARGET-MIB", "collidingMandatory")
-	assertUnresolvedScopedRef(t, cm.Groups[0].Group, "TARGET-MIB", "collidingOptional")
-	assertUnresolvedScopedRef(t, cm.Objects[0].Object, "TARGET-MIB", "collidingObject")
+	assertUnresolvedScopedRef(t, cm.MandatoryGroups[0], "collidingMandatory")
+	assertUnresolvedScopedRef(t, cm.Groups[0].Group, "collidingOptional")
+	assertUnresolvedScopedRef(t, cm.Objects[0].Object, "collidingObject")
 
 	var capability *ExportCapability
 	for i := range export.Capabilities {
@@ -101,15 +102,16 @@ func TestScopedExportRefsDoNotFallBackGlobally(t *testing.T) {
 	}
 	if capability == nil {
 		t.Fatal("scopedCapability not exported")
+		return
 	}
 	if len(capability.Supports) != 1 {
 		t.Fatalf("capability supports = %d, want 1", len(capability.Supports))
 	}
 	supports := capability.Supports[0]
-	assertUnresolvedScopedRef(t, supports.Includes[0], "TARGET-MIB", "collidingInclude")
-	assertUnresolvedScopedRef(t, supports.ObjectVariations[0].Object, "TARGET-MIB", "collidingVariationObject")
-	assertUnresolvedScopedRef(t, supports.ObjectVariations[0].CreationRequires[0], "TARGET-MIB", "collidingCreation")
-	assertUnresolvedScopedRef(t, supports.NotificationVariations[0].Notification, "TARGET-MIB", "collidingNotification")
+	assertUnresolvedScopedRef(t, supports.Includes[0], "collidingInclude")
+	assertUnresolvedScopedRef(t, supports.ObjectVariations[0].Object, "collidingVariationObject")
+	assertUnresolvedScopedRef(t, supports.ObjectVariations[0].CreationRequires[0], "collidingCreation")
+	assertUnresolvedScopedRef(t, supports.NotificationVariations[0].Notification, "collidingNotification")
 }
 
 func TestResolveNamedRefPreservesUnscopedLookup(t *testing.T) {
@@ -121,8 +123,9 @@ func TestResolveNamedRefPreservesUnscopedLookup(t *testing.T) {
 	}
 }
 
-func assertUnresolvedScopedRef(t *testing.T, ref ExportObjRef, module, name string) {
+func assertUnresolvedScopedRef(t *testing.T, ref ExportObjRef, name string) {
 	t.Helper()
+	const module = "TARGET-MIB"
 	if ref.Module != module || ref.Name != name || ref.OID != "" {
 		t.Errorf("ref = %+v, want unresolved %s::%s", ref, module, name)
 	}
@@ -138,7 +141,8 @@ func loadScopedExportTestMIB(t *testing.T) *mib.Mib {
 	}
 	cfg := mib.DefaultConfig()
 	cfg.FailAt = mib.SeverityFatal
-	m, err := gomib.Load(context.Background(),
+	m, err := gomib.Load(
+		context.Background(),
 		gomib.WithSource(gomib.FS("scoped-export-test", files)),
 		gomib.WithDiagnosticConfig(cfg),
 	)

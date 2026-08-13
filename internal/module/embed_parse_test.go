@@ -30,6 +30,7 @@ func TestEmbeddedBaseModulesParse(t *testing.T) {
 			}
 			if target == nil {
 				t.Fatalf("module %s not found in parse result (got %d modules)", name, len(mods))
+				return
 			}
 
 			for _, d := range target.Diagnostics {
@@ -56,6 +57,7 @@ func TestEmbeddedSNMPv2SMI_Content(t *testing.T) {
 	}
 	if target == nil {
 		t.Fatal("SNMPv2-SMI not found")
+		return
 	}
 
 	if len(target.TypeDefs) == 0 {
@@ -113,6 +115,7 @@ func TestEmbeddedSNMPv2TC_Content(t *testing.T) {
 	}
 	if target == nil {
 		t.Fatal("SNMPv2-TC not found")
+		return
 	}
 
 	hasTCs := false

@@ -579,6 +579,7 @@ func TestObjectDescription(t *testing.T) {
 	obj := m.Object("sysDescr")
 	if obj == nil {
 		t.Fatal("sysDescr not found")
+		return
 	}
 
 	desc := obj.Description()
@@ -593,6 +594,7 @@ func TestObjectNode(t *testing.T) {
 	obj := m.Object("ifIndex")
 	if obj == nil {
 		t.Fatal("ifIndex not found")
+		return
 	}
 
 	node := obj.Node()

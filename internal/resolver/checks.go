@@ -784,8 +784,8 @@ func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.Ob
 }
 
 func hasUnresolvedRange(ranges []model.Range) bool {
-	for _, r := range ranges {
-		if !r.IsResolved() {
+	for i := range ranges {
+		if !ranges[i].IsResolved() {
 			return true
 		}
 	}
@@ -793,8 +793,8 @@ func hasUnresolvedRange(ranges []model.Range) bool {
 }
 
 func valueInRanges(v int64, ranges []model.Range) bool {
-	for _, r := range ranges {
-		if model.RangeContainsInt64(r, v) {
+	for i := range ranges {
+		if model.RangeContainsInt64(&ranges[i], v) {
 			return true
 		}
 	}
@@ -812,8 +812,8 @@ func findNamedValue(values []model.NamedValue, label string) bool {
 }
 
 func uvalueInRanges(v uint64, ranges []model.Range) bool {
-	for _, r := range ranges {
-		if model.RangeContainsUint64(r, v) {
+	for i := range ranges {
+		if model.RangeContainsUint64(&ranges[i], v) {
 			return true
 		}
 	}

@@ -62,7 +62,8 @@ END
 
 	diagConfig := mib.DefaultConfig()
 	diagConfig.FailAt = mib.SeverityFatal
-	m, err := gomib.Load(context.Background(),
+	m, err := gomib.Load(
+		context.Background(),
 		gomib.WithSource(src),
 		gomib.WithModules("PREFERRED-MIB", "LEGACY-MIB"),
 		gomib.WithDiagnosticConfig(diagConfig),
@@ -132,7 +133,8 @@ func TestLoadAndQueryMib(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	m, err := gomib.Load(ctx,
+	m, err := gomib.Load(
+		ctx,
 		gomib.WithSource(src),
 		gomib.WithModules("IF-MIB", "SNMPv2-MIB"),
 	)
@@ -158,6 +160,7 @@ func TestLoadAndQueryMib(t *testing.T) {
 	ifIndex := m.Object("ifIndex")
 	if ifIndex == nil {
 		t.Fatal("ifIndex should be found")
+		return
 	}
 	if ifIndex.Name() != "ifIndex" {
 		t.Errorf("Object name = %q, want %q", ifIndex.Name(), "ifIndex")
@@ -274,7 +277,8 @@ func TestWithSystemPathsCombinedWithExplicitSource(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	m, err := gomib.Load(ctx,
+	m, err := gomib.Load(
+		ctx,
 		gomib.WithSource(src),
 		gomib.WithSystemPaths(),
 		gomib.WithModules("IF-MIB"),

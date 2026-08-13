@@ -327,6 +327,7 @@ func TestModulePreferenceSMIv2OverSMIv1(t *testing.T) {
 	obj := m.Object("ifIndex")
 	if obj == nil {
 		t.Fatal("ifIndex not found")
+		return
 	}
 
 	mod := obj.Module()

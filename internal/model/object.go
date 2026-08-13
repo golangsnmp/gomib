@@ -313,6 +313,7 @@ func (o *Object) setEffectiveSizes(s []Range) {
 	o.sizes = s
 	o.sizesConstrained = true
 }
+
 func (o *Object) setEffectiveRanges(r []Range) {
 	o.ranges = r
 	o.rangesConstrained = true

@@ -3,6 +3,7 @@ package model
 import (
 	"cmp"
 	"encoding/hex"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -92,9 +93,10 @@ func (b RangeBound) AsInt64() (int64, bool) {
 	case RangeBoundSigned:
 		return b.Signed, true
 	case RangeBoundUnsigned:
-		if b.Unsigned <= uint64(^uint64(0)>>1) {
+		if b.Unsigned <= math.MaxInt64 {
 			return int64(b.Unsigned), true
 		}
+	default:
 	}
 	return 0, false
 }
@@ -108,6 +110,7 @@ func (b RangeBound) AsUint64() (uint64, bool) {
 		}
 	case RangeBoundUnsigned:
 		return b.Unsigned, true
+	default:
 	}
 	return 0, false
 }
@@ -175,7 +178,7 @@ type Range struct {
 }
 
 // IsResolved reports whether both endpoints are concrete numeric values.
-func (r Range) IsResolved() bool { return r.Min.IsConcrete() && r.Max.IsConcrete() }
+func (r *Range) IsResolved() bool { return r.Min.IsConcrete() && r.Max.IsConcrete() }
 
 // String returns the range as "min..max" or just "value" for equal endpoints.
 func (r Range) String() string {

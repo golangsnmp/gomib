@@ -42,12 +42,13 @@ func TestModuleCapabilities(t *testing.T) {
 func TestCapabilityConformanceNode(t *testing.T) {
 	m := loadCapabilityMIB(t)
 
-	checkConformanceNode(t, m, conformanceNodeSpec{
-		name:   "jnxSnmpV2CapJunos",
-		module: "JNX-SNMPv2-CAPABILITY",
-		kind:   mib.KindCapability,
-		status: mib.StatusCurrent,
-	},
+	checkConformanceNode(
+		t, m, conformanceNodeSpec{
+			name:   "jnxSnmpV2CapJunos",
+			module: "JNX-SNMPv2-CAPABILITY",
+			kind:   mib.KindCapability,
+			status: mib.StatusCurrent,
+		},
 		func(m *mib.Mib, name string) *mib.Capability { return m.Capability(name) },
 		func(mod *mib.Module, name string) *mib.Capability { return mod.Capability(name) },
 		(*mib.Capability).Node,
@@ -66,6 +67,7 @@ func TestCapabilityExtraMetadata(t *testing.T) {
 	c := m.Capability("jnxSnmpV2CapJunos")
 	if c == nil {
 		t.Fatal("jnxSnmpV2CapJunos not found")
+		return
 	}
 
 	testutil.Contains(t, c.Description(), "JUNOS SNMPv2 MIB capabilities",
@@ -238,6 +240,7 @@ func TestCapabilityString(t *testing.T) {
 	c := m.Capability("jnxSnmpV2CapJunos")
 	if c == nil {
 		t.Fatal("jnxSnmpV2CapJunos not found")
+		return
 	}
 
 	s := c.String()

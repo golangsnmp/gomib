@@ -17,8 +17,8 @@ func rawMinRange(raw string, max int64) Range {
 	return Range{Min: NewRawRangeBound(raw), Max: NewSignedRangeBound(max)}
 }
 
-func rawMaxRange(min int64, raw string) Range {
-	return Range{Min: NewSignedRangeBound(min), Max: NewRawRangeBound(raw)}
+func rawMaxRange(min int64) Range {
+	return Range{Min: NewSignedRangeBound(min), Max: NewRawRangeBound("vendor-max")}
 }
 
 func symbolicRange(min, max RangeBoundKind) Range {
@@ -27,7 +27,7 @@ func symbolicRange(min, max RangeBoundKind) Range {
 
 func TestIntersectRanges(t *testing.T) {
 	rawMin := rawMinRange("vendor-min", 10)
-	rawMax := rawMaxRange(10, "vendor-max")
+	rawMax := rawMaxRange(10)
 	knownUnion := []Range{signedRange(0, 10), signedRange(20, 30)}
 	tests := []struct {
 		name   string
@@ -58,7 +58,7 @@ func TestIntersectRanges(t *testing.T) {
 		},
 		{
 			name:   "raw parent maximum cannot hide disjoint child",
-			parent: []Range{rawMaxRange(20, "vendor-max")},
+			parent: []Range{rawMaxRange(20)},
 			child:  []Range{signedRange(0, 10)},
 		},
 		{
@@ -88,7 +88,7 @@ func TestIntersectRanges(t *testing.T) {
 			name:   "concrete MAX narrows opposite raw endpoint",
 			parent: []Range{rawMax, signedRange(20, 30)},
 			child:  []Range{{Min: NewSignedRangeBound(25), Max: RangeBound{Kind: RangeBoundMax}}},
-			want:   []Range{rawMaxRange(25, "vendor-max"), signedRange(25, 30)},
+			want:   []Range{rawMaxRange(25), signedRange(25, 30)},
 		},
 		{
 			name:   "MIN MIN selects global minimum",
@@ -160,7 +160,7 @@ func TestIntersectRangesUsesUnionWideExtremeWitnesses(t *testing.T) {
 	}{
 		{
 			name:     "lower MAX with raw candidate maximum",
-			parent:   []Range{rawMaxRange(10, "vendor-max"), signedRange(20, 30)},
+			parent:   []Range{rawMaxRange(10), signedRange(20, 30)},
 			disjoint: Range{Min: RangeBound{Kind: RangeBoundMax}, Max: NewSignedRangeBound(25)},
 			adjacent: Range{Min: RangeBound{Kind: RangeBoundMax}, Max: NewSignedRangeBound(30)},
 		},

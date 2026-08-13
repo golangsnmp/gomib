@@ -255,7 +255,7 @@ func scanModuleNames(content []byte) []string {
 	tokens, _ := l.Tokenize()
 
 	var names []string
-	for i := 0; i < len(tokens); i++ {
+	for i := range tokens {
 		if tokens[i].Kind != lexer.TokUppercaseIdent {
 			continue
 		}
@@ -273,6 +273,7 @@ func scanModuleNames(content []byte) []string {
 					depth++
 				case lexer.TokRBrace:
 					depth--
+				default:
 				}
 				j++
 				if depth == 0 {
