@@ -1243,11 +1243,13 @@ func buildExportDiagnostic(d mib.Diagnostic) ExportDiagnostic {
 	}
 }
 
-// resolveNamedRef looks up a node by name (qualified then unqualified) and returns an ObjRef.
+// resolveNamedRef looks up a node within the supplied module context, or
+// globally when no module context is supplied, and returns an ObjRef.
 func resolveNamedRef(m *mib.Mib, moduleName, name string) ExportObjRef {
-	qualified := moduleName + "::" + name
-	node := m.Resolve(qualified)
-	if node == nil {
+	var node *mib.Node
+	if moduleName != "" {
+		node = m.Resolve(moduleName + "::" + name)
+	} else {
 		node = m.Resolve(name)
 	}
 	if node != nil {
