@@ -14,6 +14,7 @@ const (
 	reasonModuleNotFound     = "module_not_found"
 	reasonSymbolNotExported  = "symbol_not_exported"
 	reasonUnknownType        = "unknown_type"
+	reasonDependencyCycle    = "dependency_cycle"
 	reasonUnknownParent      = "unknown_parent"
 	reasonTrapNumberOverflow = "trap_number_overflow"
 	reasonRecursiveOid       = "recursive_oid"

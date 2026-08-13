@@ -82,6 +82,7 @@ const (
 	DiagImportNotFound               = "import-not-found"
 	DiagImportModuleNotFound         = "import-module-not-found"
 	DiagTypeUnknown                  = "type-unknown"
+	DiagTypeCycle                    = "type-cycle"
 	DiagOidOrphan                    = "oid-orphan"
 	DiagTrapNumberOverflow           = "trap-number-overflow"
 	DiagIndexUnresolved              = "index-unresolved"
@@ -289,6 +290,7 @@ var resolverDiagCodes = []codeEntry{
 	{DiagImportNotFound, SeverityError},
 	{DiagImportModuleNotFound, SeverityError},
 	{DiagTypeUnknown, SeverityError},
+	{DiagTypeCycle, SeverityError},
 	{DiagOidOrphan, SeverityError},
 	{DiagTrapNumberOverflow, SeverityError},
 	{DiagIndexUnresolved, SeverityError},

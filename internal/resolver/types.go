@@ -246,11 +246,16 @@ func resolveTypeRefParentsGraph(ctx *resolverContext) {
 				continue
 			}
 			baseName := getTypeRefBaseName(entry.td.Syntax)
-			if baseName != "" {
-				ctx.recordUnresolved(types.DiagTypeUnknown, entry.mod, entry.td.Spans.Syntax,
-					fmt.Sprintf("unresolved type: %q references unknown type %q", entry.td.Name, baseName),
-					model.UnresolvedRef{Kind: model.UnresolvedType, Symbol: baseName, Module: modName(entry.mod), Reason: reasonUnknownType})
+			if baseName == "" {
+				continue
 			}
+
+			message := fmt.Sprintf("type cycle: %q references %q in a dependency cycle", entry.td.Name, baseName)
+			if len(scc) == 1 {
+				message = fmt.Sprintf("type cycle: %q references itself", entry.td.Name)
+			}
+			ctx.recordUnresolved(types.DiagTypeCycle, entry.mod, entry.td.Spans.Syntax, message,
+				model.UnresolvedRef{Kind: model.UnresolvedType, Symbol: baseName, Module: modName(entry.mod), Reason: reasonDependencyCycle})
 		}
 	}
 

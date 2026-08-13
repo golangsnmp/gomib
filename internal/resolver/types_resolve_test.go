@@ -561,7 +561,7 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 		testutil.Len(t, unresolvedByKind(ctx, model.UnresolvedType), 0, "unresolved types")
 	})
 
-	t.Run("records each cycle participant as unresolved", func(t *testing.T) {
+	t.Run("two-node cycle keeps nil parents and records cycle metadata", func(t *testing.T) {
 		mod := module.NewModule("CYCLE-MIB", types.Span{})
 		addDefs(mod, []module.Definition{
 			makeTypeDef("TypeA", "TypeB"),
@@ -577,16 +577,52 @@ func TestResolveTypeRefParentsGraph(t *testing.T) {
 		createUserTypes(ctx)
 		resolveTypeRefParentsGraph(ctx)
 
+		for _, name := range []string{"TypeA", "TypeB"} {
+			typ, ok := ctx.resolveTypeForModule(mod, name)
+			testutil.True(t, ok, name+" should exist")
+			testutil.Nil(t, typ.Parent(), name+" parent")
+		}
+
 		unresolvedTypes := unresolvedByKind(ctx, model.UnresolvedType)
 		testutil.Len(t, unresolvedTypes, 2, "unresolved types")
-		symbols := map[string]struct{}{}
+		reasonsBySymbol := make(map[string]string, len(unresolvedTypes))
 		for _, u := range unresolvedTypes {
-			symbols[u.Symbol] = struct{}{}
+			reasonsBySymbol[u.Symbol] = u.Reason
 		}
-		_, hasA := symbols["TypeA"]
-		_, hasB := symbols["TypeB"]
-		testutil.True(t, hasA, "expected TypeA as unresolved symbol")
-		testutil.True(t, hasB, "expected TypeB as unresolved symbol")
+		testutil.Equal(t, reasonDependencyCycle, reasonsBySymbol["TypeA"], "TypeA unresolved reason")
+		testutil.Equal(t, reasonDependencyCycle, reasonsBySymbol["TypeB"], "TypeB unresolved reason")
+
+		testutil.Equal(t, 2, countDiagnostics(ctx.Diagnostics(), types.DiagTypeCycle), "type-cycle diagnostics")
+		noDiag(t, ctx.Diagnostics(), types.DiagTypeUnknown)
+		for _, diag := range ctx.Diagnostics() {
+			testutil.Contains(t, diag.Message, "dependency cycle", "cycle diagnostic message")
+		}
+	})
+
+	t.Run("self cycle keeps nil parent and records cycle metadata", func(t *testing.T) {
+		mod := module.NewModule("SELF-CYCLE-MIB", types.Span{})
+		addDefs(mod, []module.Definition{
+			makeTypeDef("SelfType", "SelfType"),
+		})
+
+		ctx := newTestContextForModules(model.DefaultConfig(), mod)
+		ctx.defNames[mod] = map[string]struct{}{"SelfType": {}}
+
+		createUserTypes(ctx)
+		resolveTypeRefParentsGraph(ctx)
+
+		selfType, ok := ctx.resolveTypeForModule(mod, "SelfType")
+		testutil.True(t, ok, "SelfType should exist")
+		testutil.Nil(t, selfType.Parent(), "SelfType parent")
+
+		unresolvedTypes := unresolvedByKind(ctx, model.UnresolvedType)
+		testutil.Len(t, unresolvedTypes, 1, "unresolved types")
+		testutil.Equal(t, "SelfType", unresolvedTypes[0].Symbol, "unresolved symbol")
+		testutil.Equal(t, reasonDependencyCycle, unresolvedTypes[0].Reason, "unresolved reason")
+
+		diag := hasDiag(t, ctx.Diagnostics(), types.DiagTypeCycle)
+		testutil.Contains(t, diag.Message, "references itself", "self-cycle diagnostic message")
+		noDiag(t, ctx.Diagnostics(), types.DiagTypeUnknown)
 	})
 }
 
