@@ -40,13 +40,14 @@ func TestMustDirSucceeds(t *testing.T) {
 }
 
 func TestDirSourceFindExisting(t *testing.T) {
-	src, err := Dir(testutil.PrimaryCorpusDir(t) + "/ietf")
+	root := filepath.Join(testutil.PrimaryCorpusDir(t), "ietf")
+	src, err := Dir(root)
 	testutil.NoError(t, err, "Dir")
 
 	result, err := src.Find("IF-MIB")
 	testutil.NoError(t, err, "Find IF-MIB")
 	testutil.True(t, len(result.Content) > 0, "Content should not be empty")
-	testutil.True(t, result.Path != "", "Path should be set")
+	testutil.Equal(t, filepath.Join(root, "IF-MIB.mib"), result.Path, "Path should use native separators")
 }
 
 func TestDirSourceFindNotExist(t *testing.T) {
@@ -104,7 +105,7 @@ END
 	result, err := src.Find("TEST-FS-MIB")
 	testutil.NoError(t, err, "Find TEST-FS-MIB in FS source")
 	testutil.True(t, len(result.Content) > 0, "Content should not be empty")
-	testutil.Contains(t, result.Path, "test-fs/", "Path should contain FS name prefix")
+	testutil.Equal(t, "test-fs/mibs/TEST-FS-MIB.mib", result.Path, "Path should use slash separators")
 
 	names, err := src.ListModules()
 	testutil.NoError(t, err, "ListModules")

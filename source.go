@@ -92,7 +92,7 @@ func Dir(root string, opts ...SourceOption) (Source, error) {
 	if err := validateDir(root); err != nil {
 		return nil, err
 	}
-	src := FS(root, os.DirFS(root), opts...)
+	src := newFSSource(root, os.DirFS(root), filepath.Join, opts...)
 	// Trigger eager indexing so walk errors are returned at construction time.
 	if _, err := src.ListModules(); err != nil {
 		return nil, err
@@ -110,9 +110,10 @@ func MustDir(root string, opts ...SourceOption) Source {
 }
 
 type fsSource struct {
-	name   string
-	fsys   fs.FS
-	config sourceConfig
+	name     string
+	fsys     fs.FS
+	joinPath func(...string) string
+	config   sourceConfig
 
 	once  sync.Once
 	index map[string][]string
@@ -124,14 +125,19 @@ type fsSource struct {
 // is lazily indexed on first use. Errors are deferred to the first
 // Find or ListModules call.
 func FS(name string, fsys fs.FS, opts ...SourceOption) Source {
+	return newFSSource(name, fsys, posixpath.Join, opts...)
+}
+
+func newFSSource(name string, fsys fs.FS, joinPath func(...string) string, opts ...SourceOption) *fsSource {
 	cfg := defaultSourceConfig()
 	for _, opt := range opts {
 		opt(&cfg)
 	}
 	return &fsSource{
-		name:   name,
-		fsys:   fsys,
-		config: cfg,
+		name:     name,
+		fsys:     fsys,
+		joinPath: joinPath,
+		config:   cfg,
 	}
 }
 
@@ -159,7 +165,7 @@ func (s *fsSource) visitCandidates(name string, visit func(FindResult) bool) (bo
 	}
 
 	for _, path := range s.index[name] {
-		fullPath := posixpath.Join(s.name, path)
+		fullPath := s.joinPath(s.name, path)
 		content, err := fs.ReadFile(s.fsys, path)
 		if err != nil {
 			return false, err

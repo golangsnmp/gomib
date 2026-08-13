@@ -208,16 +208,16 @@ func effectiveTypeConstraints(t *Type, sizes bool) ([]Range, bool) {
 	}
 	var effective []Range
 	var constrained bool
-	for i := len(chain) - 1; i >= 0; i-- {
-		own := chain[i].ranges
+	for _, current := range slices.Backward(chain) {
+		own := current.ranges
 		if sizes {
-			own = chain[i].sizes
+			own = current.sizes
 		}
 		if len(own) == 0 {
 			continue
 		}
 		if !constrained {
-			if base, ok := BaseConstraint(chain[i].EffectiveBase(), sizes, own[0].Span); ok {
+			if base, ok := BaseConstraint(current.EffectiveBase(), sizes, own[0].Span); ok {
 				effective = []Range{base}
 				constrained = true
 			}

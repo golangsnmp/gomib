@@ -232,9 +232,15 @@ func TestNetSNMPHomeExpansionPreservesGeneratedDefaults(t *testing.T) {
 	}
 
 	got = filterExistingDirs(dedup(got))
-	want = []string{defaultMIBs, envMIBs}
+	want = filterExistingDirs(dedup(want))
 	if !slices.Equal(got, want) {
 		t.Errorf("filtered paths = %v, want %v", got, want)
+	}
+	if !slices.Contains(got, defaultMIBs) {
+		t.Errorf("filtered paths %v do not contain HOME-derived default %q", got, defaultMIBs)
+	}
+	if !slices.Contains(got, envMIBs) {
+		t.Errorf("filtered paths %v do not contain environment path %q", got, envMIBs)
 	}
 }
 
