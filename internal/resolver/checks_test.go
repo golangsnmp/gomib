@@ -1312,6 +1312,34 @@ func TestCheckDefvalConstraints_OutsideRange(t *testing.T) {
 	hasDiag(t, m.Diagnostics(), types.DiagDefvalRange)
 }
 
+func TestCheckDefvalConstraints_UnresolvedRange(t *testing.T) {
+	// An unresolved RANGE endpoint makes membership unknowable, so a numeric
+	// DEFVAL must not be diagnosed as outside the constraint.
+	mod := testSMIv2Module(
+		[]module.Import{
+			module.NewImport("SNMPv2-SMI", "OBJECT-TYPE", types.Span{}),
+			module.NewImport("SNMPv2-SMI", "Integer32", types.Span{}),
+		},
+		&module.ObjectType{
+			DefBase: module.DefBase{Name: "unknownRange"},
+			Syntax: &module.TypeSyntaxConstrained{
+				Base: &module.TypeSyntaxTypeRef{Name: "Integer32"},
+				Constraint: &module.ConstraintRange{Ranges: []module.Range{{
+					Min: &module.RangeValueRaw{Value: "'0G'H"},
+					Max: &module.RangeValueRaw{Value: "'0G'H"},
+				}}},
+			},
+			Access: types.AccessReadOnly,
+			Status: types.StatusCurrent,
+			DefVal: &module.DefValInteger{Value: 50},
+			Oid:    testOid("testRoot", 1),
+		},
+	)
+
+	m := resolveStrict(mod)
+	noDiag(t, m.Diagnostics(), types.DiagDefvalRange)
+}
+
 func TestCheckDefvalConstraints_WithinRange(t *testing.T) {
 	// DEFVAL within RANGE constraint should not emit defval-range.
 	mod := testSMIv2Module(

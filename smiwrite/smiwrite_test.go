@@ -105,6 +105,7 @@ func TestFormatRanges(t *testing.T) {
 		{[]mib.Range{{Min: 0, Max: 255}}, "(0..255)"},
 		{[]mib.Range{{Min: 1, Max: 1}}, "(1)"},
 		{[]mib.Range{{Min: 0, Max: 10}, {Min: 20, Max: 30}}, "(0..10 | 20..30)"},
+		{[]mib.Range{{RawMin: "'0G'H", RawMax: "'10000000000000000'H"}}, "('0G'H..'10000000000000000'H)"},
 	}
 	for _, tt := range tests {
 		got := formatRanges(tt.input)

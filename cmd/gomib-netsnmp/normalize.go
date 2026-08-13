@@ -216,10 +216,14 @@ func normalizeGomibObject(n *NormalizedNode, obj *mib.Object) {
 	}
 
 	for _, r := range obj.EffectiveRanges() {
-		n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
+		if r.IsResolved() {
+			n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
+		}
 	}
 	for _, r := range obj.EffectiveSizes() {
-		n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
+		if r.IsResolved() {
+			n.Ranges = append(n.Ranges, RangeInfo{Low: r.Min, High: r.Max})
+		}
 	}
 
 	if dv := obj.DefaultValue(); !dv.IsZero() {

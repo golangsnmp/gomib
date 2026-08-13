@@ -27,18 +27,32 @@ type NameRef struct {
 	Span Span
 }
 
-// Range represents a min..max constraint for sizes or values.
+// Range represents a min..max constraint for sizes or values. RawMin and
+// RawMax preserve endpoints that could not be resolved to integers.
 type Range struct {
-	Min, Max int64
-	Span     Span
+	Min, Max       int64
+	RawMin, RawMax string
+	Span           Span
 }
 
-// String returns the range as "min..max" or just "value" if min equals max.
+// IsResolved reports whether both range endpoints have numeric values.
+func (r Range) IsResolved() bool { return r.RawMin == "" && r.RawMax == "" }
+
+// String returns the range as "min..max" or just "value" for equal or raw
+// single-value endpoints.
 func (r Range) String() string {
-	if r.Min == r.Max {
-		return strconv.FormatInt(r.Min, 10)
+	min := r.RawMin
+	if min == "" {
+		min = strconv.FormatInt(r.Min, 10)
 	}
-	return strconv.FormatInt(r.Min, 10) + ".." + strconv.FormatInt(r.Max, 10)
+	max := r.RawMax
+	if max == "" {
+		max = strconv.FormatInt(r.Max, 10)
+	}
+	if min == max {
+		return min
+	}
+	return min + ".." + max
 }
 
 // NamedValue represents a labeled integer from an enum or BITS definition.
@@ -134,7 +148,7 @@ func (e IndexEntry) FixedSize() (int, bool) {
 // isFixedSize reports whether sizes contains exactly one constraint with
 // min == max (and > 0), indicating a fixed-length string.
 func isFixedSize(sizes []Range) bool {
-	return len(sizes) == 1 && sizes[0].Min == sizes[0].Max && sizes[0].Min > 0
+	return len(sizes) == 1 && sizes[0].IsResolved() && sizes[0].Min == sizes[0].Max && sizes[0].Min > 0
 }
 
 // DefValKind identifies the type of default value.

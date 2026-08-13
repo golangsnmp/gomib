@@ -3,6 +3,7 @@ package lower
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/golangsnmp/gomib/internal/cst"
 	"github.com/golangsnmp/gomib/internal/lexer"
@@ -225,8 +226,19 @@ func (l *lowerer) lowerRangeValue(tok cst.SyntaxToken) module.RangeValue {
 
 	case lexer.TokHexString:
 		hexPart := stripQuotedLiteral(text)
-		value, _ := strconv.ParseUint(hexPart, 16, 64)
-		return &module.RangeValueUnsigned{Value: value}
+		normalized := strings.Map(func(r rune) rune {
+			switch r {
+			case ' ', '\t', '\n', '\r':
+				return -1
+			default:
+				return r
+			}
+		}, hexPart)
+		if value, err := strconv.ParseUint(normalized, 16, 64); err == nil {
+			return &module.RangeValueUnsigned{Value: value}
+		}
+		l.EmitDiagnostic(types.DiagInvalidHexRange, tok.Span, "invalid hex range value")
+		return &module.RangeValueRaw{Value: text}
 
 	case lexer.TokUppercaseIdent, lexer.TokForbiddenKeyword:
 		switch text {

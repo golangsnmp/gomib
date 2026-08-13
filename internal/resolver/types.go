@@ -466,14 +466,21 @@ func syntaxToBaseType(syntax module.TypeSyntax) (model.BaseType, bool) {
 func rangesToConstraint(ranges []module.Range) []model.Range {
 	out := make([]model.Range, 0, len(ranges))
 	for _, r := range ranges {
-		lo := rangeValueToI64(r.Min)
-		hi := lo
+		lo, rawLo := rangeValueToConstraint(r.Min)
+		hi, rawHi := lo, rawLo
 		if r.Max != nil {
-			hi = rangeValueToI64(r.Max)
+			hi, rawHi = rangeValueToConstraint(r.Max)
 		}
-		out = append(out, model.Range{Min: lo, Max: hi, Span: r.Span})
+		out = append(out, model.Range{Min: lo, Max: hi, RawMin: rawLo, RawMax: rawHi, Span: r.Span})
 	}
 	return out
+}
+
+func rangeValueToConstraint(value module.RangeValue) (int64, string) {
+	if raw, ok := value.(*module.RangeValueRaw); ok {
+		return 0, raw.Value
+	}
+	return rangeValueToI64(value), ""
 }
 
 func rangeValueToI64(value module.RangeValue) int64 {

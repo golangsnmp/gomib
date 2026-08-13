@@ -348,7 +348,13 @@ func checkRangeList(ctx *resolverContext, ranges []model.Range, base model.BaseT
 		boundsMin, boundsMax, hasBounds = basetypeBounds(base)
 	}
 
-	for i, r := range ranges {
+	var previous *model.Range
+	for i := range ranges {
+		r := &ranges[i]
+		if !r.IsResolved() {
+			continue
+		}
+
 		// Exchanged limits (min > max).
 		if r.Min > r.Max {
 			ctx.EmitDiagnostic(types.DiagRangeExchanged,
@@ -362,20 +368,20 @@ func checkRangeList(ctx *resolverContext, ranges []model.Range, base model.BaseT
 			checkRangeBound(ctx, r.Max, boundsMin, boundsMax, name, "upper", mod, span)
 		}
 
-		// Multi-range checks against previous range.
-		if i > 0 {
-			prev := ranges[i-1]
-			if r.Min < prev.Min {
+		// Multi-range checks against the previous resolved range.
+		if previous != nil {
+			if r.Min < previous.Min {
 				ctx.EmitDiagnostic(types.DiagRangeAscending,
 					mod, span,
 					fmt.Sprintf("%q: ranges not in ascending order", name))
 			}
-			if r.Min <= prev.Max {
+			if r.Min <= previous.Max {
 				ctx.EmitDiagnostic(types.DiagRangeOverlap,
 					mod, span,
-					fmt.Sprintf("%q: range %s overlaps with %s", name, r.String(), prev.String()))
+					fmt.Sprintf("%q: range %s overlaps with %s", name, r.String(), previous.String()))
 			}
 		}
+		previous = r
 	}
 }
 
@@ -430,12 +436,9 @@ func isLegalIndexBasetype(base model.BaseType) bool {
 // maxSizeFromRanges returns the maximum Max value across all size ranges,
 // or -1 if sizes is empty.
 func maxSizeFromRanges(sizes []model.Range) int64 {
-	if len(sizes) == 0 {
-		return -1
-	}
-	m := sizes[0].Max
-	for _, r := range sizes[1:] {
-		if r.Max > m {
+	m := int64(-1)
+	for _, r := range sizes {
+		if r.IsResolved() && r.Max > m {
 			m = r.Max
 		}
 	}
@@ -587,7 +590,7 @@ func checkIndexConstraints(ctx *resolverContext, objRefs []objectTypeRef) {
 
 			// model.Range includes negative values.
 			for _, r := range ranges {
-				if r.Min < 0 {
+				if r.IsResolved() && r.Min < 0 {
 					ctx.EmitDiagnostic(types.DiagIndexNegativeRange,
 						ref.mod, item.Span,
 						fmt.Sprintf("INDEX %q of %q has range permitting negative values", item.Object, obj.Name))
@@ -740,7 +743,8 @@ func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.Ob
 		}
 	}
 
-	// Check RANGE constraints.
+	// Check RANGE constraints. An unresolved endpoint makes non-membership
+	// unknowable, so only diagnose when every range is resolved.
 	if len(ranges) > 0 {
 		var inRange bool
 		if isUnsigned {
@@ -748,7 +752,7 @@ func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.Ob
 		} else {
 			inRange = valueInRanges(ival, ranges)
 		}
-		if !inRange {
+		if !inRange && !hasUnresolvedRange(ranges) {
 			v := any(ival)
 			if isUnsigned {
 				v = uval
@@ -787,9 +791,18 @@ func checkDefvalNumeric(ctx *resolverContext, mod *module.Module, obj *module.Ob
 	}
 }
 
+func hasUnresolvedRange(ranges []model.Range) bool {
+	for _, r := range ranges {
+		if !r.IsResolved() {
+			return true
+		}
+	}
+	return false
+}
+
 func valueInRanges(v int64, ranges []model.Range) bool {
 	for _, r := range ranges {
-		if v >= r.Min && v <= r.Max {
+		if r.IsResolved() && v >= r.Min && v <= r.Max {
 			return true
 		}
 	}
@@ -808,6 +821,9 @@ func findNamedValue(values []model.NamedValue, label string) bool {
 
 func uvalueInRanges(v uint64, ranges []model.Range) bool {
 	for _, r := range ranges {
+		if !r.IsResolved() {
+			continue
+		}
 		// model.Range Min/Max are int64. A uint64 value can only fall within a range
 		// if it fits in int64 (i.e. v <= MaxInt64) and the range bound is non-negative.
 		if r.Max < 0 {

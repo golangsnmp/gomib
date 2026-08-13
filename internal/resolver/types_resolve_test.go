@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/golangsnmp/gomib/internal/cst/lower"
+	cstparser "github.com/golangsnmp/gomib/internal/cst/parser"
 	"github.com/golangsnmp/gomib/internal/model"
 	"github.com/golangsnmp/gomib/internal/module"
 	"github.com/golangsnmp/gomib/internal/testutil"
@@ -362,10 +364,55 @@ func TestRangesToConstraint(t *testing.T) {
 		testutil.Equal(t, int64(200), got[1].Max, "got[1] max")
 	})
 
+	t.Run("raw endpoints", func(t *testing.T) {
+		ranges := []module.Range{{
+			Min: &module.RangeValueRaw{Value: "'0G'H"},
+			Max: &module.RangeValueRaw{Value: "'10000000000000000'H"},
+		}}
+		got := rangesToConstraint(ranges)
+		testutil.Len(t, got, 1, "ranges")
+		testutil.Equal(t, "'0G'H", got[0].RawMin, "raw min")
+		testutil.Equal(t, "'10000000000000000'H", got[0].RawMax, "raw max")
+		testutil.False(t, got[0].IsResolved(), "raw range should remain unresolved")
+	})
+
 	t.Run("empty ranges", func(t *testing.T) {
 		got := rangesToConstraint(nil)
 		testutil.Len(t, got, 0, "ranges")
 	})
+}
+
+func TestResolveHexRangeLiterals(t *testing.T) {
+	source := []byte(`
+TEST-MIB DEFINITIONS ::= BEGIN
+Valid ::= INTEGER ('7f ff'H..'80 00'H)
+Invalid ::= INTEGER ('0G'H..'10000000000000000'H)
+END
+`)
+	cfg := types.DefaultConfig()
+	p := cstparser.New(source, nil, cfg)
+	mods := lower.Lower(p.ParseModule(), source, p.Diagnostics(), cfg)
+	m := Resolve(mods, nil, nil, &cfg)
+
+	valid := m.Module("TEST-MIB").Type("Valid").Ranges()
+	testutil.Len(t, valid, 1, "valid ranges")
+	testutil.Equal(t, int64(0x7fff), valid[0].Min, "valid min")
+	testutil.Equal(t, int64(0x8000), valid[0].Max, "valid max")
+	testutil.True(t, valid[0].IsResolved(), "valid range should resolve")
+
+	invalid := m.Module("TEST-MIB").Type("Invalid").Ranges()
+	testutil.Len(t, invalid, 1, "invalid ranges")
+	testutil.Equal(t, "'0G'H", invalid[0].RawMin, "invalid raw min")
+	testutil.Equal(t, "'10000000000000000'H", invalid[0].RawMax, "overflow raw max")
+	testutil.False(t, invalid[0].IsResolved(), "invalid range should remain unresolved")
+
+	var invalidDiags int
+	for _, diag := range m.Diagnostics() {
+		if diag.Code == types.DiagInvalidHexRange {
+			invalidDiags++
+		}
+	}
+	testutil.Equal(t, 2, invalidDiags, "invalid hex range diagnostics")
 }
 
 func TestRangeValueToI64(t *testing.T) {

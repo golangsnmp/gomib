@@ -176,6 +176,9 @@ func TestRangeString(t *testing.T) {
 		{"range", Range{Min: 0, Max: 255}, "0..255"},
 		{"negative", Range{Min: -1, Max: 100}, "-1..100"},
 		{"zero range", Range{Min: 0, Max: 0}, "0"},
+		{"raw single value", Range{RawMin: "'0G'H", RawMax: "'0G'H"}, "'0G'H"},
+		{"raw range", Range{RawMin: "'0G'H", RawMax: "'1G'H"}, "'0G'H..'1G'H"},
+		{"raw lower endpoint", Range{RawMin: "'0G'H", Max: 10}, "'0G'H..10"},
 	}
 
 	for _, tt := range tests {

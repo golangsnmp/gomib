@@ -414,10 +414,14 @@ func exportNodeRef(node *mib.Node) ExportObjRef {
 func exportRanges(ranges []mib.Range) []ExportRange {
 	result := make([]ExportRange, 0, len(ranges))
 	for _, r := range ranges {
-		result = append(result, ExportRange{
-			Min: strconv.FormatInt(r.Min, 10),
-			Max: strconv.FormatInt(r.Max, 10),
-		})
+		min, max := r.RawMin, r.RawMax
+		if min == "" {
+			min = strconv.FormatInt(r.Min, 10)
+		}
+		if max == "" {
+			max = strconv.FormatInt(r.Max, 10)
+		}
+		result = append(result, ExportRange{Min: min, Max: max})
 	}
 	return result
 }

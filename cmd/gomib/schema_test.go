@@ -9,6 +9,16 @@ import (
 	"github.com/golangsnmp/gomib/mib"
 )
 
+func TestExportRangesPreservesRawEndpoints(t *testing.T) {
+	got := exportRanges([]mib.Range{{RawMin: "'0G'H", RawMax: "'10000000000000000'H"}})
+	if len(got) != 1 {
+		t.Fatalf("exported ranges = %d, want 1", len(got))
+	}
+	if got[0].Min != "'0G'H" || got[0].Max != "'10000000000000000'H" {
+		t.Errorf("exported range = %#v, want raw endpoints", got[0])
+	}
+}
+
 func TestScopedExportRefsDoNotFallBackGlobally(t *testing.T) {
 	m := loadScopedExportTestMIB(t)
 	export := buildExportPayload(m, "normal")

@@ -254,6 +254,56 @@ END
 	}
 }
 
+func TestHexRangeLiteralLowering(t *testing.T) {
+	mods := parseMods(t, "\nTEST-MIB DEFINITIONS ::= BEGIN\n"+
+		"Whitespace ::= INTEGER ('7f ff'H | '7f\tff'H | '7f\rff'H | '7f\nff'H)\n"+
+		"Malformed ::= INTEGER ('0G'H)\n"+
+		"Overflow ::= INTEGER ('10000000000000000'H)\n"+
+		"END\n")
+	if len(mods) != 1 {
+		t.Fatalf("got %d modules, want 1", len(mods))
+	}
+	if len(mods[0].TypeDefs) != 3 {
+		t.Fatalf("got %d type definitions, want 3", len(mods[0].TypeDefs))
+	}
+
+	constraints := func(index int) []module.Range {
+		t.Helper()
+		syntax, ok := mods[0].TypeDefs[index].Syntax.(*module.TypeSyntaxConstrained)
+		if !ok {
+			t.Fatalf("type %d syntax = %T, want constrained", index, mods[0].TypeDefs[index].Syntax)
+		}
+		return syntax.Constraint.(*module.ConstraintRange).Ranges
+	}
+
+	valid := constraints(0)
+	if len(valid) != 4 {
+		t.Fatalf("got %d whitespace ranges, want 4", len(valid))
+	}
+	for index, r := range valid {
+		min, ok := r.Min.(*module.RangeValueUnsigned)
+		if !ok || min.Value != 0x7fff {
+			t.Errorf("whitespace range %d endpoint = %#v, want 32767", index, r.Min)
+		}
+	}
+	for index, want := range []string{"'0G'H", "'10000000000000000'H"} {
+		got, ok := constraints(index + 1)[0].Min.(*module.RangeValueRaw)
+		if !ok || got.Value != want {
+			t.Errorf("type %d endpoint = %#v, want raw %q", index+1, got, want)
+		}
+	}
+
+	var invalid int
+	for _, diag := range mods[0].Diagnostics {
+		if diag.Code == types.DiagInvalidHexRange {
+			invalid++
+		}
+	}
+	if invalid != 2 {
+		t.Errorf("got %d invalid hex range diagnostics, want 2", invalid)
+	}
+}
+
 func TestBitsNameRedefinition(t *testing.T) {
 	mods := parseMods(t, `
 TEST-MIB DEFINITIONS ::= BEGIN

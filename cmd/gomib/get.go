@@ -254,21 +254,11 @@ func (c *cli) printObjectDetails(obj *mib.Object, descLimit int) {
 		}
 		ranges := obj.EffectiveRanges()
 		if len(ranges) > 0 {
-			vr := ranges[0]
-			if vr.Min == vr.Max {
-				typeDesc += fmt.Sprintf(" (%d)", vr.Min)
-			} else {
-				typeDesc += fmt.Sprintf(" (%d..%d)", vr.Min, vr.Max)
-			}
+			typeDesc += " (" + ranges[0].String() + ")"
 		}
 		sizes := obj.EffectiveSizes()
 		if len(sizes) > 0 {
-			sr := sizes[0]
-			if sr.Min == sr.Max {
-				typeDesc += fmt.Sprintf(" (SIZE(%d))", sr.Min)
-			} else {
-				typeDesc += fmt.Sprintf(" (SIZE(%d..%d))", sr.Min, sr.Max)
-			}
+			typeDesc += " (SIZE(" + sizes[0].String() + "))"
 		}
 		fmt.Fprintf(c.stdout, "Type:    %s\n", typeDesc)
 	} else {

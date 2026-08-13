@@ -229,7 +229,7 @@ func NewRangeUnsigned(min, max uint64, span types.Span) Range {
 	}
 }
 
-// RangeValue is one endpoint of a Range (signed, unsigned, MIN, or MAX).
+// RangeValue is one endpoint of a Range (signed, unsigned, MIN, MAX, or raw).
 type RangeValue interface {
 	rangeValue()
 }
@@ -247,6 +247,13 @@ type RangeValueUnsigned struct {
 }
 
 func (*RangeValueUnsigned) rangeValue() {}
+
+// RangeValueRaw preserves a range endpoint that could not be converted.
+type RangeValueRaw struct {
+	Value string
+}
+
+func (*RangeValueRaw) rangeValue() {}
 
 // RangeValueMin represents the MIN keyword in a range constraint.
 type RangeValueMin struct{}
