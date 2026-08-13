@@ -304,15 +304,41 @@ Navigate from any level: `obj.Table()` returns the containing table, `obj.Row()`
 
 ### Effective constraints
 
-Constraints can be defined inline on the object or inherited through the type chain. The `Effective*` methods walk both:
+Constraints can be defined inline on an object or inherited through its type chain. Effective SIZE and value ranges are intersections of every applicable constraint in the parent chain and the base type domain, so they can be narrower than any one declared list:
 
 ```go
-obj.EffectiveEnums()       // enum values
-obj.EffectiveBits()        // BITS values
-obj.EffectiveRanges()      // value ranges
-obj.EffectiveSizes()       // size constraints
-obj.EffectiveDisplayHint() // display hint string
+ranges := obj.EffectiveRanges() // intersected value ranges
+sizes := obj.EffectiveSizes()   // intersected SIZE constraints
+
+obj.EffectiveRangesConstrained() // any applicable value constraint exists
+obj.EffectiveSizesConstrained()  // any applicable SIZE constraint exists
+obj.EffectiveEnums()             // nearest enum values
+obj.EffectiveBits()              // nearest BITS values
+obj.EffectiveDisplayHint()       // nearest display hint string
 ```
+
+An empty effective slice is ambiguous by itself. If the corresponding `Effective*Constrained()` method is false, the value is unconstrained; if it is true, the declared constraints have an empty intersection. The same methods are available on `Type`.
+
+Each `mib.Range` is inclusive and has `Min` and `Max` endpoints of type `mib.RangeBound`. Endpoint kinds preserve signed values, unsigned values through `math.MaxUint64`, symbolic `MIN`/`MAX`, and unresolved source text:
+
+```go
+for i := range ranges {
+    r := &ranges[i]
+    if !r.IsResolved() { // symbolic or raw endpoint remains
+        fmt.Println(r.Min.Kind, r.Min.String(), r.Max.Kind, r.Max.String())
+        continue
+    }
+
+    if min, ok := r.Min.AsInt64(); ok {
+        fmt.Println("signed-compatible minimum:", min)
+    }
+    if max, ok := r.Max.AsUint64(); ok {
+        fmt.Println("unsigned-compatible maximum:", max)
+    }
+}
+```
+
+`AsInt64()` accepts signed endpoints and unsigned endpoints no greater than `math.MaxInt64`. `AsUint64()` accepts unsigned endpoints and non-negative signed endpoints. Both return `ok == false` for unrepresentable numeric values, symbolic `MIN`/`MAX`, and raw endpoints. Inspect `RangeBound.Kind` (`RangeBoundSigned`, `RangeBoundUnsigned`, `RangeBoundMin`, `RangeBoundMax`, or `RangeBoundRaw`) when the distinction matters.
 
 ## Types
 
@@ -334,9 +360,13 @@ for t := typ; t != nil; t = t.Parent() {
 }
 
 // Effective values resolve through the chain
-typ.EffectiveBase()        // underlying base type
-typ.EffectiveDisplayHint() // first non-empty hint in chain
-typ.EffectiveEnums()       // first non-empty enum set
+typ.EffectiveBase()              // underlying base type
+typ.EffectiveDisplayHint()       // first non-empty hint in chain
+typ.EffectiveEnums()             // first non-empty enum set
+typ.EffectiveRanges()            // intersection across the chain
+typ.EffectiveSizes()             // SIZE intersection across the chain
+typ.EffectiveRangesConstrained() // distinguishes absent from empty
+typ.EffectiveSizesConstrained()  // distinguishes absent from empty
 ```
 
 Classification helpers: `IsCounter()`, `IsGauge()`, `IsString()`, `IsEnumeration()`, `IsBits()`.

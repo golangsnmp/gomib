@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-13
+
+### Breaking Changes
+
+- Change `mib.Range.Min` and `mib.Range.Max` from `int64` to `RangeBound`, preserving signed, unsigned, symbolic `MIN`/`MAX`, and unresolved raw endpoints; callers must inspect `RangeBound.Kind` or use `AsInt64()`/`AsUint64()` instead of reading integer endpoints directly
+- Change `Range.IsResolved()` to a pointer receiver; calls on non-addressable `Range` values must first assign or take an address
+- Change `Type.EffectiveSizes()`, `Type.EffectiveRanges()`, and the corresponding `Object` methods to intersect constraints across the complete parent chain and base type domain instead of returning the nearest non-empty list; use the new `EffectiveSizesConstrained()` and `EffectiveRangesConstrained()` methods to distinguish no constraint from an empty intersection
+
+### Added
+
+- Add `RangeBound`, `RangeBoundKind`, endpoint constructors, conversion helpers, comparison, and concrete-value inspection to the public `mib` package
+- Add diagnostics for empty constraint intersections, type dependency cycles, overflowing generic trap numbers, and INTEGER enumeration values outside the Integer32 range
+
+### Changed
+
+- Preserve full-width unsigned, symbolic `MIN`/`MAX`, and malformed raw range endpoints in resolved constraints, schema output, and SMI output
+- Infer SMI language from base-module identity, imports, and strong syntax evidence instead of defaulting modules without SMIv2 imports to SMIv1
+- Index objects, notifications, groups, compliances, and capabilities by definition name so lookups remain correct when OID node labels differ or collide
+- Validate decoded module candidates before applying file and source precedence, including candidates discovered from changed files or duplicate advertisements
+- Store configured diagnostic severity overrides on emitted diagnostics and use those effective severities for failure checks
+- Expand literal `$HOME` placeholders in net-snmp configuration and `MIBDIRS` paths
+
+### Fixed
+
+- Fix MACRO bodies containing quoted `END`, repeated `EXPORTS` clauses, and semicolons inside `EXPORTS` comments
+- Fix forwarded imports being accepted when the final module does not define the symbol, and retain unresolved references in their module scope in exported output
+- Fix invalid or impossible `LAST-UPDATED` values influencing duplicate-module preference
+- Fix typed CLI `find` filters returning non-object definition kinds
+
 ## [0.12.0] - 2026-07-23
 
 ### Added
@@ -149,7 +178,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix path traversal in normalize output path
 - Fix godoc link to mib.DiagnosticConfig
 
-[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/golangsnmp/gomib/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/golangsnmp/gomib/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/golangsnmp/gomib/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/golangsnmp/gomib/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/golangsnmp/gomib/compare/v0.9.0...v0.10.0
