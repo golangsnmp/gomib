@@ -58,6 +58,7 @@ const (
 	DiagBitsNumberTooLarge     = "bits-number-too-large"
 	DiagBitsNumberLarge        = "bits-number-large"
 	DiagEnumZero               = "enum-zero"
+	DiagEnumValueOutOfRange    = "enum-value-out-of-range"
 	DiagEnumNameRedefinition   = "enum-name-redefinition"
 	DiagEnumValueRedefinition  = "enum-value-redefinition"
 	DiagBitsNameRedefinition   = "bits-name-redefinition"
@@ -267,6 +268,7 @@ var validateDiagCodes = []codeEntry{
 	{DiagBitsNumberTooLarge, SeverityError},
 	{DiagBitsNumberLarge, SeverityStyle},
 	{DiagEnumZero, SeverityError},
+	{DiagEnumValueOutOfRange, SeverityWarning},
 	{DiagEnumNameRedefinition, SeverityError},
 	{DiagEnumValueRedefinition, SeverityError},
 	{DiagBitsNameRedefinition, SeverityError},

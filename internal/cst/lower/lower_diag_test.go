@@ -11,9 +11,13 @@ import (
 
 func parseMods(t *testing.T, source string) []*module.Module {
 	t.Helper()
-	src := []byte(source)
 	// Use VerboseConfig so style-level diagnostics are reported.
-	cfg := types.VerboseConfig()
+	return parseModsWithConfig(t, source, types.VerboseConfig())
+}
+
+func parseModsWithConfig(t *testing.T, source string, cfg types.DiagnosticConfig) []*module.Module {
+	t.Helper()
+	src := []byte(source)
 	p := cstparser.New(src, nil, cfg)
 	file := p.ParseModule()
 	return lower.Lower(file, src, p.Diagnostics(), cfg)
@@ -169,6 +173,78 @@ END
 `)
 	if !hasDiag(mods, types.DiagEnumValueRedefinition) {
 		t.Error("expected DiagEnumValueRedefinition for duplicate enum value")
+	}
+}
+
+func TestEnumValueInteger32Bounds(t *testing.T) {
+	const source = `
+TEST-MIB DEFINITIONS ::= BEGIN
+Boundary ::= INTEGER {
+    minimum(-2147483648),
+    maximum(2147483647),
+    below(-2147483649),
+    vendorSentinel(4294967295)
+}
+END
+`
+	mods := parseMods(t, source)
+	if len(mods) != 1 {
+		t.Fatalf("got %d modules, want 1", len(mods))
+	}
+	if len(mods[0].TypeDefs) != 1 {
+		t.Fatalf("got %d type definitions, want 1", len(mods[0].TypeDefs))
+	}
+	syntax, ok := mods[0].TypeDefs[0].Syntax.(*module.TypeSyntaxIntegerEnum)
+	if !ok {
+		t.Fatalf("syntax type = %T, want *module.TypeSyntaxIntegerEnum", mods[0].TypeDefs[0].Syntax)
+	}
+	want := []int64{-2147483648, 2147483647, -2147483649, 4294967295}
+	if len(syntax.NamedNumbers) != len(want) {
+		t.Fatalf("got %d named numbers, want %d", len(syntax.NamedNumbers), len(want))
+	}
+	for i, value := range want {
+		if syntax.NamedNumbers[i].Value != value {
+			t.Errorf("named number %q value = %d, want %d", syntax.NamedNumbers[i].Name, syntax.NamedNumbers[i].Value, value)
+		}
+	}
+
+	var boundsDiags []types.Diagnostic
+	for _, diag := range mods[0].Diagnostics {
+		if diag.Code == types.DiagEnumValueOutOfRange {
+			boundsDiags = append(boundsDiags, diag)
+		}
+	}
+	if len(boundsDiags) != 2 {
+		t.Fatalf("got %d bounds diagnostics, want 2", len(boundsDiags))
+	}
+	for _, diag := range boundsDiags {
+		if diag.Severity != types.SeverityWarning {
+			t.Errorf("bounds diagnostic severity = %v, want %v", diag.Severity, types.SeverityWarning)
+		}
+	}
+}
+
+func TestEnumValueBoundsDiagnosticConfig(t *testing.T) {
+	const source = `
+TEST-MIB DEFINITIONS ::= BEGIN
+VendorEnum ::= INTEGER { vendorSentinel(4294967295) }
+END
+`
+
+	if hasDiag(parseModsWithConfig(t, source, types.DefaultConfig()), types.DiagEnumValueOutOfRange) {
+		t.Error("default reporting should suppress warning-level enum bounds diagnostic")
+	}
+
+	overridden := types.DefaultConfig()
+	overridden.Overrides = map[string]types.Severity{types.DiagEnumValueOutOfRange: types.SeverityMinor}
+	if !hasDiag(parseModsWithConfig(t, source, overridden), types.DiagEnumValueOutOfRange) {
+		t.Error("severity override should enable enum bounds diagnostic at default reporting")
+	}
+
+	ignored := types.VerboseConfig()
+	ignored.Ignore = []string{types.DiagEnumValueOutOfRange}
+	if hasDiag(parseModsWithConfig(t, source, ignored), types.DiagEnumValueOutOfRange) {
+		t.Error("ignore configuration should suppress enum bounds diagnostic")
 	}
 }
 

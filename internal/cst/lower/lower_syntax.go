@@ -114,6 +114,10 @@ func (l *lowerer) lowerNamedNumbers(values []cst.EnumValueNode) []module.NamedNu
 		v := &values[i]
 		name := l.text(v.Label)
 		value := l.convertI64(v.Value)
+		if value < -1<<31 || value > 1<<31-1 {
+			l.EmitDiagnostic(types.DiagEnumValueOutOfRange, v.Value.Span,
+				fmt.Sprintf("enum value %d is outside the Integer32 range", value))
+		}
 		result = append(result, module.NewNamedNumber(name, value, v.Span))
 	}
 	return result
