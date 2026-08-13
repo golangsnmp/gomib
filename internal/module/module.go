@@ -3,7 +3,7 @@
 // The CST lowerer produces module IR from the lossless CST, independent of
 // whether the source was SMIv1 or SMIv2. Key transformations during lowering:
 //
-//   - Language detection from imports
+//   - Language detection from base modules, imports, and strong syntax
 //   - Import flattening (one symbol per import)
 //   - Unified notification type (TRAP-TYPE and NOTIFICATION-TYPE)
 //

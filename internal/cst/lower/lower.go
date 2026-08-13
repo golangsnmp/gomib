@@ -78,10 +78,49 @@ func (l *lowerer) convertI64(tok cst.SyntaxToken) int64 {
 	return v
 }
 
-// isSMIv2Import reports whether importing from this module indicates SMIv2.
-func isSMIv2Import(name string) bool {
-	bm, ok := module.BaseModuleFromName(name)
-	return ok && bm.IsSMIv2()
+// detectLanguage determines the SMI version from explicit base-module identity,
+// imports from base modules, and syntax that is strong version evidence. It runs
+// after definitions are lowered so syntax evidence reflects what was retained.
+func detectLanguage(m *module.Module) types.Language {
+	if bm, ok := module.BaseModuleFromName(m.Name); ok {
+		if bm.IsSMIv1() {
+			return types.LanguageSMIv1
+		}
+		if bm.IsSMIv2() {
+			return types.LanguageSMIv2
+		}
+	}
+
+	hasSMIv1Evidence := false
+	hasSMIv2Evidence := false
+
+	for _, imp := range m.Imports {
+		bm, ok := module.BaseModuleFromName(imp.Module)
+		if !ok {
+			continue
+		}
+		hasSMIv1Evidence = hasSMIv1Evidence || bm.IsSMIv1()
+		hasSMIv2Evidence = hasSMIv2Evidence || bm.IsSMIv2()
+	}
+
+	if len(m.ModuleIdentities) > 0 {
+		hasSMIv2Evidence = true
+	}
+	for _, notification := range m.Notifications {
+		if notification.TrapInfo != nil {
+			hasSMIv1Evidence = true
+			break
+		}
+	}
+
+	switch {
+	case hasSMIv1Evidence && !hasSMIv2Evidence:
+		return types.LanguageSMIv1
+	case hasSMIv2Evidence && !hasSMIv1Evidence:
+		return types.LanguageSMIv2
+	default:
+		return types.LanguageUnknown
+	}
 }
 
 // lowerModule converts a CST ModuleNode to a module.Module.
@@ -101,21 +140,16 @@ func (l *lowerer) lowerModule(mod *cst.ModuleNode) *module.Module {
 
 	m := module.NewModule(name, mod.Span)
 
-	// Detect language from imports.
-	language := types.LanguageUnknown
 	if mod.Imports != nil {
-		m.Imports = l.lowerImports(mod.Imports, &language)
+		m.Imports = l.lowerImports(mod.Imports)
 	}
 
-	if language == types.LanguageUnknown {
-		language = types.LanguageSMIv1
-	}
-	m.Language = language
-
-	// Lower definitions.
+	// Lower definitions before finalizing language so retained strong syntax can
+	// contribute evidence alongside imports.
 	for _, def := range mod.Body {
 		l.lowerDefinition(def, m)
 	}
+	m.Language = detectLanguage(m)
 
 	// Build line table.
 	lineTable := types.BuildLineTable(l.source)
@@ -133,14 +167,11 @@ func (l *lowerer) lowerModule(mod *cst.ModuleNode) *module.Module {
 }
 
 // lowerImports flattens CST import groups into one Import per symbol.
-func (l *lowerer) lowerImports(imports *cst.ImportsNode, language *types.Language) []module.Import {
+func (l *lowerer) lowerImports(imports *cst.ImportsNode) []module.Import {
 	var result []module.Import
 	for i := range imports.Groups {
 		group := &imports.Groups[i]
 		fromModule := l.text(group.Module)
-		if isSMIv2Import(fromModule) {
-			*language = types.LanguageSMIv2
-		}
 		for _, sym := range group.Symbols {
 			symName := l.text(sym)
 			result = append(result, module.NewImport(fromModule, symName, sym.Span))

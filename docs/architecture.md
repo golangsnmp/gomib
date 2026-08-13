@@ -77,8 +77,10 @@ before anything else.
 TRAP-TYPE, and status values like `mandatory`. SMIv2 (RFC 2578) uses
 MAX-ACCESS, NOTIFICATION-TYPE, status values like `current`, and adds textual
 conventions, conformance groups, and MODULE-IDENTITY. Both are still found in
-production MIB collections. The language version is detected by which base
-modules a MIB imports from.
+production MIB collections. The language version is inferred conservatively
+from explicit base-module identity, imports from base modules, and strong
+syntax (`MODULE-IDENTITY` for SMIv2 or `TRAP-TYPE` for SMIv1). Conflicting or
+insufficient evidence leaves the language unknown.
 
 
 ## Processing Pipeline
@@ -349,8 +351,8 @@ The parser accepts both SMIv1 and SMIv2 syntax without version distinction:
 - Both status value sets accepted (`mandatory`/`optional` and
   `current`/`deprecated`/`obsolete`)
 
-Version detection is deferred to the lowering stage, where import analysis
-determines which SMI version the module uses.
+Version detection is deferred to the lowering stage, where explicit base-module
+identity, base-module imports, and strong syntax are combined conservatively.
 
 
 ## Stage 4: Lowering (CST -> Module IR)
@@ -380,9 +382,11 @@ concept.
 
 ### Key Transformations
 
-- **Language detection:** If any import references a SMIv2 base module
-  (SNMPv2-SMI, SNMPv2-TC, SNMPv2-CONF), the module is classified as SMIv2.
-  Otherwise it defaults to SMIv1.
+- **Language detection:** After definitions are lowered, explicit base-module
+  identity, imports from SMIv1/SMIv2 base modules, and strong syntax
+  (`MODULE-IDENTITY` or `TRAP-TYPE`) are combined as evidence. A single
+  unconflicted version is selected; conflicting or insufficient evidence
+  leaves the language unknown.
 - **Import flattening:** CST groups imports by module. The lowerer flattens
   these into individual `Import{Module, Symbol, Span}` records.
 - **Notification unification:** Both `TrapTypeNode` and `NotificationTypeNode`
@@ -774,9 +778,10 @@ Seven base modules are built from embedded source files:
 | RFC-1212 | 1212 | SMIv1 OBJECT-TYPE macro |
 | RFC-1215 | 1215 | SMIv1 TRAP-TYPE macro |
 
-These are always available without explicit source configuration. Which base
-modules a MIB imports from also signals its language version: importing from
-SNMPv2-SMI/TC/CONF means SMIv2, importing from RFC1155-SMI means SMIv1.
+These are always available without explicit source configuration. Each base
+module has an explicit SMI version. A regular module's imports from any of
+these base modules contribute language evidence alongside strong syntax;
+conflicting or insufficient evidence leaves its language unknown.
 
 
 ## Dependency Graph Package
