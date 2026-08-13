@@ -59,11 +59,33 @@ func discoverSystemPaths(logger types.Logger) []string {
 
 func discoverNetSNMPPaths(logger types.Logger) []string {
 	paths := netsnmpDefaults()
+	home, homeErr := os.UserHomeDir()
+
+	parseConfigLine := parseNetSNMPLine
+	if homeErr == nil {
+		parseConfigLine = func(line string) (pathOp, []string, bool) {
+			op, dirs, ok := parseNetSNMPLine(line)
+			return op, expandNetSNMPHome(dirs, home), ok
+		}
+	}
 	for _, cf := range netsnmpConfigFiles() {
-		paths = applyConfigFile(cf, paths, parseNetSNMPLine, logger)
+		paths = applyConfigFile(cf, paths, parseConfigLine, logger)
 	}
 	if v := os.Getenv("MIBDIRS"); v != "" {
-		paths = applyNetSNMPEnv(v, paths)
+		op, dirs := parseNetSNMPEnv(v)
+		if homeErr == nil {
+			dirs = expandNetSNMPHome(dirs, home)
+		}
+		paths = applyOp(op, dirs, paths)
+	}
+	return paths
+}
+
+// expandNetSNMPHome replaces the literal $HOME placeholder supported by
+// net-snmp. It intentionally does not perform general environment expansion.
+func expandNetSNMPHome(paths []string, home string) []string {
+	for i, path := range paths {
+		paths[i] = strings.ReplaceAll(path, "$HOME", home)
 	}
 	return paths
 }
@@ -197,14 +219,19 @@ func parseColonSemantic(value string) (op pathOp, paths []string) {
 	return pathReplace, splitPaths(value)
 }
 
-func applyNetSNMPEnv(value string, current []string) []string {
+func parseNetSNMPEnv(value string) (pathOp, []string) {
 	if strings.HasPrefix(value, "+") {
-		return applyOp(pathAppend, splitPaths(value[1:]), current)
+		return pathAppend, splitPaths(value[1:])
 	}
 	if strings.HasPrefix(value, "-") {
-		return applyOp(pathPrepend, splitPaths(value[1:]), current)
+		return pathPrepend, splitPaths(value[1:])
 	}
-	return splitPaths(value)
+	return pathReplace, splitPaths(value)
+}
+
+func applyNetSNMPEnv(value string, current []string) []string {
+	op, dirs := parseNetSNMPEnv(value)
+	return applyOp(op, dirs, current)
 }
 
 func applyLibSMIEnv(value string, current []string) []string {

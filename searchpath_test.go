@@ -171,6 +171,73 @@ func TestApplyNetSNMPEnv(t *testing.T) {
 	}
 }
 
+func TestNetSNMPHomeExpansionEnvironment(t *testing.T) {
+	home := t.TempDir()
+	mibs := filepath.Join(home, "mibs")
+	extra := filepath.Join(home, "extra")
+	for _, dir := range []string{mibs, extra} {
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	repeatedHome := filepath.Join("$HOME", "repeat", "$HOME")
+	t.Setenv("MIBDIRS", pl(
+		filepath.Join("$HOME", "mibs"),
+		mibs,
+		filepath.Join("$HOME", "extra"),
+		filepath.Join("$HOME", "missing"),
+		repeatedHome,
+	))
+
+	got := discoverNetSNMPPaths(types.Logger{})
+	want := []string{
+		mibs,
+		mibs,
+		extra,
+		filepath.Join(home, "missing"),
+		strings.ReplaceAll(repeatedHome, "$HOME", home),
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("expanded paths = %v, want %v", got, want)
+	}
+
+	got = filterExistingDirs(dedup(got))
+	want = []string{mibs, extra}
+	if !slices.Equal(got, want) {
+		t.Errorf("filtered paths = %v, want %v", got, want)
+	}
+}
+
+func TestNetSNMPHomeExpansionPreservesGeneratedDefaults(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "$HOME", "user")
+	defaultMIBs := filepath.Join(home, ".snmp", "mibs")
+	envMIBs := filepath.Join(home, "env-mibs")
+	for _, dir := range []string{defaultMIBs, envMIBs} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("MIBDIRS", "+"+filepath.Join("$HOME", "env-mibs"))
+
+	got := discoverNetSNMPPaths(types.Logger{})
+	want := append(netsnmpDefaults(), envMIBs)
+	if !slices.Equal(got, want) {
+		t.Fatalf("paths = %v, want %v", got, want)
+	}
+
+	got = filterExistingDirs(dedup(got))
+	want = []string{defaultMIBs, envMIBs}
+	if !slices.Equal(got, want) {
+		t.Errorf("filtered paths = %v, want %v", got, want)
+	}
+}
+
 func TestApplyLibSMIEnv(t *testing.T) {
 	current := []string{"/default/mibs"}
 
@@ -226,6 +293,61 @@ func TestApplyConfigFileNetSNMP(t *testing.T) {
 
 	got := applyConfigFile(confPath, []string{"/original"}, parseNetSNMPLine, types.Logger{})
 	want := []string{"/base/mibs", "/extra/mibs"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestNetSNMPHomeExpansionConfig(t *testing.T) {
+	home := t.TempDir()
+	mibs := filepath.Join(home, "mibs")
+	extra := filepath.Join(home, "extra")
+	for _, dir := range []string{mibs, extra} {
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	configDir := filepath.Join(home, ".snmp")
+	if err := os.Mkdir(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	config := "mibdirs " + pl(filepath.Join("$HOME", "mibs"), mibs) + "\n" +
+		"+mibdirs " + pl(filepath.Join("$HOME", "extra"), filepath.Join("$HOME", "missing")) + "\n"
+	if err := os.WriteFile(filepath.Join(configDir, "snmp.conf"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("MIBDIRS", "")
+
+	got := discoverNetSNMPPaths(types.Logger{})
+	want := []string{mibs, mibs, extra, filepath.Join(home, "missing")}
+	if !slices.Equal(got, want) {
+		t.Fatalf("expanded paths = %v, want %v", got, want)
+	}
+
+	got = filterExistingDirs(dedup(got))
+	want = []string{mibs, extra}
+	if !slices.Equal(got, want) {
+		t.Errorf("filtered paths = %v, want %v", got, want)
+	}
+}
+
+func TestExpandNetSNMPHome(t *testing.T) {
+	got := expandNetSNMPHome([]string{
+		"$HOME/mibs/$HOME",
+		"~/mibs",
+		"$USER/mibs",
+		"${HOME}/mibs",
+	}, "/home/test")
+	want := []string{
+		"/home/test/mibs//home/test",
+		"~/mibs",
+		"$USER/mibs",
+		"${HOME}/mibs",
+	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
