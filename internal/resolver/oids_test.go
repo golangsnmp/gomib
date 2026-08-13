@@ -497,21 +497,23 @@ func TestShouldPreferModule(t *testing.T) {
 
 	t.Run("same language uses LAST-UPDATED tiebreaker", func(t *testing.T) {
 		newSrc := &module.Module{
-			Name:     "NEW-MIB",
-			Language: types.LanguageSMIv2,
+			Name:        "ZULU-MIB",
+			Language:    types.LanguageSMIv2,
+			LastUpdated: "200501010000Z",
 		}
 		addDefs(newSrc, []module.Definition{
-			&module.ModuleIdentity{DefBase: module.DefBase{Name: "newMIB"}, LastUpdated: "200501010000Z"},
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "zuluMIB"}, LastUpdated: "200501010000Z"},
 		})
 		oldSrc := &module.Module{
-			Name:     "OLD-MIB",
-			Language: types.LanguageSMIv2,
+			Name:        "ALPHA-MIB",
+			Language:    types.LanguageSMIv2,
+			LastUpdated: "200001010000Z",
 		}
 		addDefs(oldSrc, []module.Definition{
-			&module.ModuleIdentity{DefBase: module.DefBase{Name: "oldMIB"}, LastUpdated: "200001010000Z"},
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "alphaMIB"}, LastUpdated: "200001010000Z"},
 		})
-		newMod := model.NewModule("NEW-MIB")
-		oldMod := model.NewModule("OLD-MIB")
+		newMod := model.NewModule("ZULU-MIB")
+		oldMod := model.NewModule("ALPHA-MIB")
 
 		ctx := newTestContext()
 		ctx.moduleToResolved = map[*module.Module]*model.Module{newSrc: newMod, oldSrc: oldMod}
@@ -522,21 +524,23 @@ func TestShouldPreferModule(t *testing.T) {
 
 	t.Run("same language older LAST-UPDATED loses", func(t *testing.T) {
 		newSrc := &module.Module{
-			Name:     "OLD-MIB",
-			Language: types.LanguageSMIv2,
+			Name:        "ALPHA-MIB",
+			Language:    types.LanguageSMIv2,
+			LastUpdated: "199901010000Z",
 		}
 		addDefs(newSrc, []module.Definition{
-			&module.ModuleIdentity{DefBase: module.DefBase{Name: "oldMIB"}, LastUpdated: "199901010000Z"},
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "alphaMIB"}, LastUpdated: "199901010000Z"},
 		})
 		oldSrc := &module.Module{
-			Name:     "NEW-MIB",
-			Language: types.LanguageSMIv2,
+			Name:        "ZULU-MIB",
+			Language:    types.LanguageSMIv2,
+			LastUpdated: "200501010000Z",
 		}
 		addDefs(oldSrc, []module.Definition{
-			&module.ModuleIdentity{DefBase: module.DefBase{Name: "newMIB"}, LastUpdated: "200501010000Z"},
+			&module.ModuleIdentity{DefBase: module.DefBase{Name: "zuluMIB"}, LastUpdated: "200501010000Z"},
 		})
-		newMod := model.NewModule("OLD-MIB")
-		oldMod := model.NewModule("NEW-MIB")
+		newMod := model.NewModule("ALPHA-MIB")
+		oldMod := model.NewModule("ZULU-MIB")
 
 		ctx := newTestContext()
 		ctx.moduleToResolved = map[*module.Module]*model.Module{newSrc: newMod, oldSrc: oldMod}
@@ -564,8 +568,9 @@ func TestShouldPreferModule(t *testing.T) {
 	t.Run("base module beats vendor even with newer LAST-UPDATED", func(t *testing.T) {
 		baseSrc := &module.Module{Name: "RFC1155-SMI", Language: types.LanguageSMIv1}
 		vendorSrc := &module.Module{
-			Name:     "VENDOR-MIB",
-			Language: types.LanguageSMIv2,
+			Name:        "VENDOR-MIB",
+			Language:    types.LanguageSMIv2,
+			LastUpdated: "202501010000Z",
 		}
 		addDefs(vendorSrc, []module.Definition{
 			&module.ModuleIdentity{DefBase: module.DefBase{Name: "vendorMIB"}, LastUpdated: "202501010000Z"},
@@ -582,19 +587,43 @@ func TestShouldPreferModule(t *testing.T) {
 		testutil.False(t, shouldPreferModule(ctx, baseMod, vendorSrc), "expected vendor NOT to replace base module")
 	})
 
+	t.Run("malformed multibyte timestamps use module name fallback", func(t *testing.T) {
+		alphaSrc := &module.Module{
+			Name:        "ALPHA-MIB",
+			Language:    types.LanguageSMIv2,
+			LastUpdated: "12345678éZ",
+		}
+		bravoSrc := &module.Module{
+			Name:        "BRAVO-MIB",
+			Language:    types.LanguageSMIv2,
+			LastUpdated: "é12345678Z",
+		}
+		alphaMod := model.NewModule("ALPHA-MIB")
+		bravoMod := model.NewModule("BRAVO-MIB")
+
+		ctx := newTestContext()
+		ctx.moduleToResolved = map[*module.Module]*model.Module{alphaSrc: alphaMod, bravoSrc: bravoMod}
+		ctx.resolvedToModule = map[*model.Module]*module.Module{alphaMod: alphaSrc, bravoMod: bravoSrc}
+
+		testutil.True(t, shouldPreferModule(ctx, bravoMod, alphaSrc), "expected ALPHA-MIB to win deterministic fallback")
+		testutil.False(t, shouldPreferModule(ctx, alphaMod, bravoSrc), "expected BRAVO-MIB to lose deterministic fallback")
+	})
+
 	t.Run("equal rank and timestamp uses lexicographic module name", func(t *testing.T) {
 		// Both modules have the same language and LAST-UPDATED.
 		// The lexicographically smaller module name should win.
 		aSrc := &module.Module{
-			Name:     "ALPHA-MIB",
-			Language: types.LanguageSMIv2,
+			Name:        "ALPHA-MIB",
+			Language:    types.LanguageSMIv2,
+			LastUpdated: "200501010000Z",
 		}
 		addDefs(aSrc, []module.Definition{
 			&module.ModuleIdentity{DefBase: module.DefBase{Name: "alphaMIB"}, LastUpdated: "200501010000Z"},
 		})
 		bSrc := &module.Module{
-			Name:     "BRAVO-MIB",
-			Language: types.LanguageSMIv2,
+			Name:        "BRAVO-MIB",
+			Language:    types.LanguageSMIv2,
+			LastUpdated: "200501010000Z",
 		}
 		addDefs(bSrc, []module.Definition{
 			&module.ModuleIdentity{DefBase: module.DefBase{Name: "bravoMIB"}, LastUpdated: "200501010000Z"},

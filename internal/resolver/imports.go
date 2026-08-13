@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
-	"strings"
+	"time"
 
 	"github.com/golangsnmp/gomib/internal/model"
 	"github.com/golangsnmp/gomib/internal/module"
@@ -285,8 +285,10 @@ func findCandidateWithAllSymbols(ctx *resolverContext, candidates []*module.Modu
 		})
 	}
 
-	slices.SortFunc(scoredCandidates, func(a, b scored) int {
-		// Prefer more matching symbols, then newer LAST-UPDATED
+	slices.SortStableFunc(scoredCandidates, func(a, b scored) int {
+		// Prefer more matching symbols, then newer valid LAST-UPDATED.
+		// Stable sorting preserves candidate order when timestamps are absent,
+		// invalid, or equal.
 		if c := cmp.Compare(b.symbolCount, a.symbolCount); c != 0 {
 			return c
 		}
@@ -322,26 +324,53 @@ func extractLastUpdated(mod *module.Module) string {
 	return normalizeTimestamp(mod.LastUpdated)
 }
 
-// normalizeTimestamp converts SMI LAST-UPDATED timestamps to a sortable form.
-// SMIv1 uses 10-digit format "YYMMDDHHmmZ" (2-digit year), SMIv2 uses
-// 12-digit "YYYYMMDDHHmmZ" (4-digit year). This expands 10-digit timestamps
-// to 12-digit by prepending "19" for years >= 70, "20" otherwise.
-// Both formats are normalized to include a trailing "Z".
+// normalizeTimestamp validates and converts an ASCII ExtUTCTime value to a
+// sortable form. The 2-digit-year form YYMMDDHHmmZ is expanded by prepending
+// "19" for years >= 70 and "20" otherwise. Invalid values return an empty
+// string so they do not influence module preference.
 func normalizeTimestamp(ts string) string {
-	const smiv1TimestampLen = 10
-	trimmed := strings.TrimSuffix(ts, "Z")
-	if len(trimmed) == smiv1TimestampLen {
-		yy := trimmed[:2]
-		century := "20"
-		if yy >= "70" {
-			century = "19"
+	if len(ts) != 11 && len(ts) != 13 {
+		return ""
+	}
+	if ts[len(ts)-1] != 'Z' {
+		return ""
+	}
+	for i := 0; i < len(ts)-1; i++ {
+		if ts[i] < '0' || ts[i] > '9' {
+			return ""
 		}
-		trimmed = century + trimmed
 	}
-	if trimmed == "" {
-		return ts
+
+	offset := 4
+	year := int(ts[0]-'0')*1000 + int(ts[1]-'0')*100 + int(ts[2]-'0')*10 + int(ts[3]-'0')
+	if len(ts) == 11 {
+		offset = 2
+		yy := int(ts[0]-'0')*10 + int(ts[1]-'0')
+		if yy >= 70 {
+			year = 1900 + yy
+		} else {
+			year = 2000 + yy
+		}
 	}
-	return trimmed + "Z"
+	month := int(ts[offset]-'0')*10 + int(ts[offset+1]-'0')
+	day := int(ts[offset+2]-'0')*10 + int(ts[offset+3]-'0')
+	hour := int(ts[offset+4]-'0')*10 + int(ts[offset+5]-'0')
+	minute := int(ts[offset+6]-'0')*10 + int(ts[offset+7]-'0')
+	if month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 {
+		return ""
+	}
+	parsed := time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.UTC)
+	if parsed.Year() != year || parsed.Month() != time.Month(month) || parsed.Day() != day {
+		return ""
+	}
+
+	if len(ts) == 11 {
+		if year < 2000 {
+			return "19" + ts
+		}
+		return "20" + ts
+	}
+	return ts
 }
 
 func isMacroSymbol(name string) bool {

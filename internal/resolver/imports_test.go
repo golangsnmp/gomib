@@ -73,13 +73,14 @@ func TestNormalizeTimestamp(t *testing.T) {
 		// Already 12-digit, returned as-is
 		{"200210180000Z", "200210180000Z"},
 		{"199905270000Z", "199905270000Z"},
-		// 12-digit without Z suffix, Z is added
-		{"200210180000", "200210180000Z"},
-		// Edge cases
+		// Invalid values do not enter timestamp ordering
 		{"", ""},
-		{"Z", "Z"},
-		// 10-digit without Z suffix, still gets century + Z appended
-		{"0210180000", "200210180000Z"},
+		{"Z", ""},
+		{"200210180000", ""},
+		{"0210180000", ""},
+		{"200213180000Z", ""},
+		{"200202300000Z", ""},
+		{"é12345678Z", ""},
 	}
 	for _, tt := range tests {
 		got := normalizeTimestamp(tt.input)
@@ -224,6 +225,18 @@ func TestFindCandidateWithAllSymbols(t *testing.T) {
 			syms("foo", "bar"))
 		testutil.True(t, ok, "expected match")
 		testutil.Equal(t, modNew, got, "expected MOD-NEW (newer), got")
+	})
+
+	t.Run("malformed multibyte timestamps preserve candidate order", func(t *testing.T) {
+		ctx := newTestContext()
+		first := makeTestModule(ctx, "FIRST-MIB", []string{"foo"})
+		first.LastUpdated = "12345678éZ"
+		second := makeTestModule(ctx, "SECOND-MIB", []string{"foo"})
+		second.LastUpdated = "é12345678Z"
+
+		got, ok := findCandidateWithAllSymbols(ctx, []*module.Module{first, second}, syms("foo"))
+		testutil.True(t, ok, "expected match")
+		testutil.Equal(t, first, got, "invalid timestamps should use candidate order")
 	})
 
 	t.Run("candidate with nil defNames is skipped", func(t *testing.T) {
