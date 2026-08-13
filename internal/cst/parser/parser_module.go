@@ -100,7 +100,25 @@ func (p *Parser) parseOneModule() (cst.ModuleNode, bool) {
 	}
 
 	// Definition body
-	for !p.check(lexer.TokKwEnd) && !p.isEOF() {
+	for {
+		// The lexer skips each EXPORTS body, leaving the keyword and optional
+		// semicolon for the parser to consume. Preserve those tokens in the CST
+		// while avoiding recursive definition parsing.
+		for p.check(lexer.TokKwExports) {
+			tokens := []cst.SyntaxToken{p.advance()}
+			if p.check(lexer.TokSemicolon) {
+				tokens = append(tokens, p.advance())
+			}
+			mod.Body = append(mod.Body, &cst.ErrorNode{
+				Tokens: tokens,
+				Span:   types.NewSpan(tokens[0].Span.Start, tokens[len(tokens)-1].Span.End),
+			})
+		}
+
+		if p.check(lexer.TokKwEnd) || p.isEOF() {
+			break
+		}
+
 		posBefore := p.currentSpan().Start
 		def, parseErr := p.parseDefinition()
 		if parseErr != nil {
@@ -294,14 +312,6 @@ func (p *Parser) parseDefinition() (cst.DefinitionNode, *types.SpanDiagnostic) {
 				fmt.Sprintf("type assignment %q should start with an uppercase letter", name))
 		}
 		return p.parseTypeAssignment()
-
-	// EXPORTS (skipped by lexer, but we may see the semicolon)
-	case first == lexer.TokKwExports:
-		p.advance() // EXPORTS
-		if p.check(lexer.TokSemicolon) {
-			p.advance()
-		}
-		return p.parseDefinition()
 
 	default:
 		diag := p.makeError("unexpected token: " + p.peek().Kind.LibsmiName())

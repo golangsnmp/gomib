@@ -3,6 +3,7 @@ package parser
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/cst"
@@ -611,6 +612,97 @@ TestType ::= Integer32 (0..100)
 END
 `
 	roundTrip(t, source)
+}
+
+func TestManyExportsClausesBeforeDefinition(t *testing.T) {
+	const exportsCount = 10000
+
+	var source strings.Builder
+	source.WriteString("TEST-MIB DEFINITIONS ::= BEGIN\n")
+	for range exportsCount {
+		source.WriteString("EXPORTS;\n")
+	}
+	definitionStart := source.Len()
+	source.WriteString("testMIB OBJECT IDENTIFIER ::= { enterprises 1 }\nEND\n")
+
+	src := source.String()
+	p := newTestParser(src)
+	file := p.ParseModule()
+
+	if got := len(p.Diagnostics()); got != 0 {
+		t.Fatalf("expected no diagnostics, got %d: %v", got, p.Diagnostics())
+	}
+	if len(file.Modules) != 1 {
+		t.Fatalf("expected 1 module, got %d", len(file.Modules))
+	}
+	mod := file.Modules[0]
+	if len(mod.Body) != exportsCount+1 {
+		t.Fatalf("expected %d EXPORTS placeholders and 1 definition, got %d body nodes", exportsCount, len(mod.Body))
+	}
+	exportsStart := len("TEST-MIB DEFINITIONS ::= BEGIN\n")
+	for i, node := range mod.Body[:exportsCount] {
+		errNode, ok := node.(*cst.ErrorNode)
+		if !ok {
+			t.Fatalf("body node %d: expected ErrorNode for EXPORTS clause, got %T", i, node)
+		}
+		if len(errNode.Tokens) != 2 || errNode.Tokens[0].Kind != lexer.TokKwExports || errNode.Tokens[1].Kind != lexer.TokSemicolon {
+			t.Fatalf("body node %d: expected EXPORTS and semicolon tokens, got %v", i, errNode.Tokens)
+		}
+		wantStart := exportsStart + i*len("EXPORTS;\n")
+		wantEnd := wantStart + len("EXPORTS;")
+		if got := errNode.Span; int(got.Start) != wantStart || int(got.End) != wantEnd {
+			t.Fatalf("body node %d: EXPORTS span is %v, want [%d,%d)", i, got, wantStart, wantEnd)
+		}
+	}
+	def, ok := mod.Body[exportsCount].(*cst.ValueAssignmentNode)
+	if !ok {
+		t.Fatalf("expected ValueAssignmentNode, got %T", mod.Body[exportsCount])
+	}
+	if got := p.text(def.Name.Span); got != "testMIB" {
+		t.Errorf("expected definition name testMIB, got %q", got)
+	}
+	if got := int(def.Span.Start); got != definitionStart {
+		t.Errorf("definition span starts at %d, want %d", got, definitionStart)
+	}
+	if got := string(cst.ReconstructText(file, []byte(src))); got != src {
+		t.Error("round-trip mismatch after consecutive EXPORTS clauses")
+	}
+}
+
+func TestExportsSkippingPreservesRecovery(t *testing.T) {
+	source := `TEST-MIB DEFINITIONS ::= BEGIN
+EXPORTS;
+EXPORTS;
+BROKEN
+recovered OBJECT IDENTIFIER ::= { enterprises 1 }
+END
+`
+	p := newTestParser(source)
+	file := p.ParseModule()
+
+	diags := p.Diagnostics()
+	if len(diags) != 1 || diags[0].Code != types.DiagParseError {
+		t.Fatalf("expected one parse error for BROKEN, got %v", diags)
+	}
+	mod := file.Modules[0]
+	if len(mod.Body) != 4 {
+		t.Fatalf("expected 2 EXPORTS placeholders, recovery node, and definition; got %d body nodes", len(mod.Body))
+	}
+	errNode, ok := mod.Body[2].(*cst.ErrorNode)
+	if !ok || len(errNode.Tokens) != 1 || p.text(errNode.Span) != "BROKEN" {
+		t.Fatalf("expected recovery node spanning BROKEN, got %#v", mod.Body[2])
+	}
+	def, ok := mod.Body[3].(*cst.ValueAssignmentNode)
+	if !ok {
+		t.Fatalf("expected recovered ValueAssignmentNode, got %T", mod.Body[3])
+	}
+	wantStart := strings.Index(source, "recovered OBJECT")
+	if got := int(def.Span.Start); got != wantStart {
+		t.Errorf("recovered definition span starts at %d, want %d", got, wantStart)
+	}
+	if got := string(cst.ReconstructText(file, []byte(source))); got != source {
+		t.Error("round-trip mismatch after EXPORTS recovery")
+	}
 }
 
 func TestEOFHasTrailingTrivia(t *testing.T) {
