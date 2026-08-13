@@ -145,29 +145,31 @@ func (c *cli) cmdFind(args []string) int {
 		})
 	}
 
-	matches = collectMatches(matches, m.Notifications(), mib.KindNotification, &f)
-	matches = collectMatches(matches, m.Groups(), mib.KindGroup, &f)
-	matches = collectMatches(matches, m.Compliances(), mib.KindCompliance, &f)
-	matches = collectMatches(matches, m.Capabilities(), mib.KindCapability, &f)
+	if f.baseLower == "" {
+		matches = collectMatches(matches, m.Notifications(), mib.KindNotification, &f)
+		matches = collectMatches(matches, m.Groups(), mib.KindGroup, &f)
+		matches = collectMatches(matches, m.Compliances(), mib.KindCompliance, &f)
+		matches = collectMatches(matches, m.Capabilities(), mib.KindCapability, &f)
 
-	// Walk OID tree for node/module-identity/object-identity
-	for node := range m.Nodes() {
-		if node.Kind() != mib.KindNode || node.Name() == "" {
-			continue
+		// Walk OID tree for node/module-identity/object-identity
+		for node := range m.Nodes() {
+			if node.Kind() != mib.KindNode || node.Name() == "" {
+				continue
+			}
+			if !f.matchName(node.Name()) || !f.matchNodeKind(node) {
+				continue
+			}
+			kindLabel := "node"
+			if node.IsObjectIdentity() {
+				kindLabel = "object-identity"
+			}
+			matches = append(matches, findMatch{
+				Name:   node.Name(),
+				Module: moduleName(node.Module()),
+				OID:    node.OID().String(),
+				Kind:   kindLabel,
+			})
 		}
-		if !f.matchName(node.Name()) || !f.matchNodeKind(node) {
-			continue
-		}
-		kindLabel := "node"
-		if node.IsObjectIdentity() {
-			kindLabel = "object-identity"
-		}
-		matches = append(matches, findMatch{
-			Name:   node.Name(),
-			Module: moduleName(node.Module()),
-			OID:    node.OID().String(),
-			Kind:   kindLabel,
-		})
 	}
 
 	switch {

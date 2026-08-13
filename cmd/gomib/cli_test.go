@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +12,9 @@ import (
 const testCLIMIB = `TEST-MIB DEFINITIONS ::= BEGIN
 IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, enterprises, Integer32
-        FROM SNMPv2-SMI;
+        FROM SNMPv2-SMI
+    OBJECT-GROUP, MODULE-COMPLIANCE, AGENT-CAPABILITIES
+        FROM SNMPv2-CONF;
 
 testMib MODULE-IDENTITY
     LAST-UPDATED "202603150000Z"
@@ -32,6 +35,29 @@ testNotification NOTIFICATION-TYPE
     STATUS current
     DESCRIPTION "A test notification."
     ::= { testMib 0 1 }
+
+testBare OBJECT IDENTIFIER ::= { testMib 2 }
+
+testGroup OBJECT-GROUP
+    OBJECTS { testScalar }
+    STATUS current
+    DESCRIPTION "A test group."
+    ::= { testMib 3 }
+
+testCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION "A test compliance statement."
+    MODULE
+        MANDATORY-GROUPS { testGroup }
+    ::= { testMib 4 }
+
+testCapabilities AGENT-CAPABILITIES
+    PRODUCT-RELEASE "test"
+    STATUS current
+    DESCRIPTION "Test capabilities."
+    SUPPORTS TEST-MIB
+        INCLUDES { testGroup }
+    ::= { testMib 5 }
 
 END
 `
@@ -140,6 +166,48 @@ func TestFindNoMatchExitsIssue(t *testing.T) {
 	code, _, _ := runCLI(t, "-p", dir, "find", "-m", "TEST-MIB", "zzz_nonexistent_*")
 	if code != exitIssue {
 		t.Fatalf("expected exit %d for no matches, got %d", exitIssue, code)
+	}
+}
+
+func TestFindTypeExcludesEntitiesWithoutTypesText(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "find", "-m", "TEST-MIB", "--type", "Integer32", "test*")
+	if code != exitOK {
+		t.Fatalf("find --type exited %d, stderr=%q", code, stderr)
+	}
+	want := "TEST-MIB::testScalar  1.3.6.1.4.1.99999.1  scalar\n"
+	if stdout != want {
+		t.Fatalf("unexpected text output:\n got: %q\nwant: %q", stdout, want)
+	}
+}
+
+func TestFindTypeExcludesEntitiesWithoutTypesJSON(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "find", "-m", "TEST-MIB", "--type", "Integer32", "--format", "json", "test*")
+	if code != exitOK {
+		t.Fatalf("find --type --format json exited %d, stderr=%q", code, stderr)
+	}
+	var matches []findMatch
+	if err := json.Unmarshal([]byte(stdout), &matches); err != nil {
+		t.Fatalf("decode JSON output %q: %v", stdout, err)
+	}
+	want := []findMatch{{Name: "testScalar", Module: "TEST-MIB", OID: "1.3.6.1.4.1.99999.1", Kind: "scalar"}}
+	if len(matches) != len(want) || matches[0] != want[0] {
+		t.Fatalf("unexpected JSON matches: got %#v, want %#v", matches, want)
+	}
+}
+
+func TestFindTypeExcludesEntitiesWithoutTypesCount(t *testing.T) {
+	dir := writeTestMIB(t)
+
+	code, stdout, stderr := runCLI(t, "-p", dir, "find", "-m", "TEST-MIB", "--type", "Integer32", "--count", "test*")
+	if code != exitOK {
+		t.Fatalf("find --type --count exited %d, stderr=%q", code, stderr)
+	}
+	if stdout != "1\n" {
+		t.Fatalf("expected count 1, got %q", stdout)
 	}
 }
 
