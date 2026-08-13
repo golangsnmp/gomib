@@ -339,7 +339,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 		ctx := newTestContextWithConfig(model.DefaultConfig())
 
 		// Ultimate source
-		realSource := &module.Module{Name: "REAL-SOURCE"}
+		realSource := makeTestModule(ctx, "REAL-SOURCE", []string{"remoteSym"})
 		ctx.moduleIndex["REAL-SOURCE"] = []*module.Module{realSource}
 
 		// Intermediate module that defines "localDef" and re-exports "remoteSym"
@@ -388,7 +388,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 	t.Run("partial resolution keeps forwarded symbols", func(t *testing.T) {
 		ctx := newTestContextWithConfig(model.DefaultConfig())
 
-		realSource := &module.Module{Name: "REAL-SOURCE"}
+		realSource := makeTestModule(ctx, "REAL-SOURCE", []string{"forwarded"})
 		ctx.moduleIndex["REAL-SOURCE"] = []*module.Module{realSource}
 
 		source := &module.Module{
@@ -459,7 +459,7 @@ func TestResolveImportsFromModule(t *testing.T) {
 	t.Run("forwarding works in strict mode", func(t *testing.T) {
 		ctx := newTestContextWithConfig(model.VerboseConfig())
 
-		realSource := &module.Module{Name: "REAL"}
+		realSource := makeTestModule(ctx, "REAL", []string{"sym"})
 		ctx.moduleIndex["REAL"] = []*module.Module{realSource}
 
 		intermediate := &module.Module{
@@ -477,6 +477,109 @@ func TestResolveImportsFromModule(t *testing.T) {
 		imports := ctx.importSources[importing]
 		testutil.Equal(t, 1, len(imports), "forwarding should resolve in strict mode")
 		testutil.Equal(t, realSource, imports["sym"], "sym should be forwarded from REAL")
+	})
+
+	t.Run("dead-end forwarding is rejected on original importer", func(t *testing.T) {
+		ctx := newTestContextWithConfig(model.DefaultConfig())
+		deadEnd := makeTestModule(ctx, "DEAD-END", nil)
+		ctx.moduleIndex["DEAD-END"] = []*module.Module{deadEnd}
+		intermediate := makeTestModule(ctx, "INTERMEDIATE", nil)
+		intermediate.Imports = []module.Import{{Module: "DEAD-END", Symbol: "missing"}}
+		ctx.moduleIndex["INTERMEDIATE"] = []*module.Module{intermediate}
+
+		importing := &module.Module{
+			Name:      "IMPORTER",
+			Imports:   []module.Import{{Module: "INTERMEDIATE", Symbol: "missing", Span: types.Span{Start: 7, End: 14}}},
+			LineTable: []int{0, 5},
+		}
+		resolveImportsFromModule(ctx, importing, "INTERMEDIATE", []importSymbol{{name: "missing", span: importing.Imports[0].Span}})
+
+		testutil.Equal(t, 0, len(ctx.importSources[importing]), "dead-end forwarding must not register an import")
+		unresolved := unresolvedByKind(ctx, model.UnresolvedImport)
+		testutil.Len(t, unresolved, 1, "unresolved count")
+		testutil.Equal(t, "IMPORTER", unresolved[0].Module, "failure should belong to original importer")
+		testutil.Equal(t, "missing", unresolved[0].Symbol, "unresolved symbol")
+		testutil.Equal(t, reasonSymbolNotExported, unresolved[0].Reason, "unresolved reason")
+		diag := hasDiag(t, ctx.Diagnostics(), types.DiagImportNotFound)
+		testutil.Equal(t, "IMPORTER", diag.Module, "diagnostic should belong to original importer")
+		testutil.Equal(t, 2, diag.Line, "diagnostic line should come from original import span")
+		testutil.Equal(t, 3, diag.Column, "diagnostic column should come from original import span")
+		testutil.Contains(t, diag.Message, `from "INTERMEDIATE"`, "diagnostic should name original source module")
+	})
+
+	t.Run("forwarding cycle is rejected on original importer", func(t *testing.T) {
+		ctx := newTestContextWithConfig(model.DefaultConfig())
+		modB := makeTestModule(ctx, "B", nil)
+		modC := makeTestModule(ctx, "C", nil)
+		modB.Imports = []module.Import{{Module: "C", Symbol: "loop"}}
+		modC.Imports = []module.Import{{Module: "B", Symbol: "loop"}}
+		ctx.moduleIndex["B"] = []*module.Module{modB}
+		ctx.moduleIndex["C"] = []*module.Module{modC}
+
+		span := types.Span{Start: 12, End: 16}
+		importing := &module.Module{
+			Name:      "IMPORTER",
+			Imports:   []module.Import{{Module: "B", Symbol: "loop", Span: span}},
+			LineTable: []int{0, 10},
+		}
+		resolveImportsFromModule(ctx, importing, "B", []importSymbol{{name: "loop", span: span}})
+
+		testutil.Equal(t, 0, len(ctx.importSources[importing]), "cyclic forwarding must not register an import")
+		unresolved := unresolvedByKind(ctx, model.UnresolvedImport)
+		testutil.Len(t, unresolved, 1, "unresolved count")
+		testutil.Equal(t, "IMPORTER", unresolved[0].Module, "failure should belong to original importer")
+		testutil.Equal(t, reasonSymbolNotExported, unresolved[0].Reason, "unresolved reason")
+		diag := hasDiag(t, ctx.Diagnostics(), types.DiagImportNotFound)
+		testutil.Equal(t, "IMPORTER", diag.Module, "diagnostic should belong to original importer")
+		testutil.Equal(t, 2, diag.Line, "diagnostic line should come from original import span")
+		testutil.Equal(t, 3, diag.Column, "diagnostic column should come from original import span")
+		testutil.Contains(t, diag.Message, `from "B"`, "diagnostic should name original source module")
+	})
+
+	t.Run("recursive candidates skip newer cycle and use valid sibling", func(t *testing.T) {
+		ctx := newTestContextWithConfig(model.DefaultConfig())
+		validOlder := makeTestModule(ctx, "VERSIONED", []string{"ForwardedType"})
+		validOlder.LastUpdated = "202001010000Z"
+		cyclicNewer := makeTestModule(ctx, "VERSIONED", nil)
+		cyclicNewer.LastUpdated = "202501010000Z"
+		cycleEntry := makeTestModule(ctx, "CYCLE-ENTRY", nil)
+		cyclicNewer.Imports = []module.Import{{Module: "CYCLE-ENTRY", Symbol: "ForwardedType"}}
+		cycleEntry.Imports = []module.Import{{Module: "CYCLE-BACK", Symbol: "ForwardedType"}}
+
+		// Put the valid candidate first so recursive resolution must reorder by
+		// LAST-UPDATED, reject the newer cyclic path, then try the valid sibling.
+		candidates := []*module.Module{validOlder, cyclicNewer}
+		ctx.moduleIndex["CYCLE-ENTRY"] = []*module.Module{cycleEntry}
+		ctx.moduleIndex["CYCLE-BACK"] = []*module.Module{cyclicNewer}
+
+		visited := make(map[*module.Module]struct{})
+		source, ok := resolveImportedSymbolWithVisited(ctx, candidates, "ForwardedType", visited)
+		testutil.True(t, ok, "valid sibling should resolve after cyclic candidate")
+		testutil.Equal(t, validOlder, source, "ultimate mapping should use valid sibling")
+		testutil.Equal(t, 0, len(visited), "recursive candidate paths should clean up visited state")
+	})
+
+	t.Run("valid multi-hop forwarding resolves definer and tracks importer usage", func(t *testing.T) {
+		ctx := newTestContextWithConfig(model.DefaultConfig())
+		definer := makeTestModule(ctx, "DEFINER", []string{"ForwardedType"})
+		intermediateC := makeTestModule(ctx, "C", nil)
+		intermediateB := makeTestModule(ctx, "B", nil)
+		intermediateC.Imports = []module.Import{{Module: "DEFINER", Symbol: "ForwardedType"}}
+		intermediateB.Imports = []module.Import{{Module: "C", Symbol: "ForwardedType"}}
+		ctx.moduleIndex["DEFINER"] = []*module.Module{definer}
+		ctx.moduleIndex["C"] = []*module.Module{intermediateC}
+		ctx.moduleIndex["B"] = []*module.Module{intermediateB}
+
+		importing := &module.Module{Name: "IMPORTER"}
+		resolveImportsFromModule(ctx, importing, "B", syms("ForwardedType"))
+
+		testutil.Equal(t, definer, ctx.importSources[importing]["ForwardedType"], "mapping should point to ultimate definer")
+		wantType := model.NewType("ForwardedType")
+		ctx.typeSymbols.set(definer, "ForwardedType", wantType)
+		gotType, ok := ctx.lookupType(importing, "ForwardedType")
+		testutil.True(t, ok, "forwarded type should resolve")
+		testutil.Equal(t, wantType, gotType, "resolved forwarded type")
+		testutil.True(t, ctx.usedImports.has(importing, "ForwardedType"), "usage should be tracked on original importer")
 	})
 }
 
@@ -532,32 +635,47 @@ func TestResolveTransitiveImports(t *testing.T) {
 		testutil.Equal(t, modD, ctx.importSources[modC]["x"], "expected C->D, got C->")
 	})
 
-	t.Run("cycle does not panic", func(_ *testing.T) {
+	t.Run("cycle removed and reported", func(t *testing.T) {
 		ctx := newTestContext()
-		modA := &module.Module{Name: "A"}
-		modB := &module.Module{Name: "B"}
+		modA := &module.Module{Name: "A", Imports: []module.Import{{Module: "B", Symbol: "x"}}}
+		modB := &module.Module{Name: "B", Imports: []module.Import{{Module: "A", Symbol: "x"}}}
 
 		ctx.defNames[modA] = map[string]struct{}{}
 		ctx.defNames[modB] = map[string]struct{}{}
 		ctx.registerImport(modA, "x", modB)
 		ctx.registerImport(modB, "x", modA)
 
-		// Should not panic or infinite loop.
 		resolveTransitiveImports(ctx)
+
+		testutil.False(t, ctx.importSources.has(modA, "x"), "A's cyclic mapping should be removed")
+		testutil.False(t, ctx.importSources.has(modB, "x"), "B's cyclic mapping should be removed")
+		unresolved := unresolvedByKind(ctx, model.UnresolvedImport)
+		testutil.Len(t, unresolved, 2, "each original importer should report failure")
+		for _, ref := range unresolved {
+			testutil.Equal(t, reasonSymbolNotExported, ref.Reason, "cycle unresolved reason")
+		}
 	})
 
-	t.Run("dead end preserved", func(t *testing.T) {
+	t.Run("dead end removed and reported", func(t *testing.T) {
 		ctx := newTestContext()
-		modA := &module.Module{Name: "A"}
-		modB := &module.Module{Name: "B"}
+		modA := &module.Module{Name: "A", Imports: []module.Import{{Module: "B", Symbol: "x"}}}
+		modB := &module.Module{Name: "B", Imports: []module.Import{{Module: "C", Symbol: "x"}}}
+		modC := &module.Module{Name: "C"}
 
-		// B neither defines x nor imports it.
 		ctx.defNames[modB] = map[string]struct{}{}
+		ctx.defNames[modC] = map[string]struct{}{}
 		ctx.registerImport(modA, "x", modB)
+		ctx.registerImport(modB, "x", modC)
 
 		resolveTransitiveImports(ctx)
 
-		testutil.Equal(t, modB, ctx.importSources[modA]["x"], "dead end should keep the original target")
+		testutil.False(t, ctx.importSources.has(modA, "x"), "A's dead-end mapping should be removed")
+		testutil.False(t, ctx.importSources.has(modB, "x"), "B's dead-end mapping should be removed")
+		unresolved := unresolvedByKind(ctx, model.UnresolvedImport)
+		testutil.Len(t, unresolved, 2, "each original importer should report failure")
+		for _, ref := range unresolved {
+			testutil.Equal(t, reasonSymbolNotExported, ref.Reason, "dead-end unresolved reason")
+		}
 	})
 
 	t.Run("different symbols resolve independently", func(t *testing.T) {

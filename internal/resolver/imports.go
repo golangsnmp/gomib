@@ -189,59 +189,63 @@ func tryPartialResolution(ctx *resolverContext, candidates []*module.Module, sym
 
 func resolveImportedSymbol(ctx *resolverContext, candidates []*module.Module, symbol string) (*module.Module, bool) {
 	for _, candidate := range candidates {
-		if ctx.defNames.has(candidate, symbol) {
-			return candidate, true
-		}
-
-		for _, imp := range candidate.Imports {
-			if imp.Symbol != symbol {
-				continue
-			}
-			sourceCandidates := ctx.moduleIndex[imp.Module]
-			if len(sourceCandidates) > 0 {
-				return bestCandidate(sourceCandidates), true
-			}
-			break
+		if source, ok := resolveImportedSymbolFromModule(ctx, candidate, symbol, make(map[*module.Module]struct{}, 4)); ok {
+			return source, true
 		}
 	}
 
 	return nil, false
 }
 
+// resolveImportedSymbolFromModule follows explicit imports until it reaches a
+// module that defines symbol. A forwarding chain is not valid merely because
+// each named module exists: its final module must define the symbol.
+func resolveImportedSymbolFromModule(ctx *resolverContext, candidate *module.Module, symbol string, visited map[*module.Module]struct{}) (*module.Module, bool) {
+	if ctx.defNames.has(candidate, symbol) {
+		return candidate, true
+	}
+	if _, seen := visited[candidate]; seen {
+		return nil, false
+	}
+	visited[candidate] = struct{}{}
+	defer delete(visited, candidate)
+
+	for _, imp := range candidate.Imports {
+		if imp.Symbol != symbol {
+			continue
+		}
+		return resolveImportedSymbolWithVisited(ctx, ctx.moduleIndex[imp.Module], symbol, visited)
+	}
+
+	return nil, false
+}
+
+func resolveImportedSymbolWithVisited(ctx *resolverContext, candidates []*module.Module, symbol string, visited map[*module.Module]struct{}) (*module.Module, bool) {
+	ordered := slices.Clone(candidates)
+	slices.SortStableFunc(ordered, func(a, b *module.Module) int {
+		return cmp.Compare(extractLastUpdated(b), extractLastUpdated(a))
+	})
+	for _, candidate := range ordered {
+		if source, ok := resolveImportedSymbolFromModule(ctx, candidate, symbol, visited); ok {
+			return source, true
+		}
+	}
+	return nil, false
+}
+
 func tryImportForwarding(ctx *resolverContext, candidates []*module.Module, symbols []importSymbol) []forwardedSymbol {
 	for _, candidate := range candidates {
-		candidateDefs := ctx.defNames.forModule(candidate)
-		importMap := make(map[string]string)
-		for _, imp := range candidate.Imports {
-			importMap[imp.Symbol] = imp.Module
-		}
-
 		forwarded := make([]forwardedSymbol, 0, len(symbols))
 		allFound := true
 		for _, sym := range symbols {
-			if candidateDefs != nil {
-				if _, isDirect := candidateDefs[sym.name]; isDirect {
-					forwarded = append(forwarded, forwardedSymbol{
-						symbol: sym.name,
-						source: candidate,
-					})
-					continue
-				}
-			}
-			// Not directly defined, check if re-exported via imports
-			sourceModuleName, ok := importMap[sym.name]
+			source, ok := resolveImportedSymbolFromModule(ctx, candidate, sym.name, make(map[*module.Module]struct{}, 4))
 			if !ok {
-				allFound = false
-				break
-			}
-			sourceCandidates := ctx.moduleIndex[sourceModuleName]
-			if len(sourceCandidates) == 0 {
 				allFound = false
 				break
 			}
 			forwarded = append(forwarded, forwardedSymbol{
 				symbol: sym.name,
-				source: bestCandidate(sourceCandidates),
+				source: source,
 			})
 		}
 		if allFound && len(forwarded) > 0 {
@@ -300,21 +304,6 @@ func findCandidateWithAllSymbols(ctx *resolverContext, candidates []*module.Modu
 	}
 
 	return nil, false
-}
-
-// bestCandidate picks the module with the newest LAST-UPDATED timestamp.
-// Falls back to the first candidate when no timestamps are present.
-func bestCandidate(candidates []*module.Module) *module.Module {
-	best := candidates[0]
-	bestTS := extractLastUpdated(best)
-	for _, c := range candidates[1:] {
-		ts := extractLastUpdated(c)
-		if ts > bestTS {
-			best = c
-			bestTS = ts
-		}
-	}
-	return best
 }
 
 func extractLastUpdated(mod *module.Module) string {
@@ -389,21 +378,30 @@ func isMacroSymbol(name string) bool {
 // actually defines the symbol, collapsing re-export chains. After this,
 // ModuleImports[mod][symbol] points directly to the defining module.
 func resolveTransitiveImports(ctx *resolverContext) {
-	for _, imports := range ctx.importSources {
-		type update struct {
-			symbol  string
-			definer *module.Module
-		}
-		var updates []update
+	for importingModule, imports := range ctx.importSources {
 		for symbol, sourceMod := range imports {
-			if ultimate, ok := resolveUltimateDefiner(ctx, sourceMod, symbol); ok && ultimate != sourceMod {
-				updates = append(updates, update{symbol, ultimate})
+			ultimate, ok := resolveUltimateDefiner(ctx, sourceMod, symbol)
+			if ok {
+				imports[symbol] = ultimate
+				continue
 			}
-		}
-		for _, u := range updates {
-			imports[u.symbol] = u.definer
+
+			delete(imports, symbol)
+			fromModuleName, span := originalImport(importingModule, symbol, sourceMod)
+			ctx.recordUnresolved(types.DiagImportNotFound, importingModule, span,
+				fmt.Sprintf("unresolved import: %q from %q (%s)", symbol, fromModuleName, reasonSymbolNotExported),
+				model.UnresolvedRef{Kind: model.UnresolvedImport, Symbol: symbol, Module: modName(importingModule), Reason: reasonSymbolNotExported})
 		}
 	}
+}
+
+func originalImport(importingModule *module.Module, symbol string, fallback *module.Module) (string, types.Span) {
+	for _, imp := range importingModule.Imports {
+		if imp.Symbol == symbol {
+			return imp.Module, imp.Span
+		}
+	}
+	return modName(fallback), types.Span{}
 }
 
 // resolveUltimateDefiner follows import chains from mod to find the module
