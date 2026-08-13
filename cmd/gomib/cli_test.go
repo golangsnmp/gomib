@@ -422,6 +422,36 @@ func TestLintListCodes(t *testing.T) {
 	}
 }
 
+func TestLintLevelSeverityNumberRange(t *testing.T) {
+	testLintSeverityNumberRange(t, "--level")
+}
+
+func TestLintFailOnSeverityNumberRange(t *testing.T) {
+	testLintSeverityNumberRange(t, "--fail-on")
+}
+
+func testLintSeverityNumberRange(t *testing.T, flag string) {
+	t.Helper()
+
+	for _, value := range []string{"-1", "7"} {
+		t.Run("reject_"+value, func(t *testing.T) {
+			code, _, _ := runCLI(t, "lint", flag+"="+value, "--list-codes")
+			if code != exitError {
+				t.Fatalf("lint %s=%s exited %d, want %d", flag, value, code, exitError)
+			}
+		})
+	}
+
+	for _, value := range []string{"0", "6"} {
+		t.Run("accept_"+value, func(t *testing.T) {
+			code, _, stderr := runCLI(t, "lint", flag+"="+value, "--list-codes")
+			if code != exitOK {
+				t.Fatalf("lint %s=%s exited %d, want %d; stderr=%q", flag, value, code, exitOK, stderr)
+			}
+		})
+	}
+}
+
 func TestLintQuiet(t *testing.T) {
 	dir := writeTestMIB(t)
 
