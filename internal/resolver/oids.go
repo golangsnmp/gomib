@@ -3,6 +3,7 @@ package resolver
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 
 	"github.com/golangsnmp/gomib/internal/graph"
@@ -537,6 +538,12 @@ func resolveTrapTypeDefinitions(ctx *resolverContext, defs []trapTypeRef) {
 		//  - Enterprise-specific traps:            enterprise.0.trapNumber
 		var trapNode *model.Node
 		if isSnmpTrapsOID(enterpriseNode.OID()) {
+			if trapNumber == math.MaxUint32 {
+				ctx.recordUnresolved(types.DiagTrapNumberOverflow, def.mod, span,
+					fmt.Sprintf("TRAP-TYPE %q trap number overflows the snmpTraps sub-identifier", defName),
+					model.UnresolvedRef{Kind: model.UnresolvedOID, Symbol: defName, Module: modName(def.mod), Reason: reasonTrapNumberOverflow})
+				continue
+			}
 			trapNode = model.GetOrCreateChild(enterpriseNode, trapNumber+1)
 		} else {
 			zeroNode := model.GetOrCreateChild(enterpriseNode, 0)

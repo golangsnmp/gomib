@@ -11,13 +11,14 @@ import (
 
 // Unresolved reference reason strings used by recordUnresolved call sites.
 const (
-	reasonModuleNotFound    = "module_not_found"
-	reasonSymbolNotExported = "symbol_not_exported"
-	reasonUnknownType       = "unknown_type"
-	reasonUnknownParent     = "unknown_parent"
-	reasonRecursiveOid      = "recursive_oid"
-	reasonUnknownIndex      = "unknown_index_object"
-	reasonUnknownObject     = "unknown_object"
+	reasonModuleNotFound     = "module_not_found"
+	reasonSymbolNotExported  = "symbol_not_exported"
+	reasonUnknownType        = "unknown_type"
+	reasonUnknownParent      = "unknown_parent"
+	reasonTrapNumberOverflow = "trap_number_overflow"
+	reasonRecursiveOid       = "recursive_oid"
+	reasonUnknownIndex       = "unknown_index_object"
+	reasonUnknownObject      = "unknown_object"
 )
 
 // resolverContext holds indices and working state for all resolution phases.

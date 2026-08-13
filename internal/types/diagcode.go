@@ -83,6 +83,7 @@ const (
 	DiagImportModuleNotFound         = "import-module-not-found"
 	DiagTypeUnknown                  = "type-unknown"
 	DiagOidOrphan                    = "oid-orphan"
+	DiagTrapNumberOverflow           = "trap-number-overflow"
 	DiagIndexUnresolved              = "index-unresolved"
 	DiagObjectsUnresolved            = "objects-unresolved"
 	DiagIdentifierHyphenSMI          = "identifier-hyphen-smiv2"
@@ -289,6 +290,7 @@ var resolverDiagCodes = []codeEntry{
 	{DiagImportModuleNotFound, SeverityError},
 	{DiagTypeUnknown, SeverityError},
 	{DiagOidOrphan, SeverityError},
+	{DiagTrapNumberOverflow, SeverityError},
 	{DiagIndexUnresolved, SeverityError},
 	{DiagObjectsUnresolved, SeverityError},
 	{DiagIdentifierHyphenSMI, SeverityWarning},

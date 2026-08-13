@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"math"
 	"testing"
 
 	"github.com/golangsnmp/gomib/internal/graph"
@@ -1144,6 +1145,91 @@ func TestResolveTrapTypeDefinitions_GenericTraps(t *testing.T) {
 		testutil.True(t, got.Equal(tt.wantOID), ": OID")
 		testutil.Equal(t, model.KindNotification, node.Kind(), ": kind")
 	}
+}
+
+func TestResolveTrapTypeDefinitions_GenericTrapNumberMaxNonOverflow(t *testing.T) {
+	const trapName = "maxTrap"
+	notif := &module.Notification{
+		DefBase:  module.DefBase{Name: trapName},
+		TrapInfo: &module.TrapInfo{Enterprise: "snmpTraps", TrapNumber: math.MaxUint32 - 1},
+	}
+	srcMod := &module.Module{
+		Name:          "TEST-V1-MIB",
+		Language:      types.LanguageSMIv1,
+		Notifications: []*module.Notification{notif},
+	}
+	ctx := newTestContextForModules(model.DefaultConfig(), srcMod)
+
+	snmpTrapsNode := buildOIDPath(ctx.mib.Root(), 1, 3, 6, 1, 6, 3, 1, 1, 5)
+	model.SetNodeName(snmpTrapsNode, "snmpTraps")
+	ctx.registerModuleNodeSymbol(srcMod, "snmpTraps", snmpTrapsNode)
+
+	resolveTrapTypeDefinitions(ctx, []trapTypeRef{{mod: srcMod, notif: notif}})
+	createResolvedNotifications(ctx)
+
+	noDiag(t, ctx.Diagnostics(), types.DiagTrapNumberOverflow)
+	testutil.Len(t, unresolvedByKind(ctx, model.UnresolvedOID), 0, "unresolved OIDs")
+
+	node, ok := ctx.lookupNode(srcMod, trapName)
+	testutil.True(t, ok, "maximum non-overflowing trap should resolve")
+	testutil.Equal(t, uint32(math.MaxUint32), node.Arc(), "trap sub-identifier")
+	testutil.Equal(t, snmpTrapsNode, node.Parent(), "trap parent")
+	testutil.Equal(t, node, ctx.mib.Node(trapName), "global name registration")
+	testutil.Equal(t, node, ctx.mib.NodeByOID(append(snmpTrapsOID, math.MaxUint32)), "OID registration")
+	testutil.NotNil(t, ctx.mib.Notification(trapName), "global notification registration")
+	resolvedMod := ctx.moduleToResolved[srcMod]
+	testutil.Equal(t, node, resolvedMod.Node(trapName), "module node registration")
+	testutil.NotNil(t, resolvedMod.Notification(trapName), "module notification registration")
+}
+
+func TestResolveTrapTypeDefinitions_GenericTrapNumberOverflow(t *testing.T) {
+	const trapName = "overflowTrap"
+	notif := &module.Notification{
+		DefBase:  module.DefBase{Name: trapName},
+		TrapInfo: &module.TrapInfo{Enterprise: "snmpTraps", TrapNumber: math.MaxUint32},
+	}
+	srcMod := &module.Module{
+		Name:     "TEST-V1-MIB",
+		Language: types.LanguageSMIv1,
+		ValueAssignments: []*module.ValueAssignment{{
+			DefBase: module.DefBase{Name: "snmpTraps"},
+			Oid: module.NewOidAssignment([]module.OidComponent{
+				{Number: 1, HasNumber: true},
+				{Number: 3, HasNumber: true},
+				{Number: 6, HasNumber: true},
+				{Number: 1, HasNumber: true},
+				{Number: 6, HasNumber: true},
+				{Number: 3, HasNumber: true},
+				{Number: 1, HasNumber: true},
+				{Number: 1, HasNumber: true},
+				{Number: 5, HasNumber: true},
+			}, types.Span{}),
+		}},
+		Notifications: []*module.Notification{notif},
+	}
+
+	m := Resolve([]*module.Module{srcMod}, nil, nil, nil)
+
+	diag := hasDiag(t, m.Diagnostics(), types.DiagTrapNumberOverflow)
+	testutil.Contains(t, diag.Message, trapName, "diagnostic should identify the TRAP-TYPE")
+
+	var unresolved []model.UnresolvedRef
+	for _, ref := range m.Unresolved() {
+		if ref.Kind == model.UnresolvedOID {
+			unresolved = append(unresolved, ref)
+		}
+	}
+	testutil.Len(t, unresolved, 1, "unresolved OIDs")
+	testutil.Equal(t, trapName, unresolved[0].Symbol, "unresolved symbol")
+	testutil.Equal(t, srcMod.Name, unresolved[0].Module, "unresolved module")
+	testutil.Equal(t, reasonTrapNumberOverflow, unresolved[0].Reason, "unresolved reason")
+
+	testutil.Nil(t, m.Node(trapName), "overflowing trap name should not be registered globally")
+	testutil.Nil(t, m.NodeByOID(append(snmpTrapsOID, 0)), "overflowing trap should not create snmpTraps.0")
+	testutil.Len(t, m.Notifications(), 0, "overflowing trap should not register a notification")
+	resolvedMod := m.Module(srcMod.Name)
+	testutil.Nil(t, resolvedMod.Node(trapName), "overflowing trap node should not register in its module")
+	testutil.Len(t, resolvedMod.Notifications(), 0, "overflowing trap should not register in its module")
 }
 
 func TestResolveTrapTypeDefinitions_EnterpriseSpecific(t *testing.T) {
