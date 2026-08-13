@@ -1650,6 +1650,53 @@ func TestConvertDefValOidValue(t *testing.T) {
 	})
 }
 
+func TestConvertDefValOidValueImportUse(t *testing.T) {
+	newContext := func() (*resolverContext, *module.Module) {
+		ctx := newTestContext()
+		importer := &module.Module{Name: "TEST-MIB"}
+		source := &module.Module{Name: "SOURCE-MIB"}
+		ctx.moduleIndex[source.Name] = []*module.Module{source}
+
+		root := buildOIDPath(ctx.mib.Root(), 1, 3)
+		model.SetNodeName(root, "importedRoot")
+		ctx.registerModuleNodeSymbol(source, "importedRoot", root)
+		ctx.registerImport(importer, "importedRoot", source)
+		return ctx, importer
+	}
+
+	t.Run("unqualified root uses import", func(t *testing.T) {
+		ctx, importer := newContext()
+		dv := convertDefVal(ctx, &module.DefValOidValue{
+			Components: []module.OidComponent{
+				{Name: "importedRoot"},
+				{Number: 42, HasNumber: true},
+			},
+		}, importer, nil, types.Span{})
+
+		testutil.NotNil(t, dv, "expected imported root to resolve")
+		oid, ok := model.DefValAs[model.OID](*dv)
+		testutil.True(t, ok, "expected OID value")
+		testutil.Equal(t, "1.3.42", oid.String(), "oid")
+		testutil.True(t, ctx.usedImports.has(importer, "importedRoot"), "unqualified root should mark import used")
+	})
+
+	t.Run("qualified root uses module lookup", func(t *testing.T) {
+		ctx, importer := newContext()
+		dv := convertDefVal(ctx, &module.DefValOidValue{
+			Components: []module.OidComponent{
+				{Module: "SOURCE-MIB", Name: "importedRoot"},
+				{Number: 42, HasNumber: true},
+			},
+		}, importer, nil, types.Span{})
+
+		testutil.NotNil(t, dv, "expected qualified root to resolve")
+		oid, ok := model.DefValAs[model.OID](*dv)
+		testutil.True(t, ok, "expected OID value")
+		testutil.Equal(t, "1.3.42", oid.String(), "oid")
+		testutil.False(t, ctx.usedImports.has(importer, "importedRoot"), "qualified root should not mark import used")
+	})
+}
+
 func TestInferNodeKinds(t *testing.T) {
 	t.Run("classifies table row scalar", func(t *testing.T) {
 		ctx := newTestContext()
