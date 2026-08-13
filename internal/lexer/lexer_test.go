@@ -275,6 +275,42 @@ func TestExportsSkip(t *testing.T) {
 	testutil.SliceEqual(t, expected, kinds, "token kinds")
 }
 
+func TestExportsSkipCommentSemicolons(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name:   "line comment",
+			source: "EXPORTS foo -- ignored;\nbar; testMIB OBJECT IDENTIFIER ::= { enterprises 1 }",
+		},
+		{
+			name:   "delimited comment",
+			source: "EXPORTS foo -- ignored; -- bar; testMIB OBJECT IDENTIFIER ::= { enterprises 1 }",
+		},
+	}
+	expected := []TokenKind{
+		TokKwExports,
+		TokSemicolon,
+		TokLowercaseIdent,
+		TokKwObject,
+		TokKwIdentifier,
+		TokColonColonEqual,
+		TokLBrace,
+		TokLowercaseIdent,
+		TokNumber,
+		TokRBrace,
+		TokEOF,
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			kinds := tokenKinds(tc.source)
+			testutil.SliceEqual(t, expected, kinds, "token kinds")
+		})
+	}
+}
+
 func TestForbiddenKeywordFalse(t *testing.T) {
 	source := "DEFVAL {FALSE}"
 	lexer := New([]byte(source), nil, types.DefaultConfig())

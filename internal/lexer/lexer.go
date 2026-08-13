@@ -367,6 +367,11 @@ func (l *Lexer) skipExportsBody() Token {
 			return l.token(TokSemicolon, start)
 		}
 
+		if l.isCommentStart() {
+			l.skipCommentInline()
+			continue
+		}
+
 		l.advance()
 	}
 }

@@ -669,6 +669,42 @@ func TestManyExportsClausesBeforeDefinition(t *testing.T) {
 	}
 }
 
+func TestExportsCommentSemicolonsPreserveFollowingDefinition(t *testing.T) {
+	tests := []struct {
+		name        string
+		exportsBody string
+	}{
+		{name: "line comment", exportsBody: "foo -- ignored;\nbar;"},
+		{name: "delimited comment", exportsBody: "foo -- ignored; -- bar;"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			source := "TEST-MIB DEFINITIONS ::= BEGIN\nEXPORTS " + tc.exportsBody + "\ntestMIB OBJECT IDENTIFIER ::= { enterprises 1 }\nEND\n"
+			p := newTestParser(source)
+			file := p.ParseModule()
+
+			if got := p.Diagnostics(); len(got) != 0 {
+				t.Fatalf("expected no diagnostics, got %v", got)
+			}
+			if len(file.Modules) != 1 {
+				t.Fatalf("expected 1 module, got %d", len(file.Modules))
+			}
+			body := file.Modules[0].Body
+			if len(body) != 2 {
+				t.Fatalf("expected EXPORTS placeholder and definition, got %d body nodes", len(body))
+			}
+			def, ok := body[1].(*cst.ValueAssignmentNode)
+			if !ok {
+				t.Fatalf("expected ValueAssignmentNode after EXPORTS, got %T", body[1])
+			}
+			if got := p.text(def.Name.Span); got != "testMIB" {
+				t.Errorf("expected definition name testMIB, got %q", got)
+			}
+		})
+	}
+}
+
 func TestExportsSkippingPreservesRecovery(t *testing.T) {
 	source := `TEST-MIB DEFINITIONS ::= BEGIN
 EXPORTS;
